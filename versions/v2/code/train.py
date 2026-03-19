@@ -11,6 +11,7 @@ from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
 from nemotron_reasoning_common import (
     EASY_TEMPLATES,
+    HARD_TEMPLATES,
     add_dataset_features,
     apply_nemotron_runtime_patches,
     build_sft_dataset,
@@ -30,15 +31,17 @@ from nemotron_reasoning_common import (
 # More aggressive variant inspired by higher-scoring notebook baselines:
 # - Uses TRL SFTTrainer.
 # - Uses all-linear LoRA targeting.
-# - Uses a two-stage curriculum (easy templates -> full dataset).
+# - Uses a dataset-shaped curriculum (easy templates -> full dataset -> hard templates).
 # - Defaults to bf16 full-model LoRA like the stronger notebook variants.
 #   Set LOAD_IN_4BIT=True if you need a more memory-efficient run.
+# - Shrinks sequence length to match the short-context dataset.
 
 SEED = 42
 VAL_RATIO = 0.10
-MAX_LENGTH = 1024
+MAX_LENGTH = 384
 STAGE1_EPOCHS = 0.35
 STAGE2_EPOCHS = 1.25
+STAGE3_EPOCHS = 0.35
 LEARNING_RATE = 2.0e-4
 GRAD_ACCUM_STEPS = 8
 TRAIN_BATCH_SIZE = 1
@@ -198,9 +201,11 @@ def main() -> None:
     tr_df, val_df = stratified_train_val_split(train_df, val_ratio=VAL_RATIO, seed=SEED)
 
     easy_stage_df = tr_df[tr_df["template"].isin(EASY_TEMPLATES)].copy().reset_index(drop=True)
+    hard_stage_df = tr_df[tr_df["template"].isin(HARD_TEMPLATES)].copy().reset_index(drop=True)
 
     print_split_summary("train_full", tr_df)
     print_split_summary("train_stage1_easy", easy_stage_df)
+    print_split_summary("train_stage3_hard", hard_stage_df)
     print_split_summary("valid", val_df)
 
     config, tokenizer = load_tokenizer(base_model_path)
@@ -244,13 +249,34 @@ def main() -> None:
     print("Stage 2 full-dataset training...")
     stage2_trainer.train()
 
+    if STAGE3_EPOCHS > 0 and len(hard_stage_df) > 0:
+        hard_train_ds = build_sft_dataset(hard_stage_df, tokenizer)
+        stage3_args = build_sft_config(
+            OUTPUT_ROOT / "stage3",
+            num_train_epochs=STAGE3_EPOCHS,
+            save_strategy="steps",
+            evaluation_strategy="steps",
+        )
+        stage3_trainer = build_sft_trainer(
+            model=model,
+            tokenizer=tokenizer,
+            train_dataset=hard_train_ds,
+            eval_dataset=val_ds,
+            args=stage3_args,
+        )
+        print("Stage 3 hard-template polish...")
+        stage3_trainer.train()
+        final_model = stage3_trainer.model
+    else:
+        final_model = stage2_trainer.model
+
     print("Saving adapter and packaging submission...")
-    adapter_cfg = save_adapter_submission(stage2_trainer.model, ADAPTER_DIR, SUBMISSION_ZIP)
+    adapter_cfg = save_adapter_submission(final_model, ADAPTER_DIR, SUBMISSION_ZIP)
     print(json.dumps(adapter_cfg, indent=2, ensure_ascii=False))
 
     if RUN_POST_TRAIN_EVAL:
         quick_validate(
-            stage2_trainer.model,
+            final_model,
             tokenizer,
             val_df,
             OUTPUT_ROOT / "quick_val_predictions.csv",
@@ -266,6 +292,8 @@ def main() -> None:
         "learning_rate": LEARNING_RATE,
         "stage1_epochs": STAGE1_EPOCHS,
         "stage2_epochs": STAGE2_EPOCHS,
+        "stage3_epochs": STAGE3_EPOCHS,
+        "stage3_rows": len(hard_stage_df),
         "load_in_4bit": LOAD_IN_4BIT,
         "submission_zip": str(SUBMISSION_ZIP),
     }

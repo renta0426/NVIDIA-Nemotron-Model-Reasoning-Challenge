@@ -17,6 +17,7 @@ from transformers import (
 )
 
 from nemotron_reasoning_common import (
+    HARD_TEMPLATES,
     TARGET_MODULES_EXPLICIT,
     CompletionOnlyCollator,
     add_dataset_features,
@@ -40,10 +41,11 @@ from nemotron_reasoning_common import (
 # - Uses a template-aware validation split.
 # - Removes the severe 100-step undertraining cap.
 # - Stays close to the existing ~30 GB memory envelope.
+# - Shrinks sequence length to match the short-context dataset.
 
 SEED = 42
 VAL_RATIO = 0.10
-MAX_LENGTH = 1024
+MAX_LENGTH = 384
 NUM_EPOCHS = 1.0
 LEARNING_RATE = 2.5e-4
 TRAIN_BATCH_SIZE = 1
@@ -67,6 +69,7 @@ RUN_POST_TRAIN_EVAL = True
 POST_TRAIN_EVAL_SAMPLES = 128
 EVAL_STEPS = 100
 SAVE_STEPS = 100
+HARD_TEMPLATE_BOOST_FRAC = 0.50
 
 
 
@@ -124,6 +127,15 @@ def main() -> None:
     train_df = pd.read_csv(TRAIN_PATH)
     train_df = add_dataset_features(train_df)
     tr_df, val_df = stratified_train_val_split(train_df, val_ratio=VAL_RATIO, seed=SEED)
+    hard_boost_df = tr_df[tr_df["template"].isin(HARD_TEMPLATES)]
+    if HARD_TEMPLATE_BOOST_FRAC > 0 and len(hard_boost_df) > 0:
+        hard_boost_df = hard_boost_df.sample(frac=HARD_TEMPLATE_BOOST_FRAC, random_state=SEED)
+        tr_df = (
+            pd.concat([tr_df, hard_boost_df], ignore_index=True)
+            .sample(frac=1.0, random_state=SEED)
+            .reset_index(drop=True)
+        )
+        print(f"Applied hard-template boost: +{len(hard_boost_df)} rows")
 
     print_split_summary("train", tr_df)
     print_split_summary("valid", val_df)
