@@ -6,6 +6,7 @@
 
 ## Main changes
 
+- repository rule に合わせて implementation を single-file に再構成する
 - metric と同一の prompt 形式を維持する
 - template + answer_type ベースの validation split を使う
 - 100 step 打ち切りをやめ、実質 1 epoch 学習にする
@@ -16,5 +17,4 @@
 
 ## Code layout
 
-- `code/train.py`: v1 training / packaging entrypoint
-- `code/nemotron_reasoning_common.py`: dataset, prompt, patch, eval helpers
+- `code/train.py`: practical QLoRA training / packaging entrypoint with all helpers inlined for standalone execution

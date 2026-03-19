@@ -6,6 +6,7 @@
 
 ## Main changes
 
+- repository rule に合わせて implementation を single-file に再構成する
 - `trl.SFTTrainer` を採用する
 - `target_modules="all-linear"` を使う
 - easy templates -> full dataset -> hard templates の 3 段 curriculum を入れる
@@ -15,5 +16,4 @@
 
 ## Code layout
 
-- `code/train.py`: v2 training / packaging entrypoint
-- `code/nemotron_reasoning_common.py`: shared helpers copied for version-local execution
+- `code/train.py`: aggressive SFT / curriculum / packaging entrypoint with all helpers inlined for standalone execution
