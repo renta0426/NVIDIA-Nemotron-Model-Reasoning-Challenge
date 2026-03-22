@@ -886,40 +886,21 @@ def load_lora_model(
     target_modules,
     adapter_path: str | Path | None = None,
 ):
-    from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
-    from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+    from peft import LoraConfig, PeftModel, get_peft_model
+    from transformers import AutoModelForCausalLM
 
-    if load_in_4bit:
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        )
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model_path,
-            config=config,
-            trust_remote_code=True,
-            device_map="auto",
-            local_files_only=True,
-            quantization_config=bnb_config,
-            offload_folder=str(OFFLOAD_DIR),
-            offload_state_dict=True,
-        )
-        apply_nemotron_runtime_patches(model)
-        model = prepare_model_for_kbit_training(model)
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model_path,
-            config=config,
-            trust_remote_code=True,
-            device_map="auto",
-            local_files_only=True,
-            torch_dtype=torch.bfloat16,
-            offload_folder=str(OFFLOAD_DIR),
-            offload_state_dict=True,
-        )
-        apply_nemotron_runtime_patches(model)
+    # Always load a non-quantized BF16 model (remove 4-bit quantization paths)
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model_path,
+        config=config,
+        trust_remote_code=True,
+        device_map="auto",
+        local_files_only=True,
+        torch_dtype=torch.bfloat16,
+        offload_folder=str(OFFLOAD_DIR),
+        offload_state_dict=True,
+    )
+    apply_nemotron_runtime_patches(model)
 
     if adapter_path is not None:
         model = PeftModel.from_pretrained(model, str(adapter_path), is_trainable=True)
@@ -1240,10 +1221,10 @@ GRAD_ACCUM_STEPS = int(RUNTIME_SETTINGS["grad_accum_steps"])
 WARMUP_RATIO = 0.10
 WEIGHT_DECAY = 0.0
 MAX_GRAD_NORM = 0.3
-LORA_R = 24
-LORA_ALPHA = 48
+LORA_R = 32
+LORA_ALPHA = 64
 LORA_DROPOUT = 0.05
-LOAD_IN_4BIT = True
+LOAD_IN_4BIT = False
 HARD_MIN_SCORE = 3
 HARD_BOOST_FRAC = float(RUNTIME_SETTINGS["hard_boost_frac"])
 FORMAT_BOOST_FRAC = float(RUNTIME_SETTINGS["format_boost_frac"])
@@ -1253,9 +1234,9 @@ OUTPUT_ROOT = Path("/kaggle/working/nemotron_v4_hard_mining")
 ADAPTER_DIR = OUTPUT_ROOT / "adapter"
 SUBMISSION_ZIP = Path("/kaggle/working/submission_v4.zip")
 OFFLOAD_DIR = Path(os.environ.get("NEMOTRON_OFFLOAD_DIR", "/tmp/nemotron_offload"))
-REPO_ROOT = resolve_repo_root()
-TRAIN_PATH = REPO_ROOT / "data/train.csv"
-BASE_MODEL = REPO_ROOT / "1"
+REPO_ROOT = "/kaggle/input"
+TRAIN_PATH = "/kaggle/input/nvidia-nemotron-3-reasoning-challenge/train.csv"
+BASE_MODEL = "/kaggle/input/models/metric/nemotron-3-nano-30b-a3b-bf16/transformers/default/1"
 RUN_POST_TRAIN_EVAL = os.environ.get("NEMOTRON_RUN_POST_TRAIN_EVAL", "0") == "1"
 POST_TRAIN_EVAL_SAMPLES = int(RUNTIME_SETTINGS["post_train_eval_samples"])
 EVAL_STEPS = int(RUNTIME_SETTINGS["eval_steps"])
