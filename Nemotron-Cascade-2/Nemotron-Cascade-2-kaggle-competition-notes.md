@@ -14,9 +14,12 @@
 - **LoRA 制約**: `adapter_config.json` を含み、**rank は 32 以下**。
 - **推論エンジン**: `vLLM`。
 - **推論パラメータ**: `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `gpu_memory_utilization=0.85`, `max_model_len=8192`。
-- **採点**: 最終回答は **`\boxed{}`** を優先的に抽出。boxed がなければ他のヒューリスティックや最後の数値にもフォールバックする。
+- **採点**: `nvidia-nemotron-metric.ipynb` の `extract_final_answer()` は、最後の非空 **`\boxed{}`** を最優先で抽出し、見つからなければ `The final answer is:` 系の表現、さらに **最後に現れた数値**、最後の非空行へ順にフォールバックする。
 - **タスク**: 論理推論パズル。ビット操作や代数方程式を含む「変換ルールの発見・適用」が中心。
 - **評価指標**: 正答率。文字列一致または相対誤差許容内の数値一致。
+- **正解判定**: 数値は `rel_tol=1e-2`, `abs_tol=1e-5` の `math.isclose`。非数値は case-insensitive な厳密文字列一致。
+- **可視 `test.csv`**: `DATA_ANALYSIS_REPORT.md` に基づくと 3 件すべてが `train.csv` と完全一致で、submission 動作確認用サンプルにすぎない。validation には使えない。
+- **実データ構造**: `DATA_ANALYSIS_REPORT.md` に基づくと、`train.csv` 9,500 問は 6 種類の強テンプレート群にほぼ均等分布し、prompt 中央長は約 69 token、最大でも約 110 token と短い。
 - **自由度**: 学習フレームワークや手法は自由。NVIDIA 公式レシピは任意。
 - **賞の条件**: 公開ノートブックと solution write-up が必要。
 
@@ -25,6 +28,10 @@
 - 論文の **128K〜256K トークン級の推論や test-time scaling** は、そのまま本番推論に持ち込めない。
 - 本番は **temperature 0.0 の単発 deterministic 推論** なので、論文の多サンプル生成・自己改善・多数決は **オフラインのデータ生成工程へ蒸留** する必要がある。
 - メトリクスが `\boxed{}` を強く優先するため、**回答フォーマット学習は精度に直結**する。
+- 可視 `test.csv` は train と重複するサンプルであり、validation ではない。必ず `train.csv` から自前 split を切る必要がある。
+- 競技の実像は「汎用長文推論」ではなく、**短コンテキストのテンプレート識別 + 規則推定 + 厳密な最終整形**である。
+- fallback が **最後の数値**を見るため、boxed の後ろや最終行に別の数値を書くと誤抽出されやすい。
+- prompt が非常に短いので、system prompt、few-shot、テンプレート別の answer 形式指示を載せる余裕が十分ある。
 - データセットは知識問題ではなく **変換規則推論**。よって論文中でも特に価値が高いのは、
   - 正答検証付きデータ生成
   - 形式制約の厳守
@@ -32,6 +39,23 @@
   - 段階的 post-training
   - 長い思考を短い単発推論へ蒸留する発想
   である。
+
+### `DATA_ANALYSIS_REPORT.md` と `nvidia-nemotron-metric.ipynb` で追加確定したこと
+
+- **実データは 6 テンプレートの混合**  
+  `DATA_ANALYSIS_REPORT.md` によると、可視 train はおおむね `8bit bit 操作 / 重力計算 / 単位変換 / テキスト復号 / ローマ数字変換 / 記号・式変換` の 6 系列に分かれ、件数もかなり均衡である。
+
+- **出力モードは単一ではない**  
+  数値、8bit binary、複数語テキスト、ローマ数字、短い記号列が混在する。したがって「一つの answer style だけを綺麗にする」より、**テンプレート別 canonical form** を固定する方が重要である。
+
+- **metric 実装は README の要約より具体的**  
+  `extract_final_answer()` は「最後の非空 boxed → final answer 系定型句 → 最後の数値 → 最後の非空行」の順で抽出する。特に fallback が **最後の数値**である点は、単に「数値を拾う」より危険で、末尾の余計な数値がそのまま誤答化し得る。
+
+- **ローカル再現時は notebook default をそのまま使わない**  
+  notebook の `score()` デフォルトは `max_tokens=3584`, `temperature=1.0`, `max_num_seqs=128`, `max_model_len=4096` だが、README に書かれた公式運用値は `7680 / 0.0 / 64 / 8192` である。ローカル rerun では必ず README の値に上書きする。
+
+- **metric notebook 側は boxed 指示を後付けしている**  
+  生成前に各 prompt の末尾へ boxed 指示を足し、chat template 適用時は `enable_thinking=True` を試みる。したがって、思考自体を完全に殺すより、**短く制御された reasoning から boxed へ閉じる**方が実運用に近い。
 
 ---
 
@@ -103,6 +127,7 @@
 - **Phase 2: 推論パズル hard-example SFT**
   - train.csv を difficulty 別に再編。
   - ベースモデルで既に安定正答する easy 群を薄くし、誤答群・形式崩れ群を厚くする。
+  - 6 テンプレートごとに hard-example mining と answer canonicalization を行う。
   - synthetic は solver-verified 前提。
 
 - **Phase 3: teacher-trace distillation**
@@ -116,6 +141,8 @@
 - **Phase 5: metric-aware validation**
   - `README.md` の metric 想定そのままでローカル採点。
   - boxed 抽出・数値 tolerance・文字列一致の挙動を確認し、回答表現を揃える。
+  - `train.csv` から template-stratified validation split を切り、visible `test.csv` は使わない。
+  - local metric 再現時は notebook の `score()` デフォルトではなく README の運用値で rerun する。
 
 ### GPU 98GB / 48GB 向けの計画メモ
 
@@ -525,8 +552,11 @@
 
 - `\boxed{}` を前提にした SFT データへ統一する。
 - final answer の一意性を強く学習させる。
+- `train.csv` から template-stratified validation split を作る。
+- 6 テンプレート別に answer canonical form を固定する。
 - hard-example mining を行う。
 - solver / verifier で正答確認した synthetic data だけを主力にする。
+- boxed の後ろや最終行に余計な数値を置かない。
 - 多数生成・自己修正・tool-assisted 解法は **offline teacher 生成専用**にする。
 
 ### 中優先
@@ -573,6 +603,6 @@
 - **段階を分けて干渉を減らす**
 - **test-time scaling の利益は offline distillation へ変換する**
 
-この競技は knowledge benchmark ではなく、**変換規則を見抜き、boxed で一意に答え切る単発 deterministic 推論**の勝負である。
+この競技は knowledge benchmark ではなく、**6 種類前後の強テンプレート化された短コンテキスト変換規則問題**を見抜き、boxed で一意に答え切る単発 deterministic 推論の勝負である。
 
 したがって、Nemotron-Cascade 2 から最も価値があるのは、豪華な benchmark の数字そのものではなく、**高品質な reasoning teacher をどう作り、どう短く正確な単発出力へ圧縮するか**という設計思想である。
