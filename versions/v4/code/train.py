@@ -889,17 +889,25 @@ def load_lora_model(
     from peft import LoraConfig, PeftModel, get_peft_model
     from transformers import AutoModelForCausalLM
 
-    # Always load a non-quantized BF16 model (remove 4-bit quantization paths)
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model_path,
-        config=config,
-        trust_remote_code=True,
-        device_map="auto",
-        local_files_only=True,
-        torch_dtype=torch.bfloat16,
-        offload_folder=str(OFFLOAD_DIR),
-        offload_state_dict=True,
-    )
+    # Keep the entire model on a concrete device and avoid any offload/meta path.
+    if torch.cuda.is_available():
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model_path,
+            config=config,
+            trust_remote_code=True,
+            device_map={"": 0},
+            local_files_only=True,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model_path,
+            config=config,
+            trust_remote_code=True,
+            local_files_only=True,
+            low_cpu_mem_usage=False,
+        )
     apply_nemotron_runtime_patches(model)
 
     if adapter_path is not None:
@@ -917,6 +925,11 @@ def load_lora_model(
         if "use_rslora" in inspect.signature(LoraConfig.__init__).parameters:
             lora_kwargs["use_rslora"] = True
         model = get_peft_model(model, LoraConfig(**lora_kwargs))
+
+    if torch.cuda.is_available():
+        model.to(torch.device("cuda:0"))
+    else:
+        model.to(torch.device("cpu"))
 
     model.config.use_cache = False
     try:
