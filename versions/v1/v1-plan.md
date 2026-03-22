@@ -496,3 +496,52 @@ WARNING:transformers_modules._1.modeling_nemotron_h:NemotronH requires an initia
   "use_rslora": true
 }
 Quick validation accuracy over 128 rows: 0.0469
+
+---
+
+## 追記考察（2026-03-22）
+
+### 結論
+
+今回の実行ログを見ても、`v1` に対する主たる考察は変わらない。  
+`v1` は自己ベストの `QLoRA Baseline.py`（public LB `0.62`）より明確に悪く、悪化の主因は **metric の誤読** というより **学習 recipe の逸脱** にあるとみてよい。
+
+ただし、ひとつ補正が必要である。  
+`Quick validation accuracy over 128 rows: 0.0469` は public LB `0.47~0.52` と乖離が大きすぎるため、`v1` のローカル quick validation は **絶対的な性能指標としてはかなり信用しにくい**。  
+README の Evaluation にある本番条件は `vLLM`、`max_tokens=7680`、`temperature=0.0`、`top_p=1.0`、`max_num_seqs=64`、`max_model_len=8192` である一方、この quick check は Hugging Face `generate` ベースかつ `max_new_tokens=256` であり、推論条件が一致していない。
+
+### 今回のログが補強した点
+
+1. **step inflation 仮説はかなり強くなった**
+   - ログ上、hard-template boost により `+2130 rows` され、学習データは `10679` 行。
+   - 実際の学習は `668/668 step` で完走している。
+   - baseline は `max_steps=100` で止めていたため、`v1` はかなり長く回っている。
+   - 小さく整った synthetic データに対して、これは過学習や最終 checkpoint 劣化を招きやすい。
+
+2. **`eval/save/best model selection` を外した影響は大きい**
+   - `v1` は実行都合で `eval_strategy="no"`、`save_strategy="no"`、`load_best_model_at_end=False` に寄っており、良い途中 checkpoint を拾えない。
+   - 学習損失は下がっているが、それが leaderboard 最適とは限らない。
+   - 特に `668 step` 走らせて最後の状態をそのまま提出する構成は、baseline より不利である可能性が高い。
+
+3. **hard-template boost は方向として分かるが、全体 accuracy を落としうる**
+   - boost 後の train 分布は `bit_manipulation / text_decryption / symbol_equation` 側にかなり寄っている。
+   - この競技は 6 テンプレート全体の accuracy で決まるため、難所強化がそのまま全体改善になるとは限らない。
+
+### 今回のログで修正すべき見方
+
+- `Quick validation accuracy 0.0469` は「`v1` が完全に壊れている」ことの直接証拠とは言い切れない。
+- むしろ、Hugging Face 側の生成経路では `temperature` 無視警告や cache 周りの warning も出ており、**ローカル quick validation が leaderboard proxy として弱い**ことを示している。
+- したがって、`v1` の local quick val は比較用の軽い smoke test 以上には使わず、採択判断は public LB と recipe の妥当性で見るべき。
+
+### 現時点の実務判断
+
+- `v1` をこのまま伸ばす優先度は高くない。
+- `v1` を再挑戦するなら、新しい工夫を足す前に以下を先に戻すべき。
+  - 4bit QLoRA へ戻す
+  - `eval/save/load_best_model_at_end` を復元する
+  - `max_steps` を baseline 寄りに再導入する
+  - hard-template boost は弱めるか、ablation 前提で扱う
+
+- バージョン優先度は引き続き `v7` 本命、`v4` 次点でよい。
+  - `v7` は hardest templates に specialist 容量を割きつつ、最終的に 1 adapter に merge できる。
+  - `v4` は hard-example mining と hard validation がこの競技の構造に素直で、失敗しにくい。
