@@ -42,6 +42,9 @@ temperature	0.0
 max_num_seqs	64
 gpu_memory_utilization	0.85
 max_model_len	8192
+
+Community clarification: the public metric notebook defines different default values in `score()` (for example `max_tokens = 3584`, `max_num_seqs = 128`, and `max_model_len = 4096`), but Kaggle staff clarified in the discussion *Inconsistency in Evaluation metric* that the parameters listed on the Evaluation page override those defaults during actual evaluation.
+
 Submitting
 You must submit a LoRA adapter of rank at most 32 for the NVIDIA Nemotron-3-Nano-30B model packaged into a submission.zip file. You may consider adapting the NVIDIA Nemotron Submission Demo to produce your submission.
 
