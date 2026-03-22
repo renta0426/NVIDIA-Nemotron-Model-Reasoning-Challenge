@@ -607,6 +607,62 @@ def maybe_apply_triton_environment_fixes() -> None:
         print(f"WARNING: Triton environment fix skipped: {exc}")
 
 
+def resolve_repo_root() -> Path:
+    candidates: list[Path] = []
+
+    env_root = os.environ.get("NEMOTRON_REPO_ROOT")
+    if env_root:
+        candidates.append(Path(env_root).expanduser().resolve())
+
+    script_path = globals().get("__file__")
+    if script_path:
+        resolved_script = Path(script_path).resolve()
+        candidates.append(resolved_script.parent)
+        candidates.extend(resolved_script.parents)
+
+    cwd = Path.cwd().resolve()
+    candidates.append(cwd)
+    candidates.extend(cwd.parents)
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if (
+            (candidate / "README.md").exists()
+            and (candidate / "data" / "train.csv").exists()
+            and (candidate / "versions").exists()
+        ):
+            return candidate
+
+    raise FileNotFoundError(
+        "Could not resolve repository root. Set NEMOTRON_REPO_ROOT to the repository path."
+    )
+
+
+def detect_runtime_profile() -> str:
+    override = os.environ.get("NEMOTRON_RUNTIME_PROFILE") or os.environ.get("NEMOTRON_GPU_PROFILE")
+    if override:
+        return override.strip().lower()
+
+    if not torch.cuda.is_available():
+        return "default"
+
+    gpu_name = torch.cuda.get_device_name(0).lower()
+    if "blackwell" in gpu_name or "rtx pro 6000" in gpu_name:
+        return "blackwell"
+    if "a6000" in gpu_name:
+        return "a6000"
+    return "default"
+
+
+def cleanup_checkpoints(output_dir: Path) -> None:
+    for checkpoint_dir in output_dir.glob("checkpoint-*"):
+        shutil.rmtree(checkpoint_dir, ignore_errors=True)
+
+
 
 def resolve_base_model_path(base_model: str, use_kagglehub: bool = False) -> str:
     candidates = [base_model, os.environ.get("NEMOTRON_BASE_MODEL")]
@@ -847,6 +903,8 @@ def load_lora_model(
             device_map="auto",
             local_files_only=True,
             quantization_config=bnb_config,
+            offload_folder=str(OFFLOAD_DIR),
+            offload_state_dict=True,
         )
         apply_nemotron_runtime_patches(model)
         model = prepare_model_for_kbit_training(model)
@@ -858,6 +916,8 @@ def load_lora_model(
             device_map="auto",
             local_files_only=True,
             torch_dtype=torch.bfloat16,
+            offload_folder=str(OFFLOAD_DIR),
+            offload_state_dict=True,
         )
         apply_nemotron_runtime_patches(model)
 
@@ -1119,16 +1179,64 @@ import pandas as pd
 from transformers import EarlyStoppingCallback, Trainer, TrainingArguments
 
 
+def build_runtime_settings() -> dict[str, Any]:
+    profile = detect_runtime_profile()
+    settings: dict[str, Any] = {
+        "profile": profile,
+        "train_batch_size": 1,
+        "eval_batch_size": 1,
+        "grad_accum_steps": 16,
+        "stage1_epochs": 0.75,
+        "stage2_epochs": 0.25,
+        "stage1_learning_rate": 2.2e-4,
+        "stage2_learning_rate": 1.5e-4,
+        "stage1_max_steps": 360,
+        "stage2_max_steps": 120,
+        "hard_boost_frac": 0.50,
+        "format_boost_frac": 0.50,
+        "eval_steps": 25,
+        "save_steps": 25,
+        "post_train_eval_samples": 64,
+    }
+    if profile == "blackwell":
+        settings.update(
+            train_batch_size=2,
+            grad_accum_steps=8,
+            stage1_epochs=0.75,
+            stage2_epochs=0.25,
+            stage1_max_steps=360,
+            stage2_max_steps=120,
+            hard_boost_frac=0.50,
+            format_boost_frac=0.50,
+        )
+    elif profile == "a6000":
+        settings.update(
+            train_batch_size=1,
+            grad_accum_steps=16,
+            stage1_epochs=0.60,
+            stage2_epochs=0.20,
+            stage1_max_steps=280,
+            stage2_max_steps=90,
+            hard_boost_frac=0.35,
+            format_boost_frac=0.50,
+        )
+    return settings
+
+
+RUNTIME_SETTINGS = build_runtime_settings()
+RUNTIME_PROFILE = str(RUNTIME_SETTINGS["profile"])
 SEED = 42
 VAL_RATIO = 0.10
 MAX_LENGTH = 384
-STAGE1_EPOCHS = 0.90
-STAGE2_EPOCHS = 0.45
-STAGE1_LEARNING_RATE = 2.2e-4
-STAGE2_LEARNING_RATE = 1.5e-4
-TRAIN_BATCH_SIZE = 1
-EVAL_BATCH_SIZE = 1
-GRAD_ACCUM_STEPS = 16
+STAGE1_EPOCHS = float(RUNTIME_SETTINGS["stage1_epochs"])
+STAGE2_EPOCHS = float(RUNTIME_SETTINGS["stage2_epochs"])
+STAGE1_LEARNING_RATE = float(RUNTIME_SETTINGS["stage1_learning_rate"])
+STAGE2_LEARNING_RATE = float(RUNTIME_SETTINGS["stage2_learning_rate"])
+STAGE1_MAX_STEPS = int(RUNTIME_SETTINGS["stage1_max_steps"])
+STAGE2_MAX_STEPS = int(RUNTIME_SETTINGS["stage2_max_steps"])
+TRAIN_BATCH_SIZE = int(RUNTIME_SETTINGS["train_batch_size"])
+EVAL_BATCH_SIZE = int(RUNTIME_SETTINGS["eval_batch_size"])
+GRAD_ACCUM_STEPS = int(RUNTIME_SETTINGS["grad_accum_steps"])
 WARMUP_RATIO = 0.10
 WEIGHT_DECAY = 0.0
 MAX_GRAD_NORM = 0.3
@@ -1137,23 +1245,30 @@ LORA_ALPHA = 48
 LORA_DROPOUT = 0.05
 LOAD_IN_4BIT = True
 HARD_MIN_SCORE = 3
-HARD_BOOST_FRAC = 0.75
-FORMAT_BOOST_FRAC = 1.00
+HARD_BOOST_FRAC = float(RUNTIME_SETTINGS["hard_boost_frac"])
+FORMAT_BOOST_FRAC = float(RUNTIME_SETTINGS["format_boost_frac"])
 FOCUS_ANSWER_TYPES = {"symbolic_or_other", "multiword_text", "8bit_binary"}
 
 OUTPUT_ROOT = Path("/kaggle/working/nemotron_v4_hard_mining")
 ADAPTER_DIR = OUTPUT_ROOT / "adapter"
 SUBMISSION_ZIP = Path("/kaggle/working/submission_v4.zip")
-REPO_ROOT = Path(__file__).resolve().parents[3]
+OFFLOAD_DIR = Path(os.environ.get("NEMOTRON_OFFLOAD_DIR", "/tmp/nemotron_offload"))
+REPO_ROOT = resolve_repo_root()
 TRAIN_PATH = REPO_ROOT / "data/train.csv"
 BASE_MODEL = REPO_ROOT / "1"
-RUN_POST_TRAIN_EVAL = True
-POST_TRAIN_EVAL_SAMPLES = 128
-EVAL_STEPS = 100
-SAVE_STEPS = 100
+RUN_POST_TRAIN_EVAL = os.environ.get("NEMOTRON_RUN_POST_TRAIN_EVAL", "0") == "1"
+POST_TRAIN_EVAL_SAMPLES = int(RUNTIME_SETTINGS["post_train_eval_samples"])
+EVAL_STEPS = int(RUNTIME_SETTINGS["eval_steps"])
+SAVE_STEPS = int(RUNTIME_SETTINGS["save_steps"])
 
 
-def build_training_arguments(output_dir: Path, num_train_epochs: float, learning_rate: float) -> TrainingArguments:
+def build_training_arguments(
+    output_dir: Path,
+    num_train_epochs: float,
+    learning_rate: float,
+    *,
+    max_steps: int | None = None,
+) -> TrainingArguments:
     kwargs = dict(
         output_dir=str(output_dir),
         num_train_epochs=num_train_epochs,
@@ -1161,14 +1276,6 @@ def build_training_arguments(output_dir: Path, num_train_epochs: float, learning
         per_device_train_batch_size=TRAIN_BATCH_SIZE,
         per_device_eval_batch_size=EVAL_BATCH_SIZE,
         gradient_accumulation_steps=GRAD_ACCUM_STEPS,
-        evaluation_strategy="steps",
-        eval_steps=EVAL_STEPS,
-        save_strategy="steps",
-        save_steps=SAVE_STEPS,
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
         logging_steps=10,
         bf16=True,
         fp16=False,
@@ -1178,12 +1285,33 @@ def build_training_arguments(output_dir: Path, num_train_epochs: float, learning
         weight_decay=WEIGHT_DECAY,
         max_grad_norm=MAX_GRAD_NORM,
         gradient_checkpointing=True,
-        group_by_length=True,
         remove_unused_columns=False,
         report_to="none",
         dataloader_num_workers=2,
     )
-    if "gradient_checkpointing_kwargs" in inspect.signature(TrainingArguments.__init__).parameters:
+    signature = inspect.signature(TrainingArguments.__init__).parameters
+    strategy_key = "evaluation_strategy" if "evaluation_strategy" in signature else "eval_strategy" if "eval_strategy" in signature else None
+    if strategy_key is not None:
+        kwargs[strategy_key] = "steps"
+    if "eval_steps" in signature:
+        kwargs["eval_steps"] = EVAL_STEPS
+    if "save_strategy" in signature:
+        kwargs["save_strategy"] = "steps"
+    if "save_steps" in signature:
+        kwargs["save_steps"] = SAVE_STEPS
+    if "save_total_limit" in signature:
+        kwargs["save_total_limit"] = 1
+    if "load_best_model_at_end" in signature:
+        kwargs["load_best_model_at_end"] = True
+    if "metric_for_best_model" in signature:
+        kwargs["metric_for_best_model"] = "eval_loss"
+    if "greater_is_better" in signature:
+        kwargs["greater_is_better"] = False
+    if "group_by_length" in signature:
+        kwargs["group_by_length"] = True
+    if max_steps is not None and "max_steps" in signature:
+        kwargs["max_steps"] = max_steps
+    if "gradient_checkpointing_kwargs" in signature:
         kwargs["gradient_checkpointing_kwargs"] = {"use_reentrant": False}
     return TrainingArguments(**kwargs)
 
@@ -1193,9 +1321,27 @@ def main() -> None:
     maybe_apply_triton_environment_fixes()
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     ADAPTER_DIR.mkdir(parents=True, exist_ok=True)
+    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     base_model_path = resolve_base_model_path(BASE_MODEL, use_kagglehub=True)
     print("Base model:", base_model_path)
+    print(
+        json.dumps(
+            {
+                "runtime_profile": RUNTIME_PROFILE,
+                "train_batch_size": TRAIN_BATCH_SIZE,
+                "grad_accum_steps": GRAD_ACCUM_STEPS,
+                "stage1_epochs": STAGE1_EPOCHS,
+                "stage2_epochs": STAGE2_EPOCHS,
+                "stage1_max_steps": STAGE1_MAX_STEPS,
+                "stage2_max_steps": STAGE2_MAX_STEPS,
+                "hard_boost_frac": HARD_BOOST_FRAC,
+                "format_boost_frac": FORMAT_BOOST_FRAC,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
     train_df = add_difficulty_features(pd.read_csv(TRAIN_PATH))
     tr_df, val_df = stratified_train_val_split(train_df, val_ratio=VAL_RATIO, seed=SEED)
@@ -1243,7 +1389,12 @@ def main() -> None:
 
     stage1_trainer = Trainer(
         model=model,
-        args=build_training_arguments(OUTPUT_ROOT / "stage1", STAGE1_EPOCHS, STAGE1_LEARNING_RATE),
+        args=build_training_arguments(
+            OUTPUT_ROOT / "stage1",
+            STAGE1_EPOCHS,
+            STAGE1_LEARNING_RATE,
+            max_steps=STAGE1_MAX_STEPS,
+        ),
         train_dataset=stage1_train_ds,
         eval_dataset=val_ds,
         data_collator=collator,
@@ -1251,10 +1402,16 @@ def main() -> None:
     )
     print("Stage 1 boosted full training...")
     stage1_trainer.train()
+    cleanup_checkpoints(OUTPUT_ROOT / "stage1")
 
     stage2_trainer = Trainer(
         model=stage1_trainer.model,
-        args=build_training_arguments(OUTPUT_ROOT / "stage2", STAGE2_EPOCHS, STAGE2_LEARNING_RATE),
+        args=build_training_arguments(
+            OUTPUT_ROOT / "stage2",
+            STAGE2_EPOCHS,
+            STAGE2_LEARNING_RATE,
+            max_steps=STAGE2_MAX_STEPS,
+        ),
         train_dataset=stage2_train_ds,
         eval_dataset=hard_val_ds,
         data_collator=collator,
@@ -1266,6 +1423,7 @@ def main() -> None:
     print("Saving adapter and packaging submission...")
     adapter_cfg = save_adapter_submission(stage2_trainer.model, ADAPTER_DIR, SUBMISSION_ZIP)
     print(json.dumps(adapter_cfg, indent=2, ensure_ascii=False))
+    cleanup_checkpoints(OUTPUT_ROOT / "stage2")
 
     if RUN_POST_TRAIN_EVAL:
         quick_validate(

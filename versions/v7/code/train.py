@@ -607,6 +607,62 @@ def maybe_apply_triton_environment_fixes() -> None:
         print(f"WARNING: Triton environment fix skipped: {exc}")
 
 
+def resolve_repo_root() -> Path:
+    candidates: list[Path] = []
+
+    env_root = os.environ.get("NEMOTRON_REPO_ROOT")
+    if env_root:
+        candidates.append(Path(env_root).expanduser().resolve())
+
+    script_path = globals().get("__file__")
+    if script_path:
+        resolved_script = Path(script_path).resolve()
+        candidates.append(resolved_script.parent)
+        candidates.extend(resolved_script.parents)
+
+    cwd = Path.cwd().resolve()
+    candidates.append(cwd)
+    candidates.extend(cwd.parents)
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if (
+            (candidate / "README.md").exists()
+            and (candidate / "data" / "train.csv").exists()
+            and (candidate / "versions").exists()
+        ):
+            return candidate
+
+    raise FileNotFoundError(
+        "Could not resolve repository root. Set NEMOTRON_REPO_ROOT to the repository path."
+    )
+
+
+def detect_runtime_profile() -> str:
+    override = os.environ.get("NEMOTRON_RUNTIME_PROFILE") or os.environ.get("NEMOTRON_GPU_PROFILE")
+    if override:
+        return override.strip().lower()
+
+    if not torch.cuda.is_available():
+        return "default"
+
+    gpu_name = torch.cuda.get_device_name(0).lower()
+    if "blackwell" in gpu_name or "rtx pro 6000" in gpu_name:
+        return "blackwell"
+    if "a6000" in gpu_name:
+        return "a6000"
+    return "default"
+
+
+def cleanup_checkpoints(output_dir: Path) -> None:
+    for checkpoint_dir in output_dir.glob("checkpoint-*"):
+        shutil.rmtree(checkpoint_dir, ignore_errors=True)
+
+
 
 def resolve_base_model_path(base_model: str, use_kagglehub: bool = False) -> str:
     candidates = [base_model, os.environ.get("NEMOTRON_BASE_MODEL")]
@@ -674,8 +730,10 @@ def build_sft_config(
     bf16: bool = True,
     weight_decay: float = 0.0,
     load_best_model_at_end: bool | None = None,
+    max_steps: int | None = None,
 ):
     SFTConfig, _ = import_trl()
+    resolved_load_best = (evaluation_strategy != "no") if load_best_model_at_end is None else load_best_model_at_end
     kwargs = dict(
         output_dir=str(output_dir),
         per_device_train_batch_size=train_batch_size,
@@ -686,37 +744,51 @@ def build_sft_config(
         logging_steps=10,
         bf16=bf16,
         max_grad_norm=max_grad_norm,
-        optim="adamw_torch",
+        optim="paged_adamw_8bit",
         lr_scheduler_type="cosine",
         warmup_ratio=warmup_ratio,
         weight_decay=weight_decay,
-        save_strategy=save_strategy,
-        evaluation_strategy=evaluation_strategy,
-        eval_steps=eval_steps,
-        save_steps=save_steps,
-        save_total_limit=2,
-        load_best_model_at_end=(evaluation_strategy != "no") if load_best_model_at_end is None else load_best_model_at_end,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
-        report_to="none",
-        dataset_text_field="text",
-        packing=False,
         gradient_checkpointing=True,
     )
 
     signature = inspect.signature(SFTConfig.__init__).parameters
+    if "report_to" in signature:
+        kwargs["report_to"] = "none"
+    if "dataset_text_field" in signature:
+        kwargs["dataset_text_field"] = "text"
+    if "packing" in signature:
+        kwargs["packing"] = False
+    strategy_key = "evaluation_strategy" if "evaluation_strategy" in signature else "eval_strategy" if "eval_strategy" in signature else None
+    if strategy_key is not None:
+        kwargs[strategy_key] = evaluation_strategy
+    if "save_strategy" in signature:
+        kwargs["save_strategy"] = save_strategy
+    if "eval_steps" in signature:
+        kwargs["eval_steps"] = eval_steps
+    if "save_steps" in signature:
+        kwargs["save_steps"] = save_steps
+    if "save_total_limit" in signature:
+        kwargs["save_total_limit"] = 1
+    if "load_best_model_at_end" in signature:
+        kwargs["load_best_model_at_end"] = resolved_load_best
+    if resolved_load_best and "metric_for_best_model" in signature:
+        kwargs["metric_for_best_model"] = "eval_loss"
+    if resolved_load_best and "greater_is_better" in signature:
+        kwargs["greater_is_better"] = False
     if "max_length" in signature:
         kwargs["max_length"] = max_length
     elif "max_seq_length" in signature:
         kwargs["max_seq_length"] = max_length
+    if max_steps is not None and "max_steps" in signature:
+        kwargs["max_steps"] = max_steps
     if "gradient_checkpointing_kwargs" in signature:
-        kwargs["gradient_checkpointing_kwargs"] = {"use_reentrant": True}
+        kwargs["gradient_checkpointing_kwargs"] = {"use_reentrant": False}
 
     return SFTConfig(**kwargs)
 
 
 
-def build_sft_trainer(model, tokenizer, train_dataset, eval_dataset, args):
+def build_sft_trainer(model, tokenizer, train_dataset, eval_dataset, args, callbacks=None):
     _, SFTTrainer = import_trl()
     trainer_kwargs = dict(
         model=model,
@@ -730,6 +802,8 @@ def build_sft_trainer(model, tokenizer, train_dataset, eval_dataset, args):
         trainer_kwargs["processing_class"] = tokenizer
     else:
         trainer_kwargs["tokenizer"] = tokenizer
+    if callbacks is not None and "callbacks" in signature:
+        trainer_kwargs["callbacks"] = callbacks
     return SFTTrainer(**trainer_kwargs)
 
 
@@ -847,6 +921,8 @@ def load_lora_model(
             device_map="auto",
             local_files_only=True,
             quantization_config=bnb_config,
+            offload_folder=str(OFFLOAD_DIR),
+            offload_state_dict=True,
         )
         apply_nemotron_runtime_patches(model)
         model = prepare_model_for_kbit_training(model)
@@ -858,6 +934,8 @@ def load_lora_model(
             device_map="auto",
             local_files_only=True,
             torch_dtype=torch.bfloat16,
+            offload_folder=str(OFFLOAD_DIR),
+            offload_state_dict=True,
         )
         apply_nemotron_runtime_patches(model)
 
@@ -1115,32 +1193,81 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from transformers import EarlyStoppingCallback
 
 
+def build_runtime_settings() -> dict[str, Any]:
+    profile = detect_runtime_profile()
+    settings: dict[str, Any] = {
+        "profile": profile,
+        "train_batch_size": 1,
+        "eval_batch_size": 1,
+        "grad_accum_steps": 8,
+        "general_epochs": 0.70,
+        "specialist_epochs": 0.20,
+        "general_max_steps": 380,
+        "specialist_max_steps": 120,
+        "learning_rate": 2.0e-4,
+        "general_weight": 0.60,
+        "eval_steps": 25,
+        "save_steps": 25,
+        "early_stopping_patience": 2,
+        "early_stopping_threshold": 0.001,
+    }
+    if profile == "blackwell":
+        settings.update(
+            train_batch_size=2,
+            grad_accum_steps=8,
+            general_epochs=0.70,
+            specialist_epochs=0.20,
+            general_max_steps=380,
+            specialist_max_steps=120,
+            general_weight=0.60,
+        )
+    elif profile == "a6000":
+        settings.update(
+            train_batch_size=1,
+            grad_accum_steps=8,
+            general_epochs=0.55,
+            specialist_epochs=0.15,
+            general_max_steps=300,
+            specialist_max_steps=70,
+            general_weight=0.65,
+        )
+    return settings
+
+
+RUNTIME_SETTINGS = build_runtime_settings()
+RUNTIME_PROFILE = str(RUNTIME_SETTINGS["profile"])
 SEED = 42
 VAL_RATIO = 0.10
 MAX_LENGTH = 384
-GENERAL_EPOCHS = 0.90
-SPECIALIST_EPOCHS = 0.35
-LEARNING_RATE = 2.0e-4
-GRAD_ACCUM_STEPS = 8
-TRAIN_BATCH_SIZE = 1
-EVAL_BATCH_SIZE = 1
+GENERAL_EPOCHS = float(RUNTIME_SETTINGS["general_epochs"])
+SPECIALIST_EPOCHS = float(RUNTIME_SETTINGS["specialist_epochs"])
+GENERAL_MAX_STEPS = int(RUNTIME_SETTINGS["general_max_steps"])
+SPECIALIST_MAX_STEPS = int(RUNTIME_SETTINGS["specialist_max_steps"])
+LEARNING_RATE = float(RUNTIME_SETTINGS["learning_rate"])
+GRAD_ACCUM_STEPS = int(RUNTIME_SETTINGS["grad_accum_steps"])
+TRAIN_BATCH_SIZE = int(RUNTIME_SETTINGS["train_batch_size"])
+EVAL_BATCH_SIZE = int(RUNTIME_SETTINGS["eval_batch_size"])
 WARMUP_RATIO = 0.10
 MAX_GRAD_NORM = 1.0
 LORA_R = 32
 LORA_ALPHA = 64
 LORA_DROPOUT = 0.05
 LOAD_IN_4BIT = True
-GENERAL_WEIGHT = 0.55
-EVAL_STEPS = 100
-SAVE_STEPS = 100
+GENERAL_WEIGHT = float(RUNTIME_SETTINGS["general_weight"])
+EVAL_STEPS = int(RUNTIME_SETTINGS["eval_steps"])
+SAVE_STEPS = int(RUNTIME_SETTINGS["save_steps"])
+EARLY_STOPPING_PATIENCE = int(RUNTIME_SETTINGS["early_stopping_patience"])
+EARLY_STOPPING_THRESHOLD = float(RUNTIME_SETTINGS["early_stopping_threshold"])
 
 OUTPUT_ROOT = Path("/kaggle/working/nemotron_v7_specialist_merge")
 GENERAL_ADAPTER_DIR = OUTPUT_ROOT / "general" / "adapter"
 MERGED_ADAPTER_DIR = OUTPUT_ROOT / "merged_adapter"
 SUBMISSION_ZIP = Path("/kaggle/working/submission_v7.zip")
-REPO_ROOT = Path(__file__).resolve().parents[3]
+OFFLOAD_DIR = Path(os.environ.get("NEMOTRON_OFFLOAD_DIR", "/tmp/nemotron_offload"))
+REPO_ROOT = resolve_repo_root()
 TRAIN_PATH = REPO_ROOT / "data/train.csv"
 BASE_MODEL = REPO_ROOT / "1"
 
@@ -1149,9 +1276,26 @@ def main() -> None:
     set_global_seed(SEED)
     maybe_apply_triton_environment_fixes()
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     base_model_path = resolve_base_model_path(BASE_MODEL, use_kagglehub=True)
     print("Base model:", base_model_path)
+    print(
+        json.dumps(
+            {
+                "runtime_profile": RUNTIME_PROFILE,
+                "train_batch_size": TRAIN_BATCH_SIZE,
+                "grad_accum_steps": GRAD_ACCUM_STEPS,
+                "general_epochs": GENERAL_EPOCHS,
+                "specialist_epochs": SPECIALIST_EPOCHS,
+                "general_max_steps": GENERAL_MAX_STEPS,
+                "specialist_max_steps": SPECIALIST_MAX_STEPS,
+                "general_weight": GENERAL_WEIGHT,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
     train_df = pd.read_csv(TRAIN_PATH)
     tr_df, val_df = stratified_train_val_split(train_df, val_ratio=VAL_RATIO, seed=SEED)
@@ -1185,6 +1329,7 @@ def main() -> None:
         eval_steps=EVAL_STEPS,
         save_steps=SAVE_STEPS,
         max_grad_norm=MAX_GRAD_NORM,
+        max_steps=GENERAL_MAX_STEPS,
     )
     general_trainer = build_sft_trainer(
         model=general_model,
@@ -1192,11 +1337,13 @@ def main() -> None:
         train_dataset=full_train_ds,
         eval_dataset=val_ds,
         args=general_args,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=EARLY_STOPPING_PATIENCE, early_stopping_threshold=EARLY_STOPPING_THRESHOLD)],
     )
     print("Training general adapter...")
     general_trainer.train()
     GENERAL_ADAPTER_DIR.mkdir(parents=True, exist_ok=True)
     general_trainer.model.save_pretrained(GENERAL_ADAPTER_DIR, safe_serialization=True)
+    cleanup_checkpoints(OUTPUT_ROOT / "general")
     del general_model
     del general_trainer
     release_memory()
@@ -1240,6 +1387,7 @@ def main() -> None:
             eval_steps=EVAL_STEPS,
             save_steps=SAVE_STEPS,
             max_grad_norm=MAX_GRAD_NORM,
+            max_steps=SPECIALIST_MAX_STEPS,
         )
         specialist_trainer = build_sft_trainer(
             model=specialist_model,
@@ -1247,12 +1395,14 @@ def main() -> None:
             train_dataset=spec_train_ds,
             eval_dataset=spec_val_ds,
             args=specialist_args,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=EARLY_STOPPING_PATIENCE, early_stopping_threshold=EARLY_STOPPING_THRESHOLD)],
         )
         print(f"Training specialist adapter for {template}...")
         specialist_trainer.train()
         specialist_dir = OUTPUT_ROOT / f"specialist_{template}" / "adapter"
         specialist_dir.mkdir(parents=True, exist_ok=True)
         specialist_trainer.model.save_pretrained(specialist_dir, safe_serialization=True)
+        cleanup_checkpoints(OUTPUT_ROOT / f"specialist_{template}")
         specialist_dirs.append(specialist_dir)
         specialist_summaries.append(
             {
@@ -1285,6 +1435,9 @@ def main() -> None:
         "max_length": MAX_LENGTH,
         "lora_r": LORA_R,
         "lora_alpha": LORA_ALPHA,
+        "runtime_profile": RUNTIME_PROFILE,
+        "general_max_steps": GENERAL_MAX_STEPS,
+        "specialist_max_steps": SPECIALIST_MAX_STEPS,
         "submission_zip": str(SUBMISSION_ZIP),
     }
     with (OUTPUT_ROOT / "run_summary.json").open("w", encoding="utf-8") as handle:
