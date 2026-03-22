@@ -634,7 +634,7 @@ import torch
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForCausalLM,
-    BitsAndBytesConfig,
+   # BitsAndBytesConfig,
     EarlyStoppingCallback,
     TrainingArguments,
     Trainer,
@@ -656,9 +656,9 @@ VAL_RATIO = 0.10
 MAX_LENGTH = 384
 NUM_EPOCHS = 1.0
 LEARNING_RATE = 2.5e-4
-TRAIN_BATCH_SIZE = 1
+TRAIN_BATCH_SIZE = 2
 EVAL_BATCH_SIZE = 1
-GRAD_ACCUM_STEPS = 16
+GRAD_ACCUM_STEPS = 8
 WARMUP_RATIO = 0.10
 WEIGHT_DECAY = 0.0
 MAX_GRAD_NORM = 0.3
@@ -670,16 +670,17 @@ LORA_DROPOUT = 0.05
 OUTPUT_ROOT = Path("/kaggle/working/nemotron_q_lora_v1")
 ADAPTER_DIR = OUTPUT_ROOT / "adapter"
 SUBMISSION_ZIP = Path("/kaggle/working/submission_v1.zip")
-REPO_ROOT = Path(__file__).resolve().parents[3]
-TRAIN_PATH = REPO_ROOT / "data/train.csv"
-BASE_MODEL = REPO_ROOT / "1"
+TRAIN_PATH = Path("/kaggle/input/nvidia-nemotron-3-reasoning-challenge/train.csv")
+BASE_MODEL = "/kaggle/input/models/metric/nemotron-3-nano-30b-a3b-bf16/transformers/default/1"  # 見つからなければ resolve_base_model_path(..., use_kagglehub=True) でDLされる
 RUN_POST_TRAIN_EVAL = True
 POST_TRAIN_EVAL_SAMPLES = 128
 EVAL_STEPS = 100
 SAVE_STEPS = 100
 HARD_TEMPLATE_BOOST_FRAC = 0.50
 
-
+# model 読み込み前に追加
+OFFLOAD_DIR = Path("/tmp/nemotron_offload")
+OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def build_training_arguments() -> TrainingArguments:
     kwargs = dict(
@@ -689,24 +690,23 @@ def build_training_arguments() -> TrainingArguments:
         per_device_train_batch_size=TRAIN_BATCH_SIZE,
         per_device_eval_batch_size=EVAL_BATCH_SIZE,
         gradient_accumulation_steps=GRAD_ACCUM_STEPS,
-        evaluation_strategy="steps",
+        eval_strategy="no",
         eval_steps=EVAL_STEPS,
-        save_strategy="steps",
+        save_strategy="no",
         save_steps=SAVE_STEPS,
         save_total_limit=2,
-        load_best_model_at_end=True,
+        load_best_model_at_end=False,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         logging_steps=10,
         bf16=True,
         fp16=False,
-        optim="paged_adamw_8bit",
+        optim="adamw_torch",
         lr_scheduler_type="cosine",
         warmup_ratio=WARMUP_RATIO,
         weight_decay=WEIGHT_DECAY,
         max_grad_norm=MAX_GRAD_NORM,
-        gradient_checkpointing=True,
-        group_by_length=True,
+        gradient_checkpointing=False,
         remove_unused_columns=False,
         report_to="none",
         dataloader_num_workers=2,
@@ -754,12 +754,12 @@ def main() -> None:
     val_ds = build_completion_only_dataset(tokenizer, val_df, MAX_LENGTH)
     collator = CompletionOnlyCollator(tokenizer)
 
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-    )
+#    bnb_config = BitsAndBytesConfig(
+#        load_in_4bit=True,
+#        bnb_4bit_quant_type="nf4",
+ #       bnb_4bit_use_double_quant=True,
+#        bnb_4bit_compute_dtype=torch.bfloat16,
+ #   )
 
     print("Loading base model in 4-bit...")
     model = AutoModelForCausalLM.from_pretrained(
@@ -768,11 +768,13 @@ def main() -> None:
         trust_remote_code=True,
         device_map="auto",
         local_files_only=True,
-        quantization_config=bnb_config,
+        torch_dtype=torch.bfloat16,   # 非量子化BF16
+       # quantization_config=bnb_config,
+        offload_folder=str(OFFLOAD_DIR),
     )
 
     apply_nemotron_runtime_patches(model)
-    model = prepare_model_for_kbit_training(model)
+   # model = prepare_model_for_kbit_training(model)
 
     lora_kwargs = dict(
         r=LORA_R,
@@ -797,14 +799,14 @@ def main() -> None:
         model=model,
         args=build_training_arguments(),
         train_dataset=train_ds,
-        eval_dataset=val_ds,
+#        eval_dataset=val_ds,
         data_collator=collator,
-        callbacks=[
-            EarlyStoppingCallback(
-                early_stopping_patience=4,
-                early_stopping_threshold=0.002,
-            )
-        ],
+ #       callbacks=[
+#            EarlyStoppingCallback(
+#                early_stopping_patience=4,
+#                early_stopping_threshold=0.002,
+#            )
+ #       ],
     )
 
     print("Start training v1...")
