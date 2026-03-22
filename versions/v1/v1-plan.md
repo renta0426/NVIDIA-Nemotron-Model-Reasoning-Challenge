@@ -362,3 +362,137 @@ gradient_checkpointing=False
 所感: ベースラインや自己ベスト(QLoRA Baseline.pyで
 0.62)と比較して大幅悪化
 
+---
+実行ログ
+Torch: 2.12.0.dev20260315+cu128
+CUDA available: True
+GPU: NVIDIA RTX PRO 6000 Blackwell Server Edition
+Base model: /kaggle/input/models/metric/nemotron-3-nano-30b-a3b-bf16/transformers/default/1
+Applied hard-template boost: +2130 rows
+[train] rows=10679
+template
+bit_manipulation    2186
+gravity_constant    1437
+roman_numeral       1418
+symbol_equation     2082
+text_decryption     2121
+unit_conversion     1435
+Name: count, dtype: int64
+answer_type
+8bit_binary          2186
+multiword_text       2121
+numeric              3791
+roman_numeral        1418
+symbolic_or_other    1163
+Name: count, dtype: int64
+[valid] rows=951
+template
+bit_manipulation    160
+gravity_constant    160
+roman_numeral       158
+symbol_equation     156
+text_decryption     158
+unit_conversion     159
+Name: count, dtype: int64
+answer_type
+8bit_binary          160
+multiword_text       158
+numeric              388
+roman_numeral        158
+symbolic_or_other     87
+Name: count, dtype: int64
+Built completion-only dataset: kept=10679 dropped=0
+Built completion-only dataset: kept=951 dropped=0
+Loading base model ...
+Before patch: is_fast_path_available = True
+After patch : is_fast_path_available = False
+Patched MoE dtype classes: ['NemotronHMOE']
+Patched NemotronHMLP.forward
+trainable params: 651,988,992 || all params: 32,229,926,336 || trainable%: 2.0229
+Start training v1...
+ [668/668 3:57:48, Epoch 1/1]
+Step	Training Loss
+10	40.007956
+20	13.193459
+30	9.474236
+40	7.380049
+50	7.089324
+60	6.656832
+70	6.738625
+80	6.592314
+90	6.570359
+100	6.033590
+110	6.550760
+120	6.404257
+130	6.518420
+140	6.443168
+150	6.331401
+160	6.591895
+500	5.398898
+510	5.202986
+520	4.933583
+530	4.554744
+540	4.622798
+550	5.275050
+560	4.545795
+570	5.011707
+580	4.861792
+590	4.844991
+600	4.798605
+610	5.059732
+620	5.006035
+630	4.817180
+640	5.081921
+650	4.708760
+660	4.663592
+
+Saving adapter and packaging submission...
+The following generation flags are not valid and may be ignored: ['temperature']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+WARNING:transformers_modules._1.modeling_nemotron_h:NemotronH requires an initialized `NemotronHHybridDynamicCache` to return a cache. None was provided, so no cache will be returned.
+{
+  "alora_invocation_tokens": null,
+  "alpha_pattern": {},
+  "arrow_config": null,
+  "auto_mapping": null,
+  "base_model_name_or_path": "/kaggle/input/models/metric/nemotron-3-nano-30b-a3b-bf16/transformers/default/1",
+  "bias": "none",
+  "corda_config": null,
+  "ensure_weight_tying": false,
+  "eva_config": null,
+  "exclude_modules": null,
+  "fan_in_fan_out": false,
+  "inference_mode": true,
+  "init_lora_weights": true,
+  "layer_replication": null,
+  "layers_pattern": null,
+  "layers_to_transform": null,
+  "loftq_config": {},
+  "lora_alpha": 48,
+  "lora_bias": false,
+  "lora_dropout": 0.05,
+  "megatron_config": null,
+  "megatron_core": "megatron.core",
+  "modules_to_save": null,
+  "peft_type": "LORA",
+  "peft_version": "0.18.1",
+  "qalora_group_size": 16,
+  "r": 24,
+  "rank_pattern": {},
+  "revision": null,
+  "target_modules": [
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+    "q_proj"
+  ],
+  "target_parameters": null,
+  "task_type": "CAUSAL_LM",
+  "trainable_token_indices": null,
+  "use_dora": false,
+  "use_qalora": false,
+  "use_rslora": true
+}
+Quick validation accuracy over 128 rows: 0.0469
