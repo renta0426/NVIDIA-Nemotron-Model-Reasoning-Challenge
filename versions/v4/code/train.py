@@ -1260,7 +1260,7 @@ def build_training_arguments(
         logging_steps=10,
         bf16=True,
         fp16=False,
-        optim="paged_adamw_8bit",
+        optim="adamw_torch",
         lr_scheduler_type="cosine",
         warmup_ratio=WARMUP_RATIO,
         weight_decay=WEIGHT_DECAY,
