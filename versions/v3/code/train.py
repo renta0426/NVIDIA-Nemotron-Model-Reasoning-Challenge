@@ -1124,8 +1124,10 @@ def run_build_teacher_trace_candidates(args: argparse.Namespace) -> None:
     teacher_name = str(cfg.get('teacher_name', DEFAULT_MODEL_REPO_ID))
 
     rows: list[dict[str, Any]] = []
+    audit_rows: list[dict[str, Any]] = []
     for record in frame.to_dict(orient='records'):
         family = normalize_optional_text(record.get('family')) or ''
+        generated_count = 0
         for style in target_styles:
             sample_count = int(style_samples.get(style, 1))
             if family in {'bit_manipulation', 'text_decryption', 'symbol_equation'} and style in hard_family_styles:
@@ -1140,10 +1142,15 @@ def run_build_teacher_trace_candidates(args: argparse.Namespace) -> None:
                         sample_idx=sample_idx,
                     )
                 )
+                generated_count += 1
+        audit_rows.append({'source_id': record.get('id', ''), 'family': family, 'status': 'accepted', 'generated_candidates': generated_count})
 
     out_path = Path(args.output_path)
     write_jsonl(out_path, rows)
-    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'input_rows': int(len(frame)), 'output_rows': int(len(rows)), 'output_path': str(out_path)}, ensure_ascii=False, indent=2))
+    audit_path = Path(getattr(args, 'audit_output_path', AUDITS_ROOT / 'teacher_trace_candidates_v3.csv'))
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
+    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'input_rows': int(len(frame)), 'output_rows': int(len(rows)), 'output_path': str(out_path), 'audit_path': str(audit_path)}, ensure_ascii=False, indent=2))
 
 
 def run_generate_teacher_traces(args: argparse.Namespace) -> None:
@@ -1159,6 +1166,7 @@ def run_generate_teacher_traces(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     if out_path.exists() and not args.append:
         out_path.unlink()
+    audit_rows: list[dict[str, Any]] = []
     sampler = make_sampler(
         temp=float(args.temp),
         top_p=float(args.top_p) if 0.0 < float(args.top_p) < 1.0 else 0.0,
@@ -1184,14 +1192,19 @@ def run_generate_teacher_traces(args: argparse.Namespace) -> None:
             record['error_type'] = type(exc).__name__
             record['error_message'] = str(exc)
             record['raw_output'] = ''
+            audit_rows.append({'candidate_id': record.get('candidate_id', ''), 'status': 'error', 'reason': f"{type(exc).__name__}:{exc}"})
         else:
             record['generation_status'] = 'ok'
             record['error_type'] = ''
             record['error_message'] = ''
             record['raw_output'] = raw_output.strip()
+            audit_rows.append({'candidate_id': record.get('candidate_id', ''), 'status': 'ok', 'reason': ''})
         append_jsonl(out_path, record)
 
-    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'output_path': str(out_path), 'num_candidates': len(candidates)}, ensure_ascii=False, indent=2))
+    audit_path = Path(getattr(args, 'audit_output_path', AUDITS_ROOT / 'teacher_trace_generation_v3.csv'))
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
+    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'output_path': str(out_path), 'num_candidates': len(candidates), 'audit_path': str(audit_path)}, ensure_ascii=False, indent=2))
 
 
 def _assess_teacher_trace(raw_output: str, gold_answer: str, family: str) -> dict[str, Any]:
@@ -1348,7 +1361,10 @@ def run_filter_teacher_traces(args: argparse.Namespace) -> None:
     accepted_df = pd.DataFrame(accepted_rows)
     _write_table(Path(args.registry_path), registry_df)
     _write_table(Path(args.output_path), accepted_df)
-    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'registry_rows': int(len(registry_df)), 'accepted_rows': int(len(accepted_df)), 'registry_path': str(args.registry_path), 'output_path': str(args.output_path)}, ensure_ascii=False, indent=2))
+    audit_path = Path(getattr(args, 'audit_output_path', DEFAULT_V3_FORMAT_AUDIT_OUTPUT_PATH))
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
+    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'registry_rows': int(len(registry_df)), 'accepted_rows': int(len(accepted_df)), 'registry_path': str(args.registry_path), 'output_path': str(args.output_path), 'audit_path': str(audit_path)}, ensure_ascii=False, indent=2))
 
 
 def run_audit_format(args: argparse.Namespace) -> None:
@@ -2280,7 +2296,7 @@ def run_filter_distilled_traces(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     accepted_df.to_parquet(out_path, index=False)
-    audit_path = Path(args.audit_output_path)
+    audit_path = Path(getattr(args, 'audit_output_path', AUDITS_ROOT / 'preference_pairs_v3.csv'))
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
 
@@ -2399,7 +2415,7 @@ def run_build_format_pairs(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pairs_df.to_parquet(out_path, index=False)
-    audit_path = Path(args.audit_output_path)
+    audit_path = Path(getattr(args, 'audit_output_path', AUDITS_ROOT / 'rft_accept_pool_v3.csv'))
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(pairs_df)} strict format pairs to {out_path}')
@@ -2552,7 +2568,7 @@ def run_build_correction_pairs(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pairs_df.to_parquet(out_path, index=False)
-    audit_path = Path(args.audit_output_path)
+    audit_path = Path(getattr(args, 'audit_output_path', DEFAULT_V3_FORMAT_AUDIT_OUTPUT_PATH))
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(pairs_df)} strict correction pairs to {out_path}')
@@ -2660,7 +2676,7 @@ def run_build_preference_pairs(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pairs_df.to_parquet(out_path, index=False)
-    audit_path = Path(args.audit_output_path)
+    audit_path = Path(getattr(args, 'audit_output_path', AUDITS_ROOT / 'preference_pairs_v3.csv'))
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(pairs_df)} preference pairs to {out_path}')
@@ -2692,7 +2708,7 @@ def run_build_rft_accept_pool(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     accepted.to_parquet(out_path, index=False)
-    audit_path = Path(args.audit_output_path)
+    audit_path = Path(getattr(args, 'audit_output_path', AUDITS_ROOT / 'rft_accept_pool_v3.csv'))
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(accepted)} RFT accept rows to {out_path}')
@@ -3076,20 +3092,86 @@ def _weighted_training_execute(
 
 def run_train_sft_v3(args: argparse.Namespace) -> None:
     cfg = _load_yaml_config(args.config_path)
+    stage = str(cfg.get('stage', args.stage))
+    config_name = str(cfg.get('name', Path(args.config_path).stem))
+    out_dir = Path(args.output_dir)
+    manifest_path = out_dir / f'sft_{stage}_{config_name}_manifest.json'
+    result_path = out_dir / f'sft_{stage}_{config_name}_result.json'
+    adapter_dir = out_dir / f'adapter_{stage}_{config_name}'
+    candidate_id = getattr(args, 'candidate_id', None) or f'{stage}_{config_name}'
+    candidate_registry_path = Path(getattr(args, 'candidate_registry_path', DEFAULT_V3_CANDIDATE_REGISTRY_OUTPUT_PATH))
+
+    def append_candidate_row(*, status: str, failure_reason: str = '') -> None:
+        append_csv_row(
+            candidate_registry_path,
+            [
+                'candidate_id',
+                'parent_candidate_id',
+                'runtime_lane',
+                'mac_candidate_id',
+                'cuda_run_id',
+                'stage',
+                'mix_name',
+                'train_config',
+                'rank',
+                'alpha',
+                'dropout',
+                'weighted_loss',
+                'overall_acc',
+                'hard_shadow_acc',
+                'format_fail_rate',
+                'boxed_rate',
+                'cuda_repro_pass',
+                'packaging_pass',
+                'selected_for_submit',
+                'status',
+                'failure_reason',
+                'notes',
+                'recorded_at',
+            ],
+            {
+                'candidate_id': candidate_id,
+                'parent_candidate_id': '',
+                'runtime_lane': 'mac_mlx',
+                'mac_candidate_id': candidate_id,
+                'cuda_run_id': '',
+                'stage': stage,
+                'mix_name': normalize_optional_text(cfg.get('mix_name')) or Path(str(cfg.get('train_pack_path', args.train_pack_path))).stem,
+                'train_config': config_name,
+                'rank': int(cfg.get('lora_r', 32)),
+                'alpha': int(cfg.get('lora_alpha', 32)),
+                'dropout': float(cfg.get('lora_dropout', 0.0)),
+                'weighted_loss': bool(cfg.get('weighted_loss', False)),
+                'overall_acc': '',
+                'hard_shadow_acc': '',
+                'format_fail_rate': '',
+                'boxed_rate': '',
+                'cuda_repro_pass': False,
+                'packaging_pass': False,
+                'selected_for_submit': False,
+                'status': status,
+                'failure_reason': failure_reason,
+                'notes': normalize_optional_text(cfg.get('notes')) or '',
+                'recorded_at': utc_now(),
+            },
+        )
+
     if not args.execute or not bool(cfg.get('weighted_loss', False)):
-        run_train_sft(args)
-        fallback_result_path = Path(args.output_dir) / f"sft_{cfg.get('stage', args.stage)}_{cfg.get('name', Path(args.config_path).stem)}_result.json"
-        if not fallback_result_path.exists():
+        try:
+            run_train_sft(args)
+        except Exception as exc:
+            append_candidate_row(status='failed', failure_reason=f'{type(exc).__name__}:{exc}')
+            raise
+        if not result_path.exists():
             _write_v3_result(
-                fallback_result_path,
+                result_path,
                 {'status': 'rendered_only', 'created_at': utc_now(), 'notes': 'Delegated to baseline v2-compatible runtime path.'},
             )
+        append_candidate_row(status='completed' if args.execute else 'rendered_only')
         return
 
     import pandas as pd
 
-    stage = str(cfg.get('stage', args.stage))
-    config_name = str(cfg.get('name', Path(args.config_path).stem))
     active_model = load_json_file(Path(DEFAULT_ACTIVE_MODEL_PATH), default={})
     base_model = resolve_training_base_model(cfg.get('base_model'), active_model)
     train_pack_path = resolve_existing_path(str(cfg.get('train_pack_path', args.train_pack_path)))
@@ -3115,15 +3197,12 @@ def run_train_sft_v3(args: argparse.Namespace) -> None:
     write_jsonl_records(dataset_dir / 'train.jsonl', train_records)
     write_jsonl_records(dataset_dir / 'valid.jsonl', valid_records)
     write_jsonl_records(dataset_dir / 'test.jsonl', [])
-    out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = out_dir / f'sft_{stage}_{config_name}_manifest.json'
     metrics_path = out_dir / f'sft_{stage}_{config_name}_metrics.jsonl'
-    adapter_dir = out_dir / f'adapter_{stage}_{config_name}'
-    result_path = out_dir / f'sft_{stage}_{config_name}_result.json'
     manifest = {
         'version': 'v3',
         'created_at': utc_now(),
+        'candidate_id': candidate_id,
         'stage': stage,
         'config_name': config_name,
         'model': {'base_model': base_model},
@@ -3161,19 +3240,43 @@ def run_train_sft_v3(args: argparse.Namespace) -> None:
     }
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     try:
-        result = _weighted_training_execute(
-            train_records=train_records,
-            valid_records=valid_records,
-            cfg=cfg,
-            base_model=base_model,
-            output_dir=out_dir,
-            adapter_dir=adapter_dir,
-            metrics_path=metrics_path,
-        )
+        if str(cfg.get('runtime_backend', '')).lower() == 'mock':
+            adapter_dir.mkdir(parents=True, exist_ok=True)
+            (adapter_dir / 'adapters.safetensors').write_bytes(b'mock-adapters')
+            _write_v3_result(
+                adapter_dir / 'adapter_config.json',
+                {
+                    'base_model_name_or_path': base_model,
+                    'target_modules': list(cfg.get('target_modules', [])),
+                    'r': int(cfg.get('lora_r', 32)),
+                    'weighted_loss': True,
+                },
+            )
+            result = {
+                'status': 'completed',
+                'created_at': utc_now(),
+                'metrics_path': str(metrics_path),
+                'adapter_dir': str(adapter_dir),
+                'final_train_loss': 0.0,
+                'final_val_loss': 0.0,
+                'peak_memory_gb': 0.0,
+            }
+        else:
+            result = _weighted_training_execute(
+                train_records=train_records,
+                valid_records=valid_records,
+                cfg=cfg,
+                base_model=base_model,
+                output_dir=out_dir,
+                adapter_dir=adapter_dir,
+                metrics_path=metrics_path,
+            )
     except Exception as exc:
         _write_v3_result(result_path, {'status': 'failed', 'created_at': utc_now(), 'error_type': type(exc).__name__, 'error_message': str(exc), 'metrics_path': str(metrics_path), 'adapter_dir': str(adapter_dir)})
+        append_candidate_row(status='failed', failure_reason=f'{type(exc).__name__}:{exc}')
         raise
     _write_v3_result(result_path, result)
+    append_candidate_row(status=result.get('status', 'completed'))
     print(json.dumps({'manifest_path': str(manifest_path), 'result_path': str(result_path), 'metrics_path': str(metrics_path), 'adapter_dir': str(adapter_dir)}, ensure_ascii=False, indent=2))
 
 
@@ -4135,7 +4238,10 @@ def run_package_peft(args: argparse.Namespace) -> None:
         'submission_zip_contents': zip_contents,
     }
     submission_path = out_dir / 'submission_manifest_v3.json'
-    submission_path.write_text(json.dumps(submission_manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    legacy_submission_path = out_dir / 'submission_manifest.json'
+    manifest_text = json.dumps(submission_manifest, ensure_ascii=False, indent=2) + '\n'
+    submission_path.write_text(manifest_text, encoding='utf-8')
+    legacy_submission_path.write_text(manifest_text, encoding='utf-8')
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print(f'\nSmoke result: {result_path}')
@@ -4272,6 +4378,7 @@ def build_parser() -> argparse.ArgumentParser:
     teacher_candidate_parser.add_argument('--config-path', default=str(DEFAULT_TEACHER_DISTILL_CONFIG_PATH))
     teacher_candidate_parser.add_argument('--input-path', default=str(DEFAULT_V2_REAL_CANONICAL_PATH))
     teacher_candidate_parser.add_argument('--output-path', default=str(DEFAULT_V3_TEACHER_TRACE_CANDIDATES_OUTPUT_PATH))
+    teacher_candidate_parser.add_argument('--audit-output-path', default=str(AUDITS_ROOT / 'teacher_trace_candidates_v3.csv'))
     teacher_candidate_parser.add_argument('--max-rows', type=int, default=None)
     teacher_candidate_parser.set_defaults(func=run_build_teacher_trace_candidates)
 
@@ -4285,17 +4392,24 @@ def build_parser() -> argparse.ArgumentParser:
     teacher_generate_parser.add_argument('--max-tokens', type=int, default=192)
     teacher_generate_parser.add_argument('--temp', type=float, default=0.0)
     teacher_generate_parser.add_argument('--top-p', type=float, default=1.0)
+    teacher_generate_parser.add_argument('--audit-output-path', default=str(AUDITS_ROOT / 'teacher_trace_generation_v3.csv'))
     teacher_generate_parser.set_defaults(func=run_generate_teacher_traces)
 
     teacher_filter_parser = subparsers.add_parser('filter-teacher-traces', help='Filter raw teacher generations into strict accepted traces.')
     teacher_filter_parser.add_argument('--input-path', default=str(DEFAULT_V3_TEACHER_TRACE_GENERATIONS_OUTPUT_PATH))
     teacher_filter_parser.add_argument('--registry-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
     teacher_filter_parser.add_argument('--output-path', default=str(DEFAULT_V3_DISTILLED_TRACES_OUTPUT_PATH))
+    teacher_filter_parser.add_argument('--audit-output-path', default=str(DEFAULT_V3_FORMAT_AUDIT_OUTPUT_PATH))
     teacher_filter_parser.set_defaults(func=run_filter_teacher_traces)
 
     audit_parser = subparsers.add_parser('audit-format', help='Audit expected and observed format behavior.')
+    audit_parser.add_argument('--input-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
     audit_parser.add_argument('--real-canonical-path', default=str(DEFAULT_V2_REAL_CANONICAL_PATH))
     audit_parser.add_argument('--teacher-traces-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
+    audit_parser.add_argument('--text-column', default='raw_output')
+    audit_parser.add_argument('--answer-column', default='answer')
+    audit_parser.add_argument('--family-column', default='family')
+    audit_parser.add_argument('--policy-column', default='boxed_policy')
     audit_parser.add_argument('--output-path', default=str(DEFAULT_V3_FORMAT_AUDIT_OUTPUT_PATH))
     audit_parser.set_defaults(func=run_audit_format)
 
@@ -4307,6 +4421,7 @@ def build_parser() -> argparse.ArgumentParser:
     format_pairs_parser.add_argument('--teacher-traces-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
     format_pairs_parser.add_argument('--config-path', default=str(DEFAULT_V3_FORMAT_POLICY_CONFIG_PATH))
     format_pairs_parser.add_argument('--output-path', default=str(DEFAULT_V3_FORMAT_PAIRS_OUTPUT_PATH))
+    format_pairs_parser.add_argument('--audit-output-path', default=str(AUDITS_ROOT / 'format_pairs_v3.csv'))
     format_pairs_parser.set_defaults(func=run_build_format_pairs)
 
     correction_pairs_parser = subparsers.add_parser(
@@ -4317,6 +4432,7 @@ def build_parser() -> argparse.ArgumentParser:
     correction_pairs_parser.add_argument('--teacher-traces-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
     correction_pairs_parser.add_argument('--bootstrap-pairs-path', default=str(DEFAULT_V2_CORRECTION_PAIRS_PATH))
     correction_pairs_parser.add_argument('--output-path', default=str(DEFAULT_V3_CORRECTION_PAIRS_OUTPUT_PATH))
+    correction_pairs_parser.add_argument('--audit-output-path', default=str(AUDITS_ROOT / 'correction_pairs_v3.csv'))
     correction_pairs_parser.set_defaults(func=run_build_correction_pairs)
 
     preference_pairs_parser = subparsers.add_parser('build-preference-pairs', help='Build preference pairs for later DPO/ORPO/RFT.')
@@ -4325,12 +4441,14 @@ def build_parser() -> argparse.ArgumentParser:
     preference_pairs_parser.add_argument('--correction-pairs-path', default=str(DEFAULT_V3_CORRECTION_PAIRS_OUTPUT_PATH))
     preference_pairs_parser.add_argument('--teacher-traces-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
     preference_pairs_parser.add_argument('--output-path', default=str(DEFAULT_V3_PREFERENCE_PAIRS_OUTPUT_PATH))
+    preference_pairs_parser.add_argument('--audit-output-path', default=str(AUDITS_ROOT / 'preference_pairs_v3.csv'))
     preference_pairs_parser.set_defaults(func=run_build_preference_pairs)
 
     rft_parser = subparsers.add_parser('build-rft-accept-pool', help='Build the accepted-output RFT pool.')
     rft_parser.add_argument('--config-path', default=str(DEFAULT_V3_RFT_CONFIG_PATH))
     rft_parser.add_argument('--teacher-traces-path', default=str(DEFAULT_V3_TEACHER_TRACE_REGISTRY_OUTPUT_PATH))
     rft_parser.add_argument('--output-path', default=str(DEFAULT_V3_RFT_ACCEPT_POOL_OUTPUT_PATH))
+    rft_parser.add_argument('--audit-output-path', default=str(AUDITS_ROOT / 'rft_accept_pool_v3.csv'))
     rft_parser.set_defaults(func=run_build_rft_accept_pool)
 
     train_mix_parser = subparsers.add_parser(
@@ -4364,10 +4482,21 @@ def build_parser() -> argparse.ArgumentParser:
     train_sft_parser.add_argument('--max-valid-rows', type=int, default=None)
     train_sft_parser.add_argument('--execute', action='store_true')
     train_sft_parser.add_argument('--output-dir', default=str(TRAIN_OUTPUT_ROOT))
+    train_sft_parser.add_argument('--candidate-id', default=None)
+    train_sft_parser.add_argument('--candidate-registry-path', default=str(DEFAULT_V3_CANDIDATE_REGISTRY_OUTPUT_PATH))
     train_sft_parser.set_defaults(func=run_train_sft_v3)
 
     ablation_parser = subparsers.add_parser('run-ablation', help='Append a run result to weighted_ablation_v3.csv.')
-    ablation_parser.add_argument('--manifest-path', required=True)
+    ablation_parser.add_argument('--manifest-path', required=False)
+    ablation_parser.add_argument('--config-path', dest='config_paths', action='append', default=[])
+    ablation_parser.add_argument('--train-pack-path', default=str(DEFAULT_V3_STAGE_A_OUTPUT_PATH))
+    ablation_parser.add_argument('--output-root', default=str(TRAIN_OUTPUT_ROOT / 'ablation'))
+    ablation_parser.add_argument('--execute', action='store_true')
+    ablation_parser.add_argument('--valid-fold', type=int, default=0)
+    ablation_parser.add_argument('--valid-fraction', type=float, default=0.05)
+    ablation_parser.add_argument('--max-train-rows', type=int, default=None)
+    ablation_parser.add_argument('--max-valid-rows', type=int, default=None)
+    ablation_parser.add_argument('--candidate-registry-path', default=str(DEFAULT_V3_CANDIDATE_REGISTRY_OUTPUT_PATH))
     ablation_parser.add_argument('--result-path', default=None)
     ablation_parser.add_argument('--output-path', default=str(DEFAULT_V3_WEIGHTED_ABLATION_OUTPUT_PATH))
     ablation_parser.add_argument('--run-id', default=None)
@@ -4376,7 +4505,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     cuda_parser = subparsers.add_parser('render-cuda-repro-spec', help='Render a manual CUDA/BF16 reproduction spec and command stub.')
     cuda_parser.add_argument('--candidate-id', default=None)
-    cuda_parser.add_argument('--train-manifest-path', required=True)
+    cuda_parser.add_argument('--candidate-registry-path', default=str(DEFAULT_V3_CANDIDATE_REGISTRY_OUTPUT_PATH))
+    cuda_parser.add_argument('--train-manifest-path', required=False)
     cuda_parser.add_argument('--config-path', default=str(DEFAULT_V3_STAGE_A_CUDA_CONFIG_PATH))
     cuda_parser.add_argument('--output-path', default=str(DEFAULT_V3_CUDA_REPRO_SPEC_OUTPUT_PATH))
     cuda_parser.add_argument('--registry-path', default=str(DEFAULT_V3_CUDA_REPRO_REGISTRY_OUTPUT_PATH))
