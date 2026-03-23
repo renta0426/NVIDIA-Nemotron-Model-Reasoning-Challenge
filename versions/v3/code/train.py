@@ -2423,6 +2423,52 @@ def run_build_correction_pairs(args: argparse.Namespace) -> None:
     bootstrap_path = resolve_existing_path(args.bootstrap_pairs_path) if getattr(args, 'bootstrap_pairs_path', None) else None
     bootstrap_df = _read_table(bootstrap_path) if bootstrap_path is not None and bootstrap_path.exists() else pd.DataFrame()
     pairs: list[dict[str, Any]] = []
+    audit_rows: list[dict[str, Any]] = []
+
+    def maybe_accept_pair(
+        *,
+        source_id: str,
+        family: str,
+        prompt: str,
+        chosen_output: str,
+        rejected_output: str,
+        error_family_tag: str,
+        error_subtype: str,
+        source_eval_run: str,
+        gold_answer: str,
+    ) -> None:
+        chosen_assessed = _assess_teacher_trace(chosen_output, gold_answer, family)
+        rejected_extracted, _ = v1_module.extract_final_answer_with_source(rejected_output)
+        rejected_is_correct = bool(v1_module.verify(gold_answer, rejected_extracted))
+        if not chosen_assessed['strict_pass']:
+            audit_rows.append(
+                {
+                    'source_id': source_id,
+                    'family': family,
+                    'status': 'rejected',
+                    'reason': f"chosen_invalid:{'|'.join(chosen_assessed['rejection_reasons'])}",
+                }
+            )
+            return
+        if rejected_is_correct:
+            audit_rows.append({'source_id': source_id, 'family': family, 'status': 'rejected', 'reason': 'rejected_still_correct'})
+            return
+        pairs.append(
+            {
+                'pair_id': f'corr_{source_id}_{len(pairs)}',
+                'source_id': source_id,
+                'family': family,
+                'prompt': prompt,
+                'chosen_output': chosen_output,
+                'rejected_output': rejected_output,
+                'chosen_extracted_answer': chosen_assessed['extracted_answer'],
+                'rejected_extracted_answer': rejected_extracted,
+                'error_family_tag': error_family_tag,
+                'error_subtype': error_subtype,
+                'source_eval_run': source_eval_run,
+            }
+        )
+        audit_rows.append({'source_id': source_id, 'family': family, 'status': 'accepted', 'reason': error_subtype})
 
     if not bootstrap_df.empty:
         for record in bootstrap_df.to_dict(orient='records'):
@@ -2437,22 +2483,16 @@ def run_build_correction_pairs(args: argparse.Namespace) -> None:
                 chosen_answer = str(matched.iloc[0].get('answer_canonical', matched.iloc[0].get('answer', '')))
             chosen_output = str(teacher_map.get(source_id, {}).get('raw_output') or render_v3_final_answer(chosen_answer, family))
             rejected_output = str(record.get('rejected_output', ''))
-            chosen_extracted, _ = v1_module.extract_final_answer_with_source(chosen_output)
-            rejected_extracted, _ = v1_module.extract_final_answer_with_source(rejected_output)
-            pairs.append(
-                {
-                    'pair_id': f'corr_{source_id}_{len(pairs)}',
-                    'source_id': source_id,
-                    'family': family,
-                    'prompt': prompt,
-                    'chosen_output': chosen_output,
-                    'rejected_output': rejected_output,
-                    'chosen_extracted_answer': chosen_extracted,
-                    'rejected_extracted_answer': rejected_extracted,
-                    'error_family_tag': str(record.get('error_family_tag', family)),
-                    'error_subtype': str(record.get('error_subtype', 'bootstrap_fallback')),
-                    'source_eval_run': str(record.get('source_eval_run', 'bootstrap_fallback')),
-                }
+            maybe_accept_pair(
+                source_id=source_id,
+                family=family,
+                prompt=prompt,
+                chosen_output=chosen_output,
+                rejected_output=rejected_output,
+                error_family_tag=str(record.get('error_family_tag', family)),
+                error_subtype=str(record.get('error_subtype', 'bootstrap_fallback')),
+                source_eval_run=str(record.get('source_eval_run', 'bootstrap_fallback')),
+                gold_answer=str(chosen_answer),
             )
     else:
         if 'is_holdout_hard' in df.columns:
@@ -2496,27 +2536,27 @@ def run_build_correction_pairs(args: argparse.Namespace) -> None:
                 error_subtype = 'bit:shift_confusion'
             chosen_output = render_v3_final_answer(answer, family)
             rejected_output = render_v3_final_answer(wrong_answer, family)
-            pairs.append(
-                {
-                    'pair_id': f'corr_{source_id}_{len(pairs)}',
-                    'source_id': source_id,
-                    'family': family,
-                    'prompt': prompt,
-                    'chosen_output': chosen_output,
-                    'rejected_output': rejected_output,
-                    'chosen_extracted_answer': answer,
-                    'rejected_extracted_answer': wrong_answer,
-                    'error_family_tag': family,
-                    'error_subtype': error_subtype,
-                    'source_eval_run': 'deterministic_bootstrap',
-                }
+            maybe_accept_pair(
+                source_id=source_id,
+                family=family,
+                prompt=prompt,
+                chosen_output=chosen_output,
+                rejected_output=rejected_output,
+                error_family_tag=family,
+                error_subtype=error_subtype,
+                source_eval_run='deterministic_bootstrap',
+                gold_answer=answer,
             )
 
     pairs_df = pd.DataFrame(pairs)
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pairs_df.to_parquet(out_path, index=False)
+    audit_path = Path(args.audit_output_path)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(pairs_df)} strict correction pairs to {out_path}')
+    print(f'Audit: {audit_path}')
 
 
 def run_build_preference_pairs(args: argparse.Namespace) -> None:
@@ -2528,6 +2568,7 @@ def run_build_preference_pairs(args: argparse.Namespace) -> None:
     teacher_path = resolve_existing_path(args.teacher_traces_path)
     teacher_df = _read_table(teacher_path) if teacher_path.exists() else pd.DataFrame()
     pairs: list[dict[str, Any]] = []
+    audit_rows: list[dict[str, Any]] = []
 
     for record in format_df.to_dict(orient='records'):
         pairs.append(
@@ -2546,6 +2587,7 @@ def run_build_preference_pairs(args: argparse.Namespace) -> None:
                 'preference_reason': record.get('pair_kind', 'format'),
             }
         )
+    audit_rows.append({'pair_kind': 'format', 'count': len(format_df), 'status': 'accepted'})
 
     for record in correction_df.to_dict(orient='records'):
         pairs.append(
@@ -2564,6 +2606,7 @@ def run_build_preference_pairs(args: argparse.Namespace) -> None:
                 'preference_reason': record.get('error_subtype', 'correction'),
             }
         )
+    audit_rows.append({'pair_kind': 'correction', 'count': len(correction_df), 'status': 'accepted'})
 
     if not teacher_df.empty:
         brevity_margin = int(cfg.get('brevity_margin_chars', 40))
@@ -2590,6 +2633,7 @@ def run_build_preference_pairs(args: argparse.Namespace) -> None:
                             'preference_reason': 'shorter_strict_pass',
                         }
                     )
+                    audit_rows.append({'pair_kind': 'brevity', 'source_id': source_id, 'status': 'accepted', 'reason': 'shorter_strict_pass'})
             incorrect = teacher_df.loc[(teacher_df['source_id'].astype(str) == str(source_id)) & (~teacher_df['is_correct'].fillna(False))].copy()
             if not ordered.empty and not incorrect.empty:
                 chosen = ordered.iloc[0]
@@ -2607,15 +2651,20 @@ def run_build_preference_pairs(args: argparse.Namespace) -> None:
                         'rejected_is_correct': False,
                         'chosen_format_bucket': chosen.get('format_bucket', ''),
                         'rejected_format_bucket': rejected.get('format_bucket', ''),
-                        'preference_reason': 'correct_over_incorrect',
-                    }
-                )
+                            'preference_reason': 'correct_over_incorrect',
+                        }
+                    )
+                audit_rows.append({'pair_kind': 'consensus', 'source_id': source_id, 'status': 'accepted', 'reason': 'correct_over_incorrect'})
 
     pairs_df = pd.DataFrame(pairs)
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pairs_df.to_parquet(out_path, index=False)
+    audit_path = Path(args.audit_output_path)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(pairs_df)} preference pairs to {out_path}')
+    print(f'Audit: {audit_path}')
 
 
 def run_build_rft_accept_pool(args: argparse.Namespace) -> None:
@@ -2624,6 +2673,7 @@ def run_build_rft_accept_pool(args: argparse.Namespace) -> None:
     cfg = _load_yaml_config(args.config_path)
     teacher_df = _read_table(_require_existing_path(args.teacher_traces_path, label='teacher registry parquet'))
     max_trace_tokens_est = int(cfg.get('max_trace_tokens_est', 96))
+    audit_rows: list[dict[str, Any]] = []
     accepted = teacher_df.loc[
         teacher_df['selected_for_rft'].fillna(False)
         | (
@@ -2633,10 +2683,20 @@ def run_build_rft_accept_pool(args: argparse.Namespace) -> None:
     ].copy()
     accepted['accept_id'] = accepted['trace_id'].astype(str).map(lambda value: f'rft_{value}')
     accepted['chosen_output'] = accepted['raw_output']
+    accepted_ids = set(accepted['trace_id'].astype(str))
+    for record in teacher_df.to_dict(orient='records'):
+        trace_id = str(record.get('trace_id', ''))
+        accepted_flag = trace_id in accepted_ids
+        reason = 'accepted' if accepted_flag else 'not_selected_or_too_long'
+        audit_rows.append({'trace_id': trace_id, 'status': 'accepted' if accepted_flag else 'rejected', 'reason': reason})
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     accepted.to_parquet(out_path, index=False)
+    audit_path = Path(args.audit_output_path)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(accepted)} RFT accept rows to {out_path}')
+    print(f'Audit: {audit_path}')
 
 
 def append_csv_row(path: Path, header: Sequence[str], row: dict[str, Any]) -> None:
