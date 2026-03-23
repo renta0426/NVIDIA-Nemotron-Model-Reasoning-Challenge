@@ -120,3 +120,50 @@ def test_non_strict_prompt_builder_warns_and_falls_back():
             strict_chat_template=False,
         )
     assert rendered == "content"
+
+
+def test_validate_prompt_snapshot_artifact_accepts_builtin_fallback_contract():
+    snapshots = v0.pd.DataFrame(
+        [
+            {
+                "id": "train-1",
+                "family": "bit",
+                "source": "train",
+                "raw_prompt_hash": "a",
+                "rendered_prompt_hash": "b",
+                "rendered_prompt_text": "<|user|>\nhello\n<|assistant|>\n<think>",
+                "tokenizer_name": "builtin-competition-tokenizer",
+                "tokenizer_revision": "builtin-fallback-v0",
+                "eval_mode": "official_lb",
+            },
+            {
+                "id": "public-1",
+                "family": "bit",
+                "source": "public_smoke",
+                "raw_prompt_hash": "c",
+                "rendered_prompt_hash": "d",
+                "rendered_prompt_text": "<|user|>\nworld\n<|assistant|>\n<think>",
+                "tokenizer_name": "builtin-competition-tokenizer",
+                "tokenizer_revision": "builtin-fallback-v0",
+                "eval_mode": "official_lb",
+            },
+        ]
+    )
+
+    v0.validate_prompt_snapshot_artifact(snapshots)
+
+
+def test_validate_prompt_snapshot_artifact_rejects_missing_columns():
+    snapshots = v0.pd.DataFrame(
+        [
+            {
+                "id": "train-1",
+                "family": "bit",
+                "source": "train",
+                "raw_prompt_hash": "a",
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        v0.validate_prompt_snapshot_artifact(snapshots)

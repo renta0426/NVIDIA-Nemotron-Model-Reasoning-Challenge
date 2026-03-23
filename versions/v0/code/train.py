@@ -62,6 +62,7 @@ Competition prompt invariance rules for v0
 4. Do not disable enable_thinking=True in competition-mode prompting.
 5. Do not replace the tokenizer chat template without re-running prompt snapshots.
 6. If the strict chat template path fails, treat it as a blocking issue for serious runs.
+7. When no repo-local tokenizer asset exists, builtin-competition-tokenizer@builtin-fallback-v0 is the accepted pinned fallback; rebuild snapshots with a real tokenizer before serious promotion when available.
 """
 
 KAGGLE_OFFICIAL_RERUN_GUIDE = """\
@@ -936,6 +937,43 @@ def build_prompt_snapshots(
     return snapshots_df
 
 
+def validate_prompt_snapshot_artifact(snapshots_df: pd.DataFrame) -> None:
+    required_columns = {
+        "id",
+        "family",
+        "source",
+        "raw_prompt_hash",
+        "rendered_prompt_hash",
+        "rendered_prompt_text",
+        "tokenizer_name",
+        "tokenizer_revision",
+        "eval_mode",
+    }
+    missing_columns = sorted(required_columns - set(snapshots_df.columns))
+    if missing_columns:
+        raise ValueError(
+            "Prompt snapshot artifact is missing required columns: " + ", ".join(missing_columns)
+        )
+    if snapshots_df.empty:
+        raise ValueError("Prompt snapshot artifact must contain at least one row.")
+
+    for column in ("tokenizer_name", "tokenizer_revision", "eval_mode", "rendered_prompt_text"):
+        if snapshots_df[column].astype(str).str.strip().eq("").any():
+            raise ValueError(f"Prompt snapshot artifact has blank values in {column}.")
+
+    sources = set(snapshots_df["source"].astype(str))
+    required_sources = {"train", "public_smoke"}
+    missing_sources = sorted(required_sources - sources)
+    if missing_sources:
+        raise ValueError(
+            "Prompt snapshot artifact is missing required sources: " + ", ".join(missing_sources)
+        )
+
+    eval_modes = set(snapshots_df["eval_mode"].astype(str))
+    if "official_lb" not in eval_modes:
+        raise ValueError("Prompt snapshot artifact must include official_lb rendering records.")
+
+
 def evaluate_predictions(
     *,
     predictions_path: Path,
@@ -1224,6 +1262,9 @@ def validate_v0() -> None:
     missing = [str(path) for path in required_files if not path.exists()]
     if missing:
         raise FileNotFoundError("Missing required v0 artifacts:\n" + "\n".join(missing))
+
+    snapshots_df = load_table(DEFAULT_PROMPT_SNAPSHOTS_PATH)
+    validate_prompt_snapshot_artifact(snapshots_df)
 
     print("v0 validation passed.")
 
