@@ -37,6 +37,29 @@ def test_build_model_manifest_collects_file_stats(tmp_path: Path) -> None:
     assert manifest['snapshot_dir'] == str(snapshot_dir.resolve())
 
 
+def test_default_lms_model_path_uses_repo_structure(tmp_path: Path) -> None:
+    path = v2_train.default_lms_model_path(
+        v2_train.DEFAULT_MODEL_REPO_ID,
+        models_root=tmp_path,
+    )
+
+    assert path == tmp_path / 'lmstudio-community' / 'NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit'
+
+
+def test_ensure_lms_model_symlink_creates_link(tmp_path: Path) -> None:
+    snapshot_dir = tmp_path / 'snapshot'
+    snapshot_dir.mkdir()
+
+    link = v2_train.ensure_lms_model_symlink(
+        snapshot_dir,
+        v2_train.DEFAULT_MODEL_REPO_ID,
+        models_root=tmp_path / 'models',
+    )
+
+    assert link.is_symlink()
+    assert link.resolve() == snapshot_dir.resolve()
+
+
 def test_upsert_registry_entry_replaces_same_repo_and_name() -> None:
     base = {
         'repo_id': v2_train.DEFAULT_MODEL_REPO_ID,
@@ -55,3 +78,31 @@ def test_upsert_registry_entry_replaces_same_repo_and_name() -> None:
 
     assert len(updated) == 1
     assert updated[0]['snapshot_dir'] == '/tmp/new'
+
+
+def test_resolve_active_model_directory_reads_manifest(tmp_path: Path) -> None:
+    snapshot_dir = tmp_path / 'model'
+    snapshot_dir.mkdir()
+    active_manifest = tmp_path / 'active_model.json'
+    v2_train.save_json_file(
+        active_manifest,
+        {
+            'repo_id': v2_train.DEFAULT_MODEL_REPO_ID,
+            'local_name': v2_train.DEFAULT_LOCAL_MODEL_NAME,
+            'snapshot_dir': str(snapshot_dir),
+        },
+    )
+
+    resolved = v2_train.resolve_active_model_directory(active_manifest)
+
+    assert resolved == snapshot_dir
+
+
+def test_parser_includes_smoke_model_command() -> None:
+    parser = v2_train.build_parser()
+
+    args = parser.parse_args(['smoke-model'])
+
+    assert args.command == 'smoke-model'
+    assert args.runtime == 'auto'
+    assert args.max_tokens == 8

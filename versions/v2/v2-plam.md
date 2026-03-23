@@ -281,6 +281,7 @@ v2 の主実装は 1 ファイルに集約し、責務を次に固定する。
 
 - `download-model`
 - `show-active-model`
+- `smoke-model`
 - `build-real-canonical`
 - `build-solver-registry`
 - `build-synth-core`

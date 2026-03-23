@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from dataclasses import asdict, dataclass
+import shutil
+import subprocess
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -18,6 +20,7 @@ DEFAULT_MODEL_REPO_ID = 'lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6
 DEFAULT_LOCAL_MODEL_NAME = 'nemotron-3-nano-30b-a3b-mlx-6bit'
 DEFAULT_ACTIVE_MODEL_PATH = RUNTIME_ROOT / 'active_model.json'
 DEFAULT_MODEL_REGISTRY_PATH = RUNTIME_ROOT / 'model_registry_v2.json'
+DEFAULT_SMOKE_IDENTIFIER = 'nemotron-v2-smoke'
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,36 @@ def sanitize_local_name(value: str) -> str:
 
 def default_model_directory(spec: ModelDownloadSpec) -> Path:
     return MODELS_ROOT / sanitize_local_name(spec.local_name)
+
+
+def default_lms_models_root() -> Path:
+    return Path.home() / '.lmstudio' / 'models'
+
+
+def split_repo_id(repo_id: str) -> tuple[str, str]:
+    publisher, _, artifact = repo_id.partition('/')
+    if not publisher or not artifact:
+        raise ValueError(f'repo_id must be in <publisher>/<artifact> form: {repo_id}')
+    return publisher, artifact
+
+
+def default_lms_model_path(repo_id: str, *, models_root: Path | None = None) -> Path:
+    publisher, artifact = split_repo_id(repo_id)
+    root = models_root if models_root is not None else default_lms_models_root()
+    return root / publisher / artifact
+
+
+def ensure_lms_model_symlink(snapshot_dir: Path, repo_id: str, *, models_root: Path | None = None) -> Path:
+    link_path = default_lms_model_path(repo_id, models_root=models_root)
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+    if link_path.is_symlink():
+        if link_path.resolve() == snapshot_dir.resolve():
+            return link_path
+        raise ValueError(f'Existing symlink points elsewhere: {link_path} -> {link_path.resolve()}')
+    if link_path.exists():
+        raise ValueError(f'LM Studio model path already exists and is not a symlink: {link_path}')
+    link_path.symlink_to(snapshot_dir.resolve(), target_is_directory=True)
+    return link_path
 
 
 def resolve_snapshot_download() -> Any:
@@ -147,6 +180,81 @@ def update_model_registry(manifest: dict[str, Any], registry_path: Path) -> None
     save_json_file(registry_path, updated)
 
 
+def load_active_model_manifest(active_path: Path) -> dict[str, Any]:
+    payload = load_json_file(active_path, default=None)
+    if payload is None:
+        raise FileNotFoundError(f'Active model manifest was not found: {active_path}')
+    if not isinstance(payload, dict):
+        raise ValueError('Active model manifest must be a JSON object.')
+    return payload
+
+
+def resolve_active_model_directory(active_path: Path) -> Path:
+    payload = load_active_model_manifest(active_path)
+    snapshot_dir = Path(str(payload.get('snapshot_dir', '')).strip())
+    if not snapshot_dir:
+        raise ValueError(f'Active model manifest is missing snapshot_dir: {active_path}')
+    if not snapshot_dir.exists():
+        raise FileNotFoundError(f'Active model snapshot directory does not exist: {snapshot_dir}')
+    return snapshot_dir
+
+
+def resolve_mlx_runtime() -> tuple[Any, Any]:
+    try:
+        from mlx_lm import generate, load
+    except ImportError as exc:
+        raise RuntimeError(
+            'mlx-lm and mlx are required for local model smoke tests. '
+            'Install them in your Mac environment before running `smoke-model`.'
+        ) from exc
+    return load, generate
+
+
+def resolve_lms_binary() -> str:
+    binary = shutil.which('lms')
+    if not binary:
+        raise RuntimeError('LM Studio CLI `lms` was not found on PATH.')
+    return binary
+
+
+def run_lms_command(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, check=True, text=True, capture_output=True)
+
+
+def smoke_with_lms(
+    *,
+    snapshot_dir: Path,
+    repo_id: str,
+    prompt: str,
+    max_tokens: int,
+    ttl_seconds: int,
+    identifier: str,
+) -> str:
+    del max_tokens  # LM Studio CLI prompt mode does not expose max_tokens here.
+    lms = resolve_lms_binary()
+    model_key = repo_id
+    ensure_lms_model_symlink(snapshot_dir, repo_id)
+    run_lms_command([lms, 'load', model_key, '--yes', '--ttl', str(ttl_seconds), '--identifier', identifier])
+    try:
+        result = run_lms_command(
+            [
+                lms,
+                'chat',
+                model_key,
+                '-p',
+                prompt,
+                '-y',
+                '--ttl',
+                str(ttl_seconds),
+                '--dont-fetch-catalog',
+            ]
+        )
+        return result.stdout.strip()
+    finally:
+        subprocess.run([lms, 'unload', identifier], check=False, text=True, capture_output=True)
+        subprocess.run([lms, 'unload', model_key], check=False, text=True, capture_output=True)
+
+
 def run_download_model(args: argparse.Namespace) -> None:
     ensure_runtime_directories()
     spec = ModelDownloadSpec(
@@ -170,11 +278,49 @@ def run_download_model(args: argparse.Namespace) -> None:
 
 
 def run_show_active_model(args: argparse.Namespace) -> None:
-    active_path = Path(args.active_model_path)
-    payload = load_json_file(active_path, default=None)
-    if payload is None:
-        raise FileNotFoundError(f'Active model manifest was not found: {active_path}')
+    payload = load_active_model_manifest(Path(args.active_model_path))
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def run_smoke_model(args: argparse.Namespace) -> None:
+    active_manifest = load_active_model_manifest(Path(args.active_model_path))
+    model_dir = Path(args.model_dir) if args.model_dir else resolve_active_model_directory(Path(args.active_model_path))
+    prompt = args.prompt.strip()
+    runtime = args.runtime
+    if runtime in {'auto', 'python'}:
+        try:
+            load, generate = resolve_mlx_runtime()
+            model, tokenizer = load(str(model_dir))
+            output = generate(model, tokenizer, prompt, max_tokens=args.max_tokens, verbose=False)
+            resolved_runtime = 'python'
+        except RuntimeError:
+            if runtime == 'python':
+                raise
+            output = smoke_with_lms(
+                snapshot_dir=model_dir,
+                repo_id=args.repo_id or str(active_manifest.get('repo_id', DEFAULT_MODEL_REPO_ID)),
+                prompt=prompt,
+                max_tokens=args.max_tokens,
+                ttl_seconds=args.ttl,
+                identifier=args.identifier,
+            )
+            resolved_runtime = 'lms'
+    else:
+        output = smoke_with_lms(
+            snapshot_dir=model_dir,
+            repo_id=args.repo_id or str(active_manifest.get('repo_id', DEFAULT_MODEL_REPO_ID)),
+            prompt=prompt,
+            max_tokens=args.max_tokens,
+            ttl_seconds=args.ttl,
+            identifier=args.identifier,
+        )
+        resolved_runtime = 'lms'
+    print('Model smoke completed:')
+    print(f'runtime={resolved_runtime}')
+    print(f'model_dir={model_dir}')
+    print(f'prompt={prompt!r}')
+    print('output=')
+    print(output.strip())
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -200,6 +346,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     show_parser.add_argument('--active-model-path', default=str(DEFAULT_ACTIVE_MODEL_PATH))
     show_parser.set_defaults(func=run_show_active_model)
+
+    smoke_parser = subparsers.add_parser(
+        'smoke-model',
+        help='Load the active MLX model and run a tiny local generation smoke test.',
+    )
+    smoke_parser.add_argument('--runtime', choices=('auto', 'python', 'lms'), default='auto')
+    smoke_parser.add_argument('--model-dir', default=None)
+    smoke_parser.add_argument('--repo-id', default=None)
+    smoke_parser.add_argument('--active-model-path', default=str(DEFAULT_ACTIVE_MODEL_PATH))
+    smoke_parser.add_argument('--identifier', default=DEFAULT_SMOKE_IDENTIFIER)
+    smoke_parser.add_argument('--ttl', type=int, default=600)
+    smoke_parser.add_argument('--prompt', default='Reply with exactly OK.')
+    smoke_parser.add_argument('--max-tokens', type=int, default=8)
+    smoke_parser.set_defaults(func=run_smoke_model)
     return parser
 
 
