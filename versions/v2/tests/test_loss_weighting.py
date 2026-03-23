@@ -38,7 +38,12 @@ def test_loss_weight_helpers_detect_answer_spans() -> None:
 
 def test_run_train_sft_writes_manifest_and_command(tmp_path: Path) -> None:
     train_pack_path = tmp_path / 'train_pack.parquet'
-    pd.DataFrame([{'prompt': 'p1', 'answer': 'a1'}, {'prompt': 'p2', 'answer': 'a2'}]).to_parquet(train_pack_path, index=False)
+    pd.DataFrame(
+        [
+            {'prompt': 'p1', 'answer': 'a1', 'cv5_fold': 0, 'family': 'gravity_constant'},
+            {'prompt': 'p2', 'answer': 'a2', 'cv5_fold': 1, 'family': 'roman_numeral'},
+        ]
+    ).to_parquet(train_pack_path, index=False)
 
     config_path = tmp_path / 'train.yaml'
     config_path.write_text(
@@ -63,17 +68,32 @@ def test_run_train_sft_writes_manifest_and_command(tmp_path: Path) -> None:
     )
 
     output_dir = tmp_path / 'outputs'
+    dataset_dir = tmp_path / 'dataset'
     v2_train.run_train_sft(
         SimpleNamespace(
             stage='a',
             config_path=str(config_path),
             train_pack_path=str(train_pack_path),
+            dataset_dir=str(dataset_dir),
+            valid_fold=0,
+            valid_fraction=0.05,
+            max_train_rows=None,
+            max_valid_rows=None,
+            execute=False,
             output_dir=str(output_dir),
         )
     )
 
     manifest = json.loads((output_dir / 'sft_a_unit_test_weighted_manifest.json').read_text(encoding='utf-8'))
     command = (output_dir / 'sft_a_unit_test_weighted_cmd.sh').read_text(encoding='utf-8')
+    mlx_config = yaml.safe_load((output_dir / 'sft_a_unit_test_weighted_mlx.yaml').read_text(encoding='utf-8'))
     assert manifest['data']['num_rows'] == 2
+    assert manifest['data']['train_records'] == 1
+    assert manifest['data']['valid_records'] == 1
     assert manifest['loss']['weighted'] is True
-    assert '--data' in command
+    assert manifest['data']['dataset_dir'] == str(dataset_dir)
+    assert 'python -m mlx_lm lora' in command
+    assert '--config' in command
+    assert mlx_config['data'] == str(dataset_dir)
+    assert (dataset_dir / 'train.jsonl').exists()
+    assert (dataset_dir / 'valid.jsonl').exists()

@@ -5,10 +5,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence
+
+import yaml
 
 
 VERSION_ROOT = Path(__file__).resolve().parents[1]
@@ -1798,6 +1801,181 @@ def compute_loss_weights(text: str, family: str, *, weighted: bool) -> list[floa
     return weights
 
 
+def normalize_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if value != value:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    normalized = text.strip()
+    if not normalized or normalized.lower() == 'nan':
+        return None
+    return normalized
+
+
+def build_training_prompt(raw_prompt: str) -> str:
+    boxed_instruction = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
+    return f'{raw_prompt}\n{boxed_instruction}'
+
+
+def render_answer_completion(answer: str, format_policy: str) -> str:
+    answer_text = answer.strip()
+    if not answer_text:
+        raise ValueError('answer text must not be empty')
+    if format_policy == 'boxed':
+        return rf'\boxed{{{answer_text}}}'
+    if format_policy == 'final_answer':
+        return f'Final answer: {answer_text}'
+    return answer_text
+
+
+def build_training_completion(row: dict[str, Any]) -> str:
+    for key in ('chosen_output', 'raw_output', 'completion', 'target_text'):
+        value = normalize_optional_text(row.get(key))
+        if value is not None:
+            return value
+    answer = (
+        normalize_optional_text(row.get('answer_canonical'))
+        or normalize_optional_text(row.get('answer'))
+        or normalize_optional_text(row.get('extracted_answer'))
+    )
+    if answer is None:
+        raise ValueError('row does not contain a usable answer field')
+    format_policy = normalize_optional_text(row.get('format_policy')) or 'boxed'
+    return render_answer_completion(answer, format_policy)
+
+
+def build_training_records(frame: Any) -> tuple[list[dict[str, Any]], int]:
+    records: list[dict[str, Any]] = []
+    skipped = 0
+    for row in frame.to_dict(orient='records'):
+        prompt = normalize_optional_text(row.get('prompt'))
+        if prompt is None:
+            skipped += 1
+            continue
+        try:
+            completion = build_training_completion(row)
+        except ValueError:
+            skipped += 1
+            continue
+        records.append(
+            {
+                'prompt': build_training_prompt(prompt),
+                'completion': completion,
+                'metadata': {
+                    'id': normalize_optional_text(row.get('id')),
+                    'family': normalize_optional_text(row.get('family')),
+                    'source_dataset': normalize_optional_text(row.get('source_dataset'))
+                    or normalize_optional_text(row.get('source_kind'))
+                    or 'unknown',
+                },
+            }
+        )
+    return records, skipped
+
+
+def split_training_frame(frame: Any, *, valid_fold: int, valid_fraction: float, seed: int) -> tuple[Any, Any, str]:
+    import pandas as pd
+
+    if frame.empty:
+        return frame.copy(), frame.copy(), 'empty'
+
+    if 'cv5_fold' in frame.columns and frame['cv5_fold'].notna().any():
+        folds = pd.to_numeric(frame['cv5_fold'], errors='coerce')
+        valid_mask = folds == float(valid_fold)
+        train_df = frame.loc[~valid_mask].copy()
+        valid_df = frame.loc[valid_mask].copy()
+        if not train_df.empty and not valid_df.empty:
+            return train_df, valid_df, f'cv5_fold={valid_fold}'
+
+    shuffled = frame.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    if len(shuffled) <= 1:
+        return shuffled.copy(), shuffled.iloc[0:0].copy(), 'single_row'
+
+    valid_size = max(1, int(round(len(shuffled) * valid_fraction)))
+    valid_size = min(valid_size, len(shuffled) - 1)
+    valid_df = shuffled.iloc[:valid_size].copy()
+    train_df = shuffled.iloc[valid_size:].copy()
+    return train_df, valid_df, f'random_fraction={valid_fraction}'
+
+
+def maybe_limit_rows(frame: Any, *, max_rows: int | None, seed: int) -> Any:
+    if max_rows is None or len(frame) <= max_rows:
+        return frame
+    return frame.sample(n=max_rows, random_state=seed).reset_index(drop=True)
+
+
+def write_jsonl_records(path: Path, records: Sequence[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not records:
+        if path.exists():
+            path.unlink()
+        return
+    with path.open('w', encoding='utf-8') as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
+def resolve_existing_path(path_value: str | Path) -> Path:
+    candidate = Path(path_value)
+    if candidate.exists():
+        return candidate
+    repo_relative = REPO_ROOT / candidate
+    if repo_relative.exists():
+        return repo_relative
+    version_relative = VERSION_ROOT / candidate
+    if version_relative.exists():
+        return version_relative
+    return candidate
+
+
+def resolve_training_base_model(base_model_value: Any, active_model: dict[str, Any]) -> str:
+    requested = normalize_optional_text(base_model_value)
+    active_snapshot = normalize_optional_text(active_model.get('snapshot_dir'))
+    active_repo_id = normalize_optional_text(active_model.get('repo_id'))
+    if active_snapshot and requested in {None, DEFAULT_MODEL_REPO_ID, active_repo_id, DEFAULT_LOCAL_MODEL_NAME}:
+        return active_snapshot
+    if requested is None:
+        return active_snapshot or 'UNSET_base_model'
+    resolved = resolve_existing_path(requested)
+    return str(resolved) if resolved.exists() else requested
+
+
+def build_mlx_lora_config(
+    *,
+    model_path: str,
+    dataset_dir: Path,
+    adapter_output: Path,
+    cfg: dict[str, Any],
+    total_iters: int,
+) -> dict[str, Any]:
+    return {
+        'model': model_path,
+        'train': True,
+        'data': str(dataset_dir),
+        'fine_tune_type': str(cfg.get('fine_tune_type', 'lora')),
+        'optimizer': str(cfg.get('optimizer', 'adam')),
+        'mask_prompt': bool(cfg.get('mask_prompt', True)),
+        'num_layers': int(cfg.get('num_layers', 16)),
+        'batch_size': int(cfg.get('per_device_train_batch_size', 1)),
+        'iters': int(total_iters),
+        'val_batches': int(cfg.get('val_batches', -1)),
+        'learning_rate': float(cfg.get('learning_rate', 1e-4)),
+        'steps_per_report': int(cfg.get('steps_per_report', 1)),
+        'steps_per_eval': int(cfg.get('steps_per_eval', max(1, total_iters // 2))),
+        'grad_accumulation_steps': int(cfg.get('gradient_accumulation_steps', 8)),
+        'adapter_path': str(adapter_output),
+        'save_every': int(cfg.get('save_every', max(1, total_iters))),
+        'max_seq_length': int(cfg.get('max_seq_len', 1024)),
+        'seed': int(cfg.get('seed', 0)),
+        'lora_parameters': {
+            'rank': int(cfg.get('lora_r', 32)),
+            'dropout': float(cfg.get('lora_dropout', 0.0)),
+            'scale': float(cfg.get('lora_alpha', 32)),
+        },
+    }
+
+
 def run_train_sft(args: argparse.Namespace) -> None:
     import pandas as pd
 
@@ -1806,18 +1984,38 @@ def run_train_sft(args: argparse.Namespace) -> None:
     config_name = str(cfg.get('name', Path(args.config_path).stem))
 
     active_model = load_json_file(Path(DEFAULT_ACTIVE_MODEL_PATH), default={})
-    base_model = cfg.get('base_model') or active_model.get('snapshot_dir', 'UNSET_base_model')
+    base_model = resolve_training_base_model(cfg.get('base_model'), active_model)
 
-    train_pack_arg = Path(args.train_pack_path)
+    train_pack_arg = resolve_existing_path(args.train_pack_path)
     if str(train_pack_arg) == str(DEFAULT_STAGE_A_MIX_OUTPUT_PATH) and cfg.get('train_pack_path'):
-        train_pack_path = Path(str(cfg['train_pack_path']))
+        train_pack_path = resolve_existing_path(str(cfg['train_pack_path']))
     else:
         train_pack_path = train_pack_arg
 
-    num_rows = len(pd.read_parquet(train_pack_path)) if train_pack_path.exists() else 0
+    train_pack_df = pd.read_parquet(train_pack_path) if train_pack_path.exists() else pd.DataFrame()
+    num_rows = len(train_pack_df)
     batch_size = int(cfg.get('per_device_train_batch_size', 1))
     num_epochs = float(cfg.get('num_epochs', 2.0))
-    total_iters = max(1, int(max(num_rows, 1) * num_epochs // max(batch_size, 1)))
+    seed = int(cfg.get('seed', 0))
+
+    train_split_df, valid_split_df, split_strategy = split_training_frame(
+        train_pack_df,
+        valid_fold=int(args.valid_fold),
+        valid_fraction=float(args.valid_fraction),
+        seed=seed,
+    )
+    train_split_df = maybe_limit_rows(train_split_df, max_rows=args.max_train_rows, seed=seed)
+    valid_split_df = maybe_limit_rows(valid_split_df, max_rows=args.max_valid_rows, seed=seed)
+    train_records, skipped_train_rows = build_training_records(train_split_df)
+    valid_records, skipped_valid_rows = build_training_records(valid_split_df)
+    effective_train_rows = max(len(train_records), 1)
+    total_iters = max(1, int(effective_train_rows * num_epochs // max(batch_size, 1)))
+
+    dataset_dir = Path(args.dataset_dir) if args.dataset_dir else DATASETS_ROOT / f'sft_{stage}_{config_name}'
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    write_jsonl_records(dataset_dir / 'train.jsonl', train_records)
+    write_jsonl_records(dataset_dir / 'valid.jsonl', valid_records)
+    write_jsonl_records(dataset_dir / 'test.jsonl', [])
 
     manifest = {
         'version': 'v2',
@@ -1831,7 +2029,18 @@ def run_train_sft(args: argparse.Namespace) -> None:
             'lora_dropout': float(cfg.get('lora_dropout', 0.0)),
             'target_modules': list(cfg.get('target_modules', [])),
         },
-        'data': {'train_pack_path': str(train_pack_path), 'num_rows': num_rows},
+        'data': {
+            'train_pack_path': str(train_pack_path),
+            'dataset_dir': str(dataset_dir),
+            'num_rows': num_rows,
+            'train_records': len(train_records),
+            'valid_records': len(valid_records),
+            'skipped_rows': skipped_train_rows + skipped_valid_rows,
+            'effective_train_rows': len(train_records),
+            'split_strategy': split_strategy,
+            'valid_fraction': float(args.valid_fraction),
+            'valid_fold': int(args.valid_fold),
+        },
         'training': {
             'learning_rate': float(cfg.get('learning_rate', 1e-4)),
             'num_epochs': num_epochs,
@@ -1839,6 +2048,9 @@ def run_train_sft(args: argparse.Namespace) -> None:
             'max_seq_len': int(cfg.get('max_seq_len', 1024)),
             'per_device_train_batch_size': batch_size,
             'gradient_accumulation_steps': int(cfg.get('gradient_accumulation_steps', 8)),
+            'mask_prompt': bool(cfg.get('mask_prompt', True)),
+            'num_layers': int(cfg.get('num_layers', 16)),
+            'seed': seed,
         },
         'loss': {
             'weighted': bool(cfg.get('weighted_loss', False)),
@@ -1849,6 +2061,10 @@ def run_train_sft(args: argparse.Namespace) -> None:
             'final_line_weight': float(cfg.get('final_line_weight', 1.0)),
             'answer_span_weights_by_family': dict(cfg.get('answer_span_weights', {})),
         },
+        'execution': {
+            'supports_runtime_execution': not bool(cfg.get('weighted_loss', False)),
+            'requested_execute': bool(args.execute),
+        },
     }
 
     out_dir = Path(args.output_dir)
@@ -1858,27 +2074,39 @@ def run_train_sft(args: argparse.Namespace) -> None:
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     adapter_output = out_dir / f'adapter_{stage}_{config_name}'
+    mlx_config = build_mlx_lora_config(
+        model_path=base_model,
+        dataset_dir=dataset_dir,
+        adapter_output=adapter_output,
+        cfg=cfg,
+        total_iters=total_iters,
+    )
+    mlx_config_path = out_dir / f'sft_{stage}_{config_name}_mlx.yaml'
+    mlx_config_path.write_text(yaml.safe_dump(mlx_config, sort_keys=False), encoding='utf-8')
     command_lines = [
         '#!/bin/bash',
         '# Auto-generated by train.py train-sft',
         f'# Stage: {stage}, Config: {config_name}',
         '',
-        'uv run python -m mlx_lm.lora \\',
-        f'  --model "{base_model}" \\',
-        '  --train \\',
-        f'  --data "{train_pack_path}" \\',
-        f'  --batch-size {batch_size} \\',
-        '  --lora-layers 16 \\',
-        f'  --iters {total_iters} \\',
-        f'  --learning-rate {cfg.get("learning_rate", 1e-4)} \\',
-        f'  --adapter-path "{adapter_output}"',
+        'uv run python -m mlx_lm lora \\',
+        f'  --config "{mlx_config_path}"',
     ]
     command_path = out_dir / f'sft_{stage}_{config_name}_cmd.sh'
     command_path.write_text('\n'.join(command_lines) + '\n', encoding='utf-8')
 
+    if args.execute:
+        if bool(cfg.get('weighted_loss', False)):
+            raise NotImplementedError('weighted_loss execution is not supported by the current mlx_lm runtime path')
+        subprocess.run(
+            [sys.executable, '-m', 'mlx_lm', 'lora', '--config', str(mlx_config_path)],
+            cwd=str(REPO_ROOT),
+            check=True,
+        )
+
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
     print(f'\nManifest written to: {manifest_path}')
     print(f'Command script written to: {command_path}')
+    print(f'MLX config written to: {mlx_config_path}')
 
 
 def _resolve_adapter_weight_path(adapter_dir: Path) -> Path:
@@ -2286,6 +2514,12 @@ def build_parser() -> argparse.ArgumentParser:
     train_sft_parser.add_argument('--stage', choices=('a', 'b'), default='a')
     train_sft_parser.add_argument('--config-path', default=str(DEFAULT_STAGE_A_R32_ALPHA32_CONFIG_PATH))
     train_sft_parser.add_argument('--train-pack-path', default=str(DEFAULT_STAGE_A_MIX_OUTPUT_PATH))
+    train_sft_parser.add_argument('--dataset-dir', default=None)
+    train_sft_parser.add_argument('--valid-fold', type=int, default=0)
+    train_sft_parser.add_argument('--valid-fraction', type=float, default=0.05)
+    train_sft_parser.add_argument('--max-train-rows', type=int, default=None)
+    train_sft_parser.add_argument('--max-valid-rows', type=int, default=None)
+    train_sft_parser.add_argument('--execute', action='store_true')
     train_sft_parser.add_argument('--output-dir', default=str(TRAIN_OUTPUT_ROOT))
     train_sft_parser.set_defaults(func=run_train_sft)
 
