@@ -3270,23 +3270,69 @@ def run_ablation_v3(args: argparse.Namespace) -> None:
 
 
 def run_render_cuda_repro_spec_v3(args: argparse.Namespace) -> None:
-    manifest = load_json_file(_require_existing_path(args.train_manifest_path, label='train manifest json'), default={})
     cfg = _load_yaml_config(args.config_path)
+    registry_path = Path(args.registry_path)
+    manifest_path: Path | None = None
+    candidate_id = args.candidate_id
+
+    if getattr(args, 'train_manifest_path', None):
+        manifest_path = _require_existing_path(args.train_manifest_path, label='train manifest json')
+    elif candidate_id:
+        candidate_registry = _read_table(_require_existing_path(args.candidate_registry_path, label='candidate registry csv'))
+        matched = candidate_registry.loc[candidate_registry['candidate_id'].astype(str) == str(candidate_id)].copy()
+        if matched.empty:
+            append_csv_row(
+                registry_path,
+                ['candidate_id', 'spec_path', 'status', 'manual_command_path', 'created_at', 'notes'],
+                {
+                    'candidate_id': candidate_id,
+                    'spec_path': str(args.output_path),
+                    'status': 'failed',
+                    'manual_command_path': '',
+                    'created_at': utc_now(),
+                    'notes': 'candidate_id_not_found',
+                },
+            )
+            raise ValueError(f'candidate_id not found in registry: {candidate_id}')
+        for candidate_manifest in sorted(TRAIN_OUTPUT_ROOT.rglob('sft_*_manifest.json')):
+            payload = load_json_file(candidate_manifest, default={})
+            if str(payload.get('candidate_id', '')) == str(candidate_id):
+                manifest_path = candidate_manifest
+                break
+        if manifest_path is None:
+            append_csv_row(
+                registry_path,
+                ['candidate_id', 'spec_path', 'status', 'manual_command_path', 'created_at', 'notes'],
+                {
+                    'candidate_id': candidate_id,
+                    'spec_path': str(args.output_path),
+                    'status': 'failed',
+                    'manual_command_path': '',
+                    'created_at': utc_now(),
+                    'notes': 'candidate_manifest_not_found',
+                },
+            )
+            raise FileNotFoundError(f'candidate manifest not found for candidate_id={candidate_id}')
+    else:
+        raise ValueError('Either --train-manifest-path or --candidate-id must be provided.')
+
+    manifest = load_json_file(manifest_path, default={})
+    candidate_id = candidate_id or manifest.get('candidate_id') or f"{manifest.get('stage', 'stage')}_{manifest.get('config_name', 'config')}_{stable_hash(manifest_path, manifest.get('created_at'))}"
     train_pack_path = _require_existing_path(manifest.get('data', {}).get('train_pack_path', cfg.get('train_pack_path', '')), label='train pack parquet')
-    candidate_id = args.candidate_id or f"{manifest.get('stage', 'stage')}_{manifest.get('config_name', 'config')}_{stable_hash(train_pack_path, manifest.get('created_at'))}"
     spec = {
         'version': 'v3',
         'created_at': utc_now(),
         'candidate_id': candidate_id,
         'manual_cuda_execution_required': True,
         'base_model_name_or_path': str(cfg.get('base_model_name_or_path', DEFAULT_SUBMISSION_BASE_MODEL)),
-        'mac_manifest_path': str(args.train_manifest_path),
+        'mac_manifest_path': str(manifest_path),
         'stage': manifest.get('stage', ''),
         'config_name': manifest.get('config_name', ''),
         'train_pack_path': str(train_pack_path),
         'train_pack_sha256': hashlib.sha256(train_pack_path.read_bytes()).hexdigest(),
         'train_rows': manifest.get('data', {}).get('train_records', 0),
         'valid_rows': manifest.get('data', {}).get('valid_records', 0),
+        'style_ratio': manifest.get('data', {}).get('style_distribution', {}),
         'lora': {
             'r': cfg.get('lora_r', manifest.get('adapter', {}).get('lora_r', 32)),
             'alpha': cfg.get('lora_alpha', manifest.get('adapter', {}).get('lora_alpha', 32)),
@@ -3310,13 +3356,13 @@ def run_render_cuda_repro_spec_v3(args: argparse.Namespace) -> None:
     command_path = out_path.with_suffix('.sh')
     command_path.write_text(
         '# Manual CUDA/BF16 reproduction\\n'
-        f'# Source manifest: {args.train_manifest_path}\\n'
+        f'# Source manifest: {manifest_path}\\n'
         f'# Rendered spec: {out_path}\\n'
         f'# Suggested output dir: {args.cuda_output_dir}\\n',
         encoding='utf-8',
     )
     append_csv_row(
-        Path(args.registry_path),
+        registry_path,
         ['candidate_id', 'spec_path', 'status', 'manual_command_path', 'created_at', 'notes'],
         {
             'candidate_id': candidate_id,
@@ -3372,7 +3418,8 @@ def run_write_runbook_v3(args: argparse.Namespace) -> None:
         '- local best update -> queue\n'
         '- hard split / hard family improvement -> queue\n'
         '- format fail reduction -> queue\n'
-        '- all failures and rejections must be logged in weighted_ablation_v3.csv or candidate_registry_v3.csv\n',
+        '- all failures and rejections must be logged in weighted_ablation_v3.csv, cuda_reproduction_registry_v3.csv, or candidate_registry_v3.csv\n'
+        '- selected_for_submit requires cuda_repro_pass and packaging_pass\n',
         encoding='utf-8',
     )
     runbook_path = Path(args.output_path)
@@ -3389,7 +3436,9 @@ def run_write_runbook_v3(args: argparse.Namespace) -> None:
         'uv run python versions/v3/code/train.py build-rft-accept-pool\n'
         'uv run python versions/v3/code/train.py build-train-mix\n'
         'uv run python versions/v3/code/train.py train-sft --stage a --config-path versions/v3/conf/train/sft_stage_a_weighted_mlx.yaml --execute\n'
-        'uv run python versions/v3/code/train.py render-cuda-repro-spec --train-manifest-path versions/v3/outputs/train/sft_a_sft_stage_a_weighted_mlx_manifest.json --config-path versions/v3/conf/train/sft_stage_a_cuda_bf16.yaml\n',
+        'uv run python versions/v3/code/train.py run-ablation --config-path versions/v3/conf/train/sft_stage_a_weighted_mlx.yaml --train-pack-path versions/v3/data/train_packs/stage_a_strong_v3.parquet\n'
+        'uv run python versions/v3/code/train.py render-cuda-repro-spec --candidate-id YOUR_CANDIDATE --candidate-registry-path versions/v3/data/processed/candidate_registry_v3.csv --config-path versions/v3/conf/train/sft_stage_a_cuda_bf16.yaml\n'
+        'uv run python versions/v3/code/train.py package-peft --adapter-dir /kaggle/working/YOUR_CANDIDATE/adapter --config-path versions/v3/conf/package/cuda_submission_smoke.yaml\n',
         encoding='utf-8',
     )
     print(json.dumps({'candidate_registry_path': str(candidate_registry_path), 'promotion_rules_path': str(promotion_rules_path), 'runbook_path': str(runbook_path)}, ensure_ascii=False, indent=2))
@@ -4062,7 +4111,7 @@ def run_package_peft(args: argparse.Namespace) -> None:
                 checks['peft_load_status'] = 'loaded'
 
     result = {
-        'version': 'v2',
+        'version': 'v3',
         'created_at': utc_now(),
         'adapter_dir': str(adapter_dir),
         'checks': checks,
@@ -4074,7 +4123,7 @@ def run_package_peft(args: argparse.Namespace) -> None:
     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     submission_manifest = {
-        'version': 'v2',
+        'version': 'v3',
         'created_at': utc_now(),
         'base_model_name_or_path': adapter_config.get('base_model_name_or_path', 'UNSET'),
         'adapter_dir': str(adapter_dir),
@@ -4085,7 +4134,7 @@ def run_package_peft(args: argparse.Namespace) -> None:
         'submission_zip': str(submission_zip_path),
         'submission_zip_contents': zip_contents,
     }
-    submission_path = out_dir / 'submission_manifest.json'
+    submission_path = out_dir / 'submission_manifest_v3.json'
     submission_path.write_text(json.dumps(submission_manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
