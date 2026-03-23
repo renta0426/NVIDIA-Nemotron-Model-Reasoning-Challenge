@@ -37,10 +37,12 @@ def test_package_peft_and_write_runbook(tmp_path: Path) -> None:
     config_path.write_text(
         yaml.safe_dump(
             {
+                'expected_base_model_name_or_path': 'mock-model',
                 'required_files': ['adapter_config.json', 'adapter_model.safetensors'],
                 'expected_target_modules': ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj'],
                 'expected_rank_cap': 32,
                 'required_adapter_config_keys': ['base_model_name_or_path', 'target_modules', 'r'],
+                'submission_zip_name': 'submission.zip',
             }
         ),
         encoding='utf-8',
@@ -56,7 +58,11 @@ def test_package_peft_and_write_runbook(tmp_path: Path) -> None:
     assert smoke['all_required_files_present'] is True
     assert smoke['checks']['rank_ok'] is True
     assert smoke['checks']['target_modules_ok'] is True
+    assert smoke['checks']['base_model_ok'] is True
+    assert smoke['checks']['submission_zip_ok'] is True
+    assert (output_dir / 'submission.zip').exists()
     assert submission['lora_rank'] == 16
+    assert 'adapter_config.json' in submission['submission_zip_contents']
 
     candidate_registry_path = tmp_path / 'reports' / 'candidate_registry.csv'
     promotion_rules_path = tmp_path / 'reports' / 'promotion_rules.txt'
@@ -73,5 +79,9 @@ def test_package_peft_and_write_runbook(tmp_path: Path) -> None:
         reader = csv.reader(handle)
         header = next(reader)
     assert header[0] == 'candidate_id'
-    assert 'build-real-canonical' in runbook_path.read_text(encoding='utf-8')
-    assert 'Stage A -> Stage B Promotion' in promotion_rules_path.read_text(encoding='utf-8')
+    runbook_text = runbook_path.read_text(encoding='utf-8')
+    promotion_text = promotion_rules_path.read_text(encoding='utf-8')
+    assert 'build-real-canonical' in runbook_text
+    assert 'run-probe --config sc_probe_k8' in runbook_text
+    assert 'Daily Score' in promotion_text
+    assert 'weekly_score improves by at least +0.003' in promotion_text

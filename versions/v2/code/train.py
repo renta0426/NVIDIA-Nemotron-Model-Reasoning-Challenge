@@ -1881,6 +1881,49 @@ def run_train_sft(args: argparse.Namespace) -> None:
     print(f'Command script written to: {command_path}')
 
 
+def _resolve_adapter_weight_path(adapter_dir: Path) -> Path:
+    for filename in ('adapter_model.safetensors', 'adapter_model.bin'):
+        candidate = adapter_dir / filename
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError('adapter_model.safetensors or adapter_model.bin not found')
+
+
+def package_adapter_dir(adapter_dir: Path, submission_zip: Path) -> dict[str, Any]:
+    import zipfile
+
+    adapter_dir = Path(adapter_dir)
+    submission_zip = Path(submission_zip)
+    submission_zip.parent.mkdir(parents=True, exist_ok=True)
+
+    adapter_config_path = adapter_dir / 'adapter_config.json'
+    if not adapter_config_path.exists():
+        raise FileNotFoundError('adapter_config.json not found')
+
+    adapter_cfg = json.loads(adapter_config_path.read_text(encoding='utf-8'))
+    rank_value = adapter_cfg.get('r', adapter_cfg.get('rank'))
+    if rank_value is None or int(rank_value) > 32:
+        raise ValueError(f'LoRA rank must be <= 32, got {rank_value}')
+
+    _resolve_adapter_weight_path(adapter_dir)
+
+    with zipfile.ZipFile(submission_zip, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in adapter_dir.rglob('*'):
+            if path.is_file():
+                archive.write(path, arcname=path.relative_to(adapter_dir).as_posix())
+
+    with zipfile.ZipFile(submission_zip, 'r') as archive:
+        names = archive.namelist()
+        if not any(name.endswith('adapter_config.json') for name in names):
+            raise RuntimeError('zip missing adapter_config.json')
+        if not any(
+            name.endswith('adapter_model.safetensors') or name.endswith('adapter_model.bin')
+            for name in names
+        ):
+            raise RuntimeError('zip missing adapter weights')
+        return {'adapter_config': adapter_cfg, 'zip_contents': names}
+
+
 def run_package_peft(args: argparse.Namespace) -> None:
     cfg = _load_yaml_config(args.config_path)
 
@@ -1892,6 +1935,9 @@ def run_package_peft(args: argparse.Namespace) -> None:
     expected_modules = list(cfg.get('expected_target_modules', []))
     expected_rank_cap = int(cfg.get('expected_rank_cap', 32))
     required_keys = list(cfg.get('required_adapter_config_keys', []))
+    expected_base_model = cfg.get('expected_base_model_name_or_path')
+    local_base_model_path = cfg.get('local_base_model_path')
+    submission_zip_name = str(cfg.get('submission_zip_name', 'submission.zip'))
 
     checks: dict[str, Any] = {}
     for filename in required_files:
@@ -1911,15 +1957,53 @@ def run_package_peft(args: argparse.Namespace) -> None:
     checks['target_modules_ok'] = (
         set(actual_modules) == set(expected_modules) if expected_modules else True
     )
+    checks['base_model_ok'] = (
+        adapter_config.get('base_model_name_or_path') == expected_base_model
+        if expected_base_model
+        else 'base_model_name_or_path' in adapter_config
+    )
+
+    submission_zip_path = out_dir / submission_zip_name
+    zip_contents: list[str] = []
+    if (
+        all(checks[f'file_{filename}'] for filename in required_files)
+        and checks['rank_ok']
+        and checks['target_modules_ok']
+        and checks['base_model_ok']
+    ):
+        packaged = package_adapter_dir(adapter_dir, submission_zip_path)
+        zip_contents = list(packaged['zip_contents'])
+        checks['submission_zip_ok'] = True
+    else:
+        checks['submission_zip_ok'] = False
 
     try:
-        import peft  # type: ignore  # noqa: F401
+        from peft import PeftModel  # type: ignore
+        from transformers import AutoModelForCausalLM  # type: ignore
     except ImportError:
         checks['peft_installed'] = False
         checks['peft_load_status'] = 'peft_not_installed'
     else:
         checks['peft_installed'] = True
-        checks['peft_load_status'] = 'not_attempted'
+        local_base_path = Path(str(local_base_model_path)) if local_base_model_path else None
+        if local_base_path is None:
+            checks['peft_load_status'] = 'skipped_no_local_base_model'
+        elif not local_base_path.exists():
+            checks['peft_load_status'] = 'skipped_missing_local_base_model'
+        else:
+            try:
+                base_model = AutoModelForCausalLM.from_pretrained(
+                    str(local_base_path),
+                    trust_remote_code=True,
+                    local_files_only=True,
+                )
+                peft_model = PeftModel.from_pretrained(base_model, str(adapter_dir))
+                peft_model.eval()
+            except Exception as exc:
+                checks['peft_load_status'] = f'error:{type(exc).__name__}'
+                checks['peft_load_error'] = str(exc)
+            else:
+                checks['peft_load_status'] = 'loaded'
 
     result = {
         'version': 'v2',
@@ -1928,6 +2012,7 @@ def run_package_peft(args: argparse.Namespace) -> None:
         'checks': checks,
         'all_required_files_present': all(checks[f'file_{filename}'] for filename in required_files),
         'adapter_config': adapter_config,
+        'submission_zip': str(submission_zip_path),
     }
     result_path = out_dir / 'peft_smoke_result.json'
     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -1941,6 +2026,8 @@ def run_package_peft(args: argparse.Namespace) -> None:
         'lora_rank': rank_value,
         'target_modules': actual_modules,
         'smoke_checks': checks,
+        'submission_zip': str(submission_zip_path),
+        'submission_zip_contents': zip_contents,
     }
     submission_path = out_dir / 'submission_manifest.json'
     submission_path.write_text(json.dumps(submission_manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -1961,8 +2048,16 @@ def run_write_runbook(args: argparse.Namespace) -> None:
         'stage',
         'config_name',
         'train_mix',
-        'eval_score',
-        'eval_date',
+        'shadow_256_acc',
+        'hard_shadow_256_acc',
+        'holdout_hard_acc',
+        'group_shift_mean_acc',
+        'probe_shadow128_k8_majority_acc',
+        'daily_score',
+        'weekly_score',
+        'extraction_fail_rate',
+        'format_fail_rate',
+        'recorded_at',
         'status',
         'promoted',
         'notes',
@@ -1976,19 +2071,37 @@ def run_write_runbook(args: argparse.Namespace) -> None:
     promotion_rules_path.write_text(
         '# V2 Promotion Gate Rules\n'
         '# Generated by train.py write-runbook\n\n'
-        '## Stage A -> Stage B Promotion\n'
-        '1. Stage A model must achieve eval_score >= 0.75 on held-out validation set\n'
-        '2. Per-family accuracy must be >= 0.65 for all families\n'
-        '3. Format compliance rate must be >= 0.90 (no bare answers, no malformed boxed)\n'
-        '4. No catastrophic failures: zero families with accuracy < 0.40\n\n'
-        '## Stage B -> Submission Promotion\n'
-        '1. Stage B model must achieve eval_score >= 0.80 on held-out validation set\n'
-        '2. Hard subset (is_holdout_hard) accuracy must be >= 0.60\n'
-        '3. Format compliance rate must be >= 0.95\n'
-        '4. Correction pair wins: chosen > rejected in >= 70% of correction pairs\n\n'
-        '## Rollback Criteria\n'
-        '- If Stage B eval_score < Stage A eval_score by >= 0.05, roll back to Stage A\n'
-        '- If any family shows catastrophic drop (> 20% from Stage A), investigate before submission\n',
+        '## Quick Daily Gate\n'
+        '- shadow_128 + official_lb\n'
+        '- shadow_128 + sc_probe_k8\n\n'
+        '## Serious Gate\n'
+        '- shadow_256 + official_lb\n'
+        '- hard_shadow_256 + official_lb\n\n'
+        '## Weekly / Pre-submit Gate\n'
+        '- holdout_hard + official_lb\n'
+        '- group_shift_split0 + official_lb\n'
+        '- group_shift_split1 + official_lb\n'
+        '- group_shift_split2 + official_lb\n\n'
+        '## Daily Score\n'
+        '0.50 * shadow_256_acc\n'
+        '+ 0.30 * hard_shadow_256_acc\n'
+        '+ 0.20 * probe_shadow128_k8_majority_acc\n\n'
+        '## Weekly Score\n'
+        '0.35 * shadow_256_acc\n'
+        '+ 0.25 * holdout_hard_acc\n'
+        '+ 0.20 * group_shift_mean_acc\n'
+        '+ 0.10 * hard_shadow_256_acc\n'
+        '+ 0.10 * probe_shadow128_k8_majority_acc\n\n'
+        '## Candidate Promotion Conditions\n'
+        '1. daily_score >= current_best_daily_score\n'
+        '2. hard_shadow_256_acc is non-negative versus current best\n'
+        '3. extraction_fail_rate does not worsen\n'
+        '4. no family shows a catastrophic collapse\n\n'
+        '## Submit Promotion Conditions\n'
+        '1. weekly_score improves by at least +0.003, or hard split improves by at least +0.005\n'
+        '2. bit/text/symbol shows a clear improvement in at least one of those families\n'
+        '3. packaging smoke passes\n'
+        '4. raw output audit is clean\n',
         encoding='utf-8',
     )
 
@@ -2023,6 +2136,9 @@ def run_write_runbook(args: argparse.Namespace) -> None:
         f'{DEFAULT_STAGE_B_HARDENING_CONFIG_PATH}\n\n'
         '# Step 8: Package PEFT\n'
         'uv run python versions/v2/code/train.py package-peft\n\n'
+        '# Evaluation handoff\n'
+        'uv run python versions/v1/code/train.py run-replay-eval --config official_lb ...\n'
+        'uv run python versions/v1/code/train.py run-probe --config sc_probe_k8 ...\n\n'
         '# Step 8: Write runbook (this command)\n'
         'uv run python versions/v2/code/train.py write-runbook\n',
         encoding='utf-8',

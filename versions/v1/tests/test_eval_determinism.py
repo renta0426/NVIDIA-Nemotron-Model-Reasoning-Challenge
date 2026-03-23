@@ -73,7 +73,15 @@ def test_replay_eval_is_deterministic(tmp_path):
     )
 
 
-def test_mlx_backend_raises_clear_error_when_runtime_missing():
+def test_mlx_backend_raises_clear_error_when_runtime_missing(monkeypatch):
+    original_find_spec = v1.importlib.util.find_spec
+
+    def fake_find_spec(name: str, *args, **kwargs):
+        if name == 'mlx_lm':
+            return None
+        return original_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(v1.importlib.util, 'find_spec', fake_find_spec)
     backend = v1.MLXBackend(model_path='missing-model')
     with pytest.raises(RuntimeError, match='mlx-lm'):
         backend.generate(['prompt'], max_tokens=8, top_p=1.0, temperature=0.0, max_model_len=1024, seeds=[0])

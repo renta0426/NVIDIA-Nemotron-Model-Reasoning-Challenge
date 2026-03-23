@@ -1,0 +1,89 @@
+{
+  "version": "v2",
+  "created_at": "2026-03-23T09:16:35+00:00",
+  "families": {
+    "roman_numeral": {
+      "support": "full",
+      "rule_class": "subtractive_roman",
+      "range": "1-100",
+      "hard_knobs": [
+        4,
+        9,
+        40,
+        49,
+        90,
+        94,
+        99,
+        100
+      ],
+      "generator_ready_condition": "roman_query_value is not NaN and parse_ok",
+      "note": "Deterministic int->roman conversion"
+    },
+    "gravity_constant": {
+      "support": "full",
+      "rule_class": "d_equals_half_g_t_squared",
+      "formula": "0.5 * g * t^2",
+      "generator_ready_condition": "estimated_g is not NaN and parse_ok",
+      "note": "Distance = 0.5 * g * t^2"
+    },
+    "unit_conversion": {
+      "support": "full",
+      "rule_class": "fixed_ratio",
+      "decimal_style": 2,
+      "generator_ready_condition": "estimated_ratio is not NaN and parse_ok",
+      "note": "output = input * ratio, 2 decimal places"
+    },
+    "bit_manipulation": {
+      "support": "exact_fit",
+      "rule_class": "programmatic_8bit",
+      "ops": [
+        "NOT",
+        "XOR_FF",
+        "SHIFT_LEFT_1",
+        "SHIFT_RIGHT_1",
+        "ROTATE_LEFT_1",
+        "ROTATE_RIGHT_1"
+      ],
+      "generator_ready_condition": "bit_query_binary uniquely determines op from examples",
+      "note": "8-bit programmatic rule where examples identify a single operation"
+    },
+    "text_decryption": {
+      "support": "conservative",
+      "rule_class": "validator_only",
+      "generator_ready_condition": "False - real-only preferred",
+      "note": "real-only preferred; validator checks decryption correctness"
+    },
+    "symbol_equation": {
+      "support": "conservative",
+      "rule_class": "validator_only",
+      "generator_ready_condition": "False - real-only preferred",
+      "note": "real-only preferred; validator checks equation solution"
+    }
+  },
+  "family_stats": {
+    "roman_numeral": {
+      "total": 1576,
+      "generator_ready": 1576
+    },
+    "gravity_constant": {
+      "total": 1597,
+      "generator_ready": 1597
+    },
+    "unit_conversion": {
+      "total": 1594,
+      "generator_ready": 1594
+    },
+    "bit_manipulation": {
+      "total": 1602,
+      "generator_ready": 46
+    },
+    "text_decryption": {
+      "total": 1576,
+      "generator_ready": 0
+    },
+    "symbol_equation": {
+      "total": 1555,
+      "generator_ready": 0
+    }
+  }
+}
