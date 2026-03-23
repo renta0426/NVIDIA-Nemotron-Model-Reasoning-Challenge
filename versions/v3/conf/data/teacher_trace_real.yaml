@@ -1,0 +1,34 @@
+version: v3
+section: data
+name: teacher_trace_real
+seed: 73
+teacher_name: lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit
+target_styles:
+- long
+- short
+- answer_only
+- format_safe
+style_samples:
+  long: 1
+  short: 1
+  answer_only: 1
+  format_safe: 1
+hard_family_styles:
+- short
+- format_safe
+hard_family_sample_count: 4
+temperature_by_style:
+  long: 0.1
+  short: 0.0
+  answer_only: 0.0
+  format_safe: 0.0
+top_p_by_style:
+  long: 1.0
+  short: 1.0
+  answer_only: 1.0
+  format_safe: 1.0
+max_tokens_by_style:
+  long: 384
+  short: 192
+  answer_only: 48
+  format_safe: 96

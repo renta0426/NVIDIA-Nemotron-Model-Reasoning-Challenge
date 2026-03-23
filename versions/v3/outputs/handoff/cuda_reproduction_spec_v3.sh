@@ -1,0 +1,1 @@
+# Manual CUDA/BF16 reproduction\n# Source manifest: versions/v3/outputs/train/pilot_stage_a_run1/sft_a_sft_stage_a_weighted_mlx_manifest.json\n# Rendered spec: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/versions/v3/outputs/handoff/cuda_reproduction_spec_v3.yaml\n# Suggested output dir: /kaggle/working/v3_cuda_candidate\n

@@ -1,0 +1,1 @@
+# Manual CUDA/BF16 reproduction\n# Source manifest: versions/v3/outputs/train/pilot_stage_b_run1/sft_b_sft_stage_b_weighted_mlx_manifest.json\n# Rendered spec: versions/v3/outputs/handoff/cuda_reproduction_spec_stage_b_v3.yaml\n# Suggested output dir: /kaggle/working/v3_cuda_candidate\n

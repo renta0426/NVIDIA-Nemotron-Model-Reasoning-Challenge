@@ -1,0 +1,14 @@
+# V3 Training Command Book
+# Generated at 2026-03-23T11:23:03+00:00
+
+uv run python versions/v3/code/train.py bootstrap-v3
+uv run python versions/v3/code/train.py build-teacher-trace-candidates
+uv run python versions/v3/code/train.py generate-teacher-traces
+uv run python versions/v3/code/train.py filter-teacher-traces
+uv run python versions/v3/code/train.py build-format-pairs
+uv run python versions/v3/code/train.py build-correction-pairs
+uv run python versions/v3/code/train.py build-preference-pairs
+uv run python versions/v3/code/train.py build-rft-accept-pool
+uv run python versions/v3/code/train.py build-train-mix
+uv run python versions/v3/code/train.py train-sft --stage a --config-path versions/v3/conf/train/sft_stage_a_weighted_mlx.yaml --execute
+uv run python versions/v3/code/train.py render-cuda-repro-spec --train-manifest-path versions/v3/outputs/train/sft_a_sft_stage_a_weighted_mlx_manifest.json --config-path versions/v3/conf/train/sft_stage_a_cuda_bf16.yaml

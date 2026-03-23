@@ -1,0 +1,34 @@
+version: v3
+section: train
+name: sft_stage_b_weighted_mlx
+stage: b
+train_pack_path: versions/v3/data/train_packs/stage_b_strong_v3.parquet
+base_model: lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit
+lora_r: 32
+lora_alpha: 32
+lora_dropout: 0.0
+target_modules:
+- q_proj
+- k_proj
+- v_proj
+- o_proj
+- gate_proj
+- up_proj
+- down_proj
+learning_rate: 5.0e-05
+num_epochs: 1.0
+warmup_ratio: 0.03
+max_seq_len: 1024
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+weighted_loss: true
+rationale_weight: 1.0
+final_answer_prefix_weight: 2.0
+final_line_weight: 3.0
+answer_span_weights:
+  gravity_constant: 4.0
+  unit_conversion: 4.0
+  roman_numeral: 4.0
+  bit_manipulation: 5.0
+  symbol_equation: 6.0
+  text_decryption: 3.0
