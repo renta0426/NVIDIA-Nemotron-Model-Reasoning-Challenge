@@ -1,0 +1,17 @@
+v1 daily / nightly eval commands
+
+Daily quick (preferred when MLX runtime is available)
+python versions/v1/code/train.py run-eval   --input versions/v1/data/eval_packs/shadow_128.csv   --config official_lb   --backend mlx   --model-path <mlx_model_path>   --adapter-path <adapter_path>   --out versions/v1/outputs/eval/official_det_shadow128
+
+Nightly standard
+python versions/v1/code/train.py run-eval   --input versions/v1/data/eval_packs/shadow_256.csv   --config official_lb   --backend mlx   --model-path <mlx_model_path>   --adapter-path <adapter_path>   --out versions/v1/outputs/eval/official_det_shadow256
+
+python versions/v1/code/train.py run-probe   --input versions/v1/data/eval_packs/shadow_128.csv   --config sc_probe_k8   --backend mlx   --model-path <mlx_model_path>   --adapter-path <adapter_path>   --out versions/v1/outputs/eval/sc_probe_shadow128_k8
+
+Note: when an answer contains a closing brace `}`, replay/oracle smoke outputs intentionally avoid boxed formatting because the official boxed extractor truncates at the first right brace.
+
+Replay smoke equivalents generated in this repository
+- versions/v1/outputs/eval/base_no_adapter_shadow128_official
+- versions/v1/outputs/eval/probe_shadow128_k4_smoke
+- versions/v1/outputs/eval/minimal_adapter_shadow128_probe8
+- versions/v1/outputs/eval/probe_shadow128_k16_smoke

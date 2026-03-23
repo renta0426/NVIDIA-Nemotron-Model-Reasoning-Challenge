@@ -1,0 +1,30 @@
+{"case_id": "boxed_simple_numeric", "raw_output": "The answer is \\\\boxed{42}", "expected_extracted": "42", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "boxed_simple_roman", "raw_output": "Final result: \\\\boxed{XIV}", "expected_extracted": "XIV", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "boxed_simple_binary", "raw_output": "Binary answer \\\\boxed{10101010}", "expected_extracted": "10101010", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "boxed_simple_text_phrase", "raw_output": "Solved as \\\\boxed{blue bird}", "expected_extracted": "blue bird", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "boxed_simple_symbolic", "raw_output": "Symbolic output \\\\boxed{x+y}", "expected_extracted": "x+y", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "boxed_multiple_wrong_then_correct", "raw_output": "First \\\\boxed{41} then corrected to \\\\boxed{42}", "expected_extracted": "42", "expected_source": "boxed", "expected_bucket": "boxed_multiple"}
+{"case_id": "boxed_multiple_correct_then_wrong", "raw_output": "First \\\\boxed{42} but later \\\\boxed{41}", "expected_extracted": "41", "expected_source": "boxed", "expected_bucket": "boxed_multiple"}
+{"case_id": "boxed_multiple_with_empty_entries", "raw_output": "Noise \\\\boxed{} then final \\\\boxed{42}", "expected_extracted": "42", "expected_source": "boxed", "expected_bucket": "boxed_multiple"}
+{"case_id": "boxed_empty", "raw_output": "Nothing useful \\\\boxed{}", "expected_extracted": "", "expected_source": "boxed", "expected_bucket": "boxed_empty"}
+{"case_id": "boxed_unclosed", "raw_output": "Almost there \\\\boxed{42", "expected_extracted": "42", "expected_source": "boxed", "expected_bucket": "boxed_unclosed"}
+{"case_id": "boxed_whitespace_only", "raw_output": "Whitespace \\\\boxed{   }", "expected_extracted": "", "expected_source": "boxed", "expected_bucket": "boxed_empty"}
+{"case_id": "boxed_nested_like_malformed", "raw_output": "Odd form \\\\boxed{A{B}}", "expected_extracted": "A{B", "expected_source": "boxed", "expected_bucket": "boxed_truncated_right_brace"}
+{"case_id": "boxed_truncated_right_brace", "raw_output": "Risky \\\\boxed{a}b}", "expected_extracted": "a", "expected_source": "boxed", "expected_bucket": "boxed_truncated_right_brace"}
+{"case_id": "boxed_contains_backslash", "raw_output": "Escaped token \\\\boxed{a\\\\b}", "expected_extracted": "a\\\\b", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "boxed_contains_newline", "raw_output": "\\boxed{line1\nline2}", "expected_extracted": "line1\nline2", "expected_source": "boxed", "expected_bucket": "clean_boxed"}
+{"case_id": "final_answer_the_is", "raw_output": "The final answer is: 3.14", "expected_extracted": "3.14", "expected_source": "final_answer_is", "expected_bucket": "clean_final_answer"}
+{"case_id": "final_answer_is", "raw_output": "Final answer is: 7", "expected_extracted": "7", "expected_source": "final_answer_is", "expected_bucket": "clean_final_answer"}
+{"case_id": "final_answer_colon", "raw_output": "Final answer: 9", "expected_extracted": "9", "expected_source": "final_answer_colon", "expected_bucket": "clean_final_answer"}
+{"case_id": "final_answer_lowercase", "raw_output": "final answer: zebra", "expected_extracted": "zebra", "expected_source": "final_answer_colon", "expected_bucket": "clean_final_answer"}
+{"case_id": "final_answer_fullwidth_colon", "raw_output": "Final answer\uff1aXIV", "expected_extracted": "XIV", "expected_source": "final_answer_colon", "expected_bucket": "clean_final_answer"}
+{"case_id": "last_number_reasoning_only", "raw_output": "After many steps we arrive at 42", "expected_extracted": "42", "expected_source": "last_number", "expected_bucket": "last_number_fallback"}
+{"case_id": "last_number_multiple_numbers_last_wins", "raw_output": "Candidates 2, 4, and 9", "expected_extracted": "9", "expected_source": "last_number", "expected_bucket": "last_number_fallback"}
+{"case_id": "last_number_negative", "raw_output": "Offset is -3", "expected_extracted": "-3", "expected_source": "last_number", "expected_bucket": "last_number_fallback"}
+{"case_id": "last_number_decimal", "raw_output": "Use 2.5 as the final quantity", "expected_extracted": "2.5", "expected_source": "last_number", "expected_bucket": "last_number_fallback"}
+{"case_id": "last_number_confidence_corrupts_answer", "raw_output": "42\nconfidence 0.91", "expected_extracted": "0.91", "expected_source": "last_number", "expected_bucket": "last_number_fallback"}
+{"case_id": "last_line_plain_text", "raw_output": "No digits here\nlast non-empty line", "expected_extracted": "last non-empty line", "expected_source": "last_line", "expected_bucket": "last_line_fallback"}
+{"case_id": "last_line_symbol_only", "raw_output": "No digits here\n=> result", "expected_extracted": "=> result", "expected_source": "last_line", "expected_bucket": "last_line_fallback"}
+{"case_id": "last_line_roman_only", "raw_output": "Reasoning without digits\nXIV", "expected_extracted": "XIV", "expected_source": "last_line", "expected_bucket": "last_line_fallback"}
+{"case_id": "none_output", "raw_output": null, "expected_extracted": "NOT_FOUND", "expected_source": "not_found", "expected_bucket": "not_found"}
+{"case_id": "empty_output", "raw_output": "", "expected_extracted": "NOT_FOUND", "expected_source": "not_found", "expected_bucket": "not_found"}
