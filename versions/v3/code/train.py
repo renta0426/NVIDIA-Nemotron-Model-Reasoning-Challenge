@@ -613,6 +613,69 @@ def ensure_v3_layout_scaffold(version_root: Path = VERSION_ROOT) -> None:
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents, encoding='utf-8')
+    registry_specs = {
+        version_root / 'data/processed/candidate_registry_v3.csv': [
+            'candidate_id',
+            'parent_candidate_id',
+            'runtime_lane',
+            'mac_candidate_id',
+            'cuda_run_id',
+            'stage',
+            'mix_name',
+            'train_config',
+            'rank',
+            'alpha',
+            'dropout',
+            'weighted_loss',
+            'overall_acc',
+            'hard_shadow_acc',
+            'format_fail_rate',
+            'boxed_rate',
+            'cuda_repro_pass',
+            'packaging_pass',
+            'selected_for_submit',
+            'status',
+            'failure_reason',
+            'notes',
+            'recorded_at',
+        ],
+        version_root / 'data/processed/cuda_reproduction_registry_v3.csv': [
+            'candidate_id',
+            'spec_path',
+            'status',
+            'manual_command_path',
+            'created_at',
+            'notes',
+        ],
+        version_root / 'outputs/reports/weighted_ablation_v3.csv': [
+            'run_id',
+            'config_name',
+            'stage',
+            'weighted_loss',
+            'train_pack_path',
+            'train_records',
+            'valid_records',
+            'status',
+            'final_train_loss',
+            'final_val_loss',
+            'peak_memory_gb',
+            'metrics_path',
+            'manifest_path',
+            'failure_reason',
+            'notes',
+            'recorded_at',
+        ],
+    }
+    for path, header in registry_specs.items():
+        if path.exists():
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(','.join(header) + '\n', encoding='utf-8')
+    v2_active_model = REPO_ROOT / 'versions' / 'v2' / 'outputs' / 'runtime' / 'active_model.json'
+    v3_active_model = version_root / 'outputs/runtime/active_model.json'
+    if not v3_active_model.exists() and v2_active_model.exists():
+        v3_active_model.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(v2_active_model, v3_active_model)
 
 
 def sanitize_local_name(value: str) -> str:
@@ -983,6 +1046,8 @@ def _write_table(path: Path, frame: Any) -> None:
 def select_v3_format_policy(answer: str, family: str) -> str:
     v1 = _load_v1_module()
     risk = v1.analyze_extraction_risk(answer)
+    if '{' in answer:
+        return 'final_answer'
     if risk['contains_right_brace'] or risk['contains_backslash'] or risk['contains_backtick'] or risk['contains_newline']:
         return 'final_answer'
     if family == 'symbol_equation' and any(marker in answer for marker in ('}', '\\', '`')):
@@ -1140,28 +1205,27 @@ def _assess_teacher_trace(raw_output: str, gold_answer: str, family: str) -> dic
     final_line = lines[-1] if lines else ''
     final_line_only = bool(final_line) and final_line == render_v3_final_answer(extracted_answer, family)
     boxed_count = v1.count_boxed_occurrences(raw_output)
-
+    has_extra_trailing_numbers = bool(v1.detect_extra_trailing_numbers(raw_output, extracted_answer))
+    rejection_reasons: list[str] = []
     if not is_correct:
-        selection_reason = 'wrong_answer'
-        strict_pass = False
-    elif not format_pass:
-        selection_reason = f'format_fail:{format_bucket}'
-        strict_pass = False
-    elif expected_policy == 'boxed' and format_bucket != 'clean_boxed':
-        selection_reason = 'expected_boxed_but_not_boxed'
-        strict_pass = False
-    elif expected_policy == 'final_answer' and format_bucket != 'clean_final_answer':
-        selection_reason = 'unsafe_answer_boxed'
-        strict_pass = False
-    elif expected_policy == 'final_answer' and boxed_count > 0:
-        selection_reason = 'unsafe_answer_contains_boxed'
-        strict_pass = False
-    elif not final_line_only:
-        selection_reason = 'final_answer_not_last_line'
-        strict_pass = False
-    else:
-        selection_reason = 'strict_pass'
-        strict_pass = True
+        rejection_reasons.append('wrong_answer')
+    if not format_pass:
+        rejection_reasons.append(f'format_fail:{format_bucket}')
+    if boxed_count > 1:
+        rejection_reasons.append('multiple_boxed')
+    if has_extra_trailing_numbers:
+        rejection_reasons.append('extra_trailing_numbers')
+    if expected_policy == 'boxed' and format_bucket != 'clean_boxed':
+        rejection_reasons.append('expected_boxed_but_not_boxed')
+    if expected_policy == 'final_answer' and format_bucket != 'clean_final_answer':
+        rejection_reasons.append('unsafe_answer_boxed')
+    if expected_policy == 'final_answer' and boxed_count > 0:
+        rejection_reasons.append('unsafe_answer_contains_boxed')
+    if not final_line_only:
+        rejection_reasons.append('final_answer_not_last_line')
+    rejection_reasons = list(dict.fromkeys(rejection_reasons))
+    strict_pass = not rejection_reasons
+    selection_reason = 'strict_pass' if strict_pass else '|'.join(rejection_reasons)
 
     return {
         'extracted_answer': extracted_answer,
@@ -1170,20 +1234,28 @@ def _assess_teacher_trace(raw_output: str, gold_answer: str, family: str) -> dic
         'format_bucket': format_bucket,
         'format_pass': format_pass,
         'boxed_policy': expected_policy,
+        'boxed_count': boxed_count,
+        'has_extra_trailing_numbers': has_extra_trailing_numbers,
         'trace_len_chars': len(raw_output),
         'trace_len_tokens_est': len(re.findall(r'\S+', raw_output)),
         'strict_pass': strict_pass,
         'selection_reason': selection_reason,
         'final_line_only': final_line_only,
+        'rejection_reasons': rejection_reasons,
     }
 
 
 def run_filter_teacher_traces(args: argparse.Namespace) -> None:
     import pandas as pd
 
-    generated = read_jsonl(_require_existing_path(args.input_path, label='teacher generations jsonl'))
+    input_path = _require_existing_path(args.input_path, label='teacher generations input')
+    if input_path.suffix in {'.parquet', '.csv'}:
+        generated = _read_table(input_path).to_dict(orient='records')
+    else:
+        generated = read_jsonl(input_path)
     registry_rows: list[dict[str, Any]] = []
     accepted_rows: list[dict[str, Any]] = []
+    audit_rows: list[dict[str, Any]] = []
     for index, record in enumerate(generated):
         raw_output = str(record.get('raw_output', '')).strip()
         gold_answer = str(record.get('answer', ''))
@@ -1212,6 +1284,7 @@ def run_filter_teacher_traces(args: argparse.Namespace) -> None:
                 'selected_for_preference': False,
                 'selected_for_rft': False,
                 'selection_reason': f"generation_error:{record.get('error_type', 'unknown')}",
+                'rejection_reasons': [f"generation_error:{record.get('error_type', 'unknown')}"],
                 'prompt': record.get('prompt', ''),
                 'answer': gold_answer,
                 'format_policy': record.get('format_policy', ''),
@@ -1234,6 +1307,8 @@ def run_filter_teacher_traces(args: argparse.Namespace) -> None:
                 'format_bucket': assessed['format_bucket'],
                 'format_pass': assessed['format_pass'],
                 'boxed_policy': assessed['boxed_policy'],
+                'boxed_count': assessed['boxed_count'],
+                'has_extra_trailing_numbers': assessed['has_extra_trailing_numbers'],
                 'trace_len_chars': assessed['trace_len_chars'],
                 'trace_len_tokens_est': assessed['trace_len_tokens_est'],
                 'consensus_rate': 1.0 if assessed['strict_pass'] else 0.0,
@@ -1241,11 +1316,31 @@ def run_filter_teacher_traces(args: argparse.Namespace) -> None:
                 'selected_for_preference': assessed['strict_pass'],
                 'selected_for_rft': assessed['strict_pass'] and assessed['trace_len_tokens_est'] <= 96,
                 'selection_reason': assessed['selection_reason'],
+                'rejection_reasons': assessed['rejection_reasons'],
                 'prompt': record.get('prompt', ''),
                 'answer': gold_answer,
                 'format_policy': record.get('format_policy', ''),
             }
         registry_rows.append(row)
+        audit_rows.append(
+            {
+                'trace_id': row['trace_id'],
+                'source_id': row.get('source_id', ''),
+                'family': row.get('family', ''),
+                'target_style': row.get('target_style', ''),
+                'is_correct': row.get('is_correct', False),
+                'format_bucket': row.get('format_bucket', ''),
+                'boxed_policy': row.get('boxed_policy', ''),
+                'boxed_count': row.get('boxed_count', 0),
+                'has_extra_trailing_numbers': row.get('has_extra_trailing_numbers', False),
+                'selected_for_training': row.get('selected_for_training', False),
+                'selection_reason': row.get('selection_reason', ''),
+                'rejection_reason': '|'.join(row.get('rejection_reasons', [])),
+                'raw_output': row.get('raw_output', ''),
+                'extracted_answer': row.get('extracted_answer', ''),
+                'answer': row.get('answer', ''),
+            }
+        )
         if row['selected_for_training']:
             accepted_rows.append(row)
 
@@ -1259,34 +1354,62 @@ def run_filter_teacher_traces(args: argparse.Namespace) -> None:
 def run_audit_format(args: argparse.Namespace) -> None:
     import pandas as pd
 
-    real_df = pd.read_parquet(_require_existing_path(args.real_canonical_path, label='real canonical parquet'))
-    teacher_path = resolve_existing_path(args.teacher_traces_path)
-    teacher_df = _read_table(teacher_path) if teacher_path.exists() else pd.DataFrame()
+    input_value = getattr(args, 'input_path', None) or getattr(args, 'teacher_traces_path', None) or getattr(args, 'real_canonical_path', None)
+    frame = _read_table(_require_existing_path(input_value, label='audit input table'))
+    text_column = getattr(args, 'text_column', 'raw_output')
+    answer_column = getattr(args, 'answer_column', 'answer')
+    family_column = getattr(args, 'family_column', 'family')
+    policy_column = getattr(args, 'policy_column', 'boxed_policy')
     rows: list[dict[str, Any]] = []
-    for record in real_df.to_dict(orient='records'):
-        answer = normalize_optional_text(record.get('answer_canonical')) or normalize_optional_text(record.get('answer')) or ''
-        family = normalize_optional_text(record.get('family')) or ''
-        rows.append({'scope': 'expected_policy', 'family': family, 'target_style': '', 'format_bucket': '', 'selection_reason': '', 'expected_policy': select_v3_format_policy(answer, family)})
-    for record in teacher_df.to_dict(orient='records'):
+    for record in frame.to_dict(orient='records'):
+        raw_output = normalize_optional_text(record.get(text_column))
+        answer = (
+            normalize_optional_text(record.get(answer_column))
+            or normalize_optional_text(record.get('answer_canonical'))
+            or normalize_optional_text(record.get('extracted_answer'))
+            or ''
+        )
+        family = normalize_optional_text(record.get(family_column)) or ''
+        expected_policy = normalize_optional_text(record.get(policy_column)) or select_v3_format_policy(answer, family)
+        assessed = _assess_teacher_trace(raw_output or '', answer, family) if raw_output else {
+            'extracted_answer': answer,
+            'extraction_source': 'not_found',
+            'is_correct': False,
+            'format_bucket': 'not_found',
+            'format_pass': False,
+            'boxed_policy': expected_policy,
+            'boxed_count': 0,
+            'has_extra_trailing_numbers': False,
+            'trace_len_chars': 0,
+            'trace_len_tokens_est': 0,
+            'strict_pass': False,
+            'selection_reason': 'missing_raw_output',
+            'final_line_only': False,
+            'rejection_reasons': ['missing_raw_output'],
+        }
         rows.append(
             {
-                'scope': 'teacher_trace',
-                'family': record.get('family', ''),
+                'row_id': record.get('trace_id', record.get('pair_id', record.get('id', ''))),
+                'family': family,
                 'target_style': record.get('target_style', ''),
-                'format_bucket': record.get('format_bucket', ''),
-                'selection_reason': record.get('selection_reason', ''),
-                'expected_policy': record.get('boxed_policy', ''),
+                'expected_policy': expected_policy,
+                'raw_output': raw_output or '',
+                'answer': answer,
+                'extracted_answer': assessed['extracted_answer'],
+                'format_bucket': assessed['format_bucket'],
+                'format_pass': assessed['format_pass'],
+                'boxed_count': assessed['boxed_count'],
+                'has_extra_trailing_numbers': assessed['has_extra_trailing_numbers'],
+                'selection_reason': assessed['selection_reason'],
+                'rejection_reason': '|'.join(assessed['rejection_reasons']),
+                'strict_pass': assessed['strict_pass'],
+                'trace_len_chars': assessed['trace_len_chars'],
+                'trace_len_tokens_est': assessed['trace_len_tokens_est'],
             }
         )
     audit_df = pd.DataFrame(rows)
-    summary = (
-        audit_df.groupby(['scope', 'family', 'target_style', 'format_bucket', 'selection_reason', 'expected_policy'], dropna=False)
-        .size()
-        .reset_index(name='count')
-        .sort_values(['scope', 'family', 'count'], ascending=[True, True, False])
-    )
-    _write_table(Path(args.output_path), summary)
-    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'rows': int(len(summary)), 'output_path': str(args.output_path)}, ensure_ascii=False, indent=2))
+    _write_table(Path(args.output_path), audit_df)
+    print(json.dumps({'version': 'v3', 'created_at': utc_now(), 'rows': int(len(audit_df)), 'output_path': str(args.output_path)}, ensure_ascii=False, indent=2))
 
 
 def _load_yaml_config(path: str | Path | None) -> dict[str, Any]:
@@ -2157,10 +2280,14 @@ def run_filter_distilled_traces(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     accepted_df.to_parquet(out_path, index=False)
+    audit_path = Path(args.audit_output_path)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
 
-    print(f'Filtered {len(candidates)} candidates -> {len(accepted_rows)} accepted traces')
+    print(f'Filtered {len(generated)} candidates -> {len(accepted_rows)} accepted traces')
     print(f'Written registry: {registry_path}')
     print(f'Written accepted: {out_path}')
+    print(f'Written audit: {audit_path}')
 
 
 def run_build_format_pairs(args: argparse.Namespace) -> None:
@@ -2171,6 +2298,7 @@ def run_build_format_pairs(args: argparse.Namespace) -> None:
     teacher_path = resolve_existing_path(args.teacher_traces_path)
     teacher_df = _read_table(teacher_path) if teacher_path.exists() else pd.DataFrame()
     pairs: list[dict[str, Any]] = []
+    audit_rows: list[dict[str, Any]] = []
 
     def append_pair(*, source_id: str, family: str, prompt: str, answer: str, pair_kind: str, chosen_output: str, rejected_output: str, chosen_bucket: str, rejected_bucket: str) -> None:
         pairs.append(
@@ -2188,12 +2316,25 @@ def run_build_format_pairs(args: argparse.Namespace) -> None:
                 'pair_kind': pair_kind,
             }
         )
+        audit_rows.append(
+            {
+                'source_id': source_id,
+                'family': family,
+                'pair_kind': pair_kind,
+                'status': 'accepted',
+                'chosen_format_bucket': chosen_bucket,
+                'rejected_format_bucket': rejected_bucket,
+            }
+        )
 
     for record in df.to_dict(orient='records'):
         answer = normalize_optional_text(record.get('answer_canonical')) or normalize_optional_text(record.get('answer')) or ''
         family = str(record.get('family', ''))
         source_id = str(record.get('id', ''))
         prompt = str(record.get('prompt', ''))
+        if not prompt or not answer:
+            audit_rows.append({'source_id': source_id, 'family': family, 'pair_kind': 'skipped', 'status': 'rejected', 'reason': 'missing_prompt_or_answer'})
+            continue
         chosen = render_v3_final_answer(answer, family)
         format_policy = select_v3_format_policy(answer, family)
         append_pair(
@@ -2258,7 +2399,11 @@ def run_build_format_pairs(args: argparse.Namespace) -> None:
     out_path = Path(args.output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pairs_df.to_parquet(out_path, index=False)
+    audit_path = Path(args.audit_output_path)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit_rows).to_csv(audit_path, index=False)
     print(f'Wrote {len(pairs_df)} strict format pairs to {out_path}')
+    print(f'Audit: {audit_path}')
 
 
 def run_build_correction_pairs(args: argparse.Namespace) -> None:
