@@ -1,0 +1,14 @@
+Kaggle official rerun guide for v0
+
+1. Package a single LoRA adapter with adapter_config.json for Nemotron-3-Nano-30B.
+2. Keep max_lora_rank <= 32.
+3. Confirm the evaluation parameters match official_lb:
+   - max_tokens=7680
+   - top_p=1.0
+   - temperature=0.0
+   - max_num_seqs=64
+   - gpu_memory_utilization=0.85
+   - max_model_len=8192
+4. Confirm the prompt path uses the competition boxed instruction plus tokenizer.apply_chat_template(..., add_generation_prompt=True, enable_thinking=True).
+5. Run shadow_256 first when checking backend drift.
+6. If local-vs-Kaggle extracted agreement drops below 98%, stop promotion and investigate before submitting.

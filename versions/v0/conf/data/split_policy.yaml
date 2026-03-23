@@ -1,0 +1,10 @@
+public_smoke_source: versions/v0/data/public_smoke/test_public.csv
+validation_source: versions/v0/data/processed/train_splits.parquet
+public_smoke_isolation: true
+main_split: cv5_strat_family
+hard_split: holdout_hard
+group_shift_signature_enabled: true
+exclude_public_overlap_from_primary_reports: true
+notes:
+  - visible test.csv is smoke-only and never a validation metric
+  - report summary must include both all-row and overlap-excluded accuracy
