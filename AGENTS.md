@@ -10,3 +10,4 @@
 
 - タスク完了前に必ずPushすること
 - UV環境を設定しているので追加したい場合はUV ADDで
+- UV環境を設定しているのでpythonはUV RUN PYTHONで
