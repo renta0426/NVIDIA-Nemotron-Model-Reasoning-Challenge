@@ -3178,6 +3178,73 @@ def run_train_sft_v3(args: argparse.Namespace) -> None:
 
 
 def run_ablation_v3(args: argparse.Namespace) -> None:
+    header = ['run_id', 'config_name', 'stage', 'weighted_loss', 'train_pack_path', 'train_records', 'valid_records', 'status', 'final_train_loss', 'final_val_loss', 'peak_memory_gb', 'metrics_path', 'manifest_path', 'failure_reason', 'notes', 'recorded_at']
+    output_path = Path(args.output_path)
+    config_paths = list(getattr(args, 'config_paths', []) or [])
+    if config_paths:
+        for config_path_value in config_paths:
+            config_path = resolve_existing_path(config_path_value)
+            cfg = _load_yaml_config(config_path)
+            config_name = str(cfg.get('name', Path(config_path).stem))
+            stage = str(cfg.get('stage', 'a'))
+            output_dir = Path(args.output_root) / config_name
+            run_id = args.run_id or stable_hash(config_name, args.train_pack_path, utc_now())
+            row = {
+                'run_id': run_id,
+                'config_name': config_name,
+                'stage': stage,
+                'weighted_loss': bool(cfg.get('weighted_loss', False)),
+                'train_pack_path': args.train_pack_path,
+                'train_records': '',
+                'valid_records': '',
+                'status': 'failed',
+                'final_train_loss': '',
+                'final_val_loss': '',
+                'peak_memory_gb': '',
+                'metrics_path': '',
+                'manifest_path': '',
+                'failure_reason': '',
+                'notes': args.notes or '',
+                'recorded_at': utc_now(),
+            }
+            try:
+                train_args = argparse.Namespace(
+                    stage=stage,
+                    config_path=str(config_path),
+                    train_pack_path=str(args.train_pack_path),
+                    dataset_dir=str(output_dir / 'dataset'),
+                    valid_fold=args.valid_fold,
+                    valid_fraction=args.valid_fraction,
+                    max_train_rows=args.max_train_rows,
+                    max_valid_rows=args.max_valid_rows,
+                    execute=args.execute,
+                    output_dir=str(output_dir),
+                    candidate_id=f'ablation_{config_name}',
+                    candidate_registry_path=str(getattr(args, 'candidate_registry_path', DEFAULT_V3_CANDIDATE_REGISTRY_OUTPUT_PATH)),
+                )
+                run_train_sft_v3(train_args)
+                manifest_path = output_dir / f'sft_{stage}_{config_name}_manifest.json'
+                result_path = output_dir / f'sft_{stage}_{config_name}_result.json'
+                manifest = load_json_file(manifest_path, default={})
+                result = load_json_file(result_path, default={})
+                row.update(
+                    {
+                        'train_records': manifest.get('data', {}).get('train_records', ''),
+                        'valid_records': manifest.get('data', {}).get('valid_records', ''),
+                        'status': result.get('status', 'completed'),
+                        'final_train_loss': result.get('final_train_loss', ''),
+                        'final_val_loss': result.get('final_val_loss', ''),
+                        'peak_memory_gb': result.get('peak_memory_gb', ''),
+                        'metrics_path': result.get('metrics_path', ''),
+                        'manifest_path': str(manifest_path),
+                    }
+                )
+            except Exception as exc:
+                row['failure_reason'] = f'{type(exc).__name__}:{exc}'
+            append_csv_row(output_path, header, row)
+        print(json.dumps({'output_path': str(output_path), 'num_runs': len(config_paths)}, ensure_ascii=False, indent=2))
+        return
+
     manifest = load_json_file(_require_existing_path(args.manifest_path, label='train manifest json'), default={})
     result = load_json_file(resolve_existing_path(args.result_path), default={}) if args.result_path else {}
     row = {
@@ -3198,11 +3265,7 @@ def run_ablation_v3(args: argparse.Namespace) -> None:
         'notes': args.notes or '',
         'recorded_at': utc_now(),
     }
-    append_csv_row(
-        Path(args.output_path),
-        ['run_id', 'config_name', 'stage', 'weighted_loss', 'train_pack_path', 'train_records', 'valid_records', 'status', 'final_train_loss', 'final_val_loss', 'peak_memory_gb', 'metrics_path', 'manifest_path', 'failure_reason', 'notes', 'recorded_at'],
-        row,
-    )
+    append_csv_row(output_path, header, row)
     print(json.dumps(row, ensure_ascii=False, indent=2))
 
 
