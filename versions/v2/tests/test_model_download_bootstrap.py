@@ -106,3 +106,62 @@ def test_parser_includes_smoke_model_command() -> None:
     assert args.command == 'smoke-model'
     assert args.runtime == 'auto'
     assert args.max_tokens == 8
+
+
+def test_parser_includes_all_planned_v2_commands() -> None:
+    parser = v2_train.build_parser()
+
+    for command in v2_train.PLANNED_V2_COMMANDS:
+        args = parser.parse_args([command])
+        assert args.command == command
+
+
+def test_ensure_v2_layout_scaffold_creates_expected_structure(tmp_path: Path) -> None:
+    v2_train.ensure_v2_layout_scaffold(tmp_path)
+
+    expected_dirs = (
+        tmp_path / 'conf' / 'data',
+        tmp_path / 'conf' / 'train',
+        tmp_path / 'conf' / 'package',
+        tmp_path / 'data' / 'processed',
+        tmp_path / 'data' / 'synth',
+        tmp_path / 'data' / 'train_packs',
+        tmp_path / 'outputs' / 'audits',
+        tmp_path / 'outputs' / 'datasets',
+        tmp_path / 'outputs' / 'train',
+        tmp_path / 'outputs' / 'eval',
+        tmp_path / 'outputs' / 'packaging',
+        tmp_path / 'outputs' / 'reports',
+    )
+    for directory in expected_dirs:
+        assert directory.is_dir()
+
+    expected_files = (
+        tmp_path / 'conf' / 'data' / 'real_canonical.yaml',
+        tmp_path / 'conf' / 'data' / 'synth_core.yaml',
+        tmp_path / 'conf' / 'data' / 'synth_hard.yaml',
+        tmp_path / 'conf' / 'data' / 'teacher_distill.yaml',
+        tmp_path / 'conf' / 'data' / 'format_sharpening.yaml',
+        tmp_path / 'conf' / 'data' / 'mix_stage_a.yaml',
+        tmp_path / 'conf' / 'data' / 'mix_stage_b.yaml',
+        tmp_path / 'conf' / 'train' / 'sft_stage_a_r32_alpha32.yaml',
+        tmp_path / 'conf' / 'train' / 'sft_stage_a_r32_alpha32_weighted.yaml',
+        tmp_path / 'conf' / 'train' / 'sft_stage_a_r32_alpha64.yaml',
+        tmp_path / 'conf' / 'train' / 'sft_stage_b_hardening.yaml',
+        tmp_path / 'conf' / 'train' / 'sft_stage_b_a6000_compat.yaml',
+        tmp_path / 'conf' / 'package' / 'peft_smoke.yaml',
+        tmp_path / 'data' / 'processed' / '.gitkeep',
+        tmp_path / 'data' / 'synth' / '.gitkeep',
+        tmp_path / 'data' / 'train_packs' / '.gitkeep',
+        tmp_path / 'outputs' / 'audits' / '.gitkeep',
+        tmp_path / 'outputs' / 'datasets' / '.gitkeep',
+        tmp_path / 'outputs' / 'train' / '.gitkeep',
+        tmp_path / 'outputs' / 'eval' / '.gitkeep',
+        tmp_path / 'outputs' / 'packaging' / '.gitkeep',
+        tmp_path / 'outputs' / 'reports' / '.gitkeep',
+    )
+    for path in expected_files:
+        assert path.exists()
+
+    placeholder_yaml = (tmp_path / 'conf' / 'data' / 'real_canonical.yaml').read_text(encoding='utf-8')
+    assert 'status: scaffold' in placeholder_yaml

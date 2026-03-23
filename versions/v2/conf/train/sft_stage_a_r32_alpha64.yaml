@@ -1,0 +1,26 @@
+version: v2
+section: train
+name: sft_stage_a_r32_alpha64
+stage: a
+train_pack_path: versions/v2/data/train_packs/stage_a_mix_v2.parquet
+base_model: lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit
+lora_r: 32
+lora_alpha: 64
+lora_dropout: 0.0
+target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+learning_rate: 0.0001
+num_epochs: 2.0
+warmup_ratio: 0.03
+max_seq_len: 1024
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+weighted_loss: false
+final_line_weight: 1.0
+answer_span_weights: {}
