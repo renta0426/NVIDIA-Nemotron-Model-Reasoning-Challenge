@@ -46,15 +46,87 @@
     - `format_fail_rate = 0.9609375`
     - `boxed_rate = 0.59375`
     - `avg_output_len_chars = 10519.59375`
-    - this is the current best local v4/v5 quick result, but still clearly format-fragile
-- Current in-progress runs:
-  - `v4_rft_stage_c_cleanaccept_lowlr_run3`
-    - serious gate (`shadow_256`, `hard_shadow_256`) running under official parameters
-  - additional Stage C sweeps launched in parallel while serious scoring runs:
+    - serious `shadow_256 overall_accuracy = 0.5234375`
+    - serious `hard_shadow_256 overall_accuracy = 0.5703125`
+    - `shadow_256 format_fail_rate = 0.984375`
+    - `hard_shadow_256 format_fail_rate = 0.96875`
+    - `shadow_256 avg_output_len_chars = 10825.73828125`
+    - `hard_shadow_256 avg_output_len_chars = 10024.578125`
+    - this is the current best local v4/v5 candidate so far, but it is still clearly format-fragile
+    - family behavior is highly uneven:
+      - `gravity_constant = 1.0`
+      - `roman_numeral = 1.0`
+      - `unit_conversion ≈ 0.62-0.67`
+      - `text_decryption ≈ 0.29-0.48`
+      - `bit_manipulation ≈ 0.12`
+      - `symbol_equation ≈ 0.12-0.16`
+  - `v4_rft_stage_c_cleanaccept_halfepoch_run5`
+    - quick `shadow_128 overall_accuracy = 0.5078125`
+    - `format_fail_rate = 0.984375`
+    - `boxed_rate = 0.59375`
+    - `avg_output_len_chars = 10436.6796875`
+    - slightly worse than `run3 quick` and not materially cleaner, so it is not promoted to serious scoring
+- Recent sweep outcomes:
+  - completed training plus local-gate results:
     - `v4_rft_stage_c_cleanaccept_ultralowlr_run4`
-    - `v4_rft_stage_c_cleanaccept_halfepoch_run5`
+      - `final_val_loss = 0.8187304735`
+      - quick `shadow_128 overall_accuracy = 0.515625`
+      - `format_fail_rate = 0.9609375`
+      - `boxed_rate = 0.578125`
+      - `avg_output_len_chars = 11198.671875`
+      - tied on quick accuracy, but was clearly weaker than `run6` on formatting and output length, so it was not promoted
     - `v4_rft_stage_c_cleanaccept_answerbias_run6`
-- `v5_format_sft_anchor_run1` quick scoring was intentionally paused to avoid OOM while the serious gate was active.
+      - `final_val_loss = 0.7242920995`
+      - quick `shadow_128 overall_accuracy = 0.515625`
+      - `format_fail_rate = 0.9453125`
+      - `boxed_rate = 0.609375`
+      - `avg_output_len_chars = 10411.8984375`
+      - quick matched `run3` accuracy while modestly improving format failure, so it was promoted immediately to serious scoring
+      - serious `shadow_256 overall_accuracy = 0.53515625`
+      - serious `shadow_256 format_fail_rate = 0.9375`
+      - serious `shadow_256 boxed_rate = 0.65625`
+      - serious `shadow_256 avg_output_len_chars = 10174.84765625`
+      - serious `hard_shadow_256 overall_accuracy = 0.51953125`
+      - serious `hard_shadow_256 format_fail_rate = 0.91796875`
+      - serious `hard_shadow_256 boxed_rate = 0.6484375`
+      - serious `hard_shadow_256 avg_output_len_chars = 9780.27734375`
+      - overall interpretation: `run6` beat `run3` on `shadow_256` and was much cleaner, but underperformed `run3 hard_shadow_256 = 0.5703125`, so `run3` remains the best overall serious local candidate
+    - `v4_rft_stage_c_cleanaccept_answerbias_halfepoch_run7`
+      - `final_val_loss = 0.7548022866`
+      - quick `shadow_128 overall_accuracy = 0.4765625`
+      - `format_fail_rate = 1.0`
+      - `boxed_rate = 0.5078125`
+      - `avg_output_len_chars = 9978.3125`
+      - clearly below the current quick bar, so it was not promoted
+    - `v4_rft_stage_c_cleanaccept_answerbias_ultralowlr_run8`
+      - training later completed with `final_val_loss = 0.7397576571`
+      - among the current fallback quick candidates, this is now the best completed unscored one
+      - quick `shadow_128 overall_accuracy = 0.515625`
+      - `format_fail_rate = 0.9921875`
+      - `boxed_rate = 0.578125`
+      - `avg_output_len_chars = 11490.8203125`
+      - tied on quick accuracy, but was too format-fragile to justify serious promotion
+- Current answer-biased / low-update sweep status:
+  - the main `run4` / `run6` / `run7` / `run8` quick sweep has now completed
+  - `run3` remains the best overall serious local checkpoint
+  - `run6` remains the most informative alternate because it improved `shadow_256` and formatting, but it did not hold on `hard_shadow_256`
+- `v5_format_sft_anchor_run1` quick scoring was resumed after the serious gate, but paused again because `format-SFT quick + 5 train sweeps` pushed memory too close to the OOM boundary.
+- Current automation:
+  - a watcher waits for `run6 quick` to finish
+  - if `run6 quick` is promising, it auto-launches `candidate_score_serious.yaml` for `run6`
+  - otherwise it auto-selects the best completed unscored fallback candidate among `run7`, `run8`, and `run4` by `final_val_loss` and launches the next quick gate
+  - the next single-scorer stage is configured for `10` shards because `run6 quick` + remaining train jobs still left about `~189 GB` of free pages
+  - this watcher already triggered once: `run6 quick` met the promotion rule and `run6 serious` is now live on `10` shards
+  - a second watcher is queued behind `run6 serious` so that, once `hard_shadow_256` finishes, the best completed unscored fallback candidate among `run7`, `run8`, and `run4` automatically enters quick scoring
+  - after `run8` training completed, the fallback order became `run8 -> run7 -> run4` by final validation loss
+  - after `run6 serious` finished, that second watcher auto-launched `run8 quick`
+  - `run8 quick` was then reviewed manually and rejected for serious promotion because its formatting was materially worse than `run6` / `run3`; `run7 quick` was launched next
+- quick differential note (`run6` vs `run3`):
+  - overall accuracy stayed tied at `0.515625`
+  - `run6` improved `text_decryption` (`0.2857 -> 0.4762`) and `bit_manipulation` (`0.0455 -> 0.0909`)
+  - `run6` shortened `text_decryption` outputs materially
+  - the main regression was `unit_conversion` (`0.8095 -> 0.5714`), with several rows moving from correct `boxed_multiple` answers to `last_number_fallback`
+  - this suggests answer-bias is helping text-style answer fidelity more than numeric final-answer precision
 
 ## Implemented v4 Commands
 
@@ -266,11 +338,14 @@
 - Format-preference data is plentiful.
 - Correctness-preference data exists but is relatively small.
 - Current Stage A baseline on the serious gate is weak (`0.4375` / `0.4375`) and clearly does **not** justify submission.
-- The current bottleneck is format behavior, not extraction.
+- The current best Stage C rerun already beats the baseline on the serious gate (`0.5234375` / `0.5703125`), so the project is no longer blocked on pure correctness.
+- The current bottleneck is format behavior and overlong generation, not extraction.
 - Strict RFT mining is much weaker than hoped on the Stage A parent.
-- The current active experiment is a format-specialist preference run, followed by RFT continuation and rescoring.
-- The decisive metrics are still pending:
-  - post-Stage-C candidate scores
+- The current active experiments are low-update and answer-biased Stage C sweeps intended to preserve the new accuracy gain while reducing `boxed_multiple` / `last_number_fallback` failures.
+- The next meaningful question is no longer whether Stage C can beat the baseline at all; it already can.
+- The next meaningful question is which follow-up path best preserves the `run6` formatting gains while recovering `hard_shadow_256` robustness:
+  - resume the paused `v5_format_sft_anchor_run1` quick gate, or
+  - design the next numeric-safe loss-weighting / data-mix variant
 
 ## Active Training Snapshot
 
