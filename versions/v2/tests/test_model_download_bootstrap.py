@@ -14,7 +14,7 @@ SPEC.loader.exec_module(v2_train)
 
 
 def test_fixed_model_repo_id_is_pinned() -> None:
-    assert v2_train.DEFAULT_MODEL_REPO_ID == 'lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit'
+    assert v2_train.DEFAULT_MODEL_REPO_ID == 'mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16'
 
 
 def test_default_model_directory_uses_local_name() -> None:
@@ -43,7 +43,7 @@ def test_default_lms_model_path_uses_repo_structure(tmp_path: Path) -> None:
         models_root=tmp_path,
     )
 
-    assert path == tmp_path / 'lmstudio-community' / 'NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit'
+    assert path == tmp_path / 'mlx-community' / 'NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16'
 
 
 def test_ensure_lms_model_symlink_creates_link(tmp_path: Path) -> None:
@@ -53,11 +53,53 @@ def test_ensure_lms_model_symlink_creates_link(tmp_path: Path) -> None:
     link = v2_train.ensure_lms_model_symlink(
         snapshot_dir,
         v2_train.DEFAULT_MODEL_REPO_ID,
-        models_root=tmp_path / 'models',
+        models_root=tmp_path / 'model',
     )
 
     assert link.is_symlink()
     assert link.resolve() == snapshot_dir.resolve()
+
+
+def test_download_model_to_repo_model_dir(tmp_path: Path) -> None:
+    """Download the configured DEFAULT_MODEL_REPO_ID into the repository `model/` directory.
+
+    This will call the real download flow and place the snapshot under <repo_root>/model.
+    The active manifest and registry are written into a temporary path to avoid touching outputs/.
+    """
+    import argparse
+
+    output_dir = v2_train.REPO_ROOT / 'model'
+    # ensure a clean target (remove if present to allow test re-run)
+    if output_dir.exists():
+        import shutil
+
+        shutil.rmtree(output_dir)
+
+    args = argparse.Namespace(
+        repo_id=v2_train.DEFAULT_MODEL_REPO_ID,
+        local_name=v2_train.DEFAULT_LOCAL_MODEL_NAME,
+        revision=None,
+        token_env='HF_TOKEN',
+        output_dir=str(output_dir),
+        active_model_path=str(tmp_path / 'active_model.json'),
+        registry_path=str(tmp_path / 'model_registry.json'),
+    )
+
+    # ensure huggingface_hub is available — install at runtime if necessary
+    try:
+        import huggingface_hub  # type: ignore
+    except Exception:
+        import subprocess
+        import sys
+
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'huggingface_hub'])
+
+    v2_train.run_download_model(args)
+
+    assert output_dir.exists()
+    # expect at least one file downloaded
+    found_any = any(p.is_file() for p in output_dir.rglob('*'))
+    assert found_any, f'no files found under downloaded model dir: {output_dir}'
 
 
 def test_upsert_registry_entry_replaces_same_repo_and_name() -> None:
