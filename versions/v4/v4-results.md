@@ -128,6 +128,56 @@
   - the main regression was `unit_conversion` (`0.8095 -> 0.5714`), with several rows moving from correct `boxed_multiple` answers to `last_number_fallback`
   - this suggests answer-bias is helping text-style answer fidelity more than numeric final-answer precision
 
+## 2026-03-24 Merge checkpoint
+
+- `v5_format_sft_anchor_run1`
+  - quick `shadow_128 overall_accuracy = 0.4921875`
+  - `format_fail_rate = 0.984375`
+  - `boxed_rate = 0.5703125`
+  - `avg_output_len_chars = 10911.4140625`
+  - this did not recover formatting enough and was not promoted
+- `v5_merge_run3_run6_85_15`
+  - quick `shadow_128 overall_accuracy = 0.5390625`
+  - `format_fail_rate = 0.984375`
+  - `boxed_rate = 0.6171875`
+  - `avg_output_len_chars = 10822.90625`
+  - serious `shadow_256 overall_accuracy = 0.5625`
+  - serious `hard_shadow_256 overall_accuracy = 0.55859375`
+  - `shadow_256 format_fail_rate = 0.9921875`
+  - `hard_shadow_256 format_fail_rate = 0.9765625`
+  - interpretation:
+    - this is the current **best shadow-side serious** candidate
+    - it does not beat `run3 hard_shadow_256 = 0.5703125`
+    - therefore it is a strong balanced candidate, but not an outright replacement for `run3`
+- `v5_merge_run3_run6_75_25`
+  - quick `shadow_128 overall_accuracy = 0.515625`
+  - `format_fail_rate = 0.953125`
+  - `boxed_rate = 0.6328125`
+  - `avg_output_len_chars = 10286.359375`
+  - serious `shadow_256 overall_accuracy = 0.5390625`
+  - serious `hard_shadow_256 overall_accuracy = 0.5625`
+  - `shadow_256 format_fail_rate = 0.9765625`
+  - `hard_shadow_256 format_fail_rate = 0.96484375`
+  - `hard_shadow_256 avg_output_len_chars = 9721.1015625`
+  - interpretation:
+    - `75/25` is weaker than `85/15` on `shadow_256`, but stronger on `hard_shadow_256`
+    - it still does not beat `run3 hard_shadow_256`, but it is cleaner than both `run3` and `85/15`
+    - this is the current **best balanced merge** candidate
+- overall local ranking after the merge sweep:
+  - `run3` remains the best hard-robust serious checkpoint (`hard_shadow_256 = 0.5703125`)
+  - `85/15` is the best shadow-side serious checkpoint (`shadow_256 = 0.5625`)
+  - `75/25` is the cleanest merge and the closest balanced compromise
+  - none of the merge candidates clearly dominates `run3` on both serious datasets
+- next parallel continuation:
+  - `v4_rft_stage_c_cleanaccept_hardrobust_run9` is training in parallel
+  - config change vs `run3`:
+    - `learning_rate = 3.5e-5`
+    - `final_line_weight = 4.0`
+    - `bit_manipulation = 6.0`
+    - `symbol_equation = 7.0`
+    - `text_decryption = 4.0`
+  - the goal is to preserve `run3` hard robustness while strengthening final-answer supervision without reintroducing `run6`-style hard regressions
+
 ## Implemented v4 Commands
 
 - `bootstrap-v4`
