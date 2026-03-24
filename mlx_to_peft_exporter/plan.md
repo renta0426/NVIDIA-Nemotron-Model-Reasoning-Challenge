@@ -1,260 +1,312 @@
-**「Mac で MLX 学習 → MLX→PEFT 変換 → Mac で軽い確認 → CUDA/Linux で PEFT/Transformers 検証」**までを、**実装抜き**で、できるだけ実務向けに整理します。  
-先に要点だけ言うと、**この流れは十分現実的**です。ただし **MLX→PEFT は現状“公式逆変換コマンド”が見当たらない**ので、そこだけは**自前 exporter を前提**に進めるのが安全です。`mlx-lm` の学習物は `adapters/` 配下に保存され、読み込み側も `adapter_config.json` と `adapters.safetensors` を前提にしています。一方、PEFT は `adapter_model.safetensors` と `adapter_config.json` を要求します。 
+**「MLXで学習済みの LoRA アダプタを、できるだけ意味を変えずに、このコンペの提出要件に合う PEFT/vLLM 形式へ変換する」ことだけ**に絞って、計画を組み直します。  
+**探索・再学習・精度向上のための試行は対象外**とします。
 
 ---
 
-## まず前提として固定すべきこと
+# 目的の再定義
 
-### 1) ベースモデルの“正体”を固定する
-Linux/CUDA 側の検証では、**最終的に差し込みたい official base** を固定してください。Nemotron の BF16 モデルカードでは `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` が Transformers / vLLM 利用例として案内されており、NVIDIA の Nemotron 3 公開ページでも **BF16 が post-trained Nano、Base-BF16 は pre-trained base** と分けて公開されています。したがって、**提出互換を意識した検証先は `...-A3B-BF16` で固定**するのが自然です。
-BF16(mlx):model/config.jsonなど、ここにモデル本体DL済み
-6bit(mlx): versions/v2/outputs/models/nemotron-3-nano-30b-a3b-mlx-6bit/config.jsonなど、ここにモデル本体DL済み
+このタスクの目的は次の 1 点です。
 
-### 2) LoRA 方式は“標準 LoRA”に絞る
-vLLM 側の `PEFTHelper` は、**`modules_to_save` は `None` であること、`use_dora` は未対応、`bias` は `none`、rank は `max_lora_rank` 以下**を明示的に検証します。したがって、**Mac 側の探索段階から DoRA や特殊設定を避け、標準 LoRA に寄せる**のがベストです。 
+> **既存の MLX LoRA アダプタを、提出可能な PEFT 形式へ高忠実度で変換し、コンペ evaluator と同系統の vLLM 環境で壊れていないことを確認する。**
 
-### 3) 4bit は探索用、最終候補は BF16 で再確認
-`mlx-lm` は、**量子化モデルを指すと QLoRA、非量子化モデルを指すと通常 LoRA**になります。なので 4bit MLX は探索に向いていますが、Linux 側 official 検証先は BF16 です。  
-そのため、これは私の運用推奨ですが、**粗い sweep は 4bit MLX、最終候補だけ BF16 MLX でもう一度回してから export** すると、Mac→Linux のズレをかなり減らせます。これは `mlx-lm` の QLoRA 対応と、Nemotron の official BF16 運用例からの実務的な推論です。 
-
-### 4) プロンプト契約を Mac / Linux で完全一致させる
-Nemotron の model card では、**`tokenizer.apply_chat_template(..., add_generation_prompt=True)`** を使う例が示され、`enable_thinking` は既定で有効です。比較検証では、**同じ tokenizer、同じ chat template、同じ `enable_thinking` 設定、同じ stop 条件**を使わないと、変換ミスなのか prompt 差分なのか切り分けにくくなります。 
+したがって、**「どの rank が良いか」「6bit と BF16 のどちらが強いか」**のような話は、ここでは扱いません。  
+扱うのは **変換の正確性・互換性・提出パッケージの健全性**だけです。
 
 ---
 
-# Phase A: Mac 側の具体手順
-目的は、**MLX で学習し、export 前の“正”を作ること**です。
+# このコンペ前提で最初に固定すべきこと
 
-## A-1. 環境と対象を固定する
-最初に固定するものは以下です。
+あなたが貼ってくれた metric コードを見る限り、評価時は次の前提です。
 
+- evaluator 側で **固定の Nemotron BF16 ベース**をロードする
+- 提出物は **LoRA adapter のディレクトリ**である
+- zip 展開後、**最初に見つかった `adapter_config.json`** のあるディレクトリが採用される
+- 推論は **vLLM** で行われる
+- prompt 末尾に **`\boxed{}` 指示**が付与される
+- tokenizer の **chat template** を通し、`enable_thinking=True` で生成する
+- 採点は **生成全文ではなく抽出された final answer** ベース
+
+この前提だと、**変換タスクの真のゴールは「PEFT/Transformers で読めること」ではなく、「vLLM evaluator にそのまま刺さること」**です。  
+つまり、**最終判定系は Linux/CUDA + vLLM** に置くべきです。
+
+---
+
+# 変換タスクの入出力を明確化する
+
+## 入力
+入力は **すでに存在する MLX adapter ディレクトリ**です。  
+`mlx-lm` の LoRA/QLoRA フローでは、adapter config と学習済み重みは既定で `adapters/` に保存され、出力先は `--adapter-path` で変更できます。さらに loader 側は `adapter_config.json` を読んで LoRA 層を差し込み、`adapters.safetensors` をロードします。 
+
+## 出力
+出力は **PEFT 互換 adapter ディレクトリ**です。  
+PEFT の checkpoint 形式では、少なくとも **`adapter_model.safetensors`** と **`adapter_config.json`** が必要です。Transformers/PEFT も、ローカルディレクトリから adapter を読む際にこの構成を前提にします。 
+
+---
+
+# 変換タスクのベストプラクティス
+
+## 1) 変換対象は「標準 LoRA」のみに限定する
+`mlx-lm` は `lora` / `dora` / `full` を扱えますが、vLLM 側は **`modules_to_save` は `None` のみ対応、DoRA は未対応、bias 付き adapter も未対応、rank は `max_lora_rank` 以下**という制約を持っています。したがって、**変換対象として受け入れる MLX adapter は `fine_tune_type == "lora"` に限定**するのが安全です。 
+
+## 2) 変換ロジックは 1 本に固定する
+PEFT 形式への変換では、**重みファイル名・state_dict key・config 項目・スケーリングの意味**を揃える必要があります。PEFT 自身も「他形式から PEFT 形式へ変換するには、正しい key mapping と `adapter_config.json` が必要」と明記しています。したがって、trial ごとに変換方法を変えるのではなく、**custom exporter を 1 本に固定して、その exporter だけを信頼できる変換器として運用する**のが最善です。 
+
+## 3) 変換の本質は「MLX の LoRA 意味論」を PEFT/vLLM に写すこと
+MLX の `LoRALinear` は、`lora_a` を `(input_dims, r)`、`lora_b` を `(r, output_dims)` で持ち、forward は **`y + scale * ((x @ lora_a) @ lora_b)`** です。PEFT 側の LoRA は `lora_A.weight` / `lora_B.weight` を checkpoint に持ち、vLLM は通常 LoRA で **`lora_alpha / r`** を scaling として扱います。したがって、**変換で最も重要なのは shape 向きと scale/alpha の一致**です。標準 LoRA として対応づけるなら、実務上は **`lora_alpha = scale * r`** を守るのが基本になります。 
+
+---
+
+# 変換仕様として先に固定すべきもの
+
+以下は、**実装ではなく仕様**として固定するべき項目です。
+
+## A. ファイル構成
+変換後ディレクトリは最低限これに揃えます。
+
+- `adapter_model.safetensors`
+- `adapter_config.json`
+
+PEFT はこの 2 つを要求します。`README.md` は任意です。 
+
+## B. 重みキーの命名
+PEFT の LoRA checkpoint では、LoRA の学習パラメータは **`base_model.model....lora_A.weight`** と **`base_model.model....lora_B.weight`** 形式になります。PEFT docs は、**PEFT 形式へ変換するときは `base_model.model.` prefix を付ける必要がある**と明記しています。 
+
+## C. MLX→PEFT のテンソル対応
+MLX の `lora_a` / `lora_b` は PEFT と向きが異なるため、**転置が必要**です。  
+つまり、仕様上は次を守る前提にします。
+
+- MLX `lora_a` → PEFT `lora_A.weight`
+- MLX `lora_b` → PEFT `lora_B.weight`
+- 保存時に **PEFT が期待する向きへ転置**
+- key prefix は **`base_model.model.`**
+
+これは MLX の shape 定義と PEFT の checkpoint key 規約から直接導かれる対応です。 
+
+## D. config の意味対応
+PEFT `adapter_config.json` は少なくとも以下を整合させます。
+
+- `peft_type = "LORA"`
+- `r = MLX rank`
+- `lora_alpha = MLX scale * rank`
+- `lora_dropout = MLX dropout`
+- `target_modules = MLX keys`
+- `bias = "none"`
+- `modules_to_save = null`
+- `use_dora = false`
+- `use_rslora = false` を初期方針にする
+- `inference_mode = true`
+
+vLLM の `PEFTHelper` が legal check で見るのは主に `r`, `lora_alpha`, `target_modules`, `bias`, `modules_to_save`, `use_dora`, `use_rslora` です。特に `modules_to_save != None`、`use_dora=True`、`bias!="none"`、`r > max_lora_rank` は弾かれます。 
+
+---
+
+# 変換専用フローに絞った実務手順
+
+---
+
+## Phase 1: Mac 側で「入力 artifact を凍結」する
+ここでは **学習はしない**です。  
+やることは、**変換元として使う MLX adapter を 1 個確定する**ことだけです。
+
+固定する項目:
+
+- 変換元 `adapter_path`
+- 変換元 MLX ベースモデルの識別子
 - `mlx-lm` のバージョン
-- MLX 変換済みベースの repo / commit / snapshot
-- 学習 YAML
-- 学習データの版
-- 比較用サンプルプロンプト集合
-- 生成条件  
-  - `max_new_tokens`
-  - `temperature`
-  - `top_p`
-  - `seed`
-  - `enable_thinking`
-  - stop 条件
+- 元 adapter の `adapter_config.json`
+- 元 adapter の `adapters.safetensors`
 
-`mlx-lm` は Apple silicon 向けの LLM 実行・微調整パッケージで、LoRA 学習の主コマンドは `mlx_lm.lora`、生成は `mlx_lm.generate` です。大きなモデルでは macOS 15 以降の wired memory の話もあるため、**まず再現可能な環境を固定してから実験に入る**のが重要です。 
+MLX loader は `adapter_config.json` と `adapters.safetensors` を前提に adapter を適用するので、**この 2 ファイルを source of truth とする**のが正しいです。 
 
-## A-2. ベースモデル単体で“基準出力”を取る
-LoRA 学習前に、**ベースモデル単体**で 5〜20 個くらいの固定プロンプトに対する出力を保存します。  
-ここでの目的は精度評価ではなく、**後で「学習は効いているか」「chat template が壊れていないか」を見る基準点**を持つことです。Nemotron の official 例に合わせて、**Transformers 側でも再現しやすい chat template 形式**で保存しておくのがよいです。 
-
-## A-3. `mlx_lm.lora` で学習し、成果物を `adapter_path` に集約する
-`mlx-lm` の LoRA ドキュメントでは、LoRA 学習の主コマンドは `mlx_lm.lora` で、**既定では `adapters/` に adapter config と learned weights を保存**し、出力先は `--adapter-path` で変えられます。さらに、現行の読み込みコードは **`adapter_config.json` と `adapters.safetensors` を読む**前提です。  
-したがって、**1 trial = 1 adapter ディレクトリ**にし、後工程で迷子にならないようにします。 
-
-## A-4. 学習直後に MLX ネイティブ推論で“golden samples”を作る
-学習が終わったら、その trial の adapter を使って **MLX ネイティブ推論**を行い、固定プロンプト集合に対する出力を保存します。  
-保存対象は少なくとも次です。
-
-- 入力 prompt
-- 生出力 raw text
-- 必要なら抽出後 final answer
-- 生成条件
-- 使用した base / adapter / trial ID
-
-ここで保存したものが、Linux 側比較の**golden reference**になります。MLX では `mlx_lm.generate --adapter-path ...` による生成が案内されています。 
-
-## A-5. Mac 側の“軽い整合確認”は、まず構造確認に徹する
-Mac 側でやる軽い確認は、**数値一致検証ではなく構造確認**を中心にするのが賢いです。確認項目は次です。
-
-- `fine_tune_type` が `lora` である
-- `adapter_path/adapter_config.json` が存在する
-- `adapter_path/adapters.safetensors` が存在する
-- `lora_parameters.rank / scale / dropout / keys` が期待通り
-- trial ごとに base が混ざっていない
-- 量子化ベースか BF16 ベースかが明確
-
-MLX の学習設定例では LoRA 設定名は **`rank` / `scale` / `dropout` / `keys`** です。後の export でここが PEFT 側の `r / lora_alpha / lora_dropout / target_modules` に対応します。 
-
-## A-6. Export は「custom exporter を 1 個に固定」する
-ここが一番大事です。  
-`mlx_lm.convert` の documented な役割は **Hugging Face model → MLX** 方向で、現時点では **MLX → PyTorch/PEFT の公式逆変換コマンドは文書化されていません**。`mlx-lm` 側でも reverse convert を求める issue が立っています。  
-なので運用としては、**trial ごとに場当たり変換するのではなく、exporter を 1 本に固定**してください。これで事故率が一気に下がります。 
-
-## A-7. Exporter の仕様を先に決める
-実装は不要とのことなので、**仕様だけ**書きます。Mac 側 exporter は次の責務を持たせるのがよいです。
-
-1. **入力**: MLX の `adapter_path/`  
-2. **出力**: PEFT 形式の `converted_adapter/`  
-3. **重みファイル名変換**: `adapters.safetensors` → `adapter_model.safetensors`  
-4. **キー変換**: PEFT 互換の key naming に合わせる  
-5. **config 変換**: MLX config → PEFT `adapter_config.json`  
-6. **manifest 出力**: trial ID、base model、MLX rank/scale、PEFT r/alpha、target_modules を記録  
-7. **検証ログ出力**: 変換した tensor 数、shape、dtype の一覧
-
-PEFT の checkpoint 形式は **`adapter_model.safetensors` と `adapter_config.json`** が必須で、LoRA weight keys は **`base_model.model....lora_A.weight` / `lora_B.weight`** 形式を使います。 
-
-## A-8. Export 規約はこれで固定する
-MLX source と PEFT checkpoint 仕様から、変換ルールは以下で固定するのが妥当です。
-
-- MLX の `lora_a` → PEFT の `lora_A.weight`
-- MLX の `lora_b` → PEFT の `lora_B.weight`
-- key prefix は **`base_model.model.`** を付与
-- MLX の `lora_a` / `lora_b` は shape が PEFT と向きが違うため、**転置**して保存
-- PEFT config の  
-  - `r = rank`
-  - `lora_alpha = scale * rank`
-  - `lora_dropout = dropout`
-  - `target_modules = keys` 由来
-  - `peft_type = "LORA"`
-  - `inference_mode = true`
-  - `bias = "none"`
-  - `modules_to_save = null`
-  - `use_dora = false`
-  - `use_rslora = false`（少なくとも最初は）
-
-MLX の `LoRALinear` は `lora_a` を `(input_dims, r)`、`lora_b` を `(r, output_dims)` で持ち、forward は `scale * ((x @ lora_a) @ lora_b)` です。PEFT は LoRA weight として `lora_A.weight` / `lora_B.weight` を保存し、`base_model.model.` prefix を要求します。vLLM は PEFT config を読み、**DoRA 非対応・`modules_to_save=None`・bias 非対応**を確認します。 
-
-## A-9. Mac 側で export 後にやる“最終軽チェック”
-Mac 側で export 後に最低限確認すべきものは次です。
-
-- `converted_adapter/adapter_model.safetensors` がある
-- `converted_adapter/adapter_config.json` がある
-- `base_model_name_or_path` が **Linux で使う official base** と一致している
-- `r`, `lora_alpha`, `target_modules` が MLX 側の trial 設定と矛盾していない
-- `use_dora=false`, `modules_to_save=null`, `bias=none`
-
-ここでは **Transformers 実ロードまでは Mac で無理にやらなくてよい**です。30B 級で Mac 側の追加検証まで背負うと重いので、**Mac は“学習・export・構造確認・golden sample 採取”まで**に寄せるのが実務的です。PEFT / Transformers の authoritative check は Linux に回します。 
+### Phase 1 の完了条件
+- `adapter_config.json` が存在する
+- `adapters.safetensors` が存在する
+- `fine_tune_type == "lora"` である
+- `lora_parameters` に `rank / scale / dropout / keys` がある
 
 ---
 
-# Phase B: CUDA/Linux 側の具体手順
-目的は、**変換後 adapter が official base に正しく刺さり、Mac 側の挙動を壊していないか**を確認することです。
+## Phase 2: Mac 側で MLX→PEFT 変換する
+ここが本体です。  
+ただし実装は不要とのことなので、**変換器が満たすべき責務**だけを定義します。
 
-## B-1. Linux 側は“検証専用”のクリーン環境を作る
-CUDA/Linux 側では、**学習ではなく検証専用環境**に分けるのがよいです。  
-ここで固定するものは次です。
+### exporter の責務
+1. **入力**: MLX adapter ディレクトリ  
+2. **出力**: PEFT adapter ディレクトリ  
+3. **重みファイル名**を `adapters.safetensors` → `adapter_model.safetensors` に変換  
+4. **state_dict key** を PEFT 命名へ変換  
+5. **テンソル向き**を PEFT が読む形へ変換  
+6. **`adapter_config.json`** を PEFT/vLLM 互換で生成  
+7. **manifest** を出力し、元 MLX config と変換後 config の対応を記録する
 
-- CUDA / driver
-- PyTorch
-- Transformers
-- PEFT
-- safetensors
-- 必要なら vLLM
-- official base model revision
+PEFT docs が言うとおり、変換で重要なのは「正しい parameter-name → tensor の対応」です。ここを曖昧にしないため、**exporter には manifest 出力を必須**にすると後で診断しやすいです。 
 
-Nemotron の model card は **Transformers と vLLM の使用例**を示しており、NVIDIA のカスタマイズ文書でも `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` を customization target としています。 
-
-## B-2. まず official base 単体で Linux 推論を確認する
-いきなり adapter を載せず、まず **base 単体**で次を確認します。
-
-- tokenizer がロードできる
-- `trust_remote_code=True` が必要なら通る
-- `apply_chat_template` が想定通りに動く
-- 固定 sample が問題なく生成できる
-
-Nemotron の official 使用例でも、Transformers で **`AutoTokenizer` / `AutoModelForCausalLM`** を使い、`trust_remote_code=True` と `apply_chat_template()` を使っています。 
-
-## B-3. 次に PEFT adapter を local dir からロードする
-Transformers / PEFT 側では、**local directory にある `adapter_config.json` と adapter weights** をロードできます。  
-つまり Linux 側の第一関門は単純で、**`converted_adapter/` が “普通の PEFT LoRA ディレクトリ”として読めるか**です。これは `from_pretrained()` でも `load_adapter()` でも可能です。 
-
-## B-4. 構造検証では“ロードできた”だけで満足しない
-Linux 側での構造検証では、最低限次を確認します。
-
-- missing / unexpected key が出ていないか
-- adapter が有効化されているか
-- target module 数が不自然でないか
-- active adapter が意図した 1 本だけか
-- ベース単体時と adapter 有効時で出力が変化するか
-
-PEFT には adapter の load や状態確認の仕組みがあり、Transformers の `PeftAdapterMixin` も local path から adapter をロードできます。**“ロード成功”だけでなく、実際に adapter が forward に参加しているか**まで確認すべきです。 
-
-## B-5. Mac 側の golden samples と比較する
-ここが本丸です。  
-比較は次の順でやるのがよいです。
-
-1. **同一 prompt / 同一 chat template / 同一 generation 条件**で Linux 出力を取る  
-2. Mac 側で保存した MLX native 出力と並べる  
-3. 比較対象を3段階に分ける  
-   - raw text  
-   - 抽出後 final answer  
-   - 必要なら token 単位の冒頭比較
-
-比較用 sample は 5〜20 個で十分です。  
-特に今回の用途では、**最初は “final answer が一致するか / 挙動が同等か” を主判定**にし、raw text の完全一致は補助指標にするのが現実的です。4bit MLX で学習した trial を BF16 Linux に持ってきた場合、数値誤差や量子化差で完全一致しないことはありえます。だからこそ、**最終候補は BF16 MLX でもう一度作る**運用が効きます。これは MLX の QLoRA 対応と official BF16 base 運用からの推奨です。 
-
-## B-6. 差が出たときの切り分け順
-Linux 側で差分が出たら、疑う順番はこれです。
-
-1. **base model が違う**  
-2. **chat template / `enable_thinking` / prompt 組み立てが違う**  
-3. **MLX `scale` → PEFT `lora_alpha` 変換が違う**  
-4. **tensor 転置が漏れている**  
-5. **target_modules が不足・過剰**  
-6. **DoRA / bias / `modules_to_save` など vLLM 非互換設定が混入**  
-7. **4bit trial を BF16 base に持ち込んだことで比較が荒れている**
-
-この順で見ると、だいたい原因が詰められます。MLX source は `scale` を明示的に forward に掛けており、PEFT / vLLM は `lora_alpha` と rank を config から解釈します。vLLM も unsupported な設定を明示的に弾きます。 
+### Phase 2 の完了条件
+- `adapter_model.safetensors` が生成されている
+- PEFT 用 `adapter_config.json` が生成されている
+- `r`, `lora_alpha`, `lora_dropout`, `target_modules` が source と整合している
+- `bias="none"`, `modules_to_save=null`, `use_dora=false` になっている
 
 ---
 
-# 精度を落としにくい運用ルール
+## Phase 3: Mac 側で「静的検査」だけ行う
+ここでは **推論品質の議論はしません**。  
+やるのは、**変換後 artifact が形式的に妥当か**の確認だけです。
 
-## 1) “量産 trial” と “本命 trial” を分ける
-- **量産 trial**: Mac + MLX 4bit で高速探索  
-- **本命 trial**: Mac + MLX BF16 で再学習 / 再export  
-- **検証 trial**: Linux + official BF16 base で PEFT 検証
+確認項目:
 
-この 3 段階に分けると、Mac の速さを活かしつつ、最終的な互換性も担保しやすいです。 
+- 変換後ディレクトリに **`adapter_model.safetensors`** がある
+- 変換後ディレクトリに **`adapter_config.json`** がある
+- `peft_type == "LORA"`
+- `r <= 32`
+- `bias == "none"`
+- `modules_to_save == null`
+- `use_dora == false`
+- `target_modules` が空でない
+- manifest に **MLX scale → PEFT lora_alpha** の変換結果が記録されている
 
-## 2) exporter の入力・出力仕様を固定し、trial ごとに変えない
-一度 exporter の規約を決めたら、**trial ごとに key mapping や config mapping を変えない**でください。  
-trial ごとに変えるべきなのは **LoRA の中身**だけで、**変換ロジック自体は固定**が鉄則です。PEFT checkpoint format は要求ファイルと key naming が明確です。 
+vLLM の legal check はこの種の config 項目に依存するので、**ここで落ちるものは Linux に持っていかない**のが効率的です。 
 
-## 3) prompt 比較セットを固定資産にする
-比較セットは、毎回その場で作るのではなく固定してください。  
-おすすめは以下の 3 群です。
-
-- reasoning が短い問題
-- reasoning が長い問題
-- boxed answer / 数値抽出に近い問題
-
-Nemotron は reasoning trace を生成しうるモデルなので、**短問・長問・最終解答型**を混ぜると、壊れ方が見えやすいです。model card でも reasoning/chat 用モデルであることが説明されています。 
-
-## 4) Linux 側で通った artifact だけを“採用候補”にする
-Mac 側でよく見えても、**Linux で official base + PEFT が通らないものは不採用**にした方がいいです。  
-理由は単純で、**真の互換性判定環境は Linux/CUDA 側**だからです。Transformers / PEFT / vLLM の正式なロード条件はそちらにあります。 
+### Phase 3 の完了条件
+- config 上の vLLM 非互換要素がない
+- 変換ログ上、tensor 数・shape・dtype が不自然でない
 
 ---
 
-# ここまででの完了条件
-あなたの今回の範囲なら、**次の条件を満たしたら完了**です。
+## Phase 4: CUDA/Linux で PEFT/Transformers ロード確認
+ここから先が **提出互換の本番検証**です。
 
-- Mac で MLX 学習が回る  
-- Mac で MLX native 推論結果を golden sample として保存できる  
-- MLX adapter を PEFT 形式へ export できる  
-- Linux で official Nemotron BF16 base + converted adapter をロードできる  
-- 固定 sample で、Mac 側の変換前推論結果と比べて**致命的な差がない**と判断できる  
+### 4-1. official Nemotron BF16 ベースを固定する
+Nemotron の公式 model card では `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` に対する Transformers / vLLM 利用例が示されています。したがって、**Linux 側の検証ベースはこのモデル系に固定**するのが自然です。 
 
-ここまで通れば、次の段階として **vLLM smoke test** に進む価値があります。vLLM は LoRA adapter のディレクトリ構造と config を前提に読み込むので、その前段としては十分よいゲートです。 
+### 4-2. base 単体が普通に読めることを確認する
+Nemotron では tokenizer に chat template があり、`apply_chat_template(..., add_generation_prompt=True)` を使う流れが公式に示されています。`enable_thinking` は既定で `True` です。したがって、まず **base 単体で tokenizer / model / chat template が正常**であることを確認します。 
+
+### 4-3. converted adapter を PEFT/Transformers で読む
+Transformers の PEFT 統合では、**ローカルディレクトリに `adapter_config.json` と adapter weights があれば `from_pretrained()` / `load_adapter()` で読める**とされています。したがって、Linux 側の第一関門は **「converted adapter が普通の PEFT adapter としてロードできるか」**です。 
+
+### 4-4. ここで見るべきもの
+- missing key / unexpected key がない
+- adapter が active になっている
+- target module 数が不自然でない
+- base 単体と adapter 有効時で出力が変わる
+
+ここではまだ metric スコアは見ません。  
+見るのは **「PEFT として成立しているか」**だけです。 
+
+### Phase 4 の完了条件
+- official base + converted adapter が PEFT/Transformers でロード可能
+- 明らかな key mismatch がない
+- adapter 適用時に forward が成立する
+
+---
+
+## Phase 5: CUDA/Linux で vLLM の metric 互換 smoke test を行う
+ここが**変換タスクの最終判定**です。  
+このコンペは evaluator が vLLM で LoRA を差して採点するので、**Transformers で通るだけでは十分ではありません**。
+
+### 5-1. vLLM で local adapter directory を読む
+vLLM の LoRA 機能は、`LoRARequest` に local path を渡して adapter を使えます。また vLLM docs でも、LoRA adapter をローカルディレクトリから扱う前提が示されています。 
+
+### 5-2. vLLM で重要な legal 条件
+vLLM `PEFTHelper` は少なくとも以下を確認します。
+
+- `r` が `max_lora_rank` 以下
+- `modules_to_save is None`
+- `use_dora == false`
+- `bias == "none"`
+
+加えて、`use_rslora` が `false` なら scaling は `lora_alpha / r`、`true` なら `lora_alpha / sqrt(r)` になります。変換 fidelity の観点では、**最初は `use_rslora=false` に固定**するのが無難です。 
+
+### 5-3. smoke test のやり方
+ここでは **少数サンプルで十分**です。  
+評価コードに合わせて、
+
+- prompt 末尾に `\boxed{}` 指示を付ける
+- tokenizer の chat template を適用する
+- `enable_thinking=True` を使う
+- evaluator 相当の生成設定で回す
+- final answer 抽出が破綻していないかを見る
+
+という最低限の確認をします。
+
+Nemotron 側は `apply_chat_template()` を使う前提で、thinking は既定で有効です。評価コードもこれに近い流れです。 
+
+### Phase 5 の完了条件
+- vLLM が adapter をロードできる
+- legal check で落ちない
+- few-shot の smoke test で生成が成立する
+- `\boxed{}` を含む回答が少なくとも壊れていない
+
+---
+
+# 提出パッケージ化の注意
+
+これは **あなたが貼った metric コードに強く依存する実務注意**です。
+
+## 1) zip には adapter を 1 つだけ入れる
+`generate_standard_submission()` は zip 展開後に **最初に見つかった `adapter_config.json`** を拾います。  
+つまり、**複数 trial の残骸を zip に混ぜるのは危険**です。
+
+**推奨**:
+- zip のトップ配下に提出対象 adapter ディレクトリを 1 個だけ置く
+- 余計な `checkpoint-*` や別 adapter を入れない
+
+## 2) fused model は不要
+このコンペは **LoRA adapter 提出**です。  
+したがって、MLX の `fuse` を使ってベースにマージした重みを提出物にする必要はありません。むしろ evaluator は **固定ベース + LoRA** で動くので、提出物は adapter だけにすべきです。MLX 側にも `fuse` はありますが、それは別用途です。 
+
+## 3) `base_model_name_or_path` は「整合させる」が安全
+PEFT config には base model 情報を入れるのが標準です。vLLM の filesystem resolver は `adapter_config.json` の `base_model_name_or_path` と base model 名の一致も見ます。一方で、現在のコンペ metric のように `LoRARequest` にローカルパスを直接渡す経路では、少なくとも `PEFTHelper` の legal check の主眼は `r / lora_alpha / target_modules / bias / modules_to_save / use_dora / use_rslora` です。  
+したがって、**このフィールドは evaluator での唯一の成否判定とは限らないが、PEFT 標準メタデータとして整合させておくべき**、という扱いが妥当です。 
+
+---
+
+# 変換タスクとしての Done 条件
+
+このタスクの完了条件は、精度改善ではなく次です。
+
+1. **MLX adapter source が凍結されている**  
+2. **PEFT 形式の `adapter_model.safetensors` + `adapter_config.json` が生成される**  
+3. **static preflight で vLLM 非互換設定がない**  
+4. **Linux で official Nemotron BF16 base + PEFT adapter がロードできる**  
+5. **Linux で vLLM smoke test が通る**  
+6. **提出 zip に adapter が 1 個だけ入っている**
+
+この 6 条件を満たせば、  
+**「MLX 由来 LoRA を、提出要件へ高忠実度に変換する」タスクとしては完了**です。
+
+---
+
+# あなたの元文書を、変換専用に直すなら削るべきもの
+
+以下は今回のタスク範囲外なので、文書から外してよいです。
+
+- 6bit で探索、BF16 で再学習、のような**探索戦略**
+- rank / alpha / dropout / target_modules の**最適化議論**
+- train.csv を使った**精度評価の設計**
+- Mac 側での golden sample を使った**改善ループ**
+- 「どの trial を採用するか」の**モデル選定議論**
+
+代わりに残すべきなのは、
+
+- **source artifact の固定**
+- **変換仕様**
+- **PEFT 互換検証**
+- **vLLM metric 互換検証**
+- **提出 zip の衛生管理**
+
+です。
 
 ---
 
 # 参考文献
-- MLX LM README（生成・変換・Apple silicon 向け概要） 
-- MLX LM LoRA ドキュメント（`mlx_lm.lora`, `adapter_path`, 学習/生成フロー） 
-- MLX LM source: `tuner/utils.py`（`adapter_config.json` + `adapters.safetensors` を読む現行仕様） 
-- MLX LM source: `tuner/lora.py`（`lora_a` / `lora_b` の shape と `scale` の扱い） 
-- MLX-LM issue #320（現状の `convert` が HF→MLX 方向であり、逆変換要望があること） 
-- Hugging Face PEFT checkpoint format（PEFT 形式の必要ファイル、key prefix） 
-- Transformers PEFT docs / PeftAdapterMixin（local dir から adapter を load できること） 
-- vLLM tensorizer / LoRA resolver docs（LoRA adapter のディレクトリ構造、`adapter_config.json` 前提） 
-- vLLM source: `peft_helper.py`（`modules_to_save`, DoRA, bias, rank 制約） 
-- NVIDIA Nemotron BF16 model card（Transformers / vLLM 利用例、`enable_thinking`） 
-- NVIDIA Nemotron 3 公開ページ / NVIDIA customization docs（BF16 と Base-BF16 の位置づけ、customization target） 
-
-必要なら次に、  
-**この手順に対応した「チェックリスト版」**  
-または  
-**「Mac 側 exporter 仕様書（入出力・検証項目・失敗時の診断表）」**  
-に落として出します。
+- MLX LM LoRA ドキュメント: `mlx_lm.lora` が主コマンドで、adapter config と learned weights は既定で `adapters/` に保存され、`--adapter-path` で変更できます。生成は `mlx_lm.generate --adapter-path` で行えます。 
+- MLX LM source (`tuner/utils.py`): loader は `adapter_config.json` を読み、LoRA 層を差し込み、`adapters.safetensors` をロードします。 
+- MLX LM source (`tuner/lora.py`): `LoRALinear` の `lora_a`, `lora_b`, `scale`, forward の意味が確認できます。 
+- PEFT checkpoint format: PEFT 形式には `adapter_model.safetensors` と `adapter_config.json` が必要で、LoRA keys は `base_model.model....lora_A.weight` / `lora_B.weight` 形式です。 
+- Transformers PEFT docs: local directory に `adapter_config.json` と adapter weights があれば adapter をロードできます。 
+- vLLM `PEFTHelper`: `modules_to_save=None`、DoRA 非対応、bias 非対応、rank 制限、`lora_alpha/r` スケーリングが確認できます。 
+- vLLM LoRA docs / filesystem resolver: local adapter directory の扱いと、resolver での `adapter_config.json` / `base_model_name_or_path` の利用が確認できます。 
+- NVIDIA Nemotron BF16 model card: `apply_chat_template()`、`enable_thinking=True` 既定、Transformers / vLLM 利用例が示されています。 
+- MLX-LM issue #320: 少なくとも公開議論上、`mlx_lm.convert` は HF→MLX 方向が中心で、MLX→PyTorch/PEFT の reverse convert 需要があることが分かります。 
