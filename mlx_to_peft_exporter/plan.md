@@ -1,4 +1,3 @@
-了解。  
 **「Mac で MLX 学習 → MLX→PEFT 変換 → Mac で軽い確認 → CUDA/Linux で PEFT/Transformers 検証」**までを、**実装抜き**で、できるだけ実務向けに整理します。  
 先に要点だけ言うと、**この流れは十分現実的**です。ただし **MLX→PEFT は現状“公式逆変換コマンド”が見当たらない**ので、そこだけは**自前 exporter を前提**に進めるのが安全です。`mlx-lm` の学習物は `adapters/` 配下に保存され、読み込み側も `adapter_config.json` と `adapters.safetensors` を前提にしています。一方、PEFT は `adapter_model.safetensors` と `adapter_config.json` を要求します。 
 
@@ -7,7 +6,9 @@
 ## まず前提として固定すべきこと
 
 ### 1) ベースモデルの“正体”を固定する
-Linux/CUDA 側の検証では、**最終的に差し込みたい official base** を固定してください。Nemotron の BF16 モデルカードでは `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` が Transformers / vLLM 利用例として案内されており、NVIDIA の Nemotron 3 公開ページでも **BF16 が post-trained Nano、Base-BF16 は pre-trained base** と分けて公開されています。したがって、**提出互換を意識した検証先は `...-A3B-BF16` で固定**するのが自然です。 
+Linux/CUDA 側の検証では、**最終的に差し込みたい official base** を固定してください。Nemotron の BF16 モデルカードでは `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` が Transformers / vLLM 利用例として案内されており、NVIDIA の Nemotron 3 公開ページでも **BF16 が post-trained Nano、Base-BF16 は pre-trained base** と分けて公開されています。したがって、**提出互換を意識した検証先は `...-A3B-BF16` で固定**するのが自然です。
+BF16(mlx):model/config.jsonなど、ここにモデル本体DL済み
+6bit(mlx): versions/v2/outputs/models/nemotron-3-nano-30b-a3b-mlx-6bit/config.jsonなど、ここにモデル本体DL済み
 
 ### 2) LoRA 方式は“標準 LoRA”に絞る
 vLLM 側の `PEFTHelper` は、**`modules_to_save` は `None` であること、`use_dora` は未対応、`bias` は `none`、rank は `max_lora_rank` 以下**を明示的に検証します。したがって、**Mac 側の探索段階から DoRA や特殊設定を避け、標準 LoRA に寄せる**のがベストです。 
