@@ -9,10 +9,13 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import time
+import threading
 from typing import Any, Literal, Protocol, Sequence
 import warnings
 
@@ -203,6 +206,7 @@ class GenerationBackend(Protocol):
         temperature: float,
         max_model_len: int,
         seeds: Sequence[int],
+        max_num_seqs: int = 1,
     ) -> list[list[GenerationRecord]]:
         ...
 
@@ -254,8 +258,9 @@ class ReplayBackend:
         temperature: float,
         max_model_len: int,
         seeds: Sequence[int],
+        max_num_seqs: int = 1,
     ) -> list[list[GenerationRecord]]:
-        del max_tokens, top_p, temperature, max_model_len
+        del max_tokens, top_p, temperature, max_model_len, max_num_seqs
 
         expected_prompt_indices = list(range(len(rendered_prompts)))
         actual_prompt_indices = self.replay_frame['prompt_index'].drop_duplicates().tolist()
@@ -310,6 +315,7 @@ def make_generation_record(*, prompt_id: str, sample_idx: int, seed: int, raw_ou
 
 class MLXBackend:
     backend_name = 'mlx'
+    _MODEL_CACHE: dict[tuple[str, str, bool], tuple[Any, Any]] = {}
 
     def __init__(
         self,
@@ -322,6 +328,217 @@ class MLXBackend:
         self.adapter_path = adapter_path
         self.trust_remote_code = trust_remote_code
 
+    def _require_mlx_runtime(self) -> tuple[Any, Any, Any, Any, Any]:
+        if not importlib.util.find_spec('mlx_lm'):
+            raise RuntimeError(
+                'MLXBackend requires mlx-lm, which is not installed in this environment. '
+                'Install `mlx-lm` and provide a local MLX-compatible model path to use backend=mlx.'
+            )
+
+        import mlx.core as mx  # type: ignore
+        from mlx_lm import batch_generate as mlx_batch_generate, generate as mlx_generate, load as mlx_load  # type: ignore
+        from mlx_lm.sample_utils import make_sampler as mlx_make_sampler  # type: ignore
+
+        return mx, mlx_load, mlx_generate, mlx_batch_generate, mlx_make_sampler
+
+    def _load_model_and_tokenizer(self) -> tuple[Any, Any]:
+        _, mlx_load, _, _, _ = self._require_mlx_runtime()
+        cache_key = (self.model_path, self.adapter_path or '', self.trust_remote_code)
+        cached = self._MODEL_CACHE.get(cache_key)
+        if cached is None:
+            tokenizer_config = {'trust_remote_code': True} if self.trust_remote_code else None
+            cached = mlx_load(
+                self.model_path,
+                adapter_path=self.adapter_path,
+                tokenizer_config=tokenizer_config,
+            )
+            self._MODEL_CACHE[cache_key] = cached
+        return cached
+
+    @staticmethod
+    def _encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
+        bos_token = getattr(tokenizer, 'bos_token', None)
+        add_special_tokens = bos_token is None or not prompt.startswith(str(bos_token))
+        encoded = tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
+        return list(encoded)
+
+    @staticmethod
+    def _resolve_positive_env(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None or raw == '':
+            return max(1, int(default))
+        value = int(raw)
+        if value < 1:
+            raise ValueError(f'{name} must be >= 1, got {value}.')
+        return value
+
+    def _resolve_batch_settings(self, *, max_num_seqs: int) -> tuple[int, int, int]:
+        prompt_chunk_size = self._resolve_positive_env('MLX_EVAL_PROMPT_CHUNK_SIZE', max(1, int(max_num_seqs)))
+        completion_batch_size = self._resolve_positive_env(
+            'MLX_EVAL_COMPLETION_BATCH_SIZE',
+            max(1, min(int(max_num_seqs), 16)),
+        )
+        prefill_batch_size = self._resolve_positive_env(
+            'MLX_EVAL_PREFILL_BATCH_SIZE',
+            max(1, min(completion_batch_size, 16)),
+        )
+        completion_batch_size = min(completion_batch_size, prompt_chunk_size)
+        prefill_batch_size = min(prefill_batch_size, completion_batch_size)
+        return prompt_chunk_size, prefill_batch_size, completion_batch_size
+
+    @staticmethod
+    def _resolve_nonnegative_float_env(name: str, default: float) -> float:
+        raw = os.environ.get(name)
+        if raw is None or raw == '':
+            return max(0.0, float(default))
+        value = float(raw)
+        if value < 0:
+            raise ValueError(f'{name} must be >= 0, got {value}.')
+        return value
+
+    def _generate_batched_greedy(
+        self,
+        rendered_prompts: Sequence[str],
+        *,
+        max_tokens: int,
+        top_p: float,
+        temperature: float,
+        seeds: Sequence[int],
+        max_num_seqs: int,
+    ) -> list[list[GenerationRecord]]:
+        mx, _, _, mlx_batch_generate, mlx_make_sampler = self._require_mlx_runtime()
+        model, tokenizer = self._load_model_and_tokenizer()
+        prompt_tokens = [self._encode_prompt(tokenizer, prompt) for prompt in rendered_prompts]
+        prompt_chunk_size, prefill_batch_size, completion_batch_size = self._resolve_batch_settings(
+            max_num_seqs=max_num_seqs
+        )
+        sampler = mlx_make_sampler(temp=temperature, top_p=top_p)
+        outputs: list[list[GenerationRecord]] = [[] for _ in rendered_prompts]
+        total_prompts = len(prompt_tokens)
+        total_chunks = max(1, math.ceil(total_prompts / prompt_chunk_size))
+        run_started_at = time.perf_counter()
+        heartbeat_sec = self._resolve_nonnegative_float_env('MLX_EVAL_HEARTBEAT_SEC', 60.0)
+        for sample_idx, seed in enumerate(seeds):
+            mx.random.seed(int(seed))
+            for chunk_start in range(0, len(prompt_tokens), prompt_chunk_size):
+                chunk_prompts = prompt_tokens[chunk_start : chunk_start + prompt_chunk_size]
+                chunk_index = (chunk_start // prompt_chunk_size) + 1
+                chunk_started_at = time.perf_counter()
+                chunk_end = chunk_start + len(chunk_prompts)
+                print(
+                    '[MLXBackend] '
+                    f'seed={int(seed)} '
+                    f'chunk={chunk_index}/{total_chunks} '
+                    f'prompts={chunk_start + 1}-{chunk_end}/{total_prompts} '
+                    'status=started',
+                    flush=True,
+                )
+                heartbeat_stop = threading.Event()
+                heartbeat_thread: threading.Thread | None = None
+                if heartbeat_sec > 0:
+                    def emit_heartbeat() -> None:
+                        while not heartbeat_stop.wait(heartbeat_sec):
+                            chunk_elapsed = time.perf_counter() - chunk_started_at
+                            total_elapsed = time.perf_counter() - run_started_at
+                            print(
+                                '[MLXBackend] '
+                                f'seed={int(seed)} '
+                                f'chunk={chunk_index}/{total_chunks} '
+                                f'prompts={chunk_start + 1}-{chunk_end}/{total_prompts} '
+                                'status=running '
+                                f'chunk_elapsed_sec={chunk_elapsed:.1f} '
+                                f'total_elapsed_sec={total_elapsed:.1f}',
+                                flush=True,
+                            )
+                    heartbeat_thread = threading.Thread(target=emit_heartbeat, daemon=True)
+                    heartbeat_thread.start()
+                try:
+                    batch_response = mlx_batch_generate(
+                        model,
+                        tokenizer,
+                        chunk_prompts,
+                        max_tokens=max_tokens,
+                        sampler=sampler,
+                        verbose=False,
+                        prefill_batch_size=min(prefill_batch_size, len(chunk_prompts)),
+                        completion_batch_size=min(completion_batch_size, len(chunk_prompts)),
+                    )
+                finally:
+                    if heartbeat_thread is not None:
+                        heartbeat_stop.set()
+                        heartbeat_thread.join()
+                for offset, raw_output in enumerate(batch_response.texts):
+                    prompt_index = chunk_start + offset
+                    outputs[prompt_index].append(
+                        make_generation_record(
+                            prompt_id=f'prompt-{prompt_index}',
+                            sample_idx=sample_idx,
+                            seed=int(seed),
+                            raw_output=raw_output,
+                        )
+                    )
+                chunk_elapsed = time.perf_counter() - chunk_started_at
+                total_elapsed = time.perf_counter() - run_started_at
+                stats = getattr(batch_response, 'stats', None)
+                stats_suffix = ''
+                if stats is not None:
+                    stats_suffix = (
+                        f", prompt_tps={getattr(stats, 'prompt_tps', 0):.2f}, "
+                        f"generation_tps={getattr(stats, 'generation_tps', 0):.2f}, "
+                        f"peak_memory_gb={getattr(stats, 'peak_memory', 0):.2f}"
+                    )
+                print(
+                    '[MLXBackend] '
+                    f'seed={int(seed)} '
+                    f'chunk={chunk_index}/{total_chunks} '
+                    f'prompts={chunk_start + 1}-{chunk_end}/{total_prompts} '
+                    'status=completed '
+                    f'chunk_elapsed_sec={chunk_elapsed:.1f} '
+                    f'total_elapsed_sec={total_elapsed:.1f}'
+                    f'{stats_suffix}',
+                    flush=True,
+                )
+                mx.clear_cache()
+        return outputs
+
+    def _generate_in_process_sequential(
+        self,
+        rendered_prompts: Sequence[str],
+        *,
+        max_tokens: int,
+        top_p: float,
+        temperature: float,
+        seeds: Sequence[int],
+    ) -> list[list[GenerationRecord]]:
+        mx, _, mlx_generate, _, mlx_make_sampler = self._require_mlx_runtime()
+        model, tokenizer = self._load_model_and_tokenizer()
+        sampler = mlx_make_sampler(temp=temperature, top_p=top_p)
+        outputs: list[list[GenerationRecord]] = []
+        for prompt_index, prompt in enumerate(rendered_prompts):
+            encoded_prompt = self._encode_prompt(tokenizer, prompt)
+            prompt_outputs: list[GenerationRecord] = []
+            for sample_idx, seed in enumerate(seeds):
+                mx.random.seed(int(seed))
+                raw_output = mlx_generate(
+                    model,
+                    tokenizer,
+                    encoded_prompt,
+                    verbose=False,
+                    max_tokens=max_tokens,
+                    sampler=sampler,
+                )
+                prompt_outputs.append(
+                    make_generation_record(
+                        prompt_id=f'prompt-{prompt_index}',
+                        sample_idx=sample_idx,
+                        seed=int(seed),
+                        raw_output=raw_output,
+                    )
+                )
+            outputs.append(prompt_outputs)
+            mx.clear_cache()
+        return outputs
+
     def generate(
         self,
         rendered_prompts: Sequence[str],
@@ -331,66 +548,25 @@ class MLXBackend:
         temperature: float,
         max_model_len: int,
         seeds: Sequence[int],
+        max_num_seqs: int = 1,
     ) -> list[list[GenerationRecord]]:
         del max_model_len
-        if not importlib.util.find_spec('mlx_lm'):
-            raise RuntimeError(
-                'MLXBackend requires mlx-lm, which is not installed in this environment. '
-                'Install `mlx-lm` and provide a local MLX-compatible model path to use backend=mlx.'
+        if temperature == 0.0:
+            return self._generate_batched_greedy(
+                rendered_prompts,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                temperature=temperature,
+                seeds=seeds,
+                max_num_seqs=max_num_seqs,
             )
-
-        outputs: list[list[GenerationRecord]] = []
-        for prompt_index, prompt in enumerate(rendered_prompts):
-            prompt_outputs: list[GenerationRecord] = []
-            for sample_idx, seed in enumerate(seeds):
-                command = [
-                    sys.executable,
-                    '-m',
-                    'mlx_lm.generate',
-                    '--model',
-                    self.model_path,
-                    '--prompt',
-                    '-',
-                    '--ignore-chat-template',
-                    '--max-tokens',
-                    str(max_tokens),
-                    '--temp',
-                    str(temperature),
-                    '--top-p',
-                    str(top_p),
-                    '--seed',
-                    str(seed),
-                    '--verbose',
-                    'false',
-                ]
-                if self.adapter_path:
-                    command.extend(['--adapter-path', self.adapter_path])
-                if self.trust_remote_code:
-                    command.append('--trust-remote-code')
-
-                completed = subprocess.run(
-                    command,
-                    input=prompt,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                )
-                if completed.returncode != 0:
-                    raise RuntimeError(
-                        'MLX generation failed: '
-                        f'prompt_index={prompt_index}, seed={seed}, stderr={completed.stderr.strip()}'
-                    )
-                raw_output = completed.stdout.rstrip('\n')
-                prompt_outputs.append(
-                    make_generation_record(
-                        prompt_id=f'prompt-{prompt_index}',
-                        sample_idx=sample_idx,
-                        seed=seed,
-                        raw_output=raw_output,
-                    )
-                )
-            outputs.append(prompt_outputs)
-        return outputs
+        return self._generate_in_process_sequential(
+            rendered_prompts,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            temperature=temperature,
+            seeds=seeds,
+        )
 
 
 class HFBackend:
@@ -416,8 +592,9 @@ class HFBackend:
         temperature: float,
         max_model_len: int,
         seeds: Sequence[int],
+        max_num_seqs: int = 1,
     ) -> list[list[GenerationRecord]]:
-        del max_model_len
+        del max_model_len, max_num_seqs
         try:
             import torch  # type: ignore
             from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed  # type: ignore
@@ -530,6 +707,23 @@ def load_eval_config(name_or_path: str) -> EvalConfig:
         raise FileNotFoundError(f'Evaluation config was not found: {name_or_path}')
     data = yaml.safe_load(config_path.read_text(encoding='utf-8'))
     return EvalConfig(**data)
+
+
+def resolve_mlx_eval_num_shards() -> int:
+    raw = os.environ.get('MLX_EVAL_NUM_SHARDS')
+    if raw is None or raw == '':
+        return 1
+    value = int(raw)
+    if value < 1:
+        raise ValueError(f'MLX_EVAL_NUM_SHARDS must be >= 1, got {value}.')
+    return value
+
+
+def tail_text(path: Path, *, max_chars: int = 4000) -> str:
+    if not path.exists():
+        return ''
+    text = path.read_text(encoding='utf-8', errors='replace')
+    return text[-max_chars:]
 
 
 def resolve_seeds(eval_config: EvalConfig) -> list[int]:
@@ -1005,9 +1199,65 @@ def evaluate_dataset(
     dataset_name: str = 'dataset',
 ) -> EvaluationArtifacts:
     ensure_version_directories()
-    prompt_records = build_prompt_records(frame)
     tokenizer = tokenizer or BuiltinCompetitionTokenizer()
     run_name = run_name or f'{dataset_name}-{eval_config.name}'
+    row_level = _build_row_level_for_evaluation(
+        frame,
+        backend,
+        eval_config,
+        out_dir,
+        tokenizer=tokenizer,
+        run_name=run_name,
+        dataset_name=dataset_name,
+    )
+    summary, family_metrics, failure_metrics = aggregate_eval_rows(
+        row_level,
+        run_name=run_name,
+        dataset_name=dataset_name,
+        backend_name=backend.backend_name,
+        eval_mode=eval_config.name,
+    )
+
+    save_table(row_level, out_dir / 'row_level.parquet')
+    save_table(summary, out_dir / 'summary.csv')
+    save_table(family_metrics, out_dir / 'family_metrics.csv')
+    save_table(failure_metrics, out_dir / 'failure_metrics.csv')
+
+    return EvaluationArtifacts(
+        row_level=row_level,
+        summary=summary,
+        family_metrics=family_metrics,
+        failure_metrics=failure_metrics,
+        out_dir=out_dir,
+    )
+
+
+def _build_row_level_for_evaluation(
+    frame: pd.DataFrame,
+    backend: GenerationBackend,
+    eval_config: EvalConfig,
+    out_dir: Path,
+    *,
+    tokenizer: Any,
+    run_name: str,
+    dataset_name: str,
+) -> pd.DataFrame:
+    if (
+        isinstance(backend, MLXBackend)
+        and isinstance(tokenizer, BuiltinCompetitionTokenizer)
+        and len(frame) > 0
+        and resolve_mlx_eval_num_shards() > 1
+    ):
+        return _build_row_level_via_mlx_shards(
+            frame,
+            backend,
+            eval_config,
+            out_dir,
+            run_name=run_name,
+            dataset_name=dataset_name,
+        )
+
+    prompt_records = build_prompt_records(frame)
     rendered_prompts = [build_competition_prompt(tokenizer, record.prompt, eval_config) for record in prompt_records]
     seeds = resolve_seeds(eval_config)
     generations = backend.generate(
@@ -1017,6 +1267,7 @@ def evaluate_dataset(
         temperature=eval_config.temperature,
         max_model_len=eval_config.max_model_len,
         seeds=seeds,
+        max_num_seqs=eval_config.max_num_seqs,
     )
     if len(generations) != len(prompt_records):
         raise ValueError(
@@ -1042,27 +1293,127 @@ def evaluate_dataset(
                 )
             )
 
-    row_level = pd.DataFrame([asdict(row) for row in rows]).sort_values(['id', 'sample_idx', 'seed']).reset_index(drop=True)
-    summary, family_metrics, failure_metrics = aggregate_eval_rows(
-        row_level,
-        run_name=run_name,
-        dataset_name=dataset_name,
-        backend_name=backend.backend_name,
-        eval_mode=eval_config.name,
-    )
+    return pd.DataFrame([asdict(row) for row in rows]).sort_values(['id', 'sample_idx', 'seed']).reset_index(drop=True)
 
-    save_table(row_level, out_dir / 'row_level.parquet')
-    save_table(summary, out_dir / 'summary.csv')
-    save_table(family_metrics, out_dir / 'family_metrics.csv')
-    save_table(failure_metrics, out_dir / 'failure_metrics.csv')
 
-    return EvaluationArtifacts(
-        row_level=row_level,
-        summary=summary,
-        family_metrics=family_metrics,
-        failure_metrics=failure_metrics,
-        out_dir=out_dir,
+def _build_row_level_via_mlx_shards(
+    frame: pd.DataFrame,
+    backend: MLXBackend,
+    eval_config: EvalConfig,
+    out_dir: Path,
+    *,
+    run_name: str,
+    dataset_name: str,
+) -> pd.DataFrame:
+    num_shards = min(resolve_mlx_eval_num_shards(), len(frame))
+    shard_root = out_dir / '_shards'
+    shard_root.mkdir(parents=True, exist_ok=True)
+    config_path = shard_root / 'eval_config.yaml'
+    config_path.write_text(yaml.safe_dump(asdict(eval_config), sort_keys=False), encoding='utf-8')
+    shard_frames = [frame.iloc[shard_index::num_shards].reset_index(drop=True) for shard_index in range(num_shards)]
+    shard_specs: list[tuple[int, int, Path, Path]] = []
+    launched_processes: list[tuple[int, Path, subprocess.Popen[Any], Any]] = []
+    print(
+        '[evaluate_dataset] '
+        f'launching {num_shards} MLX shard workers '
+        f'for dataset={dataset_name} run={run_name}',
+        flush=True,
     )
+    for shard_index, shard_frame in enumerate(shard_frames):
+        shard_input_path = shard_root / f'shard_{shard_index:02d}.parquet'
+        shard_out_dir = shard_root / f'out_{shard_index:02d}'
+        shard_log_path = shard_root / f'shard_{shard_index:02d}.log'
+        save_table(shard_frame, shard_input_path)
+        shard_out_dir.mkdir(parents=True, exist_ok=True)
+        command = [
+            sys.executable,
+            str(SCRIPT_PATH),
+            'run-eval',
+            '--input',
+            str(shard_input_path),
+            '--config',
+            str(config_path),
+            '--backend',
+            'mlx',
+            '--out',
+            str(shard_out_dir),
+            '--run-name',
+            run_name,
+            '--dataset-name',
+            dataset_name,
+            '--model-path',
+            backend.model_path,
+        ]
+        if backend.adapter_path:
+            command.extend(['--adapter-path', backend.adapter_path])
+        if backend.trust_remote_code:
+            command.append('--trust-remote-code')
+        worker_env = os.environ.copy()
+        worker_env['PYTHONUNBUFFERED'] = '1'
+        worker_env['MLX_EVAL_NUM_SHARDS'] = '1'
+        worker_env['MLX_EVAL_SHARD_INDEX'] = str(shard_index)
+        print(
+            '[evaluate_dataset] '
+            f'launching shard={shard_index + 1}/{num_shards} '
+            f'rows={len(shard_frame)} '
+            f'log={shard_log_path}',
+            flush=True,
+        )
+        log_handle = shard_log_path.open('w', encoding='utf-8')
+        process = subprocess.Popen(
+            command,
+            cwd=str(REPO_ROOT),
+            env=worker_env,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+        )
+        shard_specs.append((shard_index, len(shard_frame), shard_out_dir, shard_log_path))
+        launched_processes.append((shard_index, shard_log_path, process, log_handle))
+
+    try:
+        for shard_index, shard_log_path, process, log_handle in launched_processes:
+            return_code = process.wait()
+            log_handle.close()
+            if return_code != 0:
+                raise RuntimeError(
+                    'MLX shard evaluation failed: '
+                    f'shard={shard_index + 1}/{num_shards} '
+                    f'return_code={return_code} '
+                    f'log={shard_log_path}\n'
+                    f'{tail_text(shard_log_path)}'
+                )
+            print(
+                '[evaluate_dataset] '
+                f'completed shard={shard_index + 1}/{num_shards} '
+                f'log={shard_log_path}',
+                flush=True,
+            )
+    finally:
+        for _, _, process, log_handle in launched_processes:
+            if not log_handle.closed:
+                log_handle.close()
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+
+    shard_rows: list[pd.DataFrame] = []
+    for shard_index, shard_size, shard_out_dir, shard_log_path in shard_specs:
+        row_level_path = shard_out_dir / 'row_level.parquet'
+        if not row_level_path.exists():
+            raise FileNotFoundError(
+                'MLX shard evaluation did not produce row_level.parquet: '
+                f'shard={shard_index + 1}/{num_shards} '
+                f'rows={shard_size} '
+                f'log={shard_log_path}'
+            )
+        shard_rows.append(load_table(row_level_path))
+
+    row_level = pd.concat(shard_rows, ignore_index=True).sort_values(['id', 'sample_idx', 'seed']).reset_index(drop=True)
+    row_level['run_name'] = run_name
+    row_level['dataset_name'] = dataset_name
+    row_level['backend_name'] = backend.backend_name
+    row_level['eval_mode'] = eval_config.name
+    return row_level
 
 
 def stable_dataframe_hash(frame: pd.DataFrame, columns: Sequence[str]) -> str:
@@ -1253,6 +1604,14 @@ def run_eval(args: argparse.Namespace) -> None:
     out_dir = Path(args.out)
     eval_config = load_eval_config(args.config)
     backend = build_backend_from_args(args)
+    print(
+        '[run_eval] starting',
+        f'backend={backend.backend_name}',
+        f'rows={len(frame)}',
+        f'config={eval_config.name}',
+        f'out={out_dir}',
+        flush=True,
+    )
     tokenizer, tokenizer_name, tokenizer_revision = get_tokenizer(
         tokenizer_path=args.tokenizer_path,
         tokenizer_name=args.tokenizer_name,

@@ -1,0 +1,383 @@
+# v4 Results
+
+## Summary
+
+- `versions/v4/code/train.py` was converted from the copied v3 baseline into a v4-specific Stage C CLI.
+- `versions/v4/tests/` was added and the new v4 surface is covered by unit tests.
+- Repository validation is green after the v4 implementation.
+- Real v4 data generation has started on Mac/MLX.
+- `README.md` official evaluation parameters remain fixed during all local scoring:
+  - `max_tokens = 7680`
+  - `top_p = 1.0`
+  - `temperature = 0.0`
+  - `max_num_seqs = 64`
+  - `max_model_len = 8192`
+
+## Code / Validation
+
+- `uv run pytest -q versions/v1/tests/test_evaluator_core.py versions/v1/tests/test_eval_determinism.py versions/v4/tests/test_v4_builders.py versions/v4/tests/test_v4_stagec.py`
+  - Result: `12 passed`
+- `uv run pytest -q -k 'not test_download_model_to_repo_model_dir'`
+  - Result: `125 passed, 1 deselected, 2 warnings`
+- `uv run python -m py_compile versions/v1/code/train.py versions/v4/code/train.py versions/v2/tests/test_model_download_bootstrap.py`
+  - Result: passed
+
+## 2026-03-24 Follow-up Status
+
+- Shared MLX evaluator acceleration is now in place in `versions/v1/code/train.py`:
+  - persistent in-process model+adapter loading
+  - deterministic batched `mlx_lm.batch_generate`
+  - dataset shard parallelism for local gates
+  - chunk / heartbeat logging for long-running official-parameter evaluation
+- RFT accept-pool sanitization was added in `versions/v4/code/train.py`:
+  - strip known MLX warning prefixes from completions
+  - estimate trace token length before acceptance
+  - materialize cleaned `chosen_output` / `target_text` into the rebuilt Stage C mix
+- After rebuilding the accept pool:
+  - accepted rows dropped from `24` to `4`
+  - all accepted rows are `bit_manipulation`
+  - rebuilt Stage C mix now has `3940` rows and no missing `chosen_output`
+- Current scored reruns:
+  - `v4_rft_stage_c_cleanaccept_run2`
+    - quick `shadow_128 overall_accuracy = 0.0078125`
+    - rejected as a near-empty collapse candidate
+  - `v4_rft_stage_c_cleanaccept_lowlr_run3`
+    - quick `shadow_128 overall_accuracy = 0.515625`
+    - `format_fail_rate = 0.9609375`
+    - `boxed_rate = 0.59375`
+    - `avg_output_len_chars = 10519.59375`
+    - this is the current best local v4/v5 quick result, but still clearly format-fragile
+- Current in-progress runs:
+  - `v4_rft_stage_c_cleanaccept_lowlr_run3`
+    - serious gate (`shadow_256`, `hard_shadow_256`) running under official parameters
+  - additional Stage C sweeps launched in parallel while serious scoring runs:
+    - `v4_rft_stage_c_cleanaccept_ultralowlr_run4`
+    - `v4_rft_stage_c_cleanaccept_halfepoch_run5`
+    - `v4_rft_stage_c_cleanaccept_answerbias_run6`
+- `v5_format_sft_anchor_run1` quick scoring was intentionally paused to avoid OOM while the serious gate was active.
+
+## Implemented v4 Commands
+
+- `bootstrap-v4`
+- `score-candidate`
+- `score-candidate-batch`
+- `build-format-preferences`
+- `build-correctness-preferences`
+- `build-rft-candidates`
+- `filter-rft-accept-pool`
+- `build-stage-c-mix`
+- `train-stage-c-rft`
+- `train-stage-c-preference`
+- `train-specialist`
+- `merge-candidates`
+- `compress-merge-rank32`
+- `render-cuda-repro-spec`
+- `write-runbook`
+
+## Real Runs Completed
+
+### 1. bootstrap-v4
+
+- Status: completed
+- Output:
+  - v4 scaffold/config/report directories created
+  - v4 registry CSV headers created
+
+### 2. build-format-preferences
+
+- Status: completed
+- Output path:
+  - `versions/v4/data/preference/format_preference_pairs_v4.parquet`
+- Rows:
+  - `19000`
+- Interpretation:
+  - v3 preference pool already contains enough format-oriented pairs for immediate Stage C format tuning.
+
+### 3. build-correctness-preferences
+
+- Status: completed
+- Output path:
+  - `versions/v4/data/preference/correctness_preference_pairs_v4.parquet`
+- Rows:
+  - `1183`
+- Interpretation:
+  - correctness-side preference data is much smaller than format data, so early v4 preference tuning is likely to be format-heavy unless additional mining succeeds.
+
+### 4. score-candidate (serious gate, Stage A baseline)
+
+- Command:
+  - `uv run python versions/v4/code/train.py score-candidate --config-path versions/v4/conf/eval/candidate_score_serious.yaml --candidate-id v3_stage_a_baseline`
+- Candidate:
+  - `v3_stage_a_baseline`
+- Result:
+  - `shadow_256 overall_accuracy = 0.4375`
+  - `hard_shadow_256 overall_accuracy = 0.4375`
+  - `shadow_256 format_fail_rate = 0.546875`
+  - `hard_shadow_256 format_fail_rate = 0.5546875`
+  - `extraction_fail_rate = 0.0`
+  - `avg_output_len_chars ≈ 4.4k`
+  - `submit_value = False`
+- Interpretation:
+  - current v3 Stage A trunk is not submission-worthy on the serious local gate.
+  - the main visible issue is not answer extraction failure, but severe format instability / overlong responses.
+
+## Real Runs Completed / In Progress
+
+### 5. build-rft-candidates
+
+- Command:
+  - `uv run python versions/v4/code/train.py build-rft-candidates --config-path versions/v4/conf/data/rft_accept_pool.yaml --candidate-id v3_stage_a_baseline`
+- Candidate:
+  - `v3_stage_a_baseline`
+- Prompt selection already written:
+  - `288` prompts total
+  - `96` each for `bit_manipulation`, `symbol_equation`, `text_decryption`
+- Status:
+  - completed
+- Final output:
+  - `versions/v4/data/rft/rft_candidate_generations_v4.jsonl`
+- Note:
+  - prompt selection and all `1152` probe generations were completed successfully on Mac/MLX.
+
+### 6. filter-rft-accept-pool
+
+- Input:
+  - `1152` probe samples
+  - `288` prompts
+  - `4` samples per prompt
+- Output:
+  - `24` accepted rows
+  - `264` rejected prompts
+- Acceptance yield:
+  - `24 / 288 = 8.33%`
+- Accepted family distribution:
+  - `bit_manipulation = 24`
+- Interpretation:
+  - the current Stage A parent only produces strict-accept RFT material on a narrow slice of the hard families.
+  - `symbol_equation` and `text_decryption` were effectively zero-yield under the current strict filter.
+  - after later warning-stripping and trace-length sanitization, the rebuilt strict accept pool shrank further to `4` rows and remained `bit_manipulation`-only.
+
+### 7. build-stage-c-mix
+
+- RFT mix output:
+  - `versions/v4/data/train_packs/stage_c_rft_mix_v4.parquet`
+  - rows: `3956`
+- Preference mix output:
+  - `versions/v4/data/train_packs/stage_c_preference_mix_v4.parquet`
+  - rows: `3641`
+- Preference mix composition:
+  - `format = 2458`
+  - `correction = 1183`
+- RFT mix family distribution:
+  - `symbol_equation = 838`
+  - `bit_manipulation = 809`
+  - `gravity_constant = 692`
+  - `text_decryption = 675`
+  - `unit_conversion = 605`
+  - `roman_numeral = 337`
+- Interpretation:
+  - because strict RFT accepts were sparse, the Stage C RFT mix is still mostly replay-backed rather than pure accept-pool data.
+  - after the sanitized rebuild, the live Stage C mix used by the latest reruns contains `3940` rows with only `4` explicit `rft_accept` rows and the rest coming from replay / real / core_synth data.
+
+## Failures / Fixes Recorded
+
+### A. Wrong default v3 preference source path
+
+- Symptom:
+  - `build-format-preferences` initially failed because the generated config pointed to `versions/v4/data/preference/preference_pairs_v3.parquet`.
+- Cause:
+  - v4 scaffold initially inherited a version-local default instead of the real v3 artifact path.
+- Fix:
+  - code defaults were changed to point at:
+    - `versions/v3/data/preference/preference_pairs_v3.parquet`
+  - config files updated:
+    - `versions/v4/conf/data/preference_format.yaml`
+    - `versions/v4/conf/data/preference_correctness.yaml`
+
+### B. Wrong default Stage A replay source path
+
+- Symptom:
+  - Stage C mix config initially pointed to a nonexistent v4-local copy of `stage_a_strong_v3.parquet`.
+- Fix:
+  - code defaults and scaffold config were corrected to use:
+    - `versions/v3/data/train_packs/stage_a_strong_v3.parquet`
+  - config file updated:
+    - `versions/v4/conf/data/stage_c_rft_mix.yaml`
+
+### C. Helper name mismatch during real execution
+
+- Symptom:
+  - `build-rft-candidates` / `build-stage-c-mix` surfaced copied-name mismatches (`read_table`, `sample_with_weight`) during real execution hardening.
+- Fix:
+  - corrected to the actual in-file helpers:
+    - `_read_table`
+    - `_sample_with_weight`
+
+### D. RFT family metadata dropped during accept-pool building
+
+- Symptom:
+  - generated probe rows contained `family_x` / `family_y`, while the accept-pool filter expected `family`, causing accepted rows to lose family metadata.
+- Fix:
+  - v4 code now coalesces merged metadata fields (`family`, `cv5_fold`, `difficulty_tags`) during RFT generation and filtering.
+  - accept pool was regenerated after the fix.
+
+### E. Serious-gate evaluator was too slow for iterative work
+
+- Symptom:
+  - the first `v4_format_specialist_run1` serious-gate rescoring attempt was still on `shadow_256` after roughly `5.5` hours.
+- Root cause:
+  - the shared MLX evaluator (`versions/v1/code/train.py`, reused by v4) launched `mlx_lm.generate` as a fresh subprocess for every prompt.
+  - that meant model / adapter load overhead was paid repeatedly and `official_lb.max_num_seqs` was effectively unused.
+- Action taken:
+  - the slow rescoring chain was intentionally stopped.
+  - the shared MLX backend was rewritten to keep model+adapter loaded in-process and use `mlx_lm.batch_generate` for deterministic (`temperature=0.0`) scoring.
+  - `EvalConfig.max_num_seqs` is now passed through to the MLX backend.
+- Validation:
+  - targeted evaluator and v4 tests passed
+  - real batched MLX smoke test (`2` prompts) passed against the local Nemotron model + specialist adapter
+
+## Evaluator acceleration work
+
+- Changed file:
+  - `versions/v1/code/train.py`
+- New behavior:
+  - persistent in-process MLX load instead of subprocess-per-prompt
+  - batched greedy evaluation path for official-style serious scoring
+  - in-process sequential sampled fallback to preserve stochastic semantics
+- New runtime controls:
+  - `MLX_EVAL_PROMPT_CHUNK_SIZE`
+  - `MLX_EVAL_PREFILL_BATCH_SIZE`
+  - `MLX_EVAL_COMPLETION_BATCH_SIZE`
+- Current rerun settings:
+  - `prompt_chunk_size = 64`
+  - `prefill_batch_size = 64`
+  - `completion_batch_size = 64`
+- Additional observability:
+  - the shared MLX backend now logs chunk-level progress including seed, chunk index, prompt range, elapsed seconds, prompt TPS, generation TPS, and peak memory.
+- Relevant validation:
+  - `uv run pytest -q versions/v1/tests/test_evaluator_core.py versions/v1/tests/test_eval_determinism.py versions/v4/tests`
+    - Result: `13 passed`
+  - `uv run python -m py_compile versions/v1/code/train.py versions/v4/code/train.py`
+    - Result: passed
+
+## Current Assessment
+
+- v4 is no longer just a plan; the Stage C pipeline is implemented and partially running.
+- Format-preference data is plentiful.
+- Correctness-preference data exists but is relatively small.
+- Current Stage A baseline on the serious gate is weak (`0.4375` / `0.4375`) and clearly does **not** justify submission.
+- The current bottleneck is format behavior, not extraction.
+- Strict RFT mining is much weaker than hoped on the Stage A parent.
+- The current active experiment is a format-specialist preference run, followed by RFT continuation and rescoring.
+- The decisive metrics are still pending:
+  - post-Stage-C candidate scores
+
+## Active Training Snapshot
+
+### format specialist / DPO-style run1
+
+- Command:
+  - `uv run python versions/v4/code/train.py train-specialist --config-path versions/v4/conf/train/specialist_format_mlx.yaml --pair-data-path versions/v4/data/train_packs/stage_c_preference_mix_v4.parquet --output-dir versions/v4/outputs/train/format_specialist_run1 --candidate-id v4_format_specialist_run1 --parent-candidate-id v3_stage_a_baseline --execute`
+- Status:
+  - running
+- Observed early metrics:
+  - `iters = 2335`
+  - first validation after warm start: `val_loss ≈ 0.693`
+  - peak memory seen so far: `~61.35 GB`
+  - train loss rapidly collapsed near zero after early iterations
+- Caution:
+  - this may indicate the preference objective is very easy for the current sampled mix, so the real signal will come from the later serious-gate rescoring, not the training loss itself.
+
+### format specialist / DPO-style run1 (final)
+
+- Status:
+  - completed
+- Manifest:
+  - `versions/v4/outputs/train/format_specialist_run1/v4_format_specialist_run1_manifest.json`
+- Result:
+  - `train_records = 2335`
+  - `valid_records = 123`
+  - `iters = 2335`
+  - `final_train_loss ≈ 8.40e-11`
+  - `final_val_loss ≈ 2.55e-07`
+  - `peak_memory_gb ≈ 61.35`
+- Interpretation:
+  - the specialist preference run fit the sampled objective extremely hard.
+  - whether that is useful or just overfitting will only be known after serious-gate rescoring.
+
+### stage-c RFT run1
+
+- Status:
+  - completed
+- Manifest:
+  - `versions/v4/outputs/train/rft_stage_c_run1/v4_rft_stage_c_run1_manifest.json`
+- Final scale:
+  - `train_records = 3758`
+  - `valid_records = 198`
+  - `iters = 5637`
+  - `num_epochs = 1.5`
+- Final metrics:
+  - `final_train_loss ≈ 1.091`
+  - `final_val_loss ≈ 1.433`
+  - `peak_memory_gb ≈ 36.40`
+- Training behavior:
+  - initial `val_loss ≈ 2.397`
+  - early / mid train losses fluctuated widely (`~0.25` to `>10`), which is more realistic than the format-specialist run
+- Interpretation:
+  - the continuation run completed cleanly and looks less degenerate than the format-only specialist.
+  - usefulness is still unknown until the serious-gate rescoring finishes.
+
+### post-training rescoring / merge chain
+
+- Status:
+  - completed with accelerated MLX backend
+  - used **8-way MLX shard parallelism** while keeping the README official evaluation parameters unchanged
+- Previous attempt:
+  - stopped intentionally because the old evaluator path was too slow for practical iteration
+- Final runner:
+  - `versions/v4/outputs/reports/v4_stagec_runner_sharded.log`
+- Current sharded setup:
+  - `MLX_EVAL_NUM_SHARDS=8`
+  - `MLX_EVAL_PROMPT_CHUNK_SIZE=64`
+  - `MLX_EVAL_PREFILL_BATCH_SIZE=64`
+  - `MLX_EVAL_COMPLETION_BATCH_SIZE=64`
+  - `shadow_256` is split into `8` shards of `32` prompts each
+- Observability hardening for future reruns:
+  - shard workers now start with `PYTHONUNBUFFERED=1`
+  - `run-eval` writes an immediate start line
+  - long `mlx_lm.batch_generate(...)` calls emit a periodic heartbeat via `MLX_EVAL_HEARTBEAT_SEC` (default `60s`)
+- Runtime note:
+  - worker RSS summed to roughly `207 GB`
+  - user-observed machine RAM reached about `339.5 / 512 GB`
+  - to avoid OOM risk, shard count is intentionally held at `8` for this run
+  - `sample` on a live shard worker showed it inside `mlx::core::async_eval(...)` / GPU evaluation frames, so the run appears compute-bound rather than hung
+  - sampled worker peak physical footprint was about `40.2 GB`
+  - roughly `47` minutes after launch, `shadow_256` still had no merged `summary.csv`, but all `8` shard workers remained alive and actively consuming CPU / memory
+  - this particular run started before the later `PYTHONUNBUFFERED + heartbeat` observability patch, so missing per-worker progress lines are expected for this run
+- Pending outputs:
+  - none; all three serious-gate runs completed
+- Final serious-gate results:
+  - `v4_format_specialist_run1`
+    - `shadow_256 = 0.0`
+    - `hard_shadow_256 = 0.00390625`
+    - `format_fail_rate = 0.96875 / 0.90625`
+    - `boxed_rate = 0.0 / 0.015625`
+  - `v4_rft_stage_c_run1`
+    - `shadow_256 = 0.0`
+    - `hard_shadow_256 = 0.0`
+    - `format_fail_rate = 1.0 / 1.0`
+    - `extraction_fail_rate = 0.0078125 / 0.01953125`
+  - `v4_merge_rft_format_run1`
+    - `shadow_256 = 0.00390625`
+    - `hard_shadow_256 = 0.015625`
+    - `format_fail_rate = 1.0 / 1.0`
+    - `extraction_fail_rate = 0.0234375 / 0.0234375`
+    - despite these weak local scores, `submit_value` in the local scoreboard was auto-set `True` because the merge adapter improved over the two individual Stage C candidates; this is still far below the baseline and **not** a CUDA handoff / submission candidate
+- Cleanup note:
+  - after the canonical sharded chain finished, a redundant standalone `v4_format_specialist_run1` scorer was found still running and was stopped explicitly to free memory
+
+## Next Recorded Steps
+
+- Analyze why all Stage C variants collapsed on serious gate despite completing training cleanly
+- Focus on the dominant failure mode: near-total format failure / almost-zero boxed answers under official long-context evaluation
+- Do **not** render/package CUDA reproduction artifacts for v4, because no candidate beat the weak baseline meaningfully

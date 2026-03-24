@@ -1,0 +1,13 @@
+version: v4
+section: train
+name: stage_c_cuda_bf16
+base_model_name_or_path: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16
+precision: bf16
+lora_r: 32
+lora_alpha: 32
+lora_dropout: 0.0
+learning_rate: 5.0e-05
+num_epochs: 1.0
+max_seq_len: 1024
+gradient_accumulation_steps: 8
+per_device_train_batch_size: 1

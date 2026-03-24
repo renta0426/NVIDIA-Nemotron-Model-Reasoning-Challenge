@@ -1,0 +1,16 @@
+version: v4
+section: train
+name: specialist_format_mlx
+recipe_type: specialist
+specialist_tag: format
+pair_data_path: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/versions/v4/data/train_packs/stage_c_preference_mix_v4.parquet
+pair_kind: format
+base_model: lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit
+init_adapter_path: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/versions/v3/outputs/train/pilot_stage_a_run1/adapter_a_sft_stage_a_weighted_mlx
+learning_rate: 2.0e-05
+num_epochs: 1.0
+max_seq_len: 1024
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 4
+dpo_beta: 0.1
+max_train_pairs: 4096

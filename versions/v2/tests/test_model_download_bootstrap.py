@@ -14,7 +14,7 @@ SPEC.loader.exec_module(v2_train)
 
 
 def test_fixed_model_repo_id_is_pinned() -> None:
-    assert v2_train.DEFAULT_MODEL_REPO_ID == 'mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16'
+    assert v2_train.DEFAULT_MODEL_REPO_ID == 'lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit'
 
 
 def test_default_model_directory_uses_local_name() -> None:
@@ -38,12 +38,13 @@ def test_build_model_manifest_collects_file_stats(tmp_path: Path) -> None:
 
 
 def test_default_lms_model_path_uses_repo_structure(tmp_path: Path) -> None:
+    owner, repo = v2_train.DEFAULT_MODEL_REPO_ID.split('/', 1)
     path = v2_train.default_lms_model_path(
         v2_train.DEFAULT_MODEL_REPO_ID,
         models_root=tmp_path,
     )
 
-    assert path == tmp_path / 'mlx-community' / 'NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16'
+    assert path == tmp_path / owner / repo
 
 
 def test_ensure_lms_model_symlink_creates_link(tmp_path: Path) -> None:
