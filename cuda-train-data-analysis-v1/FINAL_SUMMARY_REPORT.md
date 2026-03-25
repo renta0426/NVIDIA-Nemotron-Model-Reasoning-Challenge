@@ -232,6 +232,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/36_symbol_star3_hold.md` | `*` の 3-digit bucket1 を再読し、simple product-like probe でも依然 manual hold とした根拠 |
 | `reports/37_binary_third_cluster_hold.md` | binary round2 の第3 cluster（17 行）を再読し、依然 no unique solver / no safe exclusion とした根拠 |
 | `reports/38_binary_tail_clusters_hold.md` | binary round2 の残り小 cluster を spot-check し、top3 よりさらに曖昧な tail として manual hold に据えた根拠 |
+| `reports/39_symbol_star4_bucket3_hold.md` | `*` の 4-digit bucket3 を再読し、3-shot でも simple product-like family に落ちなかった根拠 |
 
 ## 8. 最短の読み順
 
@@ -275,6 +276,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - さらに `-` の 1-digit unsigned bucket2（`4` 行）も、「2 same-op examples ずつあるので残差の本命かもしれない」という仮説で再読したが、row-local な subtraction / digit-difference / digit-sum 系 probe でも exact match は `0` 件で、結局 manual hold のままだった
 - `-` の 2-digit unsigned bucket1（`4` 行）も follow-up したが、各 row が same-op example `1` 本しか持たず、その唯一の例も query で別の値 / 形式に飛ぶため、single-example subtraction trap と判断して manual hold に戻した
 - `*` の 3-digit bucket1（`4` 行）も follow-up したが、各 row が `*` example を 1 本しか持たず、simple product-like probe でも exact match は `0` 件で、こちらも low-shot dead end として manual hold のままだった
+- `*` の 4-digit bucket3（`4` 行）も follow-up したが、3 same-op examples ずつあっても simple product-like probe は `0` 件で、依然 one-family には閉じなかった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
