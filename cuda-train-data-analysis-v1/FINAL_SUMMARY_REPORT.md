@@ -221,6 +221,8 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/26_symbol_plus3_cluster_hold.md` | round2 `symbol` の `+` 3桁 cluster を再読し、依然 manual hold とした根拠 |
 | `reports/27_binary_top_cluster_hold.md` | round2 `binary` の top 34-row cluster を再読し、依然 manual hold とした根拠 |
 | `reports/28_symbol_minus3_cluster_hold.md` | round2 `symbol` の `-` 3-character sign-embedded slice を再読し、依然 manual hold とした根拠 |
+| `reports/29_symbol_plus2_cluster_hold.md` | round2 `symbol` の `+` 2-digit slice を再読し、依然 manual hold とした根拠 |
+| `reports/30_binary_second_cluster_hold.md` | round2 `binary` の second-largest 29-row cluster を再読し、依然 manual hold とした根拠 |
 
 ## 8. 最短の読み順
 
@@ -242,6 +244,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
 - low-gap で一意 affine と gold が衝突する `11` 行は今回除外できたが、それ以外の affine mismatch は gap が大きく、まだ安全に切れない
 - round2 の top binary cluster（`34` 行, `7 examples / 1 no-candidate / 0 multi-candidate`）も再読したが、affine / boolean / byte family のどれも unique ではなく、consensus mismatch も無いので safe promotion / safe exclusion の両方ができない
+- second-largest binary cluster（`29` 行, `8 examples / 1 no-candidate / 0 multi-candidate`）も同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができない
 - つまり次は、より広い boolean/circuit family か、より複雑な non-local byte transform を考える必要がある
 
 ### 9.2 symbol がまだ重い
@@ -255,6 +258,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
 - round2 `+` 3桁 cluster も再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 でも同一 prompt 内で `2` 桁出力と `3` 桁出力が混在するため、再利用可能な exact formatter は見つからなかった
 - round2 `-` 3-character sign-embedded slice（`19` 行）も再読したが、負号が query-only になっている行が多く、high-shot rows でも signed/unsigned output や zero-pad が揺れるため、再利用可能な exact family は見つからなかった
+- round2 `+` 2-digit slice（`19` 行）も再読したが、high-shot rows でも `2` 桁出力と `3` 桁出力が混在し、最も単純に見える `4cf073bf` ですら `08` の zero-pad が prompt から一意化できないため、safe promotion は `0` だった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
