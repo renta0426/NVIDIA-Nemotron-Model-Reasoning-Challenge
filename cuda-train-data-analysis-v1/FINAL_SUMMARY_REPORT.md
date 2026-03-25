@@ -231,6 +231,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/35_symbol_minus2_unsigned_hold.md` | `-` の 2-digit unsigned bucket1 を再読し、single-example subtraction trap として依然 manual hold とした根拠 |
 | `reports/36_symbol_star3_hold.md` | `*` の 3-digit bucket1 を再読し、simple product-like probe でも依然 manual hold とした根拠 |
 | `reports/37_binary_third_cluster_hold.md` | binary round2 の第3 cluster（17 行）を再読し、依然 no unique solver / no safe exclusion とした根拠 |
+| `reports/38_binary_tail_clusters_hold.md` | binary round2 の残り小 cluster を spot-check し、top3 よりさらに曖昧な tail として manual hold に据えた根拠 |
 
 ## 8. 最短の読み順
 
@@ -254,6 +255,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - round2 の top binary cluster（`34` 行, `7 examples / 1 no-candidate / 0 multi-candidate`）も再読したが、affine / boolean / byte family のどれも unique ではなく、consensus mismatch も無いので safe promotion / safe exclusion の両方ができない
 - second-largest binary cluster（`29` 行, `8 examples / 1 no-candidate / 0 multi-candidate`）も同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができない
 - third-largest binary cluster（`17` 行, `9 examples / 1 no-candidate / 0 multi-candidate`）も follow-up したが、shift-like / inversion-like fragments が row ごとに別方向へ散っており、やはり no unique solver / no safe exclusion のままだった
+- 残る binary の小 cluster も representative rows を再読したが、今度は `bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも複数候補競合が残るタイプが中心で、top3 よりさらに曖昧だった
 - つまり次は、より広い boolean/circuit family か、より複雑な non-local byte transform を考える必要がある
 
 ### 9.2 symbol がまだ重い

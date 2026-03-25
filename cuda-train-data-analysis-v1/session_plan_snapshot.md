@@ -76,4 +76,5 @@
 - `reports/35_symbol_minus2_unsigned_hold.md` を追加し、`-` の 2-digit unsigned bucket1 `4` 行も再読した。各 row が same-op example を 1 本しか持たず、その唯一の例も query で subtraction family から外れるため、single-example subtraction trap と判断して manual 維持とした。
 - `reports/36_symbol_star3_hold.md` を追加し、`*` の 3-digit bucket1 `4` 行も再読した。各 row が `*` example を 1 本しか持たず、simple product-like probe でも exact match は 0 件で、low-shot dead end と判断して manual 維持とした。
 - `reports/37_binary_third_cluster_hold.md` を追加し、binary round2 の第3 cluster（`17` 行, `9 examples / 1 no-candidate / 0 multi-candidate`）も再読した。shift-like / inversion-like partial structure は見えるが、current solver family のどれも unique ではなく、safe exclusion も無いので manual 維持とした。
-- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち残る low-shot operator-specific tail、それから残る `binary_low_gap` 139 行の次 cluster を順に潰し、**query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/38_binary_tail_clusters_hold.md` を追加し、binary round2 の残り小 cluster も representative rows を再読した。`bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも競合候補が残るタイプが中心で、top3 よりさらに曖昧な tail と判断して manual 維持とした。
+- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち残る low-shot operator-specific tail、それから binary で本当に前進するなら **より広い boolean/circuit family か non-local byte transform family** を仮説化すること。glyph 46 行は、新しい family 仮説が出るまで hold。
