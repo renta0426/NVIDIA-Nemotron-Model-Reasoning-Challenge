@@ -225,6 +225,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/29_symbol_plus2_cluster_hold.md` | round2 `symbol` の `+` 2-digit slice を再読し、依然 manual hold とした根拠 |
 | `reports/30_binary_second_cluster_hold.md` | round2 `binary` の second-largest 29-row cluster を再読し、依然 manual hold とした根拠 |
 | `reports/31_symbol_comp99_abs_diff_recovery.md` | `comp99_abs_diff_2d` family を確定し、`1 verified + 5 answer-only` を回収した根拠 |
+| `reports/32_symbol_small_custom_op_hold.md` | `$ / @ / } / &` の small custom-op cluster を再読し、依然 manual hold とした根拠 |
 
 ## 8. 最短の読み順
 

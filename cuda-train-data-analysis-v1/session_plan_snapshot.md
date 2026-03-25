@@ -70,4 +70,5 @@
 - `reports/29_symbol_plus2_cluster_hold.md` を追加し、round2 `symbol` の `+` 2-digit slice（`19` 行）を再読したが、high-shot rows でも `2` 桁出力と `3` 桁出力が混在し、最も単純に見える `4cf073bf` ですら `08` の zero-pad が prompt から一意化できないため、safe promotion は `0` だった。
 - `reports/30_binary_second_cluster_hold.md` を追加し、round2 `binary` の second-largest 29-row cluster（`8 examples / 1 no-candidate / 0 multi-candidate`）を再読したが、top cluster と同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができないことを確認した。
 - `reports/31_symbol_comp99_abs_diff_recovery.md` を追加し、`comp99_abs_diff_2d` family を確定して `1 verified + 5 answer_only` を回収した一方、query-only conflict `12` 行と low-shot mismatch `6` 行は manual 維持とした。
+- `reports/32_symbol_small_custom_op_hold.md` を追加し、`$ / @ / } / &` の small custom-op cluster を再読したが、cluster 内で output style が崩れており、既存 prefix family を超える安全な再利用規則は見つからなかった。
 - 次ステップは、`symbol_numeric_same_op` core `299` 行のうち operator 埋め込み output の残差と未読 small clusters、それから残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
