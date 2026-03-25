@@ -55,4 +55,6 @@
 - `reports/13_manual_curation_pass1.md`、`reports/14_symbol_residual_template_scan.md`、`reports/15_binary_residual_affine_scan.md`、`reports/16_glyph_manual_hold.md` に、今回の安全昇格・suspect 化・非昇格判断の根拠を追加した。
 - `symbol_numeric_same_op` の残り 373 行について、query 答えだけ見ると `x_plus_y / x_minus_y / abs_diff_2d` に見える 32 行を再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が未確定で、追加昇格は `0` だった。`reports/17_symbol_query_only_rejection.md` と `artifacts/remaining_symbol_query_only_rejection_v1.csv` に記録した。
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output について、sum/product/diff 派生 digit-feature template を総当たりしたが、追加回収は `0` だった。`reports/18_symbol_next_safe_scan.md` に記録した。
+- `binary_low_gap` 139 行について、複数 solver family が同じ誤答に収束する consensus mismatch を追加探索したが `0` 行だった。unique affine 以外の安全除外候補は依然として薄い。
+- `glyph_len5` 46 行も、answer 長さ 1〜2 の短答群を含めて prompt を再読したが、この時点では safe promotion / safe exclusion に繋がる exact family はまだ見えていない。
 - 次ステップは、`glyph_len5` 46 行の mapping/order 一意化仮説と、残る `binary_low_gap` 139 行・`symbol_numeric_same_op` 373 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。
