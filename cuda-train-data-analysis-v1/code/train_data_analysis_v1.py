@@ -110,6 +110,7 @@ SYMBOL_NUMERIC_FORMULAS = {
 SYMBOL_NUMERIC_FORMATS = {
     "plain": lambda op, n: str(n),
     "zpad2": lambda op, n: f"{int(n):02d}" if 0 <= int(n) <= 99 else str(n),
+    "prefix_abs_zpad2": lambda op, n: f"{op}{abs(int(n)):02d}",
     "abs_plain": lambda op, n: str(abs(n)),
     "prefix_always_abs": lambda op, n: f"{op}{abs(n)}",
     "prefix_if_negative": lambda op, n: f"{op}{abs(n)}" if n < 0 else str(n),
@@ -121,7 +122,7 @@ SYMBOL_NUMERIC_STRING_TEMPLATES = {
     "abs_diff_2d_op_suffix": ("diff_t", "diff_o", "op"),
 }
 SYMBOL_NUMERIC_FORMAT_OVERRIDES = {
-    "comp99_abs_diff_2d": ("zpad2",),
+    "comp99_abs_diff_2d": ("zpad2", "prefix_abs_zpad2"),
 }
 SYMBOL_PROMOTION_FORMULA_NAMES = set(SYMBOL_NUMERIC_STRING_TEMPLATES) | set(SYMBOL_NUMERIC_FORMAT_OVERRIDES)
 
@@ -2651,7 +2652,7 @@ def build_reports(
         "",
         "## Purpose",
         "",
-        "Recheck `numeric_2x2` rows whose same-operator examples support the exact zero-padded family `99 - abs(x-y)` and split safe promotions from unsafe lookalikes under the `README.md` accuracy-first metric.",
+        "Recheck `numeric_2x2` rows whose same-operator examples support the exact two-digit complement family `99 - abs(x-y)`—either as plain zero-padded digits or as operator-prefixed zero-padded digits—and split safe promotions from unsafe lookalikes under the `README.md` accuracy-first metric.",
         "",
         "## Decision",
         "",
@@ -2689,7 +2690,7 @@ def build_reports(
             limit=20,
         ),
         "",
-        "Interpretation: `comp99_abs_diff_2d` is a real prompt-backed family, but only when the same-operator examples match it exactly. The family also creates many false positives in the query answer alone, so safe recovery requires exact example consistency plus the zero-padded two-digit format; anything weaker stays manual.",
+        "Interpretation: `comp99_abs_diff_2d` is a real prompt-backed family, but only when the same-operator examples match it exactly. The family appears both as plain zero-padded digits and as operator-prefixed zero-padded digits, and it also creates many false positives in the query answer alone, so safe recovery requires exact example consistency rather than query-only fit; anything weaker stays manual.",
         "",
     ]
     (reports_dir / "31_symbol_comp99_abs_diff_recovery.md").write_text("\n".join(comp99_recovery_lines) + "\n", encoding="utf-8")

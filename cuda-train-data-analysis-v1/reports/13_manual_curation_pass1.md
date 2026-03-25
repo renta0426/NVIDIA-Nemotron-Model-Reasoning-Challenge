@@ -8,12 +8,12 @@
 | answer_only_keep | concat_yx | 1 | 19 |
 | verified_trace_ready | concat_xy | 2 | 16 |
 | verified_trace_ready | concat_yx | 2 | 12 |
+| answer_only_keep | comp99_abs_diff_2d | 1 | 9 |
 | answer_only_keep | abs_diff_2d | 1 | 8 |
-| answer_only_keep | comp99_abs_diff_2d | 1 | 5 |
 | verified_trace_ready | abs_diff_2d | 2 | 4 |
 | verified_trace_ready | concat_yx | 3 | 4 |
+| verified_trace_ready | comp99_abs_diff_2d | 2 | 2 |
 | verified_trace_ready | abs_diff_2d_op_suffix | 2 | 1 |
-| verified_trace_ready | comp99_abs_diff_2d | 2 | 1 |
 | verified_trace_ready | concat_xy | 3 | 1 |
 | verified_trace_ready | concat_yx | 4 | 1 |
 
@@ -29,11 +29,15 @@
 | bad6f95d | answer_only_keep | - | abs_diff_2d | 1 | 41 | 54-95 |
 | e518256e | answer_only_keep | " | abs_diff_2d | 1 | 84 | 94"10 |
 | e836fb20 | answer_only_keep | - | abs_diff_2d | 1 | 68 | 89-21 |
+| 13892a7c | answer_only_keep | - | comp99_abs_diff_2d | 1 | -85 | 61-47 |
 | 1bc85bd9 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 93 | 16-22 |
+| 3a8a4ebc | answer_only_keep | ' | comp99_abs_diff_2d | 1 | '54 | 74'29 |
 | 5c008804 | answer_only_keep | @ | comp99_abs_diff_2d | 1 | 52 | 83@36 |
+| 6b769a9e | answer_only_keep | + | comp99_abs_diff_2d | 1 | +92 | 24+17 |
 | c7a7b13a | answer_only_keep | - | comp99_abs_diff_2d | 1 | 35 | 93-29 |
 | cde9f7ba | answer_only_keep | [ | comp99_abs_diff_2d | 1 | 81 | 15[33 |
 | debff779 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 94 | 36-41 |
+| ef6bc241 | answer_only_keep | $ | comp99_abs_diff_2d | 1 | $55 | 73$29 |
 | 047c4111 | answer_only_keep | $ | concat_xy | 1 | 2596 | 25$96 |
 | 2a73a462 | answer_only_keep | : | concat_xy | 1 | 9302 | 93:02 |
 | 35a89469 | answer_only_keep | [ | concat_xy | 1 | 9525 | 95[25 |
@@ -77,6 +81,7 @@
 | 878c843c | verified_trace_ready | / | abs_diff_2d | 2 | 35 | 80/45 |
 | c7420a23 | verified_trace_ready | $ | abs_diff_2d | 2 | 33 | 42$75 |
 | 824d4bcb | verified_trace_ready | : | abs_diff_2d_op_suffix | 2 | 64: | 24:88 |
+| b655eee9 | verified_trace_ready | - | comp99_abs_diff_2d | 2 | -92 | 76-83 |
 | cb2fdb6b | verified_trace_ready | - | comp99_abs_diff_2d | 2 | 54 | 08-53 |
 | 6b393b81 | verified_trace_ready | > | concat_xy | 3 | 4046 | 40>46 |
 | 0cd170a0 | verified_trace_ready | ^ | concat_xy | 2 | 9814 | 98^14 |
@@ -96,11 +101,6 @@
 | f7d90ae3 | verified_trace_ready | / | concat_xy | 2 | 9819 | 98/19 |
 | f94810f5 | verified_trace_ready | { | concat_xy | 2 | 1592 | 15{92 |
 | 552e14d7 | verified_trace_ready | + | concat_yx | 4 | 1756 | 56+17 |
-| 41e6cbfc | verified_trace_ready | + | concat_yx | 3 | 9318 | 18+93 |
-| 52c62a3e | verified_trace_ready | * | concat_yx | 3 | 1292 | 92*12 |
-| 7c72ad99 | verified_trace_ready | * | concat_yx | 3 | 2733 | 33*27 |
-| 8321a400 | verified_trace_ready | * | concat_yx | 3 | 6915 | 15*69 |
-| 383889e1 | verified_trace_ready | " | concat_yx | 2 | 5185 | 85"51 |
 
 ## Binary rows now excluded
 

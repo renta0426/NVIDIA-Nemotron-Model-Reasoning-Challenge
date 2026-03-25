@@ -6,7 +6,7 @@ Collect the full union of query-only and known-family mimic rows so round2 can d
 
 ## Scope
 
-- total mimic-union rows: `68`
+- total mimic-union rows: `67`
 - sources: report 17 high-shot arithmetic lookalikes + extra known-family / low-shot mimic rows
 
 ## Breakdown
@@ -19,15 +19,15 @@ Collect the full union of query-only and known-family mimic rows so round2 can d
 | abs_diff_2d\|x_minus_y | same_operator_examples_conflict | 9 |
 | abs_diff_2d | low_shot_example_conflict | 4 |
 | abs_diff_2d\|x_minus_y | query_format_ambiguous | 4 |
-| x_minus_y | same_operator_examples_conflict | 4 |
 | abs_diff_2d | same_operator_examples_conflict | 3 |
+| x_minus_y | same_operator_examples_conflict | 3 |
 | abs_diff_2d_op_suffix | low_shot_example_conflict | 2 |
 | abs_diff_2d_op_suffix | same_operator_examples_conflict | 2 |
 | abs_diff_2d | query_format_ambiguous | 1 |
 
 ## Source split
 
-- report 17 rows: `44`
+- report 17 rows: `43`
 - extra known-family rows (union minus report 17): `24`
 
 ## Interpretation

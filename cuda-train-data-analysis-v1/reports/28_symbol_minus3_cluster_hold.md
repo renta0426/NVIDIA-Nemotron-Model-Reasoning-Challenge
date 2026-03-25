@@ -25,6 +25,7 @@ Representative IDs re-read:
 - promoted rows: `0`
 - newly excluded rows: `0`
 - decision: keep the current `-` 3-character round2 slice in `manual_audit_priority`
+- later follow-up note: after this initial hold pass, `13892a7c` was safely promoted to `answer_only_keep` and `9a9f6025` was moved to `exclude_suspect` via the exact `comp99_abs_diff_2d` operator-prefixed zero-padded family; the remaining sign-embedded slice still stays manual
 
 ## Why these clusters still stay manual
 

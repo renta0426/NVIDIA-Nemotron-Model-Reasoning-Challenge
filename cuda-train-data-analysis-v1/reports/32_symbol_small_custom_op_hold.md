@@ -7,12 +7,12 @@ Re-read the current small unresolved `numeric_2x2` custom-operator clusters with
 ## Scope
 
 - focused current round2 clusters from `reports/20_symbol_round2_cluster_map.md`
-  - `$` answer_len=`3`, same_operator_bucket=`1`: `4` rows
+  - `$` answer_len=`3`, same_operator_bucket=`1`: `3` rows
   - `@` answer_len=`3`, same_operator_bucket=`2`: `4` rows
   - `}` answer_len=`3`, same_operator_bucket=`1`: `4` rows
   - `&` answer_len=`3`, same_operator_bucket=`1`: `3` rows
 - representative rows re-read:
-  - `$`: `50630ad8`, `ef6bc241`, `11f62c83`, `db4383f3`
+  - `$`: `50630ad8`, `11f62c83`, `db4383f3`
   - `@`: `286135d3`, `518d8529`, `bf4bd858`, `e4b6ce82`
   - `}`: `e9afa4a0`, `17c98340`, `912c6ea5`, `b3ae7f39`
   - `&`: `2c8e2e06`, `1d92ba5d`, `bc7f14d1`
@@ -25,15 +25,15 @@ Re-read the current small unresolved `numeric_2x2` custom-operator clusters with
 
 ## Cluster-by-cluster verdict
 
-### `$` bucket1 (`4` rows)
+### `$` bucket1 (`3` rows)
 
 - the cluster does not stabilize around one exact family
+- `ef6bc241` previously sat in this slice, but a later `comp99_abs_diff_2d` follow-up recovered it safely as `answer_only_keep`, so it no longer belongs to the current hold cluster
 - examples already disagree on output style:
   - `03$01 = 02`
-  - `92$58 = $65`
   - `86$91 = 78`
   - `01$97 = 197`
-- query answers (`$85`, `$55`, `951`, `175`) therefore cannot be unified by one reusable prompt-backed formatter
+- query answers (`$85`, `951`, `175`) therefore still cannot be unified by one reusable prompt-backed formatter
 
 ### `@` bucket2 (`4` rows)
 
