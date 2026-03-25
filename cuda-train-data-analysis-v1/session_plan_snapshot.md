@@ -71,4 +71,6 @@
 - `reports/30_binary_second_cluster_hold.md` を追加し、round2 `binary` の second-largest 29-row cluster（`8 examples / 1 no-candidate / 0 multi-candidate`）を再読したが、top cluster と同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができないことを確認した。
 - `reports/31_symbol_comp99_abs_diff_recovery.md` を更新し、`comp99_abs_diff_2d` family を operator-prefixed zero-pad まで広げて累計 `2 verified + 9 answer_only + 1 exclude` を確定した。
 - `reports/32_symbol_small_custom_op_hold.md` を追加し、current `$ / @ / } / &` の small custom-op cluster を再読したが、cluster 内で output style が崩れており、既存 prefix family を超える安全な再利用規則は見つからなかった。
-- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち operator 埋め込み output の残差と未読 small clusters、それから残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/33_symbol_custom4_cluster_hold.md` を追加し、current `! / " / $ / % / [` の 4桁 custom-op cluster `19` 行を再読した。さらに raw digits・pair sums/diffs/products・2-digit `x/y/x+y/|x-y|/x*y` の simple digit-template probe を当てても full-string family は 0 件で、全件 manual 維持とした。
+- `reports/34_symbol_minus1_bucket2_hold.md` を追加し、`-` の 1-digit unsigned bucket2 `4` 行も再読した。2 same-op examples ずつあるため本命候補として見たが、row-local subtraction / digit-difference / digit-sum 系 probe でも exact match は 0 件で、全件 manual 維持とした。
+- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち未読の `*` 3-digit と `-` 2-digit residual、それから残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
