@@ -202,6 +202,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/15_binary_residual_affine_scan.md` | binary low-gap の residual scan で除外した 11 行と、保留行の根拠 |
 | `reports/16_glyph_manual_hold.md` | glyph pass1 46 行を全件 manual 維持にした根拠 |
 | `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 32 行を、same-op 照合で全却下した根拠 |
+| `reports/18_symbol_next_safe_scan.md` | query-only 却下後の残差に対して次の safe family を探したが、derived template 探索でも 0 件だった記録 |
 
 ## 8. 最短の読み順
 
@@ -230,6 +231,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - `numeric_2x2` は operator-aware と string-template pass1 でかなり整理できたが、まだ `373` 行が pass1 に残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d` に見える `32` 行も再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が一意化できず、**追加昇格 0**
+- さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 
 ### 9.3 glyph_len5 は coarse 仮説止まり
