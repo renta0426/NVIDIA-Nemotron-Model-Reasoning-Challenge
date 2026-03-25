@@ -24,13 +24,13 @@
 | --- | ---: | ---: |
 | `verified_trace_ready` | 5,862 | 61.7% |
 | `answer_only_keep` | 1,075 | 11.3% |
-| `manual_audit_priority` | 2,545 | 26.8% |
-| `exclude_suspect` | 18 | 0.2% |
+| `manual_audit_priority` | 2,534 | 26.7% |
+| `exclude_suspect` | 29 | 0.3% |
 
 ### この数字の意味
 
 - 安全側の学習コア: `5,862 + 1,075 = 6,937` 行（`73.0%`）
-- 未解決 / 要注意: `2,545 + 18 = 2,563` 行（`27.0%`）
+- 未解決 / 要注意: `2,534 + 29 = 2,563` 行（`27.0%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -41,7 +41,7 @@
 | `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
-| `bit_manipulation` | 1,602 | 381 | 0 | 1,213 | 8 | 主要な残課題 |
+| `bit_manipulation` | 1,602 | 381 | 0 | 1,202 | 19 | 主要な残課題 |
 | `symbol_equation` | 1,555 | 109 | 104 | 1,332 | 10 | 主要な残課題 |
 
 ### 解釈
@@ -67,6 +67,7 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 - 以前の solved 参照値: `306`
 - 最終 verified binary: `381`
 - 改善幅: `+75`
+- さらに residual binary scan で、**一意 affine / low-gap / gold 不一致** の `11` 行を `exclude_suspect` へ移した
 
 ### 4.2 text の改善
 
@@ -103,10 +104,10 @@ symbol は大きく 2 つに分かれました。
 
 ### 4.4 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **569 行** まで縮みました。
+最優先で人手確認すべき pack は **558 行** まで縮みました。
 
 - `373` 行: `symbol_numeric_same_op`
-- `150` 行: `binary_low_gap`
+- `139` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
 次の curation ループはここから始めるのが最短です。
@@ -134,6 +135,7 @@ symbol は大きく 2 つに分かれました。
 | --- | --- |
 | `artifacts/text_answer_completion_summary_v1.csv` | 971 行の text answer-only 昇格内訳 |
 | `artifacts/binary_cluster_summary_v1.csv` | 未解決 binary のクラスタ要約 |
+| `artifacts/binary_affine_low_gap_exclude_v1.csv` | 一意 affine だが gold と衝突したため `exclude_suspect` に移した binary 行 |
 | `artifacts/binary_affine_mismatch_candidates_v1.csv` | affine 一意でも gold と衝突したため昇格しなかった binary 行 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した `concat_xy / concat_yx` 行の一覧 |
@@ -195,6 +197,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/12_symbol_tail_probes.md` | 最終段階の symbol 残差 probe |
 | `reports/13_manual_curation_pass1.md` | pass1 で安全昇格した symbol 行と、昇格しなかった binary/glyph の根拠 |
 | `reports/14_symbol_residual_template_scan.md` | residual scan で採用 / 不採用 / suspect 化した symbol 行の根拠 |
+| `reports/15_binary_residual_affine_scan.md` | binary low-gap の residual scan で除外した 11 行と、保留行の根拠 |
 
 ## 8. 最短の読み順
 
@@ -203,16 +206,18 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 1. `reports/11_latest_snapshot.md`
 2. `artifacts/train_recommended_learning_target_v1.csv`
 3. `artifacts/manual_pass1_priority_pack_v1.csv`
-4. `reports/12_symbol_tail_probes.md`
-5. `code/train_data_analysis_v1.py`
+4. `reports/15_binary_residual_affine_scan.md`
+5. `reports/14_symbol_residual_template_scan.md`
+6. `code/train_data_analysis_v1.py`
 
 ## 9. 現状の課題
 
 ### 9.1 binary がまだ重い
 
-- `bit_manipulation` はまだ `1,213 manual + 8 exclude`
+- `bit_manipulation` はまだ `1,202 manual + 19 exclude`
 - 2-bit / 3-bit / affine XOR / byte transform まで当てても、なお多数が未解決
 - 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
+- low-gap で一意 affine と gold が衝突する `11` 行は今回除外できたが、それ以外の affine mismatch は gap が大きく、まだ安全に切れない
 - つまり次は、より広い boolean/circuit family か、より複雑な non-local byte transform を考える必要がある
 
 ### 9.2 symbol がまだ重い
@@ -237,7 +242,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 
 ### 9.5 exclude 行は少数だが重要
 
-- `exclude_suspect = 17`
+- `exclude_suspect = 29`
 - 数は少ないが、こうした行を無理に学習へ混ぜると `README.md` の accuracy 評価に対して逆効果になりやすい
 - ここは「少ないから無視」ではなく、今後も別管理を維持するのが安全
 
@@ -247,7 +252,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
 2. `symbol_numeric_same_op` 373 行
-3. `binary_low_gap` 150 行
+3. `binary_low_gap` 139 行
 4. `symbol_glyph_multiset` 46 行
 
 ## 10. 検証メモ

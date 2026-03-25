@@ -56,8 +56,8 @@
 | 845fee60 | 10 | unknown | 1 | 0 | 6.0 | 01110000 |
 | 89dfa4c2 | 10 | unknown | 1 | 0 | 6.0 | 00111010 |
 | 8f07a84d | 10 | unknown | 1 | 0 | 6.0 | 11101000 |
-| ae93aec4 | 10 | unknown | 1 | 0 | 6.0 | 00011000 |
 | 06667a93 | 9 | unknown | 1 | 0 | 5.0 | 10100011 |
-| 084a4496 | 9 | unknown | 1 | 0 | 5.0 | 11000111 |
+| 0a1326f4 | 9 | unknown | 1 | 0 | 5.0 | 10010110 |
+| 20052c2f | 9 | unknown | 1 | 0 | 5.0 | 01100110 |
 
 Observation: simple byte transforms (shift/rotate/mask) recover a small extra slice, but the dominant unresolved cluster still has no single-bit candidate on at least one output position, so the remaining rules likely need broader boolean/circuit families or richer non-local byte transforms.

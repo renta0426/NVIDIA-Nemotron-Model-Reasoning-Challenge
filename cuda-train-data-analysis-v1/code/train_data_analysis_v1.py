@@ -1062,8 +1062,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     affine_answer, affine_free_var_counts = infer_bit_affine_xor_answer(examples, query_bits)
     byte_transform_answer, byte_transform_names = infer_bit_byte_transform_answer(examples, query_bits)
     strict_prediction = bijection_answer or (independent_answer or "")
-    best_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
-    matches_gold = bool(best_prediction and best_prediction == str(answer))
+    fallback_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
     no_candidate_positions = sum(1 for candidates in candidate_sets if not candidates)
     multi_candidate_positions = sum(1 for candidates in candidate_sets if len(candidates) > 1)
     reasons: list[str] = []
@@ -1107,6 +1106,34 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     elif byte_transform_answer and byte_transform_answer == str(answer):
         teacher_solver = "binary_byte_transform"
     verified = bool(teacher_solver)
+    affine_low_gap_mismatch = bool(
+        not verified
+        and not strict_prediction
+        and not boolean2_answer
+        and not boolean3_answer
+        and affine_answer
+        and not byte_transform_answer
+        and affine_answer != str(answer)
+        and len(examples) >= 7
+        and no_candidate_positions <= 1
+        and multi_candidate_positions == 0
+    )
+    if affine_low_gap_mismatch:
+        reasons.append("bit_affine_low_gap_mismatch")
+    best_prediction = fallback_prediction
+    if teacher_solver == "binary_bit_permutation_bijection":
+        best_prediction = bijection_answer
+    elif teacher_solver == "binary_bit_permutation_independent":
+        best_prediction = independent_answer or ""
+    elif teacher_solver == "binary_two_bit_boolean":
+        best_prediction = boolean2_answer or ""
+    elif teacher_solver == "binary_three_bit_boolean":
+        best_prediction = boolean3_answer or ""
+    elif teacher_solver == "binary_affine_xor":
+        best_prediction = affine_answer or ""
+    elif teacher_solver == "binary_byte_transform":
+        best_prediction = byte_transform_answer or ""
+    matches_gold = bool(best_prediction and best_prediction == str(answer))
     return {
         "template_subtype": template_subtype,
         "teacher_solver_candidate": teacher_solver,
@@ -1114,7 +1141,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "auto_solver_match": bool(matches_gold),
         "verified_trace_ready": verified,
         "example_consistency_ok": bool(all(candidate_sets)),
-        "analysis_notes": "bit_exact" if verified else "bit_audit_needed",
+        "analysis_notes": "bit_exact" if verified else ("bit_affine_low_gap_mismatch" if affine_low_gap_mismatch else "bit_audit_needed"),
         "family_analysis_json": json_dumps(
             {
                 "example_count": len(examples),
@@ -1130,10 +1157,11 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
                 "byte_transform_names": byte_transform_names,
                 "no_candidate_positions": no_candidate_positions,
                 "multi_candidate_positions": multi_candidate_positions,
+                "affine_low_gap_mismatch": affine_low_gap_mismatch,
             }
         ),
         "audit_reasons": "|".join(reasons),
-        "suspect_label": bool(strict_prediction and strict_prediction != str(answer)),
+        "suspect_label": bool((strict_prediction and strict_prediction != str(answer)) or affine_low_gap_mismatch),
         "bit_simple_family": simple_family,
         "bit_candidate_signature": bit_candidate_signature(candidate_sets),
         "bit_independent_unique": bool(independent_answer is not None),
@@ -1651,7 +1679,8 @@ def build_reports(
     symbol_tail_probe_df: pd.DataFrame,
     symbol_string_promotion_df: pd.DataFrame,
     glyph_query_consistent_df: pd.DataFrame,
-    binary_affine_mismatch_df: pd.DataFrame,
+    binary_affine_exclude_df: pd.DataFrame,
+    binary_affine_manual_df: pd.DataFrame,
     binary_cluster_df: pd.DataFrame,
     glyph_summary_df: pd.DataFrame,
     text_manual_queue_df: pd.DataFrame,
@@ -1872,7 +1901,7 @@ def build_reports(
         "## Key changes in this snapshot",
         "",
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
-        "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows.",
+        "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.",
         "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.",
         "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG and remain the sharpest glyph audit candidates.",
         "",
@@ -1921,10 +1950,18 @@ def build_reports(
             limit=80,
         ),
         "",
-        "## Binary rows inspected but not promoted",
+        "## Binary rows now excluded",
         "",
         markdown_table(
-            binary_affine_mismatch_df,
+            binary_affine_exclude_df,
+            ["id", "answer", "auto_solver_predicted_answer", "bit_no_candidate_positions", "audit_reasons"],
+            limit=20,
+        ),
+        "",
+        "## Binary affine mismatch rows still kept manual",
+        "",
+        markdown_table(
+            binary_affine_manual_df,
             ["id", "answer", "auto_solver_predicted_answer", "bit_no_candidate_positions", "audit_reasons"],
             limit=20,
         ),
@@ -1937,10 +1974,34 @@ def build_reports(
             limit=20,
         ),
         "",
-        "Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule; one extra symbol row is now flagged `exclude_suspect` after exact `abs_diff_2d` mismatch.",
+        "Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.",
         "",
     ]
     (reports_dir / "13_manual_curation_pass1.md").write_text("\n".join(manual_curation_lines) + "\n", encoding="utf-8")
+
+    binary_exclude_lines = [
+        f"# {SCRIPT_VERSION} binary residual affine scan",
+        "",
+        "## Newly excluded low-gap affine mismatches",
+        "",
+        markdown_table(
+            binary_affine_exclude_df,
+            ["id", "num_examples", "answer", "auto_solver_predicted_answer", "bit_no_candidate_positions", "bit_multi_candidate_positions", "audit_reasons"],
+            limit=40,
+        ),
+        "",
+        "## Remaining affine mismatch rows kept manual",
+        "",
+        markdown_table(
+            binary_affine_manual_df,
+            ["id", "num_examples", "answer", "auto_solver_predicted_answer", "bit_no_candidate_positions", "bit_multi_candidate_positions", "audit_reasons"],
+            limit=40,
+        ),
+        "",
+        "Interpretation: rows move to `exclude_suspect` only when the affine solution is unique, no stricter solver family wins, the gap is low (`bit_no_candidate_positions <= 1`, `bit_multi_candidate_positions == 0`), and the affine answer still contradicts the gold label. More ambiguous affine mismatches remain manual.",
+        "",
+    ]
+    (reports_dir / "15_binary_residual_affine_scan.md").write_text("\n".join(binary_exclude_lines) + "\n", encoding="utf-8")
 
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:
@@ -2010,7 +2071,17 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         .sort_values(["selection_tier", "symbol_numeric_formula_name", "symbol_same_operator_example_count", "id"], ascending=[True, True, False, True])
         .reset_index(drop=True)
     )
-    binary_affine_mismatch_df = (
+    binary_affine_exclude_df = (
+        analysis_df.loc[
+            (analysis_df["family"] == "bit_manipulation")
+            & (analysis_df["selection_tier"] == "exclude_suspect")
+            & (analysis_df["bit_affine_unique"])
+            & (~analysis_df["auto_solver_match"])
+        ]
+        .sort_values(["hard_score", "id"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    binary_affine_manual_df = (
         analysis_df.loc[
             (analysis_df["family"] == "bit_manipulation")
             & (analysis_df["selection_tier"] == "manual_audit_priority")
@@ -2101,7 +2172,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_tail_probe_df, artifacts_dir / "symbol_tail_probe_summary_v1.csv")
     write_dataframe(symbol_string_promotion_df, artifacts_dir / "symbol_string_template_promotions_v1.csv")
     write_dataframe(glyph_query_consistent_df, artifacts_dir / "glyph_query_consistent_v1.csv")
-    write_dataframe(binary_affine_mismatch_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
+    write_dataframe(binary_affine_exclude_df, artifacts_dir / "binary_affine_low_gap_exclude_v1.csv")
+    write_dataframe(binary_affine_manual_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(
@@ -2147,7 +2219,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         symbol_tail_probe_df,
         symbol_string_promotion_df,
         glyph_query_consistent_df,
-        binary_affine_mismatch_df,
+        binary_affine_exclude_df,
+        binary_affine_manual_df,
         binary_cluster_df,
         glyph_summary_df,
         text_manual_queue_df,

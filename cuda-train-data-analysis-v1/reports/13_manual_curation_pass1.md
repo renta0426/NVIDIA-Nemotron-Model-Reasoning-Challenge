@@ -100,7 +100,23 @@
 | 9760032a | verified_trace_ready | + | concat_yx | 2 | 9372 | 72+93 |
 | 99e2cf41 | verified_trace_ready | + | concat_yx | 2 | 4415 | 15+44 |
 
-## Binary rows inspected but not promoted
+## Binary rows now excluded
+
+| id | answer | auto_solver_predicted_answer | bit_no_candidate_positions | audit_reasons |
+| --- | --- | --- | --- | --- |
+| ae93aec4 | 00011000 | 10011000 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 084a4496 | 11000111 | 11100111 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 5a0c141c | 01010000 | 01000000 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 934a2c55 | 00101011 | 00101111 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| bf002000 | 11001000 | 11011000 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| eeb60061 | 00000101 | 10010101 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 26410094 | 10010000 | 11010000 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 2d74e088 | 10001100 | 10011101 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 8f6d4fb3 | 00101011 | 00111011 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| 978c688b | 11010111 | 11110111 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+| c3207775 | 11111001 | 01011001 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_affine_low_gap_mismatch |
+
+## Binary affine mismatch rows still kept manual
 
 | id | answer | auto_solver_predicted_answer | bit_no_candidate_positions | audit_reasons |
 | --- | --- | --- | --- | --- |
@@ -118,12 +134,12 @@
 | 851a22cb | 00001010 | 10001010 | 3 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | 9b1761fb | 10000000 | 00000000 | 8 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | a5749dc0 | 00000000 | 00000010 | 7 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
-| ae93aec4 | 00011000 | 10011000 | 1 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | b3785949 | 11100011 | 11100001 | 2 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | b8954f14 | 11000011 | 11100011 | 2 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | c4a6d52b | 01000010 | 11100010 | 2 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | cf447906 | 10000111 | 10000100 | 6 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 | e5d0d497 | 01101101 | 01100100 | 5 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
+| fb5a7b9e | 11111010 | 11011010 | 2 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous |
 
 ## Glyph rows still kept manual
 
@@ -135,5 +151,5 @@
 | a77be9fa | 5.0 | [" | {>\|$[ | symbol_length_mismatch\|symbol_solver_unverified |
 | afdb7326 | 5.0 | %\ | @^%(^ | symbol_length_mismatch\|symbol_solver_unverified |
 
-Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule; one extra symbol row is now flagged `exclude_suspect` after exact `abs_diff_2d` mismatch.
+Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.
 
