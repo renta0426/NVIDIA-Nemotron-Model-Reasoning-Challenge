@@ -218,6 +218,8 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/23_symbol_known_family_mimics.md` | report 17 と extra known-family mimic を合流した `symbol` mimic union の整理 |
 | `reports/24_glyph_exact_coarse_scan.md` | round2 glyph 46 行を exact examples-only coarse model で再列挙し、0 unique string を確認した report |
 | `reports/25_symbol_star4_cluster_hold.md` | round2 `symbol` の `*` 4桁 top 2 cluster（39 行）を再読し、依然 manual hold とした根拠 |
+| `reports/26_symbol_plus3_cluster_hold.md` | round2 `symbol` の `+` 3桁 cluster を再読し、依然 manual hold とした根拠 |
+| `reports/27_binary_top_cluster_hold.md` | round2 `binary` の top 34-row cluster を再読し、依然 manual hold とした根拠 |
 
 ## 8. 最短の読み順
 
@@ -238,6 +240,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - 2-bit / 3-bit / affine XOR / byte transform まで当てても、なお多数が未解決
 - 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
 - low-gap で一意 affine と gold が衝突する `11` 行は今回除外できたが、それ以外の affine mismatch は gap が大きく、まだ安全に切れない
+- round2 の top binary cluster（`34` 行, `7 examples / 1 no-candidate / 0 multi-candidate`）も再読したが、affine / boolean / byte family のどれも unique ではなく、consensus mismatch も無いので safe promotion / safe exclusion の両方ができない
 - つまり次は、より広い boolean/circuit family か、より複雑な non-local byte transform を考える必要がある
 
 ### 9.2 symbol がまだ重い
@@ -249,6 +252,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
 - report 17 の高shot mimic `32` 行に、extra known-family / low-shot mimic を足した mimic union は `56` 行となり、round2 の `symbol` 本丸は `317` 行まで圧縮できた
 - round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
+- round2 `+` 3桁 cluster も再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 でも同一 prompt 内で `2` 桁出力と `3` 桁出力が混在するため、再利用可能な exact formatter は見つからなかった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
@@ -279,7 +283,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. round2 `symbol` core `317` 行（特に `+` 3桁 / `-` 3桁 / operator 埋め込み output）
+2. round2 `symbol` core `317` 行のうち、次は `-` 3桁 / operator 埋め込み output
 3. `binary_low_gap` 139 行
 4. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 
