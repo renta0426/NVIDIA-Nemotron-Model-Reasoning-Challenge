@@ -48,8 +48,9 @@
 - `binary` は affine XOR と simple byte transform（shift / rotate / mask）を足したことで 381 verified まで伸び、baseline の 306 solved を上回った。
 - `binary` の residual low-gap scan では、一意 affine・他候補なし・`bit_no_candidate_positions<=1`・gold 不一致の 11 行を `exclude_suspect` へ降格した。これで `binary` は `381 verified / 1202 manual / 19 exclude` になった。
 - `symbol` は `numeric_2x2` の operator-aware formula search に加え、pass1 manual curation で exact string-template 規則 `concat_xy / concat_yx / abs_diff_2d / abs_diff_2d_op_suffix` を統合した。直近の residual scan では `824d4bcb` を verified、`9cb03277` を answer_only に昇格し、`4c6cf9d9` を exclude_suspect に降格した。これで `symbol` は `109 verified / 104 answer_only / 1332 manual / 10 exclude` になった。
+- `glyph_len5` pass1 の 46 行は dedicated recheck を行ったが、安全昇格 0 / 安全除外 0 だった。`glyph_query_consistent_v1.csv` の 5 行も coarse multiset+order model が非一意のため、全件 manual 維持とした。
 - `glyph_len5` のうち `glyph_multiset_possible` は 70 行、そのうち example 出力に一貫した順序制約まで通る `glyph_order_acyclic` は 46 行で、`manual_pass1_priority_pack_v1.csv` の glyph 部分はこの 46 行に絞り込んだ。
 - `text` の未verified 971 行は全件、gold answer により不足 1〜6 文字の monoalphabetic mapping を矛盾なく補完できることを確認し、`answer_only_keep` に昇格した。これで `text` は `verified=605 / answer_only=971 / manual=0` になった。
 - `manual_pass1_priority_pack_v1.csv` は `558` 行まで圧縮され、内訳は `symbol_numeric_same_op=373`, `binary_low_gap=139`, `symbol_glyph_multiset=46`。
-- `reports/13_manual_curation_pass1.md`、`reports/14_symbol_residual_template_scan.md`、`reports/15_binary_residual_affine_scan.md` に、今回の安全昇格・suspect 化・非昇格判断の根拠を追加した。
+- `reports/13_manual_curation_pass1.md`、`reports/14_symbol_residual_template_scan.md`、`reports/15_binary_residual_affine_scan.md`、`reports/16_glyph_manual_hold.md` に、今回の安全昇格・suspect 化・非昇格判断の根拠を追加した。
 - 次ステップは `glyph_len5` 46 行の mapping/order 一意化仮説と、残る `binary_low_gap` 139 行・`symbol_numeric_same_op` 373 行から次の安全 subset を抽出すること。

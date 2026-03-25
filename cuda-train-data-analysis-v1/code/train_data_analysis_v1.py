@@ -1903,7 +1903,7 @@ def build_reports(
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
         "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.",
         "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.",
-        "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG and remain the sharpest glyph audit candidates.",
+        "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG, but a dedicated pass1 recheck still finds zero safe promotions or exclusions because the coarse model remains non-unique.",
         "",
     ]
     (reports_dir / "11_latest_snapshot.md").write_text("\n".join(latest_lines) + "\n", encoding="utf-8")
@@ -2002,6 +2002,44 @@ def build_reports(
         "",
     ]
     (reports_dir / "15_binary_residual_affine_scan.md").write_text("\n".join(binary_exclude_lines) + "\n", encoding="utf-8")
+
+    glyph_pass1_df = manual_pass1_df.loc[manual_pass1_df["audit_focus"] == "symbol_glyph_multiset"].copy() if len(manual_pass1_df) else pd.DataFrame()
+    glyph_hold_lines = [
+        f"# {SCRIPT_VERSION} glyph manual hold",
+        "",
+        "## Decision",
+        "",
+        f"- pass1 glyph rows reviewed: `{len(glyph_pass1_df)}`",
+        f"- rows promoted: `0`",
+        f"- rows newly excluded: `0`",
+        "- decision: keep all glyph pass1 rows in `manual_audit_priority`.",
+        "",
+        "## Why they stay manual",
+        "",
+        "- every pass1 glyph row still carries `symbol_length_mismatch|symbol_solver_unverified`.",
+        "- the strongest 5 rows in `glyph_query_consistent_v1.csv` only show that query+gold is compatible with the coarse multiset+order model; they do **not** make the model unique.",
+        "- per `README.md`, leaderboard score is direct final-answer accuracy, so teaching non-unique glyph hypotheses is riskier than leaving these rows manual.",
+        "",
+        "## Glyph query-consistent rows",
+        "",
+        markdown_table(
+            glyph_query_consistent_df,
+            ["id", "hard_score", "answer", "query_raw", "audit_reasons"],
+            limit=20,
+        ),
+        "",
+        "## Top glyph pass1 rows",
+        "",
+        markdown_table(
+            glyph_pass1_df,
+            ["id", "hard_score", "answer", "query_raw", "audit_reasons"],
+            limit=40,
+        ),
+        "",
+        "Interpretation: even the best glyph candidates remain underdetermined. They are suitable for future human reasoning work, but not for safe automatic promotion or exclusion in the current pass.",
+        "",
+    ]
+    (reports_dir / "16_glyph_manual_hold.md").write_text("\n".join(glyph_hold_lines) + "\n", encoding="utf-8")
 
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:

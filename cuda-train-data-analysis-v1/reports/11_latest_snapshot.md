@@ -1,6 +1,6 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-03-25T17:37:03.767324+00:00`
+- generated_at_utc: `2026-03-25T17:48:09.825288+00:00`
 - verified_trace_ready: `5862`
 - answer_only_keep: `1075`
 - manual_audit_priority: `2534`
@@ -30,5 +30,5 @@
 - `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.
 - `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.
 - `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.
-- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG and remain the sharpest glyph audit candidates.
+- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG, but a dedicated pass1 recheck still finds zero safe promotions or exclusions because the coarse model remains non-unique.
 

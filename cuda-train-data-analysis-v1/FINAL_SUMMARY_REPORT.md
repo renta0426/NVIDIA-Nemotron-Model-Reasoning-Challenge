@@ -100,7 +100,8 @@ symbol は大きく 2 つに分かれました。
 
 - `70` 行が multiset 風の粗い仮説に整合
 - そのうち `46` 行は global output-order DAG にも整合
-- この `46` 行が、glyph 系 manual audit の最優先候補です
+- ただし dedicated glyph pass1 recheck でも **安全昇格 0 / 安全除外 0**
+- この `46` 行は、引き続き glyph 系 manual audit の最優先候補です
 
 ### 4.4 pass1 manual pack の圧縮
 
@@ -198,6 +199,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/13_manual_curation_pass1.md` | pass1 で安全昇格した symbol 行と、昇格しなかった binary/glyph の根拠 |
 | `reports/14_symbol_residual_template_scan.md` | residual scan で採用 / 不採用 / suspect 化した symbol 行の根拠 |
 | `reports/15_binary_residual_affine_scan.md` | binary low-gap の residual scan で除外した 11 行と、保留行の根拠 |
+| `reports/16_glyph_manual_hold.md` | glyph pass1 46 行を全件 manual 維持にした根拠 |
 
 ## 8. 最短の読み順
 
@@ -233,6 +235,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - `46` 行は order DAG にも整合
 - ただし coarse model が **一意でない** ため、教師として昇格できない
 - query+gold を足しても整合する行は `5` 行だけあったが、それでも非一意なので manual のままにしている
+- dedicated glyph pass1 recheck でも、安全昇格 0 / 安全除外 0 のままだった
 
 ### 9.4 text は accuracy 向けには強いが、trace 完全性では未完
 
