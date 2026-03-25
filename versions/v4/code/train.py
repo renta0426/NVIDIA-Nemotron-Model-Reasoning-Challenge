@@ -46,9 +46,13 @@ EVAL_ROOT = OUTPUTS_ROOT / 'eval'
 PACKAGING_ROOT = OUTPUTS_ROOT / 'packaging'
 REPORTS_ROOT = OUTPUTS_ROOT / 'reports'
 
-DEFAULT_MODEL_REPO_ID = 'lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit'
+LEGACY_MODEL_REPO_ID = 'lmstudio-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6bit'
+DEFAULT_MODEL_REPO_ID = 'mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16'
 DEFAULT_SUBMISSION_BASE_MODEL = 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16'
-DEFAULT_LOCAL_MODEL_NAME = 'nemotron-3-nano-30b-a3b-mlx-6bit'
+LEGACY_LOCAL_MODEL_NAME = 'nemotron-3-nano-30b-a3b-mlx-6bit'
+DEFAULT_LOCAL_MODEL_NAME = 'nemotron-3-nano-30b-a3b-mlx-bf16'
+DEFAULT_LOCAL_MODEL_PATH = REPO_ROOT / 'model'
+LEGACY_LOCAL_MODEL_PATH = REPO_ROOT / 'versions' / 'v2' / 'outputs' / 'models' / LEGACY_LOCAL_MODEL_NAME
 DEFAULT_ACTIVE_MODEL_PATH = REPO_ROOT / 'versions' / 'v2' / 'outputs' / 'runtime' / 'active_model.json'
 DEFAULT_MODEL_REGISTRY_PATH = RUNTIME_ROOT / 'model_registry_v3.json'
 DEFAULT_SMOKE_IDENTIFIER = 'nemotron-v3-smoke'
@@ -1149,8 +1153,14 @@ def load_active_model_manifest_v4() -> dict[str, Any]:
 
 
 def resolve_active_snapshot_path_v4() -> str:
+    preferred_local_model = resolve_preferred_mlx_model_path_v4()
+    if preferred_local_model is not None:
+        return preferred_local_model
     active_model = load_active_model_manifest_v4()
     snapshot_dir = normalize_optional_text(active_model.get('snapshot_dir'))
+    fallback_model = resolve_fallback_mlx_model_path_v4(snapshot_dir)
+    if fallback_model is not None:
+        return fallback_model
     if snapshot_dir is None:
         return str(DEFAULT_V3_ACTIVE_MODEL_PATH)
     return snapshot_dir
@@ -4520,14 +4530,84 @@ def resolve_existing_path(path_value: str | Path) -> Path:
     return candidate
 
 
+def has_complete_mlx_snapshot(model_dir: Path) -> bool:
+    if not model_dir.exists() or not model_dir.is_dir():
+        return False
+    if any(model_dir.glob('model-*.safetensors')):
+        return True
+    single_file = model_dir / 'model.safetensors'
+    if single_file.exists():
+        return True
+    index_path = model_dir / 'model.safetensors.index.json'
+    if not index_path.exists():
+        return False
+    try:
+        payload = json.loads(index_path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError:
+        return False
+    weight_map = payload.get('weight_map')
+    if not isinstance(weight_map, dict) or not weight_map:
+        return False
+    shard_names = {str(value) for value in weight_map.values() if value}
+    return bool(shard_names) and all((model_dir / shard_name).exists() for shard_name in shard_names)
+
+
+def huggingface_snapshot_root_for_repo(repo_id: str) -> Path:
+    safe_repo = repo_id.replace('/', '--')
+    return Path.home() / '.cache' / 'huggingface' / 'hub' / f'models--{safe_repo}' / 'snapshots'
+
+
+def resolve_preferred_mlx_model_path_v4() -> str | None:
+    candidate_paths = [DEFAULT_LOCAL_MODEL_PATH, default_lms_model_path(DEFAULT_MODEL_REPO_ID)]
+    snapshot_root = huggingface_snapshot_root_for_repo(DEFAULT_MODEL_REPO_ID)
+    if snapshot_root.exists():
+        candidate_paths.extend(sorted(path for path in snapshot_root.iterdir() if path.is_dir()))
+    active_model = load_active_model_manifest_v4()
+    active_snapshot = normalize_optional_text(active_model.get('snapshot_dir'))
+    active_repo_id = normalize_optional_text(active_model.get('repo_id'))
+    if active_snapshot and active_repo_id == DEFAULT_MODEL_REPO_ID:
+        candidate_paths.append(resolve_existing_path(active_snapshot))
+    for candidate in candidate_paths:
+        if has_complete_mlx_snapshot(candidate):
+            return str(candidate.resolve())
+    return None
+
+
+def resolve_fallback_mlx_model_path_v4(active_snapshot: str | None = None) -> str | None:
+    candidate_paths = [LEGACY_LOCAL_MODEL_PATH, default_lms_model_path(LEGACY_MODEL_REPO_ID)]
+    if active_snapshot:
+        candidate_paths.insert(0, resolve_existing_path(active_snapshot))
+    for candidate in candidate_paths:
+        if has_complete_mlx_snapshot(candidate):
+            return str(candidate.resolve())
+    return None
+
+
+def is_default_mlx_model_request(requested: str | None, active_repo_id: str | None) -> bool:
+    return requested in {
+        None,
+        DEFAULT_MODEL_REPO_ID,
+        LEGACY_MODEL_REPO_ID,
+        active_repo_id,
+        DEFAULT_LOCAL_MODEL_NAME,
+        LEGACY_LOCAL_MODEL_NAME,
+        'model',
+        str(DEFAULT_LOCAL_MODEL_PATH),
+    }
+
+
 def resolve_training_base_model(base_model_value: Any, active_model: dict[str, Any]) -> str:
     requested = normalize_optional_text(base_model_value)
     active_snapshot = normalize_optional_text(active_model.get('snapshot_dir'))
     active_repo_id = normalize_optional_text(active_model.get('repo_id'))
-    if active_snapshot and requested in {None, DEFAULT_MODEL_REPO_ID, active_repo_id, DEFAULT_LOCAL_MODEL_NAME}:
-        return active_snapshot
+    preferred_local_model = resolve_preferred_mlx_model_path_v4()
+    fallback_model = resolve_fallback_mlx_model_path_v4(active_snapshot)
+    if preferred_local_model and is_default_mlx_model_request(requested, active_repo_id):
+        return preferred_local_model
+    if fallback_model and is_default_mlx_model_request(requested, active_repo_id):
+        return fallback_model
     if requested is None:
-        return active_snapshot or 'UNSET_base_model'
+        return preferred_local_model or fallback_model or 'UNSET_base_model'
     resolved = resolve_existing_path(requested)
     return str(resolved) if resolved.exists() else requested
 
