@@ -59,4 +59,6 @@
 - `glyph_len5` 46 行も、answer 長さ 1〜2 の短答群を含めて prompt を再読したが、この時点では safe promotion / safe exclusion に繋がる exact family はまだ見えていない。
 - `reports/19_pass1_completion_and_round2.md` に、pass1 がどこまで完了したかと、round2 の優先 cluster（`*`4桁, `+`3桁, `-`3桁, operator 埋め込み output）をまとめた。
 - `artifacts/symbol_round2_cluster_summary_v1.csv` と `reports/20_symbol_round2_cluster_map.md` を追加し、query-only / derived-template を除いた `symbol_numeric_same_op` 341 行の round2 入口を cluster 化した。
+- `artifacts/glyph_round2_cluster_summary_v1.csv` と `reports/21_glyph_round2_cluster_map.md` を追加し、`symbol_glyph_multiset` 46 行の round2 入口も長さ・重複構造ベースで cluster 化した。
+- `artifacts/binary_round2_cluster_summary_v1.csv` と `reports/22_binary_round2_cluster_map.md` を追加し、`binary_low_gap` 139 行の round2 入口も gap / uniqueness flag ベースで cluster 化した。
 - 次ステップは、`glyph_len5` 46 行の mapping/order 一意化仮説と、残る `binary_low_gap` 139 行・`symbol_numeric_same_op` 373 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。
