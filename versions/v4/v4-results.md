@@ -8,6 +8,7 @@
 - Real v4 data generation has started on Mac/MLX.
 - Current best local hard-gate candidate is `v5_merge_run3_run6_80_20` with `hard_shadow_256 = 0.5859375`.
 - Current best local shadow-side serious candidate remains `v5_merge_run3_run6_85_15` with `shadow_256 = 0.5625`.
+- Follow-up scoring for `v4_rft_stage_c_cleanaccept_balancedrobust_run11` reached `shadow_256 = 0.51953125` / `hard_shadow_256 = 0.52734375`; formatting was much cleaner than `run3` / `run6`, but it did not become the new best local candidate.
 - Fine-grained merge-ratio sweeps now look diagnostic rather than transformative: `82/18` regressed on quick, so future gains need structural changes on weak families rather than more merge interpolation.
 - `README.md` official evaluation parameters remain fixed during all local scoring:
   - `max_tokens = 7680`
@@ -256,6 +257,39 @@
   - the biggest unresolved weak families are still `bit_manipulation`, `symbol_equation`, and `text_decryption`
   - `run10` / `run11` confirmed that simple parameter retuning around `run3` is not the main path forward
   - reaching an official score near `0.9` will require structural improvements on those weak families; merge interpolation alone is not enough
+
+## 2026-03-25 run11 evaluation follow-up
+
+- user requested a later evaluation pass for `v4_rft_stage_c_cleanaccept_balancedrobust_run11` using the same local flow as the prior v4 candidates, still anchored to the `README.md` official settings (`max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `max_model_len = 8192`)
+- quick gate:
+  - `shadow_128 overall_accuracy = 0.515625`
+  - `format_fail_rate = 0.890625`
+  - `boxed_rate = 0.625`
+  - `avg_output_len_chars = 10352.203125`
+  - interpretation:
+    - this matched the quick accuracy bar used to promote prior candidates
+    - unlike most earlier v4 runs, the format failure rate was materially cleaner, so the candidate clearly deserved serious scoring
+- serious gate:
+  - `shadow_256 overall_accuracy = 0.51953125`
+  - `shadow_256 format_fail_rate = 0.921875`
+  - `shadow_256 boxed_rate = 0.65234375`
+  - `shadow_256 avg_output_len_chars = 10403.58203125`
+  - `hard_shadow_256 overall_accuracy = 0.52734375`
+  - `hard_shadow_256 format_fail_rate = 0.875`
+  - `hard_shadow_256 boxed_rate = 0.6640625`
+  - `hard_shadow_256 avg_output_len_chars = 10292.55078125`
+  - family read:
+    - `gravity_constant = 1.0`
+    - `roman_numeral = 1.0`
+    - `bit_manipulation = 0.1163 / 0.2093` (`shadow_256` / `hard_shadow_256`)
+    - `symbol_equation = 0.1395 / 0.1163`
+    - `text_decryption = 0.3095 / 0.2857`
+    - `unit_conversion = 0.5476 / 0.5476`
+  - interpretation:
+    - `run11` did **not** beat `run3 shadow_256 = 0.5234375`, `run3 hard_shadow_256 = 0.5703125`, or `80/20 hard_shadow_256 = 0.5859375`
+    - however, it was substantially cleaner than `run3` and `run6` on formatting (`hard_shadow_256 format_fail_rate = 0.875` versus `0.96875` for `run3` and `0.91796875` for `run6`)
+    - the main gain was output hygiene plus a partial hard-side `bit_manipulation` recovery, but `symbol_equation`, `text_decryption`, and numeric precision remained too weak
+    - conclusion: this balanced-robust retune is a useful signal that cleaner decoding behavior is attainable, but simple loss retuning still does not produce the step-function accuracy gain needed toward an official `0.9+`
 
 ## Implemented v4 Commands
 
