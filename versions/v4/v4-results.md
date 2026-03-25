@@ -222,19 +222,39 @@
   - `final_train_loss = 0.3779761791`
   - `final_val_loss = 0.9210160971`
   - `peak_memory_gb = 34.24126099`
-  - left unscored at this checkpoint
+  - relative to `run3`, this changed only training/loss parameters:
+    - `learning_rate: 1.0e-5 -> 5.0e-5`
+    - `num_epochs: 1.0 -> 1.5`
+    - `rationale_weight: 1.0 -> 0.8`
+    - `final_line_weight: 3.0 -> 5.0`
+    - answer-span weights shifted to `3/3/3/6/8/4`
+  - interpretation:
+    - this is still fundamentally a `run3`-family parameter variation, not a structural change in data or modeling
+    - the final validation loss is worse than `run3` (`0.9210 > 0.8168`), so the chance of clearly updating the local best looked low
+    - for that reason, inference was intentionally skipped at this checkpoint
 - `v4_rft_stage_c_cleanaccept_balancedrobust_run11`
   - the first launch accidentally produced a `rendered_only` artifact because `train-stage-c-rft` was invoked without `--execute`
   - the real training rerun then completed successfully
   - `final_train_loss = 0.8444767594`
   - `final_val_loss = 0.7712868452`
   - `peak_memory_gb = 34.241110838`
-  - left unscored at this checkpoint
+  - relative to `run3`, this also changed only training/loss parameters:
+    - `learning_rate: 1.0e-5 -> 1.2e-5`
+    - `num_epochs: 1.0 -> 1.0` (unchanged)
+    - `rationale_weight: 1.0 -> 1.0` (unchanged)
+    - `final_line_weight: 3.0 -> 3.5`
+    - answer-span weights shifted to `4/4/4/5.5/6.5/3.5`
+  - interpretation:
+    - this was a conservative `run3` refinement, not a new recipe class
+    - the final validation loss improved over `run3` (`0.7713 < 0.8168`), so it looked better than `run10`
+    - however the expected upside still looked incremental rather than the kind of jump needed to move meaningfully toward an official `0.9+`
+    - therefore inference was also intentionally skipped at this checkpoint
 - consolidated read after the current stop point:
   - best scored single-training checkpoint remains `run3`
   - best serious hard checkpoint overall is now `80/20`
   - best serious shadow checkpoint remains `85/15`
   - the biggest unresolved weak families are still `bit_manipulation`, `symbol_equation`, and `text_decryption`
+  - `run10` / `run11` confirmed that simple parameter retuning around `run3` is not the main path forward
   - reaching an official score near `0.9` will require structural improvements on those weak families; merge interpolation alone is not enough
 
 ## Implemented v4 Commands
