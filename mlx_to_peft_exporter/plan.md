@@ -1,312 +1,555 @@
-**「MLXで学習済みの LoRA アダプタを、できるだけ意味を変えずに、このコンペの提出要件に合う PEFT/vLLM 形式へ変換する」ことだけ**に絞って、計画を組み直します。  
-**探索・再学習・精度向上のための試行は対象外**とします。
+# MLX 学習済み LoRA を PEFT/vLLM 提出形式へ高忠実度変換するための実行計画
+
+この文書は、**既存の MLX 学習済み LoRA アダプタを、意味を変えずに、README.md の提出契約に合う PEFT/vLLM 形式へ変換する**ための計画に限定する。  
+探索、再学習、精度改善、候補選定の一般論は対象外とし、**変換の正確性・互換性・安全性**だけを扱う。
 
 ---
 
-# 目的の再定義
+## 1. README.md から固定すべき提出契約
 
-このタスクの目的は次の 1 点です。
+`README.md:31-49` から、この変換タスクで絶対に満たすべき契約は次のとおり。
 
-> **既存の MLX LoRA アダプタを、提出可能な PEFT 形式へ高忠実度で変換し、コンペ evaluator と同系統の vLLM 環境で壊れていないことを確認する。**
+- 提出物は **NVIDIA Nemotron-3-Nano-30B** 向けの **LoRA adapter**
+- 評価時は **vLLM inference engine** で LoRA をロードする
+- adapter には **`adapter_config.json`** が必要
+- 提出形式は **`submission.zip`**
+- LoRA の **rank は 32 以下**
+- 実評価パラメータは README 記載値を優先する  
+  - `max_lora_rank = 32`
+  - `max_tokens = 7680`
+  - `top_p = 1.0`
+  - `temperature = 0.0`
+  - `max_num_seqs = 64`
+  - `gpu_memory_utilization = 0.85`
+  - `max_model_len = 8192`
 
-したがって、**「どの rank が良いか」「6bit と BF16 のどちらが強いか」**のような話は、ここでは扱いません。  
-扱うのは **変換の正確性・互換性・提出パッケージの健全性**だけです。
-
----
-
-# このコンペ前提で最初に固定すべきこと
-
-あなたが貼ってくれた metric コードを見る限り、評価時は次の前提です。
-
-- evaluator 側で **固定の Nemotron BF16 ベース**をロードする
-- 提出物は **LoRA adapter のディレクトリ**である
-- zip 展開後、**最初に見つかった `adapter_config.json`** のあるディレクトリが採用される
-- 推論は **vLLM** で行われる
-- prompt 末尾に **`\boxed{}` 指示**が付与される
-- tokenizer の **chat template** を通し、`enable_thinking=True` で生成する
-- 採点は **生成全文ではなく抽出された final answer** ベース
-
-この前提だと、**変換タスクの真のゴールは「PEFT/Transformers で読めること」ではなく、「vLLM evaluator にそのまま刺さること」**です。  
-つまり、**最終判定系は Linux/CUDA + vLLM** に置くべきです。
+したがって、変換の完了条件は **「PEFT として読めること」ではなく、「README 契約どおり vLLM evaluator に刺さる提出物になること」**である。
 
 ---
 
-# 変換タスクの入出力を明確化する
+## 2. 現在の主対象アダプタ
 
-## 入力
-入力は **すでに存在する MLX adapter ディレクトリ**です。  
-`mlx-lm` の LoRA/QLoRA フローでは、adapter config と学習済み重みは既定で `adapters/` に保存され、出力先は `--adapter-path` で変更できます。さらに loader 側は `adapter_config.json` を読んで LoRA 層を差し込み、`adapters.safetensors` をロードします。 
+現時点で exporter の主対象にすべきアダプタは、以下の **80/20 merge**。
 
-## 出力
-出力は **PEFT 互換 adapter ディレクトリ**です。  
-PEFT の checkpoint 形式では、少なくとも **`adapter_model.safetensors`** と **`adapter_config.json`** が必要です。Transformers/PEFT も、ローカルディレクトリから adapter を読む際にこの構成を前提にします。 
+- 候補 ID: `v5_merge_run3_run6_80_20`
+- adapter path:  
+  `versions/v4/outputs/train/merge_run3_run6_80_20/adapter_v5_merge_run3_run6_80_20`
 
----
+根拠:
 
-# 変換タスクのベストプラクティス
+- `versions/v4/v4-results.md:196-212`
+  - `hard_shadow_256 overall_accuracy = 0.5859375`
+  - 現在の **best local hard-gate candidate**
+- `versions/v4/data/processed/merge_candidate_registry_v4.csv:5`
+  - `status=scored`
+  - `quick_score=0.5390625`
+  - `serious_score=0.5859375`
 
-## 1) 変換対象は「標準 LoRA」のみに限定する
-`mlx-lm` は `lora` / `dora` / `full` を扱えますが、vLLM 側は **`modules_to_save` は `None` のみ対応、DoRA は未対応、bias 付き adapter も未対応、rank は `max_lora_rank` 以下**という制約を持っています。したがって、**変換対象として受け入れる MLX adapter は `fine_tune_type == "lora"` に限定**するのが安全です。 
-
-## 2) 変換ロジックは 1 本に固定する
-PEFT 形式への変換では、**重みファイル名・state_dict key・config 項目・スケーリングの意味**を揃える必要があります。PEFT 自身も「他形式から PEFT 形式へ変換するには、正しい key mapping と `adapter_config.json` が必要」と明記しています。したがって、trial ごとに変換方法を変えるのではなく、**custom exporter を 1 本に固定して、その exporter だけを信頼できる変換器として運用する**のが最善です。 
-
-## 3) 変換の本質は「MLX の LoRA 意味論」を PEFT/vLLM に写すこと
-MLX の `LoRALinear` は、`lora_a` を `(input_dims, r)`、`lora_b` を `(r, output_dims)` で持ち、forward は **`y + scale * ((x @ lora_a) @ lora_b)`** です。PEFT 側の LoRA は `lora_A.weight` / `lora_B.weight` を checkpoint に持ち、vLLM は通常 LoRA で **`lora_alpha / r`** を scaling として扱います。したがって、**変換で最も重要なのは shape 向きと scale/alpha の一致**です。標準 LoRA として対応づけるなら、実務上は **`lora_alpha = scale * r`** を守るのが基本になります。 
+このため、**MLX→PEFT/vLLM exporter の最初の正式ターゲットは上記 adapter で固定**する。  
+別候補へ話を広げると、変換ロジックの問題と候補選定の問題が混ざるため、当面は避ける。
 
 ---
 
-# 変換仕様として先に固定すべきもの
+## 3. 現在アーティファクトと README 提出契約の互換ギャップ
 
-以下は、**実装ではなく仕様**として固定するべき項目です。
+既存の smoke/packaging 結果  
+`versions/v4/outputs/handoff/peft_smoke_v5_merge_run3_run6_80_20/peft_smoke_result.json`  
+から、現物はまだ submission-compatible ではない。
 
-## A. ファイル構成
-変換後ディレクトリは最低限これに揃えます。
+### 確認済みギャップ
 
-- `adapter_model.safetensors`
-- `adapter_config.json`
+- `adapter_config.json` は存在する
+- **`adapter_model.safetensors` が存在しない**
+- top-level の **`r` が無い**
+- `rank_ok = false`
+- `base_model_ok = false`
+- `submission_zip_ok = false`
+- `all_required_files_present = false`
+- `peft_load_status = "skipped_no_local_base_model"`
 
-PEFT はこの 2 つを要求します。`README.md` は任意です。 
+### つまり何が足りないか
 
-## B. 重みキーの命名
-PEFT の LoRA checkpoint では、LoRA の学習パラメータは **`base_model.model....lora_A.weight`** と **`base_model.model....lora_B.weight`** 形式になります。PEFT docs は、**PEFT 形式へ変換するときは `base_model.model.` prefix を付ける必要がある**と明記しています。 
+README 契約と照らすと、現状の MLX artifact は少なくとも以下が不足または未整合。
 
-## C. MLX→PEFT のテンソル対応
-MLX の `lora_a` / `lora_b` は PEFT と向きが異なるため、**転置が必要**です。  
-つまり、仕様上は次を守る前提にします。
+1. **PEFT が期待する重みファイル名と構成**
+   - MLX 側は `adapters.safetensors`
+   - 提出互換側では少なくとも `adapter_model.safetensors` が必要
+2. **PEFT/vLLM が直接参照する config フィールド**
+   - top-level `r`
+   - `lora_alpha`
+   - `lora_dropout`
+   - `bias`
+   - `peft_type`
+   - `target_modules`
+   - `modules_to_save`
+   - `use_dora`
+   - `use_rslora`
+   - `inference_mode`
+3. **ベースモデル識別子の整合**
+   - 現在の `base_model_name_or_path` はローカル MLX 6bit パス
+   - README 契約上の提出対象は **Nemotron-3-Nano-30B** 向け LoRA
+   - evaluator/vLLM で前提となるベース識別子と一致している保証がない
+4. **submission.zip として成立する包装**
+   - valid zip として最終提出に使える状態ではない
 
-- MLX `lora_a` → PEFT `lora_A.weight`
-- MLX `lora_b` → PEFT `lora_B.weight`
-- 保存時に **PEFT が期待する向きへ転置**
-- key prefix は **`base_model.model.`**
+---
 
-これは MLX の shape 定義と PEFT の checkpoint key 規約から直接導かれる対応です。 
+## 4. 意味を変えずに変換するために必要な情報
 
-## D. config の意味対応
-PEFT `adapter_config.json` は少なくとも以下を整合させます。
+高忠実度変換には、単にファイル名を変えるだけでは不十分。  
+**「MLX 側で何を意味していた重みか」を、PEFT/vLLM 側で同じ意味に再現するための情報**が必要。
+
+### 4.1 モジュール対応情報
+
+最低限、各 LoRA 重みについて以下を確定する必要がある。
+
+- MLX 側 module path
+- それに対応する PEFT/HF/vLLM 側 module path
+- その module が線形層なのか、MoE shared expert なのか、switch expert 群なのか
+- その module が README 契約下の vLLM LoRA 実装で対象化可能か
+
+必要な観点:
+
+- `q_proj / k_proj / v_proj / o_proj / gate_proj / up_proj / down_proj` だけでなく、
+- 実際の tensor key に出てくる  
+  `backbone.layers.*.mixer.shared_experts.*`
+- `backbone.layers.*.mixer.switch_mlp.*`
+
+が **どの HF/PEFT module に対応するか** を確定しなければならない。
+
+### 4.2 テンソル意味論
+
+各 tensor について、少なくとも以下を知る必要がある。
+
+- `lora_a` / `lora_b` がどちらが入力側・出力側か
+- forward での適用順
+- 転置の必要有無
+- どの軸が rank か
+- どの軸が expert 軸か
+- shared expert と switched experts の違い
+- PEFT/vLLM 側が想定する LoRA weight layout
+
+### 4.3 MoE / switch expert 軸の意味
+
+今回の主 blocker は、80/20 adapter 内に **3D の expert-wise tensor** が存在すること。
+
+確認済み shape:
+
+- `backbone.layers.36.mixer.shared_experts.down_proj.lora_a = (3712, 32)`
+- `backbone.layers.36.mixer.shared_experts.down_proj.lora_b = (32, 2688)`
+- `backbone.layers.36.mixer.switch_mlp.fc1.lora_a = (128, 32, 2688)`
+- `backbone.layers.36.mixer.switch_mlp.fc1.lora_b = (128, 1856, 32)`
+- `backbone.layers.36.mixer.switch_mlp.fc2.lora_a = (128, 32, 1856)`
+- `backbone.layers.36.mixer.switch_mlp.fc2.lora_b = (128, 2688, 32)`
+
+ここから分かること:
+
+- shared expert 系は 2D LoRA で見える
+- switch expert 系は **expert 数 128 を含む 3D tensor**
+- この 3D 軸を **そのまま PEFT 標準 LoRA に写せる保証がない**
+
+したがって、faithful conversion には少なくとも以下の知識が必要。
+
+- `128` が expert index 軸であることの確認
+- 各 expert ごとの独立 LoRA とみなすべきか
+- 1 つの grouped parameter とみなすべきか
+- HF/PEFT/vLLM が Nemotron MoE のこの表現を受理するか
+- 受理しない場合、等価な分解表現が存在するか
+
+### 4.4 scaling / alpha の意味
+
+変換時には以下の意味対応が必要。
+
+- MLX の `scale`
+- PEFT の `lora_alpha`
+- vLLM の scaling 計算
+- `use_rslora` の有無
+
+ここが不一致だと、shape が合っても**実質別 adapter**になる。  
+意味保存を主張するには、少なくとも
+
+- `rank`
+- `scale`
+- `dropout`
+- `use_rslora`
+- `bias`
+
+の意味を確定して、変換先 config に明示的に反映する必要がある。
+
+### 4.5 metadata / packaging 情報
+
+faithful conversion に必要なメタデータ:
+
+- base model identity
+- adapter 作成時の fine-tune type
+- target module 一覧
+- rank / dropout / scale
+- モジュールごとの shape registry
+- MoE expert 軸の表現ルール
+- 元 adapter と変換後 adapter の対応 manifest
+
+---
+
+## 5. exporter 実装に必要な具体的構成要素
+
+実装は 1 ファイルにまとめる前提で、最低限以下が必要。
+
+### 5.1 入力検査
+
+- MLX adapter directory を受け取る
+- `adapter_config.json` の存在確認
+- `adapters.safetensors` の存在確認
+- `fine_tune_type == "lora"` の確認
+- rank が 32 以下か確認
+- target_modules が空でないことを確認
+
+### 5.2 MLX config 読み取りと正規化
+
+MLX config から少なくとも以下を抽出して正規化する。
+
+- `base_model_name_or_path`
+- `fine_tune_type`
+- `lora_parameters.rank`
+- `lora_parameters.scale`
+- `lora_parameters.dropout`
+- `target_modules`
+
+必要なら追加で保持:
+
+- `num_layers`
+- `merge_sources`
+- `merge_weights`
+- 親 adapter 情報
+
+### 5.3 state_dict 走査と module mapping
+
+重みキーを全走査し、各 key について:
+
+- MLX key を分解
+- 対応する PEFT key を決定
+- 2D LoRA か 3D expert-wise LoRA か分類
+- 非対応 key を検出して停止または隔離
+
+### 5.4 tensor layout 変換
+
+2D tensor について必要なら:
+
+- `lora_a` → `lora_A.weight`
+- `lora_b` → `lora_B.weight`
+- PEFT 側期待 layout への転置
+
+3D expert-wise tensor について必要:
+
+- expert 軸の意味を保持した変換ロジック
+  - もしくは
+- **「PEFT/vLLM 等価表現が未確認なら明示的に停止する」ロジック**
+
+### 5.5 PEFT adapter_config.json 生成
+
+少なくとも以下を出力:
 
 - `peft_type = "LORA"`
-- `r = MLX rank`
-- `lora_alpha = MLX scale * rank`
-- `lora_dropout = MLX dropout`
-- `target_modules = MLX keys`
+- `base_model_name_or_path`
+- `r`
+- `lora_alpha`
+- `lora_dropout`
+- `target_modules`
 - `bias = "none"`
 - `modules_to_save = null`
 - `use_dora = false`
-- `use_rslora = false` を初期方針にする
+- `use_rslora` の明示
 - `inference_mode = true`
 
-vLLM の `PEFTHelper` が legal check で見るのは主に `r`, `lora_alpha`, `target_modules`, `bias`, `modules_to_save`, `use_dora`, `use_rslora` です。特に `modules_to_save != None`、`use_dora=True`、`bias!="none"`、`r > max_lora_rank` は弾かれます。 
+### 5.6 packaging
+
+- `adapter_model.safetensors` を出力
+- `adapter_config.json` を出力
+- 必要なら manifest を同ディレクトリに出力
+- `submission.zip` 用の単一 adapter ディレクトリ構造を保証
+
+### 5.7 監査ログ / manifest
+
+最低限記録すべき内容:
+
+- 元 adapter path
+- 元 config 抜粋
+- 変換先 base model identity
+- key mapping 一覧
+- tensor shape 変換結果
+- 未対応 key 一覧
+- 3D expert-wise tensor の扱い
+- 変換停止理由または注意事項
 
 ---
 
-# 変換専用フローに絞った実務手順
+## 6. まだ不足しているもの
+
+現時点では、以下が不足しているため、**まだ「意味保存で変換できる」とは言えない**。
+
+### 6.1 Nemotron MoE 部分の確定的 module mapping
+
+特に不足しているのは:
+
+- `shared_experts.down_proj`
+- `switch_mlp.fc1`
+- `switch_mlp.fc2`
+
+が HF/PEFT/vLLM 側でどう表現されるべきかの確証。
+
+### 6.2 3D expert-wise LoRA の PEFT/vLLM 等価表現
+
+最大の未解決点:
+
+- `(128, ..., ...)` 形状の LoRA を、PEFT 標準 LoRA checkpoint としてどう表すか
+- vLLM がそれをどう受理するか
+- expert 軸を flatten / split / per-expert module に分解しても意味が保存されるか
+
+この点が未確認のままでは、**変換しても別物になる危険が高い**。
+
+### 6.3 ベースモデル識別子の正式固定
+
+現在の MLX config はローカル MLX 6bit パスを持っているが、提出契約上は
+
+- Nemotron-3-Nano-30B 向け
+- vLLM evaluator が使う base と整合
+
+である必要がある。  
+どの文字列を `base_model_name_or_path` として最終採用するか、正式に固定が必要。
+
+### 6.4 変換後の実機検証
+
+必要な検証がまだ足りない。
+
+- PEFT でロードできるか
+- vLLM で legal check を通るか
+- official evaluator 相当条件で smoke test を通るか
+- 変換前後でローカルな出力差が破綻していないか
 
 ---
 
-## Phase 1: Mac 側で「入力 artifact を凍結」する
-ここでは **学習はしない**です。  
-やることは、**変換元として使う MLX adapter を 1 個確定する**ことだけです。
+## 7. 信頼できる変換と認めるための確認事項
 
-固定する項目:
+変換を trust するには、最低でも以下が必要。
 
-- 変換元 `adapter_path`
-- 変換元 MLX ベースモデルの識別子
-- `mlx-lm` のバージョン
-- 元 adapter の `adapter_config.json`
-- 元 adapter の `adapters.safetensors`
+### 7.1 静的整合チェック
 
-MLX loader は `adapter_config.json` と `adapters.safetensors` を前提に adapter を適用するので、**この 2 ファイルを source of truth とする**のが正しいです。 
-
-### Phase 1 の完了条件
-- `adapter_config.json` が存在する
-- `adapters.safetensors` が存在する
-- `fine_tune_type == "lora"` である
-- `lora_parameters` に `rank / scale / dropout / keys` がある
-
----
-
-## Phase 2: Mac 側で MLX→PEFT 変換する
-ここが本体です。  
-ただし実装は不要とのことなので、**変換器が満たすべき責務**だけを定義します。
-
-### exporter の責務
-1. **入力**: MLX adapter ディレクトリ  
-2. **出力**: PEFT adapter ディレクトリ  
-3. **重みファイル名**を `adapters.safetensors` → `adapter_model.safetensors` に変換  
-4. **state_dict key** を PEFT 命名へ変換  
-5. **テンソル向き**を PEFT が読む形へ変換  
-6. **`adapter_config.json`** を PEFT/vLLM 互換で生成  
-7. **manifest** を出力し、元 MLX config と変換後 config の対応を記録する
-
-PEFT docs が言うとおり、変換で重要なのは「正しい parameter-name → tensor の対応」です。ここを曖昧にしないため、**exporter には manifest 出力を必須**にすると後で診断しやすいです。 
-
-### Phase 2 の完了条件
-- `adapter_model.safetensors` が生成されている
-- PEFT 用 `adapter_config.json` が生成されている
-- `r`, `lora_alpha`, `lora_dropout`, `target_modules` が source と整合している
-- `bias="none"`, `modules_to_save=null`, `use_dora=false` になっている
-
----
-
-## Phase 3: Mac 側で「静的検査」だけ行う
-ここでは **推論品質の議論はしません**。  
-やるのは、**変換後 artifact が形式的に妥当か**の確認だけです。
-
-確認項目:
-
-- 変換後ディレクトリに **`adapter_model.safetensors`** がある
-- 変換後ディレクトリに **`adapter_config.json`** がある
-- `peft_type == "LORA"`
+- `adapter_model.safetensors` がある
+- `adapter_config.json` がある
 - `r <= 32`
+- `target_modules` が空でない
 - `bias == "none"`
 - `modules_to_save == null`
 - `use_dora == false`
-- `target_modules` が空でない
-- manifest に **MLX scale → PEFT lora_alpha** の変換結果が記録されている
+- base model identity が固定されている
 
-vLLM の legal check はこの種の config 項目に依存するので、**ここで落ちるものは Linux に持っていかない**のが効率的です。 
+### 7.2 PEFT ロード確認
 
-### Phase 3 の完了条件
-- config 上の vLLM 非互換要素がない
-- 変換ログ上、tensor 数・shape・dtype が不自然でない
+- official Nemotron base に対して adapter を attach できる
+- missing/unexpected key が出ない
+- adapter 適用で forward が成立する
 
----
+### 7.3 vLLM smoke
 
-## Phase 4: CUDA/Linux で PEFT/Transformers ロード確認
-ここから先が **提出互換の本番検証**です。
+- README 契約相当の設定で LoRA をロード可能
+- rank 制約で落ちない
+- submission.zip から認識できる
+- few-shot でも generation が壊れない
 
-### 4-1. official Nemotron BF16 ベースを固定する
-Nemotron の公式 model card では `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` に対する Transformers / vLLM 利用例が示されています。したがって、**Linux 側の検証ベースはこのモデル系に固定**するのが自然です。 
+### 7.4 変換 fidelity の最低検証
 
-### 4-2. base 単体が普通に読めることを確認する
-Nemotron では tokenizer に chat template があり、`apply_chat_template(..., add_generation_prompt=True)` を使う流れが公式に示されています。`enable_thinking` は既定で `True` です。したがって、まず **base 単体で tokenizer / model / chat template が正常**であることを確認します。 
+可能なら同一プロンプトに対して
 
-### 4-3. converted adapter を PEFT/Transformers で読む
-Transformers の PEFT 統合では、**ローカルディレクトリに `adapter_config.json` と adapter weights があれば `from_pretrained()` / `load_adapter()` で読める**とされています。したがって、Linux 側の第一関門は **「converted adapter が普通の PEFT adapter としてロードできるか」**です。 
+- MLX + 元 adapter
+- HF/vLLM + 変換後 adapter
 
-### 4-4. ここで見るべきもの
-- missing key / unexpected key がない
-- adapter が active になっている
-- target module 数が不自然でない
-- base 単体と adapter 有効時で出力が変わる
-
-ここではまだ metric スコアは見ません。  
-見るのは **「PEFT として成立しているか」**だけです。 
-
-### Phase 4 の完了条件
-- official base + converted adapter が PEFT/Transformers でロード可能
-- 明らかな key mismatch がない
-- adapter 適用時に forward が成立する
+を比較し、少なくとも主要 layer 出力または初期 token 挙動が極端に乖離しないことを確認する。  
+これが取れない場合、**意味保存の主張は弱い**。
 
 ---
 
-## Phase 5: CUDA/Linux で vLLM の metric 互換 smoke test を行う
-ここが**変換タスクの最終判定**です。  
-このコンペは evaluator が vLLM で LoRA を差して採点するので、**Transformers で通るだけでは十分ではありません**。
+## 8. 今後 MLX adapter 作成時点で必ず仕込むべき要件
 
-### 5-1. vLLM で local adapter directory を読む
-vLLM の LoRA 機能は、`LoRARequest` に local path を渡して adapter を使えます。また vLLM docs でも、LoRA adapter をローカルディレクトリから扱う前提が示されています。 
+ここは特に重要。  
+後から exporter で救えない情報があるため、**MLX adapter creation time に残しておくべき情報**を明示する。
 
-### 5-2. vLLM で重要な legal 条件
-vLLM `PEFTHelper` は少なくとも以下を確認します。
+### 8.1 base model identity を作成時に固定保存する
 
-- `r` が `max_lora_rank` 以下
-- `modules_to_save is None`
-- `use_dora == false`
-- `bias == "none"`
+必須:
 
-加えて、`use_rslora` が `false` なら scaling は `lora_alpha / r`、`true` なら `lora_alpha / sqrt(r)` になります。変換 fidelity の観点では、**最初は `use_rslora=false` に固定**するのが無難です。 
+- Hugging Face / evaluator と整合する base model identifier
+- 量子化済みローカルパスだけでなく、**元の公式ベース識別子**
+- 可能なら model revision / commit / checksum
 
-### 5-3. smoke test のやり方
-ここでは **少数サンプルで十分**です。  
-評価コードに合わせて、
+理由:
 
-- prompt 末尾に `\boxed{}` 指示を付ける
-- tokenizer の chat template を適用する
-- `enable_thinking=True` を使う
-- evaluator 相当の生成設定で回す
-- final answer 抽出が破綻していないかを見る
+- 後からローカル MLX パスしか残っていないと、提出契約上の base 整合が崩れる
 
-という最低限の確認をします。
+### 8.2 target module registry を作成時に保存する
 
-Nemotron 側は `apply_chat_template()` を使う前提で、thinking は既定で有効です。評価コードもこれに近い流れです。 
+必須:
 
-### Phase 5 の完了条件
-- vLLM が adapter をロードできる
-- legal check で落ちない
-- few-shot の smoke test で生成が成立する
-- `\boxed{}` を含む回答が少なくとも壊れていない
+- 学習対象 module の完全修飾名一覧
+- short name だけでなく **実 tensor key に対応する完全 path**
+- 各 module の種類
+  - dense linear
+  - shared expert
+  - switch expert
+
+理由:
+
+- `target_modules = ["q_proj", ...]` だけでは MoE 実体との対応が足りない
+
+### 8.3 shape / layout registry を作成時に保存する
+
+必須:
+
+- 各 LoRA key の shape
+- どの軸が input/output/rank/expert か
+- forward での適用規約
+- 転置要否
+
+理由:
+
+- 後から shape だけ見ても、3D tensor の意味が断定できない
+
+### 8.4 MoE expert 軸の意味を作成時に明文化する
+
+必須:
+
+- `128` 軸が何を表すか
+- expert ごとに独立 parameter なのか
+- grouped operator として扱うのか
+- HF/PEFT 変換時に想定する表現
+
+理由:
+
+- ここが曖昧だと 3D LoRA は exporter で正しく扱えない
+
+### 8.5 module mapping registry を作成時に保存する
+
+必須:
+
+- MLX module path → HF/PEFT module path の対応表
+- shared expert / switched expert の対応規則
+- バージョン差分がある場合はその対応条件
+
+理由:
+
+- 後から手作業推定すると変換の意味保存性が崩れる
+
+### 8.6 scaling semantics を作成時に固定保存する
+
+必須:
+
+- rank
+- scale
+- dropout
+- bias 使用有無
+- rsLoRA / DoRA 使用有無
+- 可能なら forward 式のバージョン情報
+
+理由:
+
+- alpha の再構成に必要
+
+### 8.7 module coverage を作成時に保存する
+
+必須:
+
+- どの layer に adapter が入ったか
+- どの layer には入っていないか
+- merge 後 adapter の場合、由来 source と coverage 差分
+
+理由:
+
+- PEFT 側で key 数が減った時に、欠落か仕様かを判断できる
+
+### 8.8 export manifest を毎回残す
+
+推奨ではなく必須:
+
+- 元 MLX config
+- 元 tensor key 一覧
+- shape registry
+- module mapping registry
+- base model identity
+- 変換先想定フォーマット
+
+理由:
+
+- 今回のように後追いで exporter を作る場合の情報欠落を防ぐ
 
 ---
 
-# 提出パッケージ化の注意
+## 9. リスク / 変換停止条件
 
-これは **あなたが貼った metric コードに強く依存する実務注意**です。
+以下に当てはまる場合、**変換は unsafe または実質不可能**として停止すべき。
 
-## 1) zip には adapter を 1 つだけ入れる
-`generate_standard_submission()` は zip 展開後に **最初に見つかった `adapter_config.json`** を拾います。  
-つまり、**複数 trial の残骸を zip に混ぜるのは危険**です。
+### 9.1 3D expert-wise tensor の意味対応が確定しない
 
-**推奨**:
-- zip のトップ配下に提出対象 adapter ディレクトリを 1 個だけ置く
-- 余計な `checkpoint-*` や別 adapter を入れない
+- PEFT/vLLM 等価表現が確認できない
+- expert 軸をどう扱うか仕様が無い
+- flatten / split で意味保存を証明できない
 
-## 2) fused model は不要
-このコンペは **LoRA adapter 提出**です。  
-したがって、MLX の `fuse` を使ってベースにマージした重みを提出物にする必要はありません。むしろ evaluator は **固定ベース + LoRA** で動くので、提出物は adapter だけにすべきです。MLX 側にも `fuse` はありますが、それは別用途です。 
+この場合、**direct PEFT/vLLM translation は不可**とみなす。
 
-## 3) `base_model_name_or_path` は「整合させる」が安全
-PEFT config には base model 情報を入れるのが標準です。vLLM の filesystem resolver は `adapter_config.json` の `base_model_name_or_path` と base model 名の一致も見ます。一方で、現在のコンペ metric のように `LoRARequest` にローカルパスを直接渡す経路では、少なくとも `PEFTHelper` の legal check の主眼は `r / lora_alpha / target_modules / bias / modules_to_save / use_dora / use_rslora` です。  
-したがって、**このフィールドは evaluator での唯一の成否判定とは限らないが、PEFT 標準メタデータとして整合させておくべき**、という扱いが妥当です。 
+### 9.2 base model identity が固定できない
 
----
+- どの Nemotron base に対する adapter か確定できない
+- evaluator base と齟齬の可能性がある
 
-# 変換タスクとしての Done 条件
+この場合、提出互換を主張できない。
 
-このタスクの完了条件は、精度改善ではなく次です。
+### 9.3 学習時 metadata が足りない
 
-1. **MLX adapter source が凍結されている**  
-2. **PEFT 形式の `adapter_model.safetensors` + `adapter_config.json` が生成される**  
-3. **static preflight で vLLM 非互換設定がない**  
-4. **Linux で official Nemotron BF16 base + PEFT adapter がロードできる**  
-5. **Linux で vLLM smoke test が通る**  
-6. **提出 zip に adapter が 1 個だけ入っている**
+- rank/scale/dropout はあるが module-level layout 情報が無い
+- MoE expert 軸の意味が不明
+- module mapping registry が無い
 
-この 6 条件を満たせば、  
-**「MLX 由来 LoRA を、提出要件へ高忠実度に変換する」タスクとしては完了**です。
+この場合、重みを「それっぽく」並べ替えるしかなくなり、意味保存ではない。
 
----
+### 9.4 vLLM legal 条件に反する
 
-# あなたの元文書を、変換専用に直すなら削るべきもの
+- `r > 32`
+- `bias != "none"`
+- `modules_to_save != null`
+- `use_dora = true`
 
-以下は今回のタスク範囲外なので、文書から外してよいです。
+この場合、README 契約に適合しない。
 
-- 6bit で探索、BF16 で再学習、のような**探索戦略**
-- rank / alpha / dropout / target_modules の**最適化議論**
-- train.csv を使った**精度評価の設計**
-- Mac 側での golden sample を使った**改善ループ**
-- 「どの trial を採用するか」の**モデル選定議論**
+### 9.5 変換後に PEFT/vLLM smoke が通らない
 
-代わりに残すべきなのは、
+- PEFT attach 不可
+- key mismatch 多発
+- submission.zip 不成立
+- vLLM load failure
 
-- **source artifact の固定**
-- **変換仕様**
-- **PEFT 互換検証**
-- **vLLM metric 互換検証**
-- **提出 zip の衛生管理**
-
-です。
+この場合、提出物として採用しない。
 
 ---
 
-# 参考文献
-- MLX LM LoRA ドキュメント: `mlx_lm.lora` が主コマンドで、adapter config と learned weights は既定で `adapters/` に保存され、`--adapter-path` で変更できます。生成は `mlx_lm.generate --adapter-path` で行えます。 
-- MLX LM source (`tuner/utils.py`): loader は `adapter_config.json` を読み、LoRA 層を差し込み、`adapters.safetensors` をロードします。 
-- MLX LM source (`tuner/lora.py`): `LoRALinear` の `lora_a`, `lora_b`, `scale`, forward の意味が確認できます。 
-- PEFT checkpoint format: PEFT 形式には `adapter_model.safetensors` と `adapter_config.json` が必要で、LoRA keys は `base_model.model....lora_A.weight` / `lora_B.weight` 形式です。 
-- Transformers PEFT docs: local directory に `adapter_config.json` と adapter weights があれば adapter をロードできます。 
-- vLLM `PEFTHelper`: `modules_to_save=None`、DoRA 非対応、bias 非対応、rank 制限、`lora_alpha/r` スケーリングが確認できます。 
-- vLLM LoRA docs / filesystem resolver: local adapter directory の扱いと、resolver での `adapter_config.json` / `base_model_name_or_path` の利用が確認できます。 
-- NVIDIA Nemotron BF16 model card: `apply_chat_template()`、`enable_thinking=True` 既定、Transformers / vLLM 利用例が示されています。 
-- MLX-LM issue #320: 少なくとも公開議論上、`mlx_lm.convert` は HF→MLX 方向が中心で、MLX→PyTorch/PEFT の reverse convert 需要があることが分かります。 
+## 10. 実務上の優先順位
+
+現時点の優先順位は以下。
+
+1. **80/20 merge adapter を唯一の exporter ターゲットとして固定**
+2. **MLX artifact と README 契約のギャップを埋める最小 PEFT packaging を定義**
+3. **MoE / switch expert 3D tensor の意味対応可否を最優先で調査**
+4. **等価表現が無ければ unsafe として停止**
+5. **今後の MLX adapter 作成時に必要 metadata を必須化**
+
+---
+
+## 11. この計画の結論
+
+現段階で分かっていることを一文で言うと:
+
+> **2D の通常 LoRA 部分だけなら PEFT 形式への写像は見えているが、80/20 merge adapter に含まれる 3D の MoE expert-wise LoRA が、意味保存付きで PEFT/vLLM に直訳できるかは未確認であり、ここがコア blocker である。**
+
+したがって、現時点の正しい計画は次の二段階。
+
+1. **README 契約に照らして何が必要かを固定する**
+2. **MoE 3D tensor の等価表現が確認できるまで、faithful conversion 完了とは言わない**
+
+これにより、「とりあえず PEFT っぽいファイルを作る」ことと、  
+「意味を変えずに submission-compatible にする」ことを明確に区別できる。
