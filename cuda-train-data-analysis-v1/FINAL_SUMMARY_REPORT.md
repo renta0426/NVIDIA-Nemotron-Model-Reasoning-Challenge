@@ -22,15 +22,15 @@
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
-| `verified_trace_ready` | 5,827 | 61.3% |
-| `answer_only_keep` | 1,036 | 10.9% |
-| `manual_audit_priority` | 2,620 | 27.6% |
+| `verified_trace_ready` | 5,861 | 61.7% |
+| `answer_only_keep` | 1,074 | 11.3% |
+| `manual_audit_priority` | 2,548 | 26.8% |
 | `exclude_suspect` | 17 | 0.2% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `5,827 + 1,036 = 6,863` 行（`72.2%`）
-- 未解決 / 要注意: `2,620 + 17 = 2,637` 行（`27.8%`）
+- 安全側の学習コア: `5,861 + 1,074 = 6,935` 行（`73.0%`）
+- 未解決 / 要注意: `2,548 + 17 = 2,565` 行（`27.0%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -42,7 +42,7 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 381 | 0 | 1,213 | 8 | 主要な残課題 |
-| `symbol_equation` | 1,555 | 74 | 65 | 1,407 | 9 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 108 | 103 | 1,335 | 9 | 主要な残課題 |
 
 ### 解釈
 
@@ -89,10 +89,11 @@ symbol は大きく 2 つに分かれました。
 - `numeric_2x2`
 - `glyph_len5`
 
-`numeric_2x2` では、operator-aware の row-local formula search により:
+`numeric_2x2` では、operator-aware の row-local formula search に加えて、pass1 manual curation で exact な文字列テンプレート規則（`concat_xy`, `concat_yx`）を安全昇格しました。
 
-- `74 verified`
-- `65 answer-only`
+- `108 verified`
+- `103 answer-only`
+- この pass だけで `72` 行（`34 verified + 38 answer-only`）を追加昇格
 
 `glyph_len5` では:
 
@@ -102,9 +103,9 @@ symbol は大きく 2 つに分かれました。
 
 ### 4.4 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **644 行** まで縮みました。
+最優先で人手確認すべき pack は **572 行** まで縮みました。
 
-- `448` 行: `symbol_numeric_same_op`
+- `376` 行: `symbol_numeric_same_op`
 - `150` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
@@ -133,7 +134,9 @@ symbol は大きく 2 つに分かれました。
 | --- | --- |
 | `artifacts/text_answer_completion_summary_v1.csv` | 971 行の text answer-only 昇格内訳 |
 | `artifacts/binary_cluster_summary_v1.csv` | 未解決 binary のクラスタ要約 |
+| `artifacts/binary_affine_mismatch_candidates_v1.csv` | affine 一意でも gold と衝突したため昇格しなかった binary 行 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
+| `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した `concat_xy / concat_yx` 行の一覧 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
 | `artifacts/symbol_tail_probe_summary_v1.csv` | 最終段階の symbol tail probe 結果 |
@@ -190,6 +193,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/10_glyph_order_probe.md` | multiset + order DAG に整合する glyph 候補 |
 | `reports/11_latest_snapshot.md` | 最終状態を最短で確認できるスナップショット |
 | `reports/12_symbol_tail_probes.md` | 最終段階の symbol 残差 probe |
+| `reports/13_manual_curation_pass1.md` | pass1 で安全昇格した symbol 行と、昇格しなかった binary/glyph の根拠 |
 
 ## 8. 最短の読み順
 
@@ -212,8 +216,8 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 
 ### 9.2 symbol がまだ重い
 
-- `symbol_equation` は `1,407 manual + 9 exclude`
-- `numeric_2x2` は operator-aware でかなり整理できたが、まだ `448` 行が pass1 に残る
+- `symbol_equation` は `1,335 manual + 9 exclude`
+- `numeric_2x2` は operator-aware と string-template pass1 でかなり整理できたが、まだ `376` 行が pass1 に残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 
@@ -241,7 +245,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. `symbol_numeric_same_op` 448 行
+2. `symbol_numeric_same_op` 376 行
 3. `binary_low_gap` 150 行
 4. `symbol_glyph_multiset` 46 行
 

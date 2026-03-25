@@ -112,6 +112,10 @@ SYMBOL_NUMERIC_FORMATS = {
     "prefix_always_abs": lambda op, n: f"{op}{abs(n)}",
     "prefix_if_negative": lambda op, n: f"{op}{abs(n)}" if n < 0 else str(n),
 }
+SYMBOL_NUMERIC_STRING_TEMPLATES = {
+    "concat_xy": lambda x_text, y_text: f"{x_text}{y_text}",
+    "concat_yx": lambda x_text, y_text: f"{y_text}{x_text}",
+}
 
 
 def utc_now() -> str:
@@ -220,8 +224,8 @@ def classify_symbol_subtype(query: str, examples: list[tuple[str, str]]) -> str:
     return "symbol_mixed"
 
 
-def parse_symbol_numeric_examples(prompt: str) -> list[tuple[int, str, int, str]]:
-    rows: list[tuple[int, str, int, str]] = []
+def parse_symbol_numeric_examples(prompt: str) -> list[tuple[str, str, str, str]]:
+    rows: list[tuple[str, str, str, str]] = []
     for line in str(prompt).splitlines():
         stripped = line.strip(" `")
         if "=" not in stripped:
@@ -232,7 +236,7 @@ def parse_symbol_numeric_examples(prompt: str) -> list[tuple[int, str, int, str]
         match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(left)
         if match is None:
             continue
-        rows.append((int(match.group(1)), match.group(2), int(match.group(3)), right))
+        rows.append((match.group(1), match.group(2), match.group(3), right))
     return rows
 
 
@@ -250,9 +254,9 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
             "query_operator": "",
             "low_shot": False,
         }
-    query_x = int(query_match.group(1))
+    query_x_text = query_match.group(1)
     query_operator = query_match.group(2)
-    query_y = int(query_match.group(3))
+    query_y_text = query_match.group(3)
     same_operator_examples = [
         (left_value, right_value, output_text)
         for left_value, operator, right_value, output_text in parse_symbol_numeric_examples(prompt)
@@ -260,11 +264,24 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
     ]
     candidate_predictions: set[str] = set()
     winning_specs: list[tuple[str, str, str]] = []
+    for template_name, template in SYMBOL_NUMERIC_STRING_TEMPLATES.items():
+        valid = True
+        for left_value_text, right_value_text, output_text in same_operator_examples:
+            if template(left_value_text, right_value_text) != str(output_text):
+                valid = False
+                break
+        if not valid:
+            continue
+        predicted_answer = template(query_x_text, query_y_text)
+        candidate_predictions.add(predicted_answer)
+        winning_specs.append((template_name, "string_template", predicted_answer))
+    query_x = int(query_x_text)
+    query_y = int(query_y_text)
     for formula_name, formula in SYMBOL_NUMERIC_FORMULAS.items():
         for format_name, formatter in SYMBOL_NUMERIC_FORMATS.items():
             valid = True
-            for left_value, right_value, output_text in same_operator_examples:
-                numeric_value = formula(left_value, right_value)
+            for left_value_text, right_value_text, output_text in same_operator_examples:
+                numeric_value = formula(int(left_value_text), int(right_value_text))
                 if numeric_value is None or formatter(query_operator, numeric_value) != str(output_text):
                     valid = False
                     break
@@ -1610,7 +1627,9 @@ def build_reports(
     text_completion_df: pd.DataFrame,
     symbol_operator_df: pd.DataFrame,
     symbol_tail_probe_df: pd.DataFrame,
+    symbol_string_promotion_df: pd.DataFrame,
     glyph_query_consistent_df: pd.DataFrame,
+    binary_affine_mismatch_df: pd.DataFrame,
     binary_cluster_df: pd.DataFrame,
     glyph_summary_df: pd.DataFrame,
     text_manual_queue_df: pd.DataFrame,
@@ -1832,6 +1851,7 @@ def build_reports(
         "",
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
         "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows.",
+        "- `symbol_equation/numeric_2x2`: manual curation pass1 safely promoted 72 exact string-template rows (`concat_xy`, `concat_yx`), moving 34 rows to `verified_trace_ready` and 38 rows to `answer_only_keep`.",
         "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG and remain the sharpest glyph audit candidates.",
         "",
     ]
@@ -1856,6 +1876,49 @@ def build_reports(
         "",
     ]
     (reports_dir / "12_symbol_tail_probes.md").write_text("\n".join(tail_lines) + "\n", encoding="utf-8")
+
+    promotion_summary_df = grouped_counts(
+        symbol_string_promotion_df,
+        ["selection_tier", "symbol_numeric_formula_name", "symbol_same_operator_example_count"],
+        name="rows",
+    ) if len(symbol_string_promotion_df) else pd.DataFrame(
+        columns=["selection_tier", "symbol_numeric_formula_name", "symbol_same_operator_example_count", "rows"]
+    )
+    manual_curation_lines = [
+        f"# {SCRIPT_VERSION} manual curation pass1",
+        "",
+        "## Safe symbol promotions added in this pass",
+        "",
+        markdown_table(promotion_summary_df, list(promotion_summary_df.columns)),
+        "",
+        "## Promoted symbol rows",
+        "",
+        markdown_table(
+            symbol_string_promotion_df,
+            ["id", "selection_tier", "symbol_query_operator", "symbol_numeric_formula_name", "symbol_same_operator_example_count", "answer", "query_raw"],
+            limit=80,
+        ),
+        "",
+        "## Binary rows inspected but not promoted",
+        "",
+        markdown_table(
+            binary_affine_mismatch_df,
+            ["id", "answer", "auto_solver_predicted_answer", "bit_no_candidate_positions", "audit_reasons"],
+            limit=20,
+        ),
+        "",
+        "## Glyph rows still kept manual",
+        "",
+        markdown_table(
+            glyph_query_consistent_df,
+            ["id", "hard_score", "answer", "query_raw", "audit_reasons"],
+            limit=20,
+        ),
+        "",
+        "Decision summary: this pass safely promoted only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`). Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule.",
+        "",
+    ]
+    (reports_dir / "13_manual_curation_pass1.md").write_text("\n".join(manual_curation_lines) + "\n", encoding="utf-8")
 
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:
@@ -1915,6 +1978,26 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         name="rows",
     )
     symbol_tail_probe_df, glyph_query_consistent_df = probe_symbol_tail_cases(analysis_df, v1)
+    symbol_string_promotion_df = (
+        analysis_df.loc[
+            (analysis_df["family"] == "symbol_equation")
+            & (analysis_df["template_subtype"] == "numeric_2x2")
+            & (analysis_df["symbol_numeric_formula_name"].isin(SYMBOL_NUMERIC_STRING_TEMPLATES.keys()))
+            & (analysis_df["selection_tier"].isin(["verified_trace_ready", "answer_only_keep"]))
+        ]
+        .sort_values(["selection_tier", "symbol_numeric_formula_name", "symbol_same_operator_example_count", "id"], ascending=[True, True, False, True])
+        .reset_index(drop=True)
+    )
+    binary_affine_mismatch_df = (
+        analysis_df.loc[
+            (analysis_df["family"] == "bit_manipulation")
+            & (analysis_df["selection_tier"] == "manual_audit_priority")
+            & (analysis_df["bit_affine_unique"])
+            & (~analysis_df["auto_solver_match"])
+        ]
+        .sort_values(["hard_score", "id"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
     glyph_summary_df = grouped_counts(
         analysis_df.loc[
             (analysis_df["family"] == "symbol_equation") & (analysis_df["template_subtype"] == "glyph_len5")
@@ -1994,7 +2077,9 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(text_completion_df, artifacts_dir / "text_answer_completion_summary_v1.csv")
     write_dataframe(symbol_operator_df, artifacts_dir / "symbol_operator_summary_v1.csv")
     write_dataframe(symbol_tail_probe_df, artifacts_dir / "symbol_tail_probe_summary_v1.csv")
+    write_dataframe(symbol_string_promotion_df, artifacts_dir / "symbol_string_template_promotions_v1.csv")
     write_dataframe(glyph_query_consistent_df, artifacts_dir / "glyph_query_consistent_v1.csv")
+    write_dataframe(binary_affine_mismatch_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(
@@ -2038,7 +2123,9 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         text_completion_df,
         symbol_operator_df,
         symbol_tail_probe_df,
+        symbol_string_promotion_df,
         glyph_query_consistent_df,
+        binary_affine_mismatch_df,
         binary_cluster_df,
         glyph_summary_df,
         text_manual_queue_df,

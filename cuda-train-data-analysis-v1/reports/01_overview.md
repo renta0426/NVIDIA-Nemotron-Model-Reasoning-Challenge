@@ -1,11 +1,11 @@
 # cuda-train-data-analysis-v1 overview
 
-- generated_at_utc: `2026-03-25T15:57:29.279706+00:00`
+- generated_at_utc: `2026-03-25T16:56:19.300028+00:00`
 - grounded_in: `README.md`, `try-cuda-train-data-analyst-plan.md`, `try-cuda-train-result.md`, `try-cuda-train.md`
 - analyzed_rows: `9500`
-- verified_trace_ready: `5827`
-- answer_only_keep: `1036`
-- manual_audit_priority: `2620`
+- verified_trace_ready: `5861`
+- answer_only_keep: `1074`
+- manual_audit_priority: `2548`
 - exclude_suspect: `17`
 
 ## Family summary
@@ -15,7 +15,7 @@
 | bit_manipulation | 1602 | 1.0 | 381 | 0 | 1213 | 8 | 8 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
-| symbol_equation | 1555 | 1.0 | 74 | 65 | 1407 | 9 | 9 | 3.1775 |
+| symbol_equation | 1555 | 1.0 | 108 | 103 | 1335 | 9 | 9 | 3.1775 |
 | text_decryption | 1576 | 1.0 | 605 | 971 | 0 | 0 | 0 | 1.7411 |
 | unit_conversion | 1594 | 1.0 | 1594 | 0 | 0 | 0 | 0 | 1.5276 |
 
@@ -26,7 +26,7 @@
 | bit_manipulation | 1602 | 306 | 0.191 | 381 | 0.2378 | 75 |
 | gravity_constant | 1597 | 0 | 0.0 | 1597 | 1.0 | 1597 |
 | roman_numeral | 1576 | 1576 | 1.0 | 1576 | 1.0 | 0 |
-| symbol_equation | 1555 | 0 | 0.0 | 74 | 0.0476 | 74 |
+| symbol_equation | 1555 | 0 | 0.0 | 108 | 0.0695 | 108 |
 | text_decryption | 1576 | 0 | 0.0 | 605 | 0.3839 | 605 |
 | unit_conversion | 1594 | 1594 | 1.0 | 1594 | 1.0 | 0 |
 

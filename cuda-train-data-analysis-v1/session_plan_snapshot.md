@@ -34,9 +34,9 @@
 
 - 単一スクリプト `files/cuda-train-data-analysis-v1/code/train_data_analysis_v1.py` を作成し、`data/train.csv` 9,500 件を全件解析済み。
 - 現時点の厳密カテゴリ分け:
-  - `verified_trace_ready`: 5,827
-  - `manual_audit_priority`: 2,620
-  - `answer_only_keep`: 1,036
+  - `verified_trace_ready`: 5,861
+  - `manual_audit_priority`: 2,548
+  - `answer_only_keep`: 1,074
   - `exclude_suspect`: 17
 - family ごとの厳密 verified:
   - roman: 1,576 / 1,576
@@ -44,9 +44,11 @@
   - unit: 1,594 / 1,594
   - text: 605 / 1,576
   - binary: 381 / 1,602
-  - symbol: 74 / 1,555
+  - symbol: 108 / 1,555
 - `binary` は affine XOR と simple byte transform（shift / rotate / mask）を足したことで 381 verified まで伸び、baseline の 306 solved を上回った。
-- `symbol` は `numeric_2x2` の operator-aware formula search で 74 verified / 65 answer-only に到達した一方、`glyph_len5` は依然未解決。
+- `symbol` は `numeric_2x2` の operator-aware formula search に加え、pass1 manual curation で exact string-template 規則 `concat_xy / concat_yx` を統合し、72 行（34 verified + 38 answer-only）を安全昇格した。これで `symbol` は `108 verified / 103 answer_only / 1335 manual / 9 exclude` になった。
 - `glyph_len5` のうち `glyph_multiset_possible` は 70 行、そのうち example 出力に一貫した順序制約まで通る `glyph_order_acyclic` は 46 行で、`manual_pass1_priority_pack_v1.csv` の glyph 部分はこの 46 行に絞り込んだ。
 - `text` の未verified 971 行は全件、gold answer により不足 1〜6 文字の monoalphabetic mapping を矛盾なく補完できることを確認し、`answer_only_keep` に昇格した。これで `text` は `verified=605 / answer_only=971 / manual=0` になった。
-- 次ステップは `glyph_len5` 46 行の mapping/order 一意化仮説と `binary` 150 行の low-gap 群をさらに掘りつつ、`manual_pass1_priority_pack_v1.csv` をもとに symbol/binary の人手監査ループへ入ること。
+- `manual_pass1_priority_pack_v1.csv` は `572` 行まで圧縮され、内訳は `symbol_numeric_same_op=376`, `binary_low_gap=150`, `symbol_glyph_multiset=46`。
+- `reports/13_manual_curation_pass1.md` と `artifacts/symbol_string_template_promotions_v1.csv` に、今回の安全昇格と非昇格判断の根拠を追加した。
+- 次ステップは `glyph_len5` 46 行の mapping/order 一意化仮説と `binary` 150 行の low-gap 群をさらに掘りつつ、残る `symbol_numeric_same_op` 376 行から次の安全 subset を抽出すること。

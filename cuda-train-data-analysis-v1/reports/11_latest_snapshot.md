@@ -1,9 +1,9 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-03-25T15:57:29.299259+00:00`
-- verified_trace_ready: `5827`
-- answer_only_keep: `1036`
-- manual_audit_priority: `2620`
+- generated_at_utc: `2026-03-25T16:56:19.326394+00:00`
+- verified_trace_ready: `5861`
+- answer_only_keep: `1074`
+- manual_audit_priority: `2548`
 - exclude_suspect: `17`
 
 ## Family summary
@@ -13,7 +13,7 @@
 | bit_manipulation | 1602 | 1.0 | 381 | 0 | 1213 | 8 | 8 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
-| symbol_equation | 1555 | 1.0 | 74 | 65 | 1407 | 9 | 9 | 3.1775 |
+| symbol_equation | 1555 | 1.0 | 108 | 103 | 1335 | 9 | 9 | 3.1775 |
 | text_decryption | 1576 | 1.0 | 605 | 971 | 0 | 0 | 0 | 1.7411 |
 | unit_conversion | 1594 | 1.0 | 1594 | 0 | 0 | 0 | 0 | 1.5276 |
 
@@ -21,7 +21,7 @@
 
 | audit_focus | family | rows |
 | --- | --- | --- |
-| symbol_numeric_same_op | symbol_equation | 448 |
+| symbol_numeric_same_op | symbol_equation | 376 |
 | binary_low_gap | bit_manipulation | 150 |
 | symbol_glyph_multiset | symbol_equation | 46 |
 
@@ -29,5 +29,6 @@
 
 - `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.
 - `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows.
+- `symbol_equation/numeric_2x2`: manual curation pass1 safely promoted 72 exact string-template rows (`concat_xy`, `concat_yx`), moving 34 rows to `verified_trace_ready` and 38 rows to `answer_only_keep`.
 - `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG and remain the sharpest glyph audit candidates.
 
