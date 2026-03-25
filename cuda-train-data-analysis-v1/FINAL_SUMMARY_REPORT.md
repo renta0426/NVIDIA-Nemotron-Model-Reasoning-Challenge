@@ -1,23 +1,24 @@
-# cuda-train-data-analysis-v1 Final Summary Report
+# cuda-train-data-analysis-v1 最終サマリーレポート
 
-## 1. Purpose and evaluation context
+## 1. このフォルダの目的
 
-This folder contains the final outputs of the train-data analysis task requested in `try-cuda-train-data-analyst-plan.md`.
+このフォルダは、`try-cuda-train-data-analyst-plan.md` に基づいて実施した **学習データ分析タスクの最終成果物一式** です。
 
-Per `README.md`, the competition score is determined by **accuracy**: the Nemotron model is evaluated on its final boxed answer, and the leaderboard score is the proportion of correct answers. Because of that, this analysis prioritized:
+`README.md` では、このコンペの評価は **Accuracy（最終解答の正答率）** で決まり、Nemotron は最終答を `\boxed{}` に入れて出力する前提になっています。  
+そのため今回の分析では、次を最優先にしました。
 
-- maximizing trustworthy answer supervision
-- separating strong teacher rows from ambiguous rows
-- isolating suspicious labels instead of forcing them into training
-- producing a clear manual-audit queue for the remaining hard families
+- 信頼できる教師データを最大化すること
+- 強い教師行と曖昧な行を分離すること
+- 怪しいラベルは無理に学習へ入れず除外すること
+- 残る難所に対して、次の人手監査キューを明確にすること
 
-No training was run in this workstream. This folder is analysis-only.
+この作業では **学習は一切実行していません**。このフォルダは分析専用です。
 
-## 2. Executive summary
+## 2. 最終結論の要約
 
-The dataset analysis covered all `9,500` rows from `data/train.csv`.
+`data/train.csv` の **9,500 行を全件分析** しました。
 
-### Final selection tiers
+### 最終 selection tier
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
@@ -26,132 +27,132 @@ The dataset analysis covered all `9,500` rows from `data/train.csv`.
 | `manual_audit_priority` | 2,620 | 27.6% |
 | `exclude_suspect` | 17 | 0.2% |
 
-### What this means
+### この数字の意味
 
-- Safe learning core: `5,827 + 1,036 = 6,863` rows (`72.2%`)
-- Remaining unresolved/suspicious rows: `2,620 + 17 = 2,637` rows (`27.8%`)
-- Bottom line: the result is **good and practically useful**, but **not perfect**
+- 安全側の学習コア: `5,827 + 1,036 = 6,863` 行（`72.2%`）
+- 未解決 / 要注意: `2,620 + 17 = 2,637` 行（`27.8%`）
+- 結論: **かなり良いが、完璧ではない**
 
-## 3. Family-level final result
+## 3. family ごとの最終結果
 
-| family | total | verified | answer_only | manual | exclude | summary |
+| family | total | verified | answer_only | manual | exclude | 概要 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `roman_numeral` | 1,576 | 1,576 | 0 | 0 | 0 | Essentially complete |
-| `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | Essentially complete |
-| `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | Essentially complete |
-| `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | All unresolved rows were clean answer-only completions |
-| `bit_manipulation` | 1,602 | 381 | 0 | 1,213 | 8 | Major remaining bottleneck |
-| `symbol_equation` | 1,555 | 74 | 65 | 1,407 | 9 | Major remaining bottleneck |
+| `roman_numeral` | 1,576 | 1,576 | 0 | 0 | 0 | 実質完了 |
+| `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
+| `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
+| `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
+| `bit_manipulation` | 1,602 | 381 | 0 | 1,213 | 8 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 74 | 65 | 1,407 | 9 | 主要な残課題 |
 
-### Interpretation
+### 解釈
 
-- `roman`, `gravity`, and `unit` are effectively solved for curation purposes.
-- `text` is in good shape for accuracy-oriented supervision, but `971` rows are still **answer-only**, not full reasoning-trace teachers.
-- The two hard residual families are `bit_manipulation` and `symbol_equation`.
+- `roman` / `gravity` / `unit` は、curation の観点ではほぼ完成です。
+- `text` は accuracy 向けの教師としてかなり良い状態ですが、`971` 行は **answer-only** であり、完全な reasoning trace 教師ではありません。
+- 残る主要ボトルネックは `bit_manipulation` と `symbol_equation` です。
 
-## 4. Main improvements achieved
+## 4. 今回の主な改善点
 
-### 4.1 Binary
+### 4.1 binary の改善
 
-Binary coverage improved beyond the earlier baseline by adding multiple rule families:
+binary では、既存の単純規則だけでなく次の rule family を追加で当てました。
 
 - bit permutation / inversion
-- 2-bit boolean rules
-- 3-bit boolean rules
-- affine XOR over GF(2)
-- simple byte-level transforms (`shift`, `rotate`, `mask`)
+- 2-bit boolean
+- 3-bit boolean
+- GF(2) affine XOR
+- byte-level transform（`shift` / `rotate` / `mask`）
 
-Result:
+結果:
 
-- baseline solved reference: `306`
-- final verified binary rows: `381`
-- net gain over baseline: `+75`
+- 以前の solved 参照値: `306`
+- 最終 verified binary: `381`
+- 改善幅: `+75`
 
-### 4.2 Text
+### 4.2 text の改善
 
-The biggest curation improvement came from text:
+今回もっとも大きかったのは text の整理です。
 
-- previously unresolved text rows were not conflicting ciphers
-- they were missing 1 to 6 query characters not shown in the in-row examples
-- all `971` such rows were cleanly promotable to `answer_only_keep`
+- 未解決 text は **壊れた cipher** ではありませんでした
+- 主因は、query に必要な暗号文字が examples に 1〜6 文字足りないことでした
+- そのため、`971` 行すべてを **clean answer-only** として昇格できました
 
-Result:
+結果:
 
 - `605 verified`
-- `971 clean answer-only`
+- `971 answer-only`
 - `0 manual`
 
-### 4.3 Symbol
+### 4.3 symbol の改善
 
-The symbol family split into two distinct subtypes:
+symbol は大きく 2 つに分かれました。
 
 - `numeric_2x2`
 - `glyph_len5`
 
-For `numeric_2x2`, operator-aware row-local formula search recovered:
+`numeric_2x2` では、operator-aware の row-local formula search により:
 
 - `74 verified`
 - `65 answer-only`
 
-For `glyph_len5`:
+`glyph_len5` では:
 
-- `70` rows satisfy a coarse multiset-style mapping hypothesis
-- `46` of those also satisfy a global output-order DAG
-- these `46` rows are the strongest remaining glyph manual-audit targets
+- `70` 行が multiset 風の粗い仮説に整合
+- そのうち `46` 行は global output-order DAG にも整合
+- この `46` 行が、glyph 系 manual audit の最優先候補です
 
-### 4.4 Manual pass1 pack
+### 4.4 pass1 manual pack の圧縮
 
-The highest-priority human review pack is now only `644` rows:
+最優先で人手確認すべき pack は **644 行** まで縮みました。
 
-- `448` `symbol_numeric_same_op`
-- `150` `binary_low_gap`
-- `46` `symbol_glyph_multiset`
+- `448` 行: `symbol_numeric_same_op`
+- `150` 行: `binary_low_gap`
+- `46` 行: `symbol_glyph_multiset`
 
-That is the shortest path for the next curation pass.
+次の curation ループはここから始めるのが最短です。
 
-## 5. Final deliverables in this folder
+## 5. 最終成果物一覧
 
-### 5.1 Most important CSV artifacts
+### 5.1 最重要 CSV
 
-| path | purpose |
+| path | 役割 |
 | --- | --- |
-| `artifacts/train_row_analysis_v1.csv` | Full per-row analysis ledger for all 9,500 rows |
-| `artifacts/train_recommended_learning_target_v1.csv` | Recommended safe training pool (`verified + answer_only`) |
-| `artifacts/train_verified_trace_ready_v1.csv` | Highest-confidence trace-ready teacher rows |
-| `artifacts/train_answer_only_keep_v1.csv` | Clean answer-only supervision rows |
-| `artifacts/train_manual_audit_priority_v1.csv` | Remaining unresolved rows to inspect |
-| `artifacts/train_exclude_suspect_v1.csv` | Rows intentionally excluded due to label/rule mismatch risk |
-| `artifacts/manual_pass1_priority_pack_v1.csv` | First manual-review queue |
-| `artifacts/teacher_coverage_recovery_v1.csv` | Comparison against prior solved coverage |
-| `artifacts/family_summary_v1.csv` | Final family-level result table |
-| `artifacts/selection_summary_v1.csv` | Final selection-tier summary |
+| `artifacts/train_row_analysis_v1.csv` | 9,500 行すべての分析台帳 |
+| `artifacts/train_recommended_learning_target_v1.csv` | 推奨学習対象（`verified + answer_only`） |
+| `artifacts/train_verified_trace_ready_v1.csv` | 最も信頼度の高い trace-ready 教師 |
+| `artifacts/train_answer_only_keep_v1.csv` | clean な answer-only 教師 |
+| `artifacts/train_manual_audit_priority_v1.csv` | まだ人手確認が必要な行 |
+| `artifacts/train_exclude_suspect_v1.csv` | 学習から外すべき怪しい行 |
+| `artifacts/manual_pass1_priority_pack_v1.csv` | 最初に見るべき manual review pack |
+| `artifacts/teacher_coverage_recovery_v1.csv` | 過去 coverage との差分 |
+| `artifacts/family_summary_v1.csv` | family ごとの最終集計 |
+| `artifacts/selection_summary_v1.csv` | selection tier の最終集計 |
 
-### 5.2 Important specialist artifacts
+### 5.2 専門補助 artifacts
 
-| path | purpose |
+| path | 役割 |
 | --- | --- |
-| `artifacts/text_answer_completion_summary_v1.csv` | Breakdown of the 971 text answer-only promotions |
-| `artifacts/binary_cluster_summary_v1.csv` | Cluster view of unresolved binary rows |
-| `artifacts/symbol_operator_summary_v1.csv` | Operator-level split for numeric symbol rows |
-| `artifacts/glyph_multiset_summary_v1.csv` | Coarse glyph feasibility breakdown |
-| `artifacts/glyph_query_consistent_v1.csv` | 5 glyph rows whose query+gold still fit the coarse model |
-| `artifacts/symbol_tail_probe_summary_v1.csv` | Final tail probes for remaining symbol rows |
+| `artifacts/text_answer_completion_summary_v1.csv` | 971 行の text answer-only 昇格内訳 |
+| `artifacts/binary_cluster_summary_v1.csv` | 未解決 binary のクラスタ要約 |
+| `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
+| `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
+| `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
+| `artifacts/symbol_tail_probe_summary_v1.csv` | 最終段階の symbol tail probe 結果 |
 
-## 6. Execution file overview
+## 6. 実行ファイル概要
 
 ### `code/train_data_analysis_v1.py`
 
-This is the **single-file implementation** of the whole analysis pipeline.
+このファイルが **全分析をまとめた単一実装** です。
 
-Major responsibilities:
+主な責務:
 
-- import and reuse parser/metadata logic from `versions/v1/code/train.py`
-- analyze each row family-by-family
-- assign `verified_trace_ready` / `answer_only_keep` / `manual_audit_priority` / `exclude_suspect`
-- generate CSV artifacts under `artifacts/`
-- generate Markdown reports under `reports/`
+- `versions/v1/code/train.py` の parser / metadata を再利用
+- family ごとに各行を解析
+- `verified_trace_ready` / `answer_only_keep` / `manual_audit_priority` / `exclude_suspect` を割り当て
+- `artifacts/` に CSV を出力
+- `reports/` に Markdown レポートを出力
 
-Main functions:
+主要関数:
 
 - `analyze_bit_row(...)`
 - `analyze_text_row(...)`
@@ -161,7 +162,7 @@ Main functions:
 - `run_analysis(...)`
 - `main()`
 
-### Example rerun command
+### 再実行コマンド例
 
 ```bash
 cd /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge
@@ -171,28 +172,28 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
   --out-root /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1
 ```
 
-## 7. Report-by-report guide
+## 7. 各レポートの概要
 
-| report | summary |
+| report | 内容 |
 | --- | --- |
-| `reports/00_kickoff.md` | Initial scope, constraints, and setup note |
-| `reports/01_overview.md` | Early end-to-end overview and high-priority manual rows |
-| `reports/02_hard_family_findings.md` | Binary/text/symbol solver findings |
-| `reports/03_curation_recommendations.md` | How to use each selection tier for future training |
-| `reports/04_mid_results.md` | Earlier milestone snapshot before later improvements |
-| `reports/05_symbol_split_notes.md` | First explicit split of symbol into `numeric_2x2` and `glyph_len5` |
-| `reports/06_text_unknown_notes.md` | Final text answer-completion summary |
-| `reports/07_binary_cluster_notes.md` | Remaining binary clusters and top manual queue |
-| `reports/08_symbol_operator_notes.md` | Numeric operator split plus glyph multiset summary |
-| `reports/09_manual_pass1_pack.md` | First practical human-audit pack |
-| `reports/10_glyph_probe_notes.md` | Earlier glyph probe note showing failed simple transducer direction |
-| `reports/10_glyph_order_probe.md` | Glyph rows consistent with multiset plus order DAG |
-| `reports/11_latest_snapshot.md` | Best single snapshot of the final state |
-| `reports/12_symbol_tail_probes.md` | Final symbol-tail probes and why remaining rows stay manual |
+| `reports/00_kickoff.md` | 初期スコープと制約の確認 |
+| `reports/01_overview.md` | 初回の全体像と高優先 manual 行 |
+| `reports/02_hard_family_findings.md` | binary / text / symbol の solver 調査 |
+| `reports/03_curation_recommendations.md` | selection tier ごとの使い方 |
+| `reports/04_mid_results.md` | 改善前半時点の中間スナップショット |
+| `reports/05_symbol_split_notes.md` | symbol が `numeric_2x2` と `glyph_len5` に分かれることの整理 |
+| `reports/06_text_unknown_notes.md` | text answer-completion の最終整理 |
+| `reports/07_binary_cluster_notes.md` | 未解決 binary のクラスタと上位 manual 候補 |
+| `reports/08_symbol_operator_notes.md` | numeric operator 別の内訳と glyph 要約 |
+| `reports/09_manual_pass1_pack.md` | 最初に着手すべき manual pack |
+| `reports/10_glyph_probe_notes.md` | 失敗した simple transducer 方向の記録 |
+| `reports/10_glyph_order_probe.md` | multiset + order DAG に整合する glyph 候補 |
+| `reports/11_latest_snapshot.md` | 最終状態を最短で確認できるスナップショット |
+| `reports/12_symbol_tail_probes.md` | 最終段階の symbol 残差 probe |
 
-## 8. Recommended reading order
+## 8. 最短の読み順
 
-If you only want the essentials, read in this order:
+時間がない場合は、次の順で読めば十分です。
 
 1. `reports/11_latest_snapshot.md`
 2. `artifacts/train_recommended_learning_target_v1.csv`
@@ -200,30 +201,75 @@ If you only want the essentials, read in this order:
 4. `reports/12_symbol_tail_probes.md`
 5. `code/train_data_analysis_v1.py`
 
-## 9. Validation notes
+## 9. 現状の課題
 
-Validation performed after copying the analysis folder into the repository:
+### 9.1 binary がまだ重い
+
+- `bit_manipulation` はまだ `1,213 manual + 8 exclude`
+- 2-bit / 3-bit / affine XOR / byte transform まで当てても、なお多数が未解決
+- 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
+- つまり次は、より広い boolean/circuit family か、より複雑な non-local byte transform を考える必要がある
+
+### 9.2 symbol がまだ重い
+
+- `symbol_equation` は `1,407 manual + 9 exclude`
+- `numeric_2x2` は operator-aware でかなり整理できたが、まだ `448` 行が pass1 に残る
+- 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
+- つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
+
+### 9.3 glyph_len5 は coarse 仮説止まり
+
+- `70` 行は multiset 仮説に整合
+- `46` 行は order DAG にも整合
+- ただし coarse model が **一意でない** ため、教師として昇格できない
+- query+gold を足しても整合する行は `5` 行だけあったが、それでも非一意なので manual のままにしている
+
+### 9.4 text は accuracy 向けには強いが、trace 完全性では未完
+
+- `text` の未解決は全部 clean answer-only にできた
+- ただし `971` 行は **answer-only** であり、完全な reasoning trace 教師ではない
+- したがって accuracy 寄りの SFT には有用だが、trace 蒸留の純度という意味では満額ではない
+
+### 9.5 exclude 行は少数だが重要
+
+- `exclude_suspect = 17`
+- 数は少ないが、こうした行を無理に学習へ混ぜると `README.md` の accuracy 評価に対して逆効果になりやすい
+- ここは「少ないから無視」ではなく、今後も別管理を維持するのが安全
+
+### 9.6 次の優先順位
+
+次に触る順番は、現状では次が合理的です。
+
+1. `artifacts/manual_pass1_priority_pack_v1.csv`
+2. `symbol_numeric_same_op` 448 行
+3. `binary_low_gap` 150 行
+4. `symbol_glyph_multiset` 46 行
+
+## 10. 検証メモ
+
+repo 反映後に次を確認しています。
 
 - `python3 -m py_compile cuda-train-data-analysis-v1/code/train_data_analysis_v1.py`
-- smoke rerun of the analysis script
+- analysis script の smoke rerun
 - `python3 -m pytest -q -k 'not test_scaffold_runbook_and_ablation_failure_logging'`
 
-Observed result:
+確認結果:
 
 - `125 passed, 1 deselected`
 
-The full repository test suite still has one unrelated pre-existing failure:
+なお full test suite では、今回の変更とは無関係の既存 failure が 1 件あります。
 
 - `versions/v3/tests/test_candidate_promotion.py::test_scaffold_runbook_and_ablation_failure_logging`
 
-## 10. Final conclusion
+## 11. 最終まとめ
 
-This folder should be treated as the final packaged result of the analysis pass.
+このフォルダは、今回の train data analysis pass の **最終パッケージ** と見なしてよいです。
 
-The most important takeaway is:
+重要なポイントは次の 3 つです。
 
-- the project now has a **strong safe training core**
-- the remaining uncertainty is concentrated, not diffuse
-- future effort should focus primarily on `binary` and `symbol`
+- **安全に学習へ回せる中核教師集合** はできた
+- 不確実性は全体に散らばらず、`binary` と `symbol` に集中した
+- 次の作業は `manual_pass1_priority_pack_v1.csv` から始めればよい
 
-For accuracy-oriented Nemotron fine-tuning, `artifacts/train_recommended_learning_target_v1.csv` is the key output. For the next manual curation pass, `artifacts/manual_pass1_priority_pack_v1.csv` is the key output.
+accuracy 重視の Nemotron fine-tuning に使う主成果物は `artifacts/train_recommended_learning_target_v1.csv` です。  
+次の manual curation に使う主成果物は `artifacts/manual_pass1_priority_pack_v1.csv` です。
