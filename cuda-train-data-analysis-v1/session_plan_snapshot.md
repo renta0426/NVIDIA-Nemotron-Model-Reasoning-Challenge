@@ -78,4 +78,5 @@
 - `reports/37_binary_third_cluster_hold.md` を追加し、binary round2 の第3 cluster（`17` 行, `9 examples / 1 no-candidate / 0 multi-candidate`）も再読した。shift-like / inversion-like partial structure は見えるが、current solver family のどれも unique ではなく、safe exclusion も無いので manual 維持とした。
 - `reports/38_binary_tail_clusters_hold.md` を追加し、binary round2 の残り小 cluster も representative rows を再読した。`bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも競合候補が残るタイプが中心で、top3 よりさらに曖昧な tail と判断して manual 維持とした。
 - `reports/39_symbol_star4_bucket3_hold.md` を追加し、`*` の 4-digit bucket3 `4` 行も再読した。3 same-op examples ずつある最後の有望 `*` residual だったが、simple product-like probe は 0 件で、これも manual 維持とした。
-- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち残る singleton / doubleton 級の operator-specific tail をどう束ねるか見直し、それでも前進しない場合は binary で **より広い boolean/circuit family か non-local byte transform family** を仮説化すること。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/40_symbol_tiny_tail_hold.md` を追加し、残る singleton / doubleton の symbol operator tail も representative rows を再読した。ここは broader family なしでは safe promotion の入口が無い long tail と判断し、manual 維持とした。
+- 次ステップは、binary で **より広い boolean/circuit family か non-local byte transform family** を仮説化するか、symbol で mini-slice 単位ではなく cross-operator の broader family を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。
