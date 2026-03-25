@@ -4402,9 +4402,23 @@ def estimate_trace_tokens(text: str) -> int:
     return len(re.findall(r'\S+', text))
 
 
-def build_training_prompt(raw_prompt: str) -> str:
-    boxed_instruction = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
-    return f'{raw_prompt}\n{boxed_instruction}'
+DEFAULT_BOXED_PROMPT_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
+NOTEBOOK_BOXED_PROMPT_INSTRUCTION = r"Put your final answer inside \boxed{}."
+
+
+def resolve_prompt_instruction(value: Any, *, default: str = DEFAULT_BOXED_PROMPT_INSTRUCTION) -> str:
+    if value is None:
+        return default
+    if value != value:
+        return default
+    return str(value).strip()
+
+
+def build_training_prompt(raw_prompt: str, prompt_instruction: str = DEFAULT_BOXED_PROMPT_INSTRUCTION) -> str:
+    instruction = prompt_instruction.strip()
+    if not instruction:
+        return raw_prompt
+    return f'{raw_prompt}\n{instruction}'
 
 
 def render_answer_completion(answer: str, format_policy: str) -> str:
@@ -4436,7 +4450,7 @@ def build_training_completion(row: dict[str, Any]) -> str:
     return render_answer_completion(answer, format_policy)
 
 
-def build_training_records(frame: Any) -> tuple[list[dict[str, Any]], int]:
+def build_training_records(frame: Any, *, prompt_instruction: str = DEFAULT_BOXED_PROMPT_INSTRUCTION) -> tuple[list[dict[str, Any]], int]:
     records: list[dict[str, Any]] = []
     skipped = 0
     for row in frame.to_dict(orient='records'):
@@ -4451,7 +4465,10 @@ def build_training_records(frame: Any) -> tuple[list[dict[str, Any]], int]:
             continue
         records.append(
             {
-                'prompt': build_training_prompt(prompt),
+                'prompt': build_training_prompt(
+                    prompt,
+                    resolve_prompt_instruction(row.get('prompt_instruction'), default=prompt_instruction),
+                ),
                 'completion': completion,
                 'metadata': {
                     'id': normalize_optional_text(row.get('id')),
@@ -4470,6 +4487,9 @@ def split_training_frame(frame: Any, *, valid_fold: int, valid_fraction: float, 
 
     if frame.empty:
         return frame.copy(), frame.copy(), 'empty'
+
+    if valid_fraction <= 0.0:
+        return frame.copy(), frame.iloc[0:0].copy(), 'disabled'
 
     if 'cv5_fold' in frame.columns and frame['cv5_fold'].notna().any():
         folds = pd.to_numeric(frame['cv5_fold'], errors='coerce')
@@ -4606,7 +4626,7 @@ def build_mlx_lora_config(
     cfg: dict[str, Any],
     total_iters: int,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         'model': model_path,
         'train': True,
         'data': str(dataset_dir),
@@ -4631,6 +4651,61 @@ def build_mlx_lora_config(
             'scale': float(cfg.get('lora_alpha', 32)),
         },
     }
+    lr_schedule = build_mlx_lr_schedule_config_v4(cfg, total_iters=total_iters)
+    if lr_schedule is not None:
+        payload['lr_schedule'] = lr_schedule
+    optimizer_config = cfg.get('optimizer_config')
+    if isinstance(optimizer_config, dict) and optimizer_config:
+        payload['optimizer_config'] = optimizer_config
+    lora_module_keys = [str(key).strip() for key in list(cfg.get('lora_module_keys', []) or []) if str(key).strip()]
+    if lora_module_keys:
+        payload['lora_parameters']['keys'] = lora_module_keys
+    return payload
+
+
+def build_mlx_lr_schedule_config_v4(cfg: dict[str, Any], *, total_iters: int) -> dict[str, Any] | None:
+    schedule_cfg = cfg.get('lr_schedule')
+    if isinstance(schedule_cfg, dict) and schedule_cfg:
+        return schedule_cfg
+    schedule_type = normalize_optional_text(cfg.get('lr_schedule_type'))
+    if schedule_type is None:
+        return None
+    if schedule_type in {'cosine', 'cosine_decay'}:
+        warmup_steps = max(0, int(round(float(cfg.get('warmup_ratio', 0.0)) * max(total_iters, 1))))
+        return {
+            'name': 'cosine_decay',
+            'arguments': [float(cfg.get('learning_rate', 1e-4)), int(max(total_iters, 1))],
+            'warmup': warmup_steps,
+        }
+    raise ValueError(f'Unsupported MLX lr_schedule_type: {schedule_type}')
+
+
+def build_mlx_optimizer_v4(optim_module: Any, cfg: dict[str, Any], *, total_iters: int, default_learning_rate: float) -> Any:
+    from mlx_lm.tuner.utils import build_schedule
+
+    learning_rate: Any = float(cfg.get('learning_rate', default_learning_rate))
+    lr_schedule = build_mlx_lr_schedule_config_v4(cfg, total_iters=total_iters)
+    if lr_schedule is not None:
+        learning_rate = build_schedule(lr_schedule)
+    optimizer_name = str(cfg.get('optimizer', 'adam')).strip().lower()
+    optimizer_config = cfg.get('optimizer_config')
+    optimizer_kwargs = {}
+    if isinstance(optimizer_config, dict):
+        if optimizer_name in optimizer_config and isinstance(optimizer_config[optimizer_name], dict):
+            optimizer_kwargs = dict(optimizer_config[optimizer_name])
+        elif optimizer_config and all(not isinstance(value, dict) for value in optimizer_config.values()):
+            optimizer_kwargs = dict(optimizer_config)
+    if optimizer_name == 'adam':
+        return optim_module.Adam(learning_rate=learning_rate, **optimizer_kwargs)
+    if optimizer_name == 'adamw':
+        return optim_module.AdamW(learning_rate=learning_rate, **optimizer_kwargs)
+    if optimizer_name == 'sgd':
+        return optim_module.SGD(learning_rate=learning_rate, **optimizer_kwargs)
+    if optimizer_name == 'adafactor':
+        return optim_module.Adafactor(learning_rate=learning_rate, **optimizer_kwargs)
+    if optimizer_name == 'muon':
+        return optim_module.Muon(learning_rate=learning_rate, **optimizer_kwargs)
+    raise ValueError(f'Unsupported optimizer: {optimizer_name}')
 
 
 def run_train_sft(args: argparse.Namespace) -> None:
@@ -4663,8 +4738,9 @@ def run_train_sft(args: argparse.Namespace) -> None:
     )
     train_split_df = maybe_limit_rows(train_split_df, max_rows=args.max_train_rows, seed=seed)
     valid_split_df = maybe_limit_rows(valid_split_df, max_rows=args.max_valid_rows, seed=seed)
-    train_records, skipped_train_rows = build_training_records(train_split_df)
-    valid_records, skipped_valid_rows = build_training_records(valid_split_df)
+    prompt_instruction = resolve_prompt_instruction(cfg.get('prompt_instruction'), default=DEFAULT_BOXED_PROMPT_INSTRUCTION)
+    train_records, skipped_train_rows = build_training_records(train_split_df, prompt_instruction=prompt_instruction)
+    valid_records, skipped_valid_rows = build_training_records(valid_split_df, prompt_instruction=prompt_instruction)
     effective_train_rows = max(len(train_records), 1)
     total_iters = max(1, int(effective_train_rows * num_epochs // max(batch_size, 1)))
 
@@ -4764,6 +4840,253 @@ def run_train_sft(args: argparse.Namespace) -> None:
     print(f'\nManifest written to: {manifest_path}')
     print(f'Command script written to: {command_path}')
     print(f'MLX config written to: {mlx_config_path}')
+
+
+def run_build_baseline_sft_pack_v4(args: argparse.Namespace) -> None:
+    import pandas as pd
+
+    input_path = _require_existing_path(args.input_path, label='baseline train csv')
+    output_path = Path(args.output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    frame = pd.read_csv(input_path)
+    original_rows = len(frame)
+    subsample_size = int(args.subsample_size)
+    subsample_seed = int(args.subsample_seed)
+    if subsample_size > 0 and len(frame) > subsample_size:
+        frame = frame.sample(n=subsample_size, random_state=subsample_seed).reset_index(drop=True)
+    frame['format_policy'] = 'boxed'
+    frame['source_dataset'] = 'baseline_notebook'
+    frame['prompt_instruction'] = resolve_prompt_instruction(
+        getattr(args, 'prompt_instruction', None),
+        default=NOTEBOOK_BOXED_PROMPT_INSTRUCTION,
+    )
+    frame.to_parquet(output_path, index=False)
+    append_experiment_log(
+        'build_baseline_sft_pack_v4',
+        'completed',
+        input_path=str(input_path),
+        output_path=str(output_path),
+        original_rows=original_rows,
+        output_rows=len(frame),
+        subsample_size=subsample_size,
+        subsample_seed=subsample_seed,
+    )
+    print(
+        json.dumps(
+            {
+                'input_path': str(input_path),
+                'output_path': str(output_path),
+                'original_rows': original_rows,
+                'output_rows': len(frame),
+                'subsample_size': subsample_size,
+                'subsample_seed': subsample_seed,
+                'prompt_instruction': frame['prompt_instruction'].iloc[0] if not frame.empty else '',
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
+def run_train_sft_v4(args: argparse.Namespace) -> None:
+    import pandas as pd
+
+    cfg = _load_yaml_config(args.config_path)
+    config_name = str(cfg.get('name', Path(args.config_path).stem))
+    stage = normalize_optional_text(getattr(args, 'stage', None)) or normalize_optional_text(cfg.get('stage')) or 'baseline'
+    train_pack_path = _require_existing_path(
+        getattr(args, 'train_pack_path', None) or cfg.get('train_pack_path'),
+        label='sft train parquet',
+    )
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    candidate_id = getattr(args, 'candidate_id', None) or f'v4_sft_{config_name}'
+    parent_candidate_id = normalize_optional_text(getattr(args, 'parent_candidate_id', None))
+    manifest_path = output_dir / f'{candidate_id}_manifest.json'
+    result_path = output_dir / f'{candidate_id}_result.json'
+    adapter_dir = output_dir / f'adapter_{candidate_id}'
+    metrics_path = output_dir / f'{candidate_id}_metrics.jsonl'
+    init_adapter_path = prepare_parent_adapter_path_v4(cfg, args)
+    train_pack_df = pd.read_parquet(train_pack_path)
+    seed = int(cfg.get('seed', 0))
+    train_df, valid_df, split_strategy = split_training_frame(
+        train_pack_df,
+        valid_fold=int(args.valid_fold),
+        valid_fraction=float(args.valid_fraction),
+        seed=seed,
+    )
+    train_df = maybe_limit_rows(train_df, max_rows=args.max_train_rows, seed=seed)
+    valid_df = maybe_limit_rows(valid_df, max_rows=args.max_valid_rows, seed=seed)
+    prompt_instruction = resolve_prompt_instruction(cfg.get('prompt_instruction'), default=DEFAULT_BOXED_PROMPT_INSTRUCTION)
+    train_records, skipped_train = build_training_records(train_df, prompt_instruction=prompt_instruction)
+    valid_records, skipped_valid = build_training_records(valid_df, prompt_instruction=prompt_instruction)
+    effective_train_rows = max(len(train_records), 1)
+    cfg['iters'] = max(
+        1,
+        int(
+            effective_train_rows
+            * float(cfg.get('num_epochs', 1.0))
+            // max(int(cfg.get('per_device_train_batch_size', 1)), 1)
+        ),
+    )
+    base_model = resolve_training_base_model(cfg.get('base_model'), load_active_model_manifest_v4())
+    manifest = prepare_training_manifest_v4(
+        version='v4',
+        candidate_id=candidate_id,
+        recipe_type='sft',
+        config_name=config_name,
+        base_model=base_model,
+        data_path=train_pack_path,
+        train_records=len(train_records),
+        valid_records=len(valid_records),
+        split_strategy=split_strategy,
+        cfg=cfg,
+        adapter_dir=adapter_dir,
+        metrics_path=metrics_path,
+        parent_candidate_id=parent_candidate_id,
+    )
+    manifest['stage'] = stage
+    manifest['data']['skipped_rows'] = skipped_train + skipped_valid
+    manifest['data']['prompt_instruction'] = prompt_instruction
+    manifest['loss'] = {
+        'weighted': bool(cfg.get('weighted_loss', False)),
+        'final_line_weight': float(cfg.get('final_line_weight', 1.0)),
+        'answer_span_weights': dict(cfg.get('answer_span_weights', {})),
+    }
+    manifest['training']['mask_prompt'] = bool(cfg.get('mask_prompt', True))
+    manifest['training']['optimizer'] = str(cfg.get('optimizer', 'adam'))
+    manifest['training']['num_layers'] = int(cfg.get('num_layers', 16))
+    lr_schedule_type = normalize_optional_text(cfg.get('lr_schedule_type'))
+    if lr_schedule_type is not None:
+        manifest['training']['lr_schedule_type'] = lr_schedule_type
+    if 'warmup_ratio' in cfg:
+        manifest['training']['warmup_ratio'] = float(cfg.get('warmup_ratio', 0.0))
+    save_json_v4(manifest_path, manifest)
+    try:
+        if not args.execute or str(cfg.get('runtime_backend', '')).lower() == 'mock':
+            import numpy as np
+            from safetensors.numpy import save_file
+
+            adapter_dir.mkdir(parents=True, exist_ok=True)
+            save_file({'layers.0.q_proj.lora_a': np.zeros((2, 2), dtype=np.float32)}, str(adapter_dir / 'adapters.safetensors'))
+            save_json_v4(
+                adapter_dir / 'adapter_config.json',
+                {
+                    'base_model_name_or_path': base_model,
+                    'target_modules': list(cfg.get('target_modules', [])),
+                    'r': int(cfg.get('lora_r', 32)),
+                    'weighted_loss': bool(cfg.get('weighted_loss', False)),
+                    'mask_prompt': bool(cfg.get('mask_prompt', True)),
+                    'optimizer': str(cfg.get('optimizer', 'adam')),
+                    'prompt_instruction': prompt_instruction,
+                    'parent_adapter_path': str(init_adapter_path) if init_adapter_path is not None else '',
+                },
+            )
+            result = {
+                'status': 'completed' if args.execute else 'rendered_only',
+                'created_at': utc_now(),
+                'metrics_path': str(metrics_path),
+                'adapter_dir': str(adapter_dir),
+                'final_train_loss': 0.0,
+                'final_val_loss': 0.0,
+                'peak_memory_gb': 0.0,
+            }
+        else:
+            result = weighted_training_execute_v4(
+                train_records=train_records,
+                valid_records=valid_records,
+                cfg=cfg,
+                base_model=base_model,
+                output_dir=output_dir,
+                adapter_dir=adapter_dir,
+                metrics_path=metrics_path,
+                init_adapter_path=init_adapter_path,
+            )
+    except Exception as exc:
+        result = {
+            'status': 'failed',
+            'created_at': utc_now(),
+            'error_type': type(exc).__name__,
+            'error_message': str(exc),
+            'metrics_path': str(metrics_path),
+            'adapter_dir': str(adapter_dir),
+        }
+        save_json_v4(result_path, result)
+        append_experiment_log('train_sft_v4', 'failed', candidate_id=candidate_id, error=f'{type(exc).__name__}:{exc}')
+        raise
+    save_json_v4(result_path, result)
+    upsert_csv_row(
+        Path(DEFAULT_V4_CANDIDATE_REGISTRY_OUTPUT_PATH),
+        [
+            'candidate_id',
+            'parent_candidate_id',
+            'candidate_kind',
+            'manifest_path',
+            'adapter_path',
+            'runtime_lane',
+            'stage',
+            'recipe_type',
+            'pair_kind',
+            'train_pack_path',
+            'overall_acc',
+            'hard_shadow_acc',
+            'format_fail_rate',
+            'extraction_fail_rate',
+            'submit_value',
+            'cuda_repro_pass',
+            'packaging_pass',
+            'selected_for_submit',
+            'status',
+            'failure_reason',
+            'notes',
+            'recorded_at',
+        ],
+        ['candidate_id'],
+        {
+            'candidate_id': candidate_id,
+            'parent_candidate_id': parent_candidate_id or '',
+            'candidate_kind': 'adapter',
+            'manifest_path': str(manifest_path),
+            'adapter_path': str(adapter_dir),
+            'runtime_lane': 'mac_mlx',
+            'stage': stage,
+            'recipe_type': 'sft',
+            'pair_kind': '',
+            'train_pack_path': str(train_pack_path),
+            'overall_acc': '',
+            'hard_shadow_acc': '',
+            'format_fail_rate': '',
+            'extraction_fail_rate': '',
+            'submit_value': False,
+            'cuda_repro_pass': False,
+            'packaging_pass': False,
+            'selected_for_submit': False,
+            'status': result.get('status', 'completed'),
+            'failure_reason': result.get('error_message', ''),
+            'notes': normalize_optional_text(cfg.get('notes')) or '',
+            'recorded_at': utc_now(),
+        },
+    )
+    append_experiment_log(
+        'train_sft_v4',
+        'completed',
+        candidate_id=candidate_id,
+        manifest_path=str(manifest_path),
+        result_path=str(result_path),
+        adapter_dir=str(adapter_dir),
+    )
+    print(
+        json.dumps(
+            {
+                'candidate_id': candidate_id,
+                'manifest_path': str(manifest_path),
+                'result_path': str(result_path),
+                'adapter_dir': str(adapter_dir),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 def _resolve_adapter_weight_path(adapter_dir: Path) -> Path:
@@ -5810,6 +6133,10 @@ def weighted_training_execute_v4(
     from mlx_lm.tuner.utils import linear_to_lora_layers, load_adapters, print_trainable_parameters
     from mlx_lm.utils import save_config
 
+    mask_prompt = bool(cfg.get('mask_prompt', True))
+    weighted_loss_enabled = bool(cfg.get('weighted_loss', True))
+    prompt_instruction = resolve_prompt_instruction(cfg.get('prompt_instruction'), default=DEFAULT_BOXED_PROMPT_INSTRUCTION)
+
     class MetricsCallback:
         def __init__(self) -> None:
             self.last_train_loss: float | None = None
@@ -5829,7 +6156,7 @@ def weighted_training_execute_v4(
         def __init__(self, data: list[dict[str, Any]], tokenizer: Any) -> None:
             self._data = data
             self.tokenizer = tokenizer
-            self.mask_prompt = True
+            self.mask_prompt = mask_prompt
 
         def __getitem__(self, index: int) -> dict[str, Any]:
             return self._data[index]
@@ -5842,8 +6169,13 @@ def weighted_training_execute_v4(
             completion = str(datum['completion'])
             messages = [{'role': 'user', 'content': prompt}, {'role': 'assistant', 'content': completion}]
             tokens = list(self.tokenizer.apply_chat_template(messages, return_dict=False))
-            offset = len(self.tokenizer.apply_chat_template(messages[:-1], add_generation_prompt=True, return_dict=False))
-            completion_weights = _build_completion_token_weights(self.tokenizer, completion, str(datum['metadata'].get('family', '')), cfg)
+            offset = 0
+            if self.mask_prompt:
+                offset = len(self.tokenizer.apply_chat_template(messages[:-1], add_generation_prompt=True, return_dict=False))
+            if weighted_loss_enabled:
+                completion_weights = _build_completion_token_weights(self.tokenizer, completion, str(datum['metadata'].get('family', '')), cfg)
+            else:
+                completion_weights = [1.0] * max(len(tokens) - offset, 0)
             token_weights = [1.0] * offset + completion_weights
             if len(token_weights) < len(tokens):
                 token_weights.extend([completion_weights[-1] if completion_weights else 1.0] * (len(tokens) - len(token_weights)))
@@ -5889,8 +6221,11 @@ def weighted_training_execute_v4(
         targets = batch[:, 1:]
         logits = model(inputs)
         steps = mx.arange(1, targets.shape[1] + 1)
-        prompt_mask = mx.logical_and(steps >= lengths[:, 0:1], steps <= lengths[:, 1:])
-        weights = token_weights[:, 1:] * prompt_mask.astype(token_weights.dtype)
+        if mask_prompt:
+            active_mask = mx.logical_and(steps >= lengths[:, 0:1], steps <= lengths[:, 1:])
+        else:
+            active_mask = steps <= lengths[:, 1:]
+        weights = token_weights[:, 1:] * active_mask.astype(token_weights.dtype)
         ntoks = weights.astype(mx.float32).sum()
         ce = nn.losses.cross_entropy(logits, targets) * weights
         denom = mx.maximum(ntoks, mx.array(1.0, dtype=mx.float32))
@@ -5904,14 +6239,18 @@ def weighted_training_execute_v4(
         load_adapters(model, str(init_adapter_path))
         adapter_config = load_adapter_config_v4(init_adapter_path)
     else:
+        lora_parameters = {
+            'rank': int(cfg.get('lora_r', 32)),
+            'dropout': float(cfg.get('lora_dropout', 0.0)),
+            'scale': float(cfg.get('lora_alpha', 32)),
+        }
+        lora_module_keys = [str(key).strip() for key in list(cfg.get('lora_module_keys', []) or []) if str(key).strip()]
+        if lora_module_keys:
+            lora_parameters['keys'] = lora_module_keys
         linear_to_lora_layers(
             model,
             int(cfg.get('num_layers', 16)),
-            {
-                'rank': int(cfg.get('lora_r', 32)),
-                'dropout': float(cfg.get('lora_dropout', 0.0)),
-                'scale': float(cfg.get('lora_alpha', 32)),
-            },
+            lora_parameters,
         )
         adapter_config = {}
     print_trainable_parameters(model)
@@ -5930,7 +6269,10 @@ def weighted_training_execute_v4(
                 },
             ),
             'target_modules': list(adapter_config.get('target_modules', cfg.get('target_modules', []))),
-            'weighted_loss': True,
+            'weighted_loss': weighted_loss_enabled,
+            'mask_prompt': mask_prompt,
+            'optimizer': str(cfg.get('optimizer', 'adam')),
+            'prompt_instruction': prompt_instruction,
             'rationale_weight': float(cfg.get('rationale_weight', 1.0)),
             'final_line_weight': float(cfg.get('final_line_weight', 3.0)),
             'answer_span_weights': dict(cfg.get('answer_span_weights', {})),
@@ -5938,7 +6280,12 @@ def weighted_training_execute_v4(
         },
         adapter_dir / 'adapter_config.json',
     )
-    optimizer = optim.Adam(learning_rate=float(cfg.get('learning_rate', 1e-4)))
+    optimizer = build_mlx_optimizer_v4(
+        optim,
+        cfg,
+        total_iters=int(cfg.get('iters', 1)),
+        default_learning_rate=1e-4,
+    )
     training_args = TrainingArgs(
         batch_size=int(cfg.get('per_device_train_batch_size', 1)),
         iters=int(cfg.get('iters', 1)),
@@ -6255,8 +6602,9 @@ def run_train_stage_c_rft_v4(args: argparse.Namespace) -> None:
     train_df, valid_df, split_strategy = split_training_frame(train_pack_df, valid_fold=int(args.valid_fold), valid_fraction=float(args.valid_fraction), seed=seed)
     train_df = maybe_limit_rows(train_df, max_rows=args.max_train_rows, seed=seed)
     valid_df = maybe_limit_rows(valid_df, max_rows=args.max_valid_rows, seed=seed)
-    train_records, skipped_train = build_training_records(train_df)
-    valid_records, skipped_valid = build_training_records(valid_df)
+    prompt_instruction = resolve_prompt_instruction(cfg.get('prompt_instruction'), default=DEFAULT_BOXED_PROMPT_INSTRUCTION)
+    train_records, skipped_train = build_training_records(train_df, prompt_instruction=prompt_instruction)
+    valid_records, skipped_valid = build_training_records(valid_df, prompt_instruction=prompt_instruction)
     effective_train_rows = max(len(train_records), 1)
     cfg['iters'] = max(1, int(effective_train_rows * float(cfg.get('num_epochs', 1.0)) // max(int(cfg.get('per_device_train_batch_size', 1)), 1)))
     base_model = resolve_training_base_model(cfg.get('base_model'), load_active_model_manifest_v4())
@@ -7031,6 +7379,29 @@ def build_parser() -> argparse.ArgumentParser:
     build_stage_c_mix_parser.add_argument('--rft-output-path', default=str(DEFAULT_V4_STAGE_C_RFT_OUTPUT_PATH))
     build_stage_c_mix_parser.add_argument('--preference-output-path', default=str(DEFAULT_V4_STAGE_C_PREFERENCE_OUTPUT_PATH))
     build_stage_c_mix_parser.set_defaults(func=run_build_stage_c_mix_v4)
+
+    build_baseline_sft_pack_parser = subparsers.add_parser('build-baseline-sft-pack', help='Build a notebook-faithful BF16 SFT train pack from README train.csv.')
+    build_baseline_sft_pack_parser.add_argument('--input-path', default=str(REPO_ROOT / 'data' / 'train.csv'))
+    build_baseline_sft_pack_parser.add_argument('--output-path', default=str(VERSION_ROOT / 'data' / 'train_packs' / 'baseline_notebook_sft_600.parquet'))
+    build_baseline_sft_pack_parser.add_argument('--subsample-size', type=int, default=600)
+    build_baseline_sft_pack_parser.add_argument('--subsample-seed', type=int, default=42)
+    build_baseline_sft_pack_parser.add_argument('--prompt-instruction', default=NOTEBOOK_BOXED_PROMPT_INSTRUCTION)
+    build_baseline_sft_pack_parser.set_defaults(func=run_build_baseline_sft_pack_v4)
+
+    train_sft_v4_parser = subparsers.add_parser('train-sft-v4', help='Render or execute a v4 MLX SFT run from a parquet train pack.')
+    train_sft_v4_parser.add_argument('--config-path', required=True)
+    train_sft_v4_parser.add_argument('--train-pack-path', required=True)
+    train_sft_v4_parser.add_argument('--output-dir', required=True)
+    train_sft_v4_parser.add_argument('--candidate-id', default=None)
+    train_sft_v4_parser.add_argument('--parent-candidate-id', default=None)
+    train_sft_v4_parser.add_argument('--init-adapter-path', default=None)
+    train_sft_v4_parser.add_argument('--stage', default='baseline')
+    train_sft_v4_parser.add_argument('--valid-fold', type=int, default=-1)
+    train_sft_v4_parser.add_argument('--valid-fraction', type=float, default=0.05)
+    train_sft_v4_parser.add_argument('--max-train-rows', type=int, default=None)
+    train_sft_v4_parser.add_argument('--max-valid-rows', type=int, default=None)
+    train_sft_v4_parser.add_argument('--execute', action='store_true')
+    train_sft_v4_parser.set_defaults(func=run_train_sft_v4)
 
     train_stage_c_rft_parser = subparsers.add_parser('train-stage-c-rft', help='Render or execute the v4 Stage C RFT continuation run.')
     train_stage_c_rft_parser.add_argument('--config-path', default=str(DEFAULT_V4_RFT_TRAIN_CONFIG_PATH))
