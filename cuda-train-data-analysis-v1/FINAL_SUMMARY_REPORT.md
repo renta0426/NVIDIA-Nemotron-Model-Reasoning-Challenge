@@ -220,6 +220,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/25_symbol_star4_cluster_hold.md` | round2 `symbol` の `*` 4桁 top 2 cluster（39 行）を再読し、依然 manual hold とした根拠 |
 | `reports/26_symbol_plus3_cluster_hold.md` | round2 `symbol` の `+` 3桁 cluster を再読し、依然 manual hold とした根拠 |
 | `reports/27_binary_top_cluster_hold.md` | round2 `binary` の top 34-row cluster を再読し、依然 manual hold とした根拠 |
+| `reports/28_symbol_minus3_cluster_hold.md` | round2 `symbol` の `-` 3-character sign-embedded slice を再読し、依然 manual hold とした根拠 |
 
 ## 8. 最短の読み順
 
@@ -253,6 +254,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - report 17 の高shot mimic `32` 行に、extra known-family / low-shot mimic を足した mimic union は `56` 行となり、round2 の `symbol` 本丸は `317` 行まで圧縮できた
 - round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
 - round2 `+` 3桁 cluster も再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 でも同一 prompt 内で `2` 桁出力と `3` 桁出力が混在するため、再利用可能な exact formatter は見つからなかった
+- round2 `-` 3-character sign-embedded slice（`19` 行）も再読したが、負号が query-only になっている行が多く、high-shot rows でも signed/unsigned output や zero-pad が揺れるため、再利用可能な exact family は見つからなかった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
@@ -283,7 +285,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. round2 `symbol` core `317` 行のうち、次は `-` 3桁 / operator 埋め込み output
+2. round2 `symbol` core `317` 行のうち、次は operator 埋め込み output の残差と未読 small clusters
 3. `binary_low_gap` 139 行
 4. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 

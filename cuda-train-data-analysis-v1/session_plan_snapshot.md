@@ -66,4 +66,5 @@
 - `reports/25_symbol_star4_cluster_hold.md` を追加し、round2 `symbol` の `*` 4桁 top 2 cluster（`22 + 17` 行）を代表 prompt から再読したが、`+/-/*` 混在かつ `*` 例が 1-2 個しか無く、再利用可能な exact family は見つからなかった。
 - `reports/26_symbol_plus3_cluster_hold.md` を追加し、round2 `symbol` の `+` 3桁 cluster を再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 も同一 prompt 内で `2` 桁出力と `3` 桁出力が混在し、再利用可能な exact formatter は見つからなかった。
 - `reports/27_binary_top_cluster_hold.md` を追加し、round2 `binary` の top 34-row cluster（`7 examples / 1 no-candidate / 0 multi-candidate`）を再読したが、affine / boolean / byte family のどれも unique ではなく、safe promotion / safe exclusion の両方ができないことを確認した。
-- 次ステップは、`symbol_numeric_same_op` core `317` 行のうち `-` 3桁 / operator 埋め込み output と、残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/28_symbol_minus3_cluster_hold.md` を追加し、round2 `symbol` の `-` 3-character sign-embedded slice（`19` 行）を再読したが、負号が query-only になっている行が多く、high-shot rows でも signed/unsigned output や zero-pad が揺れており、再利用可能な exact family は見つからなかった。
+- 次ステップは、`symbol_numeric_same_op` core `317` 行のうち operator 埋め込み output の残差と未読 small clusters、それから残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
