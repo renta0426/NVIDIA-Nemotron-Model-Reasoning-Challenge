@@ -209,7 +209,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 32 行を、same-op 照合で全却下した根拠 |
 | `reports/18_symbol_next_safe_scan.md` | query-only 却下後の残差に対して次の safe family を探したが、derived template 探索でも 0 件だった記録 |
 | `reports/19_pass1_completion_and_round2.md` | pass1 の完了範囲と、round2 で最初に読むべき残差 cluster をまとめた要約 |
-| `reports/20_symbol_round2_cluster_map.md` | 残る `symbol_numeric_same_op` 341 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
+| `reports/20_symbol_round2_cluster_map.md` | mimic union を除いた `symbol_numeric_same_op` 317 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
 | `reports/21_glyph_round2_cluster_map.md` | `symbol_glyph_multiset` 46 行を長さ・重複署名で cluster 化した round2 入口 |
 | `reports/22_binary_round2_cluster_map.md` | `binary_low_gap` 139 行を gap / uniqueness 構造で cluster 化した round2 入口 |
 | `reports/23_symbol_known_family_mimics.md` | report 17 と extra known-family mimic を合流した `symbol` mimic union の整理 |
