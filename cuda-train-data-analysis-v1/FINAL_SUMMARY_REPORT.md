@@ -141,6 +141,7 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した `concat_xy / concat_yx` 行の一覧 |
 | `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 32 行の台帳 |
+| `artifacts/symbol_round2_cluster_summary_v1.csv` | query-only / derived-template を除いた残差 symbol を round2 向けに cluster 化した台帳 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
 | `artifacts/symbol_tail_probe_summary_v1.csv` | 最終段階の symbol tail probe 結果 |
@@ -203,6 +204,8 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/16_glyph_manual_hold.md` | glyph pass1 46 行を全件 manual 維持にした根拠 |
 | `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 32 行を、same-op 照合で全却下した根拠 |
 | `reports/18_symbol_next_safe_scan.md` | query-only 却下後の残差に対して次の safe family を探したが、derived template 探索でも 0 件だった記録 |
+| `reports/19_pass1_completion_and_round2.md` | pass1 の完了範囲と、round2 で最初に読むべき残差 cluster をまとめた要約 |
+| `reports/20_symbol_round2_cluster_map.md` | 残る `symbol_numeric_same_op` 341 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
 
 ## 8. 最短の読み順
 
@@ -233,6 +236,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d` に見える `32` 行も再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が一意化できず、**追加昇格 0**
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
+- pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
 ### 9.3 glyph_len5 は coarse 仮説止まり
 
