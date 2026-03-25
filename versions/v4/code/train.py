@@ -1153,17 +1153,7 @@ def load_active_model_manifest_v4() -> dict[str, Any]:
 
 
 def resolve_active_snapshot_path_v4() -> str:
-    preferred_local_model = resolve_preferred_mlx_model_path_v4()
-    if preferred_local_model is not None:
-        return preferred_local_model
-    active_model = load_active_model_manifest_v4()
-    snapshot_dir = normalize_optional_text(active_model.get('snapshot_dir'))
-    fallback_model = resolve_fallback_mlx_model_path_v4(snapshot_dir)
-    if fallback_model is not None:
-        return fallback_model
-    if snapshot_dir is None:
-        return str(DEFAULT_V3_ACTIVE_MODEL_PATH)
-    return snapshot_dir
+    return require_preferred_mlx_model_path_v4()
 
 
 def ensure_v4_layout_scaffold(version_root: Path = VERSION_ROOT) -> None:
@@ -4573,14 +4563,14 @@ def resolve_preferred_mlx_model_path_v4() -> str | None:
     return None
 
 
-def resolve_fallback_mlx_model_path_v4(active_snapshot: str | None = None) -> str | None:
-    candidate_paths = [LEGACY_LOCAL_MODEL_PATH, default_lms_model_path(LEGACY_MODEL_REPO_ID)]
-    if active_snapshot:
-        candidate_paths.insert(0, resolve_existing_path(active_snapshot))
-    for candidate in candidate_paths:
-        if has_complete_mlx_snapshot(candidate):
-            return str(candidate.resolve())
-    return None
+def require_preferred_mlx_model_path_v4() -> str:
+    preferred_local_model = resolve_preferred_mlx_model_path_v4()
+    if preferred_local_model is not None:
+        return preferred_local_model
+    raise RuntimeError(
+        'BF16 MLX model is required and no complete local snapshot was found. '
+        'Run `uv run python download_bf16_mlx_model.py` to materialize the model into `model/`.'
+    )
 
 
 def is_default_mlx_model_request(requested: str | None, active_repo_id: str | None) -> bool:
@@ -4593,21 +4583,17 @@ def is_default_mlx_model_request(requested: str | None, active_repo_id: str | No
         LEGACY_LOCAL_MODEL_NAME,
         'model',
         str(DEFAULT_LOCAL_MODEL_PATH),
+        str(LEGACY_LOCAL_MODEL_PATH),
     }
 
 
 def resolve_training_base_model(base_model_value: Any, active_model: dict[str, Any]) -> str:
     requested = normalize_optional_text(base_model_value)
-    active_snapshot = normalize_optional_text(active_model.get('snapshot_dir'))
     active_repo_id = normalize_optional_text(active_model.get('repo_id'))
-    preferred_local_model = resolve_preferred_mlx_model_path_v4()
-    fallback_model = resolve_fallback_mlx_model_path_v4(active_snapshot)
-    if preferred_local_model and is_default_mlx_model_request(requested, active_repo_id):
-        return preferred_local_model
-    if fallback_model and is_default_mlx_model_request(requested, active_repo_id):
-        return fallback_model
+    if is_default_mlx_model_request(requested, active_repo_id):
+        return require_preferred_mlx_model_path_v4()
     if requested is None:
-        return preferred_local_model or fallback_model or 'UNSET_base_model'
+        return require_preferred_mlx_model_path_v4()
     resolved = resolve_existing_path(requested)
     return str(resolved) if resolved.exists() else requested
 
