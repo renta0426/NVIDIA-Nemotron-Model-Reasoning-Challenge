@@ -113,8 +113,10 @@ SYMBOL_NUMERIC_FORMATS = {
     "prefix_if_negative": lambda op, n: f"{op}{abs(n)}" if n < 0 else str(n),
 }
 SYMBOL_NUMERIC_STRING_TEMPLATES = {
-    "concat_xy": lambda x_text, y_text: f"{x_text}{y_text}",
-    "concat_yx": lambda x_text, y_text: f"{y_text}{x_text}",
+    "concat_xy": ("x1", "x2", "y1", "y2"),
+    "concat_yx": ("y1", "y2", "x1", "x2"),
+    "abs_diff_2d": ("diff_t", "diff_o"),
+    "abs_diff_2d_op_suffix": ("diff_t", "diff_o", "op"),
 }
 
 
@@ -240,6 +242,24 @@ def parse_symbol_numeric_examples(prompt: str) -> list[tuple[str, str, str, str]
     return rows
 
 
+def build_symbol_numeric_token_map(x_text: str, operator: str, y_text: str) -> dict[str, str]:
+    abs_diff_text = f"{abs(int(x_text) - int(y_text)):02d}"
+    return {
+        "x1": x_text[0],
+        "x2": x_text[1],
+        "y1": y_text[0],
+        "y2": y_text[1],
+        "op": operator,
+        "diff_t": abs_diff_text[0],
+        "diff_o": abs_diff_text[1],
+    }
+
+
+def render_symbol_numeric_string_template(template_tokens: tuple[str, ...], x_text: str, operator: str, y_text: str) -> str:
+    token_map = build_symbol_numeric_token_map(x_text, operator, y_text)
+    return "".join(token_map[token] for token in template_tokens)
+
+
 def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
     if query_match is None:
@@ -267,12 +287,14 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
     for template_name, template in SYMBOL_NUMERIC_STRING_TEMPLATES.items():
         valid = True
         for left_value_text, right_value_text, output_text in same_operator_examples:
-            if template(left_value_text, right_value_text) != str(output_text):
+            if render_symbol_numeric_string_template(template, left_value_text, query_operator, right_value_text) != str(output_text):
                 valid = False
                 break
         if not valid:
             continue
-        predicted_answer = template(query_x_text, query_y_text)
+        predicted_answer = render_symbol_numeric_string_template(template, query_x_text, query_operator, query_y_text)
+        if template_name.startswith("abs_diff_2d") and len(str(answer).strip()) != len(predicted_answer):
+            continue
         candidate_predictions.add(predicted_answer)
         winning_specs.append((template_name, "string_template", predicted_answer))
     query_x = int(query_x_text)
@@ -1851,7 +1873,7 @@ def build_reports(
         "",
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
         "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows.",
-        "- `symbol_equation/numeric_2x2`: manual curation pass1 safely promoted 72 exact string-template rows (`concat_xy`, `concat_yx`), moving 34 rows to `verified_trace_ready` and 38 rows to `answer_only_keep`.",
+        "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.",
         "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG and remain the sharpest glyph audit candidates.",
         "",
     ]
@@ -1887,7 +1909,7 @@ def build_reports(
     manual_curation_lines = [
         f"# {SCRIPT_VERSION} manual curation pass1",
         "",
-        "## Safe symbol promotions added in this pass",
+        "## Current exact string-template-backed symbol rows",
         "",
         markdown_table(promotion_summary_df, list(promotion_summary_df.columns)),
         "",
@@ -1915,7 +1937,7 @@ def build_reports(
             limit=20,
         ),
         "",
-        "Decision summary: this pass safely promoted only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`). Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule.",
+        "Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule; one extra symbol row is now flagged `exclude_suspect` after exact `abs_diff_2d` mismatch.",
         "",
     ]
     (reports_dir / "13_manual_curation_pass1.md").write_text("\n".join(manual_curation_lines) + "\n", encoding="utf-8")

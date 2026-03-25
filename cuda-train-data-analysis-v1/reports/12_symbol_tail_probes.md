@@ -4,7 +4,7 @@
 
 | probe_name | rows_checked | rows_consistent_or_recovered | notes |
 | --- | --- | --- | --- |
-| numeric_broader_linear_small_coeff | 184 | 0 | a,b in [-2,2], c in [-3,3], plus min/max/avg_if_int; no safe extra recoveries |
+| numeric_broader_linear_small_coeff | 182 | 0 | a,b in [-2,2], c in [-3,3], plus min/max/avg_if_int; no safe extra recoveries |
 | glyph_query_answer_consistency | 823 | 5 | query+gold preserves multiset+order constraints but remains non-unique, so rows stay manual |
 
 ## Glyph rows whose query+gold pair still fits the coarse multiset+order model

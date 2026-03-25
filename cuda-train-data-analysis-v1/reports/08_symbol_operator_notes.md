@@ -7,12 +7,12 @@
 | glyph_len5 |  | manual_audit_priority |  | 823 |
 | numeric_2x2 | - | manual_audit_priority |  | 96 |
 | numeric_2x2 | + | manual_audit_priority |  | 90 |
-| numeric_2x2 | * | manual_audit_priority |  | 74 |
+| numeric_2x2 | * | manual_audit_priority |  | 73 |
 | numeric_2x2 | / | manual_audit_priority |  | 17 |
 | numeric_2x2 | @ | manual_audit_priority |  | 15 |
-| numeric_2x2 | ! | manual_audit_priority |  | 14 |
-| numeric_2x2 | : | manual_audit_priority |  | 14 |
+| numeric_2x2 | ! | manual_audit_priority |  | 13 |
 | numeric_2x2 | % | manual_audit_priority |  | 13 |
+| numeric_2x2 | : | manual_audit_priority |  | 13 |
 | numeric_2x2 | [ | manual_audit_priority |  | 13 |
 | numeric_2x2 | ` | manual_audit_priority |  | 13 |
 | numeric_2x2 | ^ | manual_audit_priority |  | 12 |
@@ -33,17 +33,17 @@
 | numeric_2x2 | ] | manual_audit_priority |  | 7 |
 | numeric_2x2 | ' | manual_audit_priority |  | 6 |
 | numeric_2x2 | * | verified_trace_ready | concat_yx | 6 |
-| numeric_2x2 | - | answer_only_keep | x_minus_y | 6 |
-| numeric_2x2 | ( | manual_audit_priority |  | 5 |
 | numeric_2x2 | \| | manual_audit_priority |  | 5 |
-| numeric_2x2 | - | verified_trace_ready | x_minus_y | 4 |
+| numeric_2x2 | ( | manual_audit_priority |  | 4 |
+| numeric_2x2 | - | answer_only_keep | abs_diff_2d | 4 |
 | numeric_2x2 | ( | verified_trace_ready | x_minus_y | 3 |
 | numeric_2x2 | * | exclude_suspect | x_plus_y | 3 |
 | numeric_2x2 | + | answer_only_keep | x_plus_y | 3 |
-| numeric_2x2 | - | exclude_suspect | x_minus_y | 3 |
-| numeric_2x2 | - | manual_audit_priority | x_minus_y | 3 |
+| numeric_2x2 | - | verified_trace_ready | x_minus_y | 3 |
 | numeric_2x2 | ? | verified_trace_ready | concat_xy | 3 |
 | numeric_2x2 | { | verified_trace_ready | concat_xy | 3 |
+| numeric_2x2 | ! | answer_only_keep | x_mul_y_plus1 | 2 |
+| numeric_2x2 | ! | verified_trace_ready | x_minus_y | 2 |
 
 ## Glyph multiset summary
 

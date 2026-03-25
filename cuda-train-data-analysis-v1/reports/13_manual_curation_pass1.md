@@ -1,6 +1,6 @@
 # cuda-train-data-analysis-v1 manual curation pass1
 
-## Safe symbol promotions added in this pass
+## Current exact string-template-backed symbol rows
 
 | selection_tier | symbol_numeric_formula_name | symbol_same_operator_example_count | rows |
 | --- | --- | --- | --- |
@@ -8,7 +8,10 @@
 | answer_only_keep | concat_yx | 1 | 19 |
 | verified_trace_ready | concat_xy | 2 | 16 |
 | verified_trace_ready | concat_yx | 2 | 12 |
+| answer_only_keep | abs_diff_2d | 1 | 8 |
+| verified_trace_ready | abs_diff_2d | 2 | 4 |
 | verified_trace_ready | concat_yx | 3 | 4 |
+| verified_trace_ready | abs_diff_2d_op_suffix | 2 | 1 |
 | verified_trace_ready | concat_xy | 3 | 1 |
 | verified_trace_ready | concat_yx | 4 | 1 |
 
@@ -16,6 +19,14 @@
 
 | id | selection_tier | symbol_query_operator | symbol_numeric_formula_name | symbol_same_operator_example_count | answer | query_raw |
 | --- | --- | --- | --- | --- | --- | --- |
+| 16699d43 | answer_only_keep | + | abs_diff_2d | 1 | 10 | 67+57 |
+| 74b9b0ec | answer_only_keep | [ | abs_diff_2d | 1 | 16 | 22[38 |
+| 86cda2ec | answer_only_keep | - | abs_diff_2d | 1 | 13 | 26-39 |
+| 9cb03277 | answer_only_keep | ! | abs_diff_2d | 1 | 26 | 52!78 |
+| 9d4ae6b8 | answer_only_keep | - | abs_diff_2d | 1 | 16 | 51-35 |
+| bad6f95d | answer_only_keep | - | abs_diff_2d | 1 | 41 | 54-95 |
+| e518256e | answer_only_keep | " | abs_diff_2d | 1 | 84 | 94"10 |
+| e836fb20 | answer_only_keep | - | abs_diff_2d | 1 | 68 | 89-21 |
 | 047c4111 | answer_only_keep | $ | concat_xy | 1 | 2596 | 25$96 |
 | 2a73a462 | answer_only_keep | : | concat_xy | 1 | 9302 | 93:02 |
 | 35a89469 | answer_only_keep | [ | concat_xy | 1 | 9525 | 95[25 |
@@ -54,6 +65,11 @@
 | cd9d50e2 | answer_only_keep | + | concat_yx | 1 | 5293 | 93+52 |
 | e70d5739 | answer_only_keep | + | concat_yx | 1 | 6257 | 57+62 |
 | f28681ad | answer_only_keep | * | concat_yx | 1 | 4314 | 14*43 |
+| 0a15c5c7 | verified_trace_ready | - | abs_diff_2d | 2 | 43 | 79-36 |
+| 75032b65 | verified_trace_ready | & | abs_diff_2d | 2 | 27 | 52&25 |
+| 878c843c | verified_trace_ready | / | abs_diff_2d | 2 | 35 | 80/45 |
+| c7420a23 | verified_trace_ready | $ | abs_diff_2d | 2 | 33 | 42$75 |
+| 824d4bcb | verified_trace_ready | : | abs_diff_2d_op_suffix | 2 | 64: | 24:88 |
 | 6b393b81 | verified_trace_ready | > | concat_xy | 3 | 4046 | 40>46 |
 | 0cd170a0 | verified_trace_ready | ^ | concat_xy | 2 | 9814 | 98^14 |
 | 1c48f9aa | verified_trace_ready | { | concat_xy | 2 | 8610 | 86{10 |
@@ -83,11 +99,6 @@
 | 8dea05d7 | verified_trace_ready | + | concat_yx | 2 | 3907 | 07+39 |
 | 9760032a | verified_trace_ready | + | concat_yx | 2 | 9372 | 72+93 |
 | 99e2cf41 | verified_trace_ready | + | concat_yx | 2 | 4415 | 15+44 |
-| 9dd8adaa | verified_trace_ready | * | concat_yx | 2 | 4308 | 08*43 |
-| b989c740 | verified_trace_ready | + | concat_yx | 2 | 8618 | 18+86 |
-| c4f66ede | verified_trace_ready | * | concat_yx | 2 | 6125 | 25*61 |
-| d3b20e29 | verified_trace_ready | + | concat_yx | 2 | 3922 | 22+39 |
-| f3e08a24 | verified_trace_ready | + | concat_yx | 2 | 0548 | 48+05 |
 
 ## Binary rows inspected but not promoted
 
@@ -124,5 +135,5 @@
 | a77be9fa | 5.0 | [" | {>\|$[ | symbol_length_mismatch\|symbol_solver_unverified |
 | afdb7326 | 5.0 | %\ | @^%(^ | symbol_length_mismatch\|symbol_solver_unverified |
 
-Decision summary: this pass safely promoted only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`). Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule.
+Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary affine mismatches and glyph coarse-consistent rows remain manual because they still risk teaching the wrong answer or an underdetermined rule; one extra symbol row is now flagged `exclude_suspect` after exact `abs_diff_2d` mismatch.
 
