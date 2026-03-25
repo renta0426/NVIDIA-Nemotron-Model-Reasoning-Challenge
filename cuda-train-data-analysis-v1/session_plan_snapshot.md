@@ -73,4 +73,6 @@
 - `reports/32_symbol_small_custom_op_hold.md` を追加し、current `$ / @ / } / &` の small custom-op cluster を再読したが、cluster 内で output style が崩れており、既存 prefix family を超える安全な再利用規則は見つからなかった。
 - `reports/33_symbol_custom4_cluster_hold.md` を追加し、current `! / " / $ / % / [` の 4桁 custom-op cluster `19` 行を再読した。さらに raw digits・pair sums/diffs/products・2-digit `x/y/x+y/|x-y|/x*y` の simple digit-template probe を当てても full-string family は 0 件で、全件 manual 維持とした。
 - `reports/34_symbol_minus1_bucket2_hold.md` を追加し、`-` の 1-digit unsigned bucket2 `4` 行も再読した。2 same-op examples ずつあるため本命候補として見たが、row-local subtraction / digit-difference / digit-sum 系 probe でも exact match は 0 件で、全件 manual 維持とした。
-- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち未読の `*` 3-digit と `-` 2-digit residual、それから残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/35_symbol_minus2_unsigned_hold.md` を追加し、`-` の 2-digit unsigned bucket1 `4` 行も再読した。各 row が same-op example を 1 本しか持たず、その唯一の例も query で subtraction family から外れるため、single-example subtraction trap と判断して manual 維持とした。
+- `reports/36_symbol_star3_hold.md` を追加し、`*` の 3-digit bucket1 `4` 行も再読した。各 row が `*` example を 1 本しか持たず、simple product-like probe でも exact match は 0 件で、low-shot dead end と判断して manual 維持とした。
+- 次ステップは、`symbol_numeric_same_op` core `294` 行のうち残る low-shot operator-specific tail、それから残る `binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。

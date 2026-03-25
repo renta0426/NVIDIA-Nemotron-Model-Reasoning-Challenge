@@ -228,6 +228,8 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/32_symbol_small_custom_op_hold.md` | `$ / @ / } / &` の small custom-op cluster を再読し、依然 manual hold とした根拠 |
 | `reports/33_symbol_custom4_cluster_hold.md` | `! / " / $ / % / [` の 4桁 custom-op cluster を再読し、digit-template probe でも依然 manual hold とした根拠 |
 | `reports/34_symbol_minus1_bucket2_hold.md` | `-` の 1-digit unsigned bucket2 を再読し、row-local subtraction probe でも依然 manual hold とした根拠 |
+| `reports/35_symbol_minus2_unsigned_hold.md` | `-` の 2-digit unsigned bucket1 を再読し、single-example subtraction trap として依然 manual hold とした根拠 |
+| `reports/36_symbol_star3_hold.md` | `*` の 3-digit bucket1 を再読し、simple product-like probe でも依然 manual hold とした根拠 |
 
 ## 8. 最短の読み順
 
@@ -267,6 +269,8 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - round2 `+` 2-digit slice（`19` 行）も再読したが、high-shot rows でも `2` 桁出力と `3` 桁出力が混在し、最も単純に見える `4cf073bf` ですら `08` の zero-pad が prompt から一意化できないため、safe promotion は `0` だった
 - round2 の 4桁 custom-op 小 cluster（`! / " / $ / % / [` の `19` 行）も再読し、さらに raw digits・pair sums/diffs/products・2-digit `x/y/x+y/|x-y|/x*y` を使う simple digit-template probe を当てたが、full-string で再利用可能な exact family は `0` 件だった
 - さらに `-` の 1-digit unsigned bucket2（`4` 行）も、「2 same-op examples ずつあるので残差の本命かもしれない」という仮説で再読したが、row-local な subtraction / digit-difference / digit-sum 系 probe でも exact match は `0` 件で、結局 manual hold のままだった
+- `-` の 2-digit unsigned bucket1（`4` 行）も follow-up したが、各 row が same-op example `1` 本しか持たず、その唯一の例も query で別の値 / 形式に飛ぶため、single-example subtraction trap と判断して manual hold に戻した
+- `*` の 3-digit bucket1（`4` 行）も follow-up したが、各 row が `*` example を 1 本しか持たず、simple product-like probe でも exact match は `0` 件で、こちらも low-shot dead end として manual hold のままだった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
@@ -297,7 +301,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. round2 `symbol` core `294` 行のうち、次は未読の `*` 3-digit と `-` 2-digit residual、さらに未確認の operator-specific tail
+2. round2 `symbol` core `294` 行のうち、次は残る low-shot operator-specific tail
 3. `binary_low_gap` 139 行
 4. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 
