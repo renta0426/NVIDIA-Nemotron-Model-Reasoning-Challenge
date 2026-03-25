@@ -53,4 +53,5 @@
 - `text` の未verified 971 行は全件、gold answer により不足 1〜6 文字の monoalphabetic mapping を矛盾なく補完できることを確認し、`answer_only_keep` に昇格した。これで `text` は `verified=605 / answer_only=971 / manual=0` になった。
 - `manual_pass1_priority_pack_v1.csv` は `558` 行まで圧縮され、内訳は `symbol_numeric_same_op=373`, `binary_low_gap=139`, `symbol_glyph_multiset=46`。
 - `reports/13_manual_curation_pass1.md`、`reports/14_symbol_residual_template_scan.md`、`reports/15_binary_residual_affine_scan.md`、`reports/16_glyph_manual_hold.md` に、今回の安全昇格・suspect 化・非昇格判断の根拠を追加した。
-- 次ステップは `glyph_len5` 46 行の mapping/order 一意化仮説と、残る `binary_low_gap` 139 行・`symbol_numeric_same_op` 373 行から次の安全 subset を抽出すること。
+- `symbol_numeric_same_op` の残り 373 行について、query 答えだけ見ると `x_plus_y / x_minus_y / abs_diff_2d` に見える 32 行を再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が未確定で、追加昇格は `0` だった。`reports/17_symbol_query_only_rejection.md` と `artifacts/remaining_symbol_query_only_rejection_v1.csv` に記録した。
+- 次ステップは、`glyph_len5` 46 行の mapping/order 一意化仮説と、残る `binary_low_gap` 139 行・`symbol_numeric_same_op` 373 行から **query-only mimic ではない** 次の安全 subset を抽出すること。

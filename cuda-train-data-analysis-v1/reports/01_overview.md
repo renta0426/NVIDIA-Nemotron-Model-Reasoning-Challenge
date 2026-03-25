@@ -1,6 +1,6 @@
 # cuda-train-data-analysis-v1 overview
 
-- generated_at_utc: `2026-03-25T17:48:09.806891+00:00`
+- generated_at_utc: `2026-03-25T18:21:03.425483+00:00`
 - grounded_in: `README.md`, `try-cuda-train-data-analyst-plan.md`, `try-cuda-train-result.md`, `try-cuda-train.md`
 - analyzed_rows: `9500`
 - verified_trace_ready: `5862`

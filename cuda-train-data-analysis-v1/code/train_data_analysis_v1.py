@@ -269,6 +269,7 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
             "matches_gold": False,
             "same_operator_example_count": 0,
             "candidate_prediction_count": 0,
+            "candidate_predictions": [],
             "formula_name": "",
             "format_name": "",
             "query_operator": "",
@@ -332,6 +333,7 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
         "matches_gold": matches_gold,
         "same_operator_example_count": len(same_operator_examples),
         "candidate_prediction_count": len(candidate_predictions),
+        "candidate_predictions": sorted(candidate_predictions),
         "formula_name": chosen_formula_name,
         "format_name": chosen_format_name,
         "query_operator": query_operator,
@@ -1663,6 +1665,89 @@ def probe_symbol_tail_cases(analysis_df: pd.DataFrame, v1: Any) -> tuple[pd.Data
     return probe_summary_df, glyph_query_consistent_df
 
 
+def collect_symbol_query_only_arithmetic_rejections(
+    manual_pass1_df: pd.DataFrame,
+    prompt_by_id: dict[str, str],
+) -> pd.DataFrame:
+    columns = [
+        "id",
+        "query_raw",
+        "answer",
+        "query_only_matching_families",
+        "same_operator_example_count",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "rejection_reason",
+        "prompt_example_lines",
+    ]
+    if len(manual_pass1_df) == 0:
+        return pd.DataFrame(columns=columns)
+
+    subset = manual_pass1_df.loc[
+        (manual_pass1_df["audit_focus"] == "symbol_numeric_same_op")
+        & (manual_pass1_df["selection_tier"] == "manual_audit_priority")
+        & (manual_pass1_df["symbol_same_operator_example_count"] >= 2)
+    ].copy()
+    if len(subset) == 0:
+        return pd.DataFrame(columns=columns)
+
+    records: list[dict[str, Any]] = []
+    for row in subset.to_dict(orient="records"):
+        query_text = str(row.get("query_raw", ""))
+        match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(query_text)
+        if match is None:
+            continue
+        x_text, _, y_text = match.groups()
+        x_value = int(x_text)
+        y_value = int(y_text)
+        gold_answer = str(row.get("answer", "")).strip()
+        matching_families: list[str] = []
+        if gold_answer == str(x_value + y_value):
+            matching_families.append("x_plus_y")
+        if gold_answer == str(x_value - y_value):
+            matching_families.append("x_minus_y")
+        abs_diff_plain = str(abs(x_value - y_value))
+        abs_diff_zpad = f"{abs(x_value - y_value):02d}"
+        if gold_answer in {abs_diff_plain, abs_diff_zpad}:
+            matching_families.append("abs_diff_2d")
+        if not matching_families:
+            continue
+
+        prompt = prompt_by_id.get(str(row.get("id", "")), "")
+        solve_result = solve_symbol_numeric_operator_formula(prompt, query_text, gold_answer)
+        rejection_reason = (
+            "same_operator_examples_conflict"
+            if int(solve_result["candidate_prediction_count"]) == 0
+            else "query_format_ambiguous"
+        )
+        prompt_example_lines = " || ".join(
+            line.strip()
+            for line in str(prompt).splitlines()
+            if "=" in line and any(char.isdigit() for char in line)
+        )
+        records.append(
+            {
+                "id": str(row.get("id", "")),
+                "query_raw": query_text,
+                "answer": gold_answer,
+                "query_only_matching_families": "|".join(sorted(set(matching_families))),
+                "same_operator_example_count": int(row.get("symbol_same_operator_example_count", 0)),
+                "candidate_prediction_count": int(solve_result["candidate_prediction_count"]),
+                "candidate_predictions": "|".join(solve_result["candidate_predictions"]),
+                "rejection_reason": rejection_reason,
+                "prompt_example_lines": prompt_example_lines,
+            }
+        )
+
+    if not records:
+        return pd.DataFrame(columns=columns)
+
+    return pd.DataFrame(records).sort_values(
+        ["rejection_reason", "same_operator_example_count", "id"],
+        ascending=[True, False, True],
+    ).reset_index(drop=True)
+
+
 def build_reports(
     out_root: Path,
     analysis_df: pd.DataFrame,
@@ -1687,6 +1772,7 @@ def build_reports(
     symbol_manual_queue_df: pd.DataFrame,
     binary_manual_queue_df: pd.DataFrame,
     manual_pass1_df: pd.DataFrame,
+    symbol_query_only_rejection_df: pd.DataFrame,
 ) -> None:
     reports_dir = out_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -1711,6 +1797,19 @@ def build_reports(
         .sort_values(["hard_score", "id"], ascending=[False, True])
         .reset_index(drop=True)
     )
+    symbol_query_only_rejection_summary_df = grouped_counts(
+        symbol_query_only_rejection_df,
+        ["query_only_matching_families", "rejection_reason"],
+        name="rows",
+    ) if len(symbol_query_only_rejection_df) else pd.DataFrame(
+        columns=["query_only_matching_families", "rejection_reason", "rows"]
+    )
+    symbol_query_only_conflict_count = int(
+        (symbol_query_only_rejection_df["rejection_reason"] == "same_operator_examples_conflict").sum()
+    ) if len(symbol_query_only_rejection_df) else 0
+    symbol_query_only_ambiguous_count = int(
+        (symbol_query_only_rejection_df["rejection_reason"] == "query_format_ambiguous").sum()
+    ) if len(symbol_query_only_rejection_df) else 0
 
     overview_lines = [
         f"# {SCRIPT_VERSION} overview",
@@ -1903,6 +2002,7 @@ def build_reports(
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
         "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.",
         "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.",
+        f"- `symbol_equation/numeric_2x2`: 32 query-only arithmetic lookalikes were rechecked and all rejected from promotion (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities), so the queue size stays unchanged.",
         "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG, but a dedicated pass1 recheck still finds zero safe promotions or exclusions because the coarse model remains non-unique.",
         "",
     ]
@@ -2040,6 +2140,51 @@ def build_reports(
         "",
     ]
     (reports_dir / "16_glyph_manual_hold.md").write_text("\n".join(glyph_hold_lines) + "\n", encoding="utf-8")
+
+    representative_rejection_df = symbol_query_only_rejection_df.loc[
+        symbol_query_only_rejection_df["id"].isin(["08d8d7e1", "0641ef58", "094bf548", "224efda1"])
+    ].copy() if len(symbol_query_only_rejection_df) else pd.DataFrame(
+        columns=["id", "query_raw", "query_only_matching_families", "rejection_reason", "candidate_predictions", "prompt_example_lines"]
+    )
+    query_only_rejection_lines = [
+        f"# {SCRIPT_VERSION} symbol query-only arithmetic rejection",
+        "",
+        "## Purpose",
+        "",
+        "Review manual `symbol_numeric_same_op` rows whose gold query answer superficially matches `x_plus_y`, `x_minus_y`, or `abs_diff_2d`, and verify whether prompt evidence really makes them safe promotions.",
+        "",
+        "## Decision",
+        "",
+        f"- rows checked: `{len(symbol_query_only_rejection_df)}`",
+        f"- `same_operator_examples_conflict`: `{symbol_query_only_conflict_count}`",
+        f"- `query_format_ambiguous`: `{symbol_query_only_ambiguous_count}`",
+        "- promoted rows: `0`",
+        "- decision: keep all of these rows in `manual_audit_priority`.",
+        "",
+        "## Breakdown",
+        "",
+        markdown_table(symbol_query_only_rejection_summary_df, list(symbol_query_only_rejection_summary_df.columns)),
+        "",
+        "## Representative rows",
+        "",
+        markdown_table(
+            representative_rejection_df,
+            ["id", "query_raw", "query_only_matching_families", "rejection_reason", "candidate_predictions", "prompt_example_lines"],
+            limit=10,
+        ),
+        "",
+        "## Full rejected slice",
+        "",
+        markdown_table(
+            symbol_query_only_rejection_df,
+            ["id", "query_raw", "answer", "query_only_matching_families", "same_operator_example_count", "candidate_prediction_count", "rejection_reason"],
+            limit=80,
+        ),
+        "",
+        "Interpretation: these rows look temptingly recoverable if you only inspect the query answer, but that is not enough. Most rows contradict their same-operator examples outright; the rest still leave sign/prefix formatting unresolved, so using the gold answer as a tie-break would be unsafe supervision under the `README.md` accuracy regime.",
+        "",
+    ]
+    (reports_dir / "17_symbol_query_only_rejection.md").write_text("\n".join(query_only_rejection_lines) + "\n", encoding="utf-8")
 
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:
@@ -2193,6 +2338,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         .sort_values(["audit_focus", "hard_score", "id"], ascending=[True, False, True])
         .reset_index(drop=True)
     )
+    prompt_by_id = dict(zip(train_df["id"].astype(str), train_df["prompt"].astype(str)))
+    symbol_query_only_rejection_df = collect_symbol_query_only_arithmetic_rejections(manual_pass1_df, prompt_by_id)
 
     write_dataframe(metadata_df, artifacts_dir / "train_metadata_rebuilt_v1.csv")
     write_dataframe(manual_audit_seed_df, artifacts_dir / "manual_audit_seed_v1.csv")
@@ -2214,6 +2361,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_affine_manual_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
+    write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
     write_dataframe(
         analysis_df.loc[analysis_df["selection_tier"] == "verified_trace_ready"].reset_index(drop=True),
         artifacts_dir / "train_verified_trace_ready_v1.csv",
@@ -2265,6 +2413,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         symbol_manual_queue_df,
         binary_manual_queue_df,
         manual_pass1_df,
+        symbol_query_only_rejection_df,
     )
 
     manifest = {

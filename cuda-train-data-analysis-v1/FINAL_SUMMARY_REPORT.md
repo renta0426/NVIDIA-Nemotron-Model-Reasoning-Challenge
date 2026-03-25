@@ -140,6 +140,7 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_affine_mismatch_candidates_v1.csv` | affine 一意でも gold と衝突したため昇格しなかった binary 行 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した `concat_xy / concat_yx` 行の一覧 |
+| `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 32 行の台帳 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
 | `artifacts/symbol_tail_probe_summary_v1.csv` | 最終段階の symbol tail probe 結果 |
@@ -200,6 +201,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/14_symbol_residual_template_scan.md` | residual scan で採用 / 不採用 / suspect 化した symbol 行の根拠 |
 | `reports/15_binary_residual_affine_scan.md` | binary low-gap の residual scan で除外した 11 行と、保留行の根拠 |
 | `reports/16_glyph_manual_hold.md` | glyph pass1 46 行を全件 manual 維持にした根拠 |
+| `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 32 行を、same-op 照合で全却下した根拠 |
 
 ## 8. 最短の読み順
 
@@ -227,6 +229,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - `symbol_equation` は `1,332 manual + 10 exclude`
 - `numeric_2x2` は operator-aware と string-template pass1 でかなり整理できたが、まだ `373` 行が pass1 に残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
+- query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d` に見える `32` 行も再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が一意化できず、**追加昇格 0**
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 
 ### 9.3 glyph_len5 は coarse 仮説止まり
