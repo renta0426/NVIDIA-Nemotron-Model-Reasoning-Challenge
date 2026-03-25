@@ -11,6 +11,7 @@
 
 - every pass1 glyph row still carries `symbol_length_mismatch|symbol_solver_unverified`.
 - the strongest 5 rows in `glyph_query_consistent_v1.csv` only show that query+gold is compatible with the coarse multiset+order model; they do **not** make the model unique.
+- exact examples-only enumeration under the same coarse model yields `0` unique query strings (`33` query-unseen, `12` ambiguous-multiset, `1` ambiguous-order, `0` no-multiset).
 - per `README.md`, leaderboard score is direct final-answer accuracy, so teaching non-unique glyph hypotheses is riskier than leaving these rows manual.
 
 ## Glyph query-consistent rows

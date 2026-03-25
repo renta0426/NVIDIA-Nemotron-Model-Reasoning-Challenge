@@ -1,6 +1,6 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-03-25T19:40:16.165930+00:00`
+- generated_at_utc: `2026-03-25T20:04:55.236955+00:00`
 - verified_trace_ready: `5862`
 - answer_only_keep: `1075`
 - manual_audit_priority: `2534`
@@ -31,5 +31,5 @@
 - `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.
 - `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.
 - `symbol_equation/numeric_2x2`: 32 query-only arithmetic lookalikes were rechecked and all rejected from promotion (`27` same-op conflicts, `5` format ambiguities), so the queue size stays unchanged.
-- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG, but a dedicated pass1 recheck still finds zero safe promotions or exclusions because the coarse model remains non-unique.
+- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield `0` unique query strings (`33` query-unseen, `12` ambiguous-multiset, `1` ambiguous-order, `0` no-multiset), so glyph rows stay manual.
 

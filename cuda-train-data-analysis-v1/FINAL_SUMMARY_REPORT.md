@@ -101,7 +101,9 @@ symbol は大きく 2 つに分かれました。
 - `70` 行が multiset 風の粗い仮説に整合
 - そのうち `46` 行は global output-order DAG にも整合
 - ただし dedicated glyph pass1 recheck でも **安全昇格 0 / 安全除外 0**
+- さらに exact examples-only coarse enumeration を追加した結果も、`33 query_has_unseen_chars / 12 ambiguous_multiset / 1 ambiguous_order / 0 unique_string`
 - この `46` 行は、引き続き glyph 系 manual audit の最優先候補です
+- つまり、現行の multiset/order 系 coarse family は round2 glyph に対して **追加回収源としてはほぼ枯れている** と判断できる
 
 ### 4.4 pass1 manual pack の圧縮
 
@@ -148,6 +150,7 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/glyph_round2_cluster_summary_v1.csv` | glyph 46 行を答え長・重複構造ベースで round2 向けに cluster 化した台帳 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
+| `artifacts/glyph_exact_coarse_predictions_v1.csv` | round2 glyph 46 行を exact examples-only coarse model で再列挙した台帳 |
 | `artifacts/symbol_tail_probe_summary_v1.csv` | 最終段階の symbol tail probe 結果 |
 
 ## 6. 実行ファイル概要
@@ -213,6 +216,8 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/21_glyph_round2_cluster_map.md` | `symbol_glyph_multiset` 46 行を長さ・重複署名で cluster 化した round2 入口 |
 | `reports/22_binary_round2_cluster_map.md` | `binary_low_gap` 139 行を gap / uniqueness 構造で cluster 化した round2 入口 |
 | `reports/23_symbol_known_family_mimics.md` | report 17 と extra known-family mimic を合流した `symbol` mimic union の整理 |
+| `reports/24_glyph_exact_coarse_scan.md` | round2 glyph 46 行を exact examples-only coarse model で再列挙し、0 unique string を確認した report |
+| `reports/25_symbol_star4_cluster_hold.md` | round2 `symbol` の `*` 4桁 top 2 cluster（39 行）を再読し、依然 manual hold とした根拠 |
 
 ## 8. 最短の読み順
 
@@ -243,6 +248,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d` に見える `32` 行も再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が一意化できず、**追加昇格 0**
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
 - report 17 の高shot mimic `32` 行に、extra known-family / low-shot mimic を足した mimic union は `56` 行となり、round2 の `symbol` 本丸は `317` 行まで圧縮できた
+- round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
@@ -253,6 +259,8 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 - ただし coarse model が **一意でない** ため、教師として昇格できない
 - query+gold を足しても整合する行は `5` 行だけあったが、それでも非一意なので manual のままにしている
 - dedicated glyph pass1 recheck でも、安全昇格 0 / 安全除外 0 のままだった
+- exact examples-only coarse enumeration を追加しても、`33` 行は query に example 未出現記号を含み、残る `13` 行も `12 ambiguous_multiset + 1 ambiguous_order` で、**0 unique string**
+- よって現行の glyph coarse abstraction は round2 46 行に対して追加回収源としては尽きており、次に進むなら別 family 仮説が必要
 
 ### 9.4 text は accuracy 向けには強いが、trace 完全性では未完
 
@@ -271,9 +279,9 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. `symbol_numeric_same_op` 373 行
+2. round2 `symbol` core `317` 行（特に `+` 3桁 / `-` 3桁 / operator 埋め込み output）
 3. `binary_low_gap` 139 行
-4. `symbol_glyph_multiset` 46 行
+4. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 
 ## 10. 検証メモ
 

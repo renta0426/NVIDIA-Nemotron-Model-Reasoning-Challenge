@@ -62,4 +62,6 @@
 - その後 `artifacts/remaining_symbol_known_family_mimics_v1.csv` と `artifacts/remaining_symbol_mimic_union_v1.csv`、`reports/23_symbol_known_family_mimics.md` を追加し、report 17 の 32 行に extra known-family / low-shot mimic を足した union `56` 行を分離した。これで `symbol` round2 の本丸は `317` 行になった。
 - `artifacts/glyph_round2_cluster_summary_v1.csv` と `reports/21_glyph_round2_cluster_map.md` を追加し、`symbol_glyph_multiset` 46 行の round2 入口も長さ・重複構造ベースで cluster 化した。
 - `artifacts/binary_round2_cluster_summary_v1.csv` と `reports/22_binary_round2_cluster_map.md` を追加し、`binary_low_gap` 139 行の round2 入口も gap / uniqueness flag ベースで cluster 化した。
-- 次ステップは、`glyph_len5` 46 行の mapping/order 一意化仮説と、残る `binary_low_gap` 139 行・`symbol_numeric_same_op` 373 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。
+- `artifacts/glyph_exact_coarse_predictions_v1.csv` と `reports/24_glyph_exact_coarse_scan.md` を追加し、round2 glyph 46 行を exact examples-only coarse model で再列挙した結果、`33 query_has_unseen_chars / 12 ambiguous_multiset / 1 ambiguous_order / 0 unique_string` を確認した。現行 glyph coarse family は追加回収源としてはほぼ枯れている。
+- `reports/25_symbol_star4_cluster_hold.md` を追加し、round2 `symbol` の `*` 4桁 top 2 cluster（`22 + 17` 行）を代表 prompt から再読したが、`+/-/*` 混在かつ `*` 例が 1-2 個しか無く、再利用可能な exact family は見つからなかった。
+- 次ステップは、`symbol_numeric_same_op` core `317` 行（特に `+` 3桁 / `-` 3桁 / operator 埋め込み output）と、`binary_low_gap` 139 行から **query-only mimic でも単純 derived template でもない** 次の安全 subset を抽出すること。glyph 46 行は、新しい family 仮説が出るまで hold。

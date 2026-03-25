@@ -420,6 +420,200 @@ def glyph_output_order_acyclic(examples: list[tuple[str, str]]) -> bool:
     return visited == len(nodes)
 
 
+def glyph_unique_topological_order(nodes: list[str], edges: dict[str, set[str]]) -> tuple[bool, list[str]]:
+    indegree = {node: 0 for node in nodes}
+    filtered_edges = {node: set() for node in nodes}
+    for left_node, right_nodes in edges.items():
+        if left_node not in indegree:
+            continue
+        for right_node in right_nodes:
+            if right_node not in indegree or right_node in filtered_edges[left_node]:
+                continue
+            filtered_edges[left_node].add(right_node)
+            indegree[right_node] += 1
+    queue = sorted(node for node, degree in indegree.items() if degree == 0)
+    order: list[str] = []
+    while queue:
+        if len(queue) > 1:
+            return False, []
+        node = queue.pop(0)
+        order.append(node)
+        for neighbor in sorted(filtered_edges[node]):
+            indegree[neighbor] -= 1
+            if indegree[neighbor] == 0:
+                queue.append(neighbor)
+                queue.sort()
+    return (len(order) == len(nodes), order if len(order) == len(nodes) else [])
+
+
+def enumerate_glyph_query_predictions(analysis_df: pd.DataFrame, v1: Any) -> pd.DataFrame:
+    glyph_subset = analysis_df.loc[
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "glyph_len5")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["glyph_multiset_possible"])
+        & (analysis_df["glyph_order_acyclic"])
+    ].reset_index(drop=True)
+    records: list[dict[str, Any]] = []
+    outcome_limit = 65
+
+    for row in glyph_subset.itertuples(index=False):
+        parsed = v1.parse_symbol_prompt(str(row.prompt), str(row.answer))
+        examples = extract_examples(parsed)
+        query_raw = str(parsed.query_raw or "")
+        input_chars = sorted({char for source, _ in examples for char in source})
+        output_chars = sorted({char for _, target in examples for char in target})
+        unseen_query_chars = sorted({char for char in query_raw if char not in input_chars})
+        if unseen_query_chars:
+            records.append(
+                {
+                    "id": str(row.id),
+                    "hard_score": float(row.hard_score),
+                    "answer": str(row.answer),
+                    "query_raw": query_raw,
+                    "exact_coarse_status": "query_has_unseen_chars",
+                    "glyph_query_unseen_chars": "".join(unseen_query_chars),
+                    "query_multiset_count_capped": 0,
+                    "query_multiset_count_truncated": False,
+                    "multiset_unique": False,
+                    "order_unique": False,
+                    "predicted_answer": "",
+                    "predicted_multiset_json": "",
+                    "output_chars": "".join(output_chars),
+                }
+            )
+            continue
+
+        occurrence_tables = [{char: source.count(char) for char in input_chars} for source, _ in examples]
+        residual_counters = [Counter(target) for _, target in examples]
+        ordered_input_chars = sorted(input_chars, key=lambda char: -sum(table.get(char, 0) for table in occurrence_tables))
+        query_char_counts = {char: query_raw.count(char) for char in ordered_input_chars}
+
+        @lru_cache(maxsize=None)
+        def dfs(index: int, state: tuple[int, ...]) -> frozenset[tuple[int, ...]]:
+            residuals: list[Counter[str]] = [Counter() for _ in examples]
+            pointer = 0
+            for example_index in range(len(examples)):
+                for output_char in output_chars:
+                    value = state[pointer]
+                    if value:
+                        residuals[example_index][output_char] = value
+                    pointer += 1
+            if index == len(ordered_input_chars):
+                return frozenset([tuple(0 for _ in output_chars)]) if all(not counter for counter in residuals) else frozenset()
+
+            current_char = ordered_input_chars[index]
+            current_counts = [table.get(current_char, 0) for table in occurrence_tables]
+            query_count = query_char_counts.get(current_char, 0)
+            outcomes: set[tuple[int, ...]] = set(dfs(index + 1, state))
+            if len(outcomes) >= outcome_limit:
+                return frozenset(outcomes)
+
+            for output_index, output_char in enumerate(output_chars):
+                next_state: list[int] = []
+                valid = True
+                for example_index, counter in enumerate(residuals):
+                    remaining = counter.get(output_char, 0) - current_counts[example_index]
+                    if remaining < 0:
+                        valid = False
+                        break
+                    for candidate_char in output_chars:
+                        next_state.append(remaining if candidate_char == output_char else counter.get(candidate_char, 0))
+                if not valid:
+                    continue
+                for tail in dfs(index + 1, tuple(next_state)):
+                    next_counts = list(tail)
+                    next_counts[output_index] += query_count
+                    outcomes.add(tuple(next_counts))
+                    if len(outcomes) >= outcome_limit:
+                        return frozenset(outcomes)
+            return frozenset(outcomes)
+
+        initial_state: list[int] = []
+        for counter in residual_counters:
+            for output_char in output_chars:
+                initial_state.append(counter.get(output_char, 0))
+        query_multisets = set(dfs(0, tuple(initial_state)))
+        multiset_unique = len(query_multisets) == 1
+        multiset_truncated = len(query_multisets) >= outcome_limit
+        order_unique = False
+        predicted_answer = ""
+        predicted_multiset_json = ""
+        status = "ambiguous_multiset"
+
+        if not query_multisets:
+            status = "no_example_only_multiset"
+        elif multiset_unique:
+            multiset = next(iter(query_multisets))
+            predicted_multiset = {
+                output_chars[index]: int(count)
+                for index, count in enumerate(multiset)
+                if int(count) > 0
+            }
+            predicted_multiset_json = json_dumps(predicted_multiset)
+            active_chars = [output_chars[index] for index, count in enumerate(multiset) if int(count) > 0]
+            if active_chars:
+                edges: dict[str, set[str]] = defaultdict(set)
+                for _, target in examples:
+                    for left_index in range(len(target)):
+                        for right_index in range(left_index + 1, len(target)):
+                            left_char = target[left_index]
+                            right_char = target[right_index]
+                            if left_char != right_char:
+                                edges[left_char].add(right_char)
+                order_unique, order = glyph_unique_topological_order(active_chars, edges)
+                if order_unique:
+                    predicted_answer = "".join(char * predicted_multiset.get(char, 0) for char in order)
+                    status = "unique_string"
+                else:
+                    status = "ambiguous_order"
+            else:
+                order_unique = True
+                predicted_answer = ""
+                status = "unique_string"
+
+        records.append(
+            {
+                "id": str(row.id),
+                "hard_score": float(row.hard_score),
+                "answer": str(row.answer),
+                "query_raw": query_raw,
+                "exact_coarse_status": status,
+                "glyph_query_unseen_chars": "".join(unseen_query_chars),
+                "query_multiset_count_capped": int(len(query_multisets)),
+                "query_multiset_count_truncated": bool(multiset_truncated),
+                "multiset_unique": bool(multiset_unique),
+                "order_unique": bool(order_unique),
+                "predicted_answer": predicted_answer,
+                "predicted_multiset_json": predicted_multiset_json,
+                "output_chars": "".join(output_chars),
+            }
+        )
+
+    if not records:
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "hard_score",
+                "answer",
+                "query_raw",
+                "exact_coarse_status",
+                "glyph_query_unseen_chars",
+                "query_multiset_count_capped",
+                "query_multiset_count_truncated",
+                "multiset_unique",
+                "order_unique",
+                "predicted_answer",
+                "predicted_multiset_json",
+                "output_chars",
+            ]
+        )
+    return pd.DataFrame(records).sort_values(
+        ["exact_coarse_status", "hard_score", "id"],
+        ascending=[True, False, True],
+    ).reset_index(drop=True)
+
+
 def analyze_char_mapping(
     examples: list[tuple[str, str]],
     query: str,
@@ -1764,6 +1958,7 @@ def build_reports(
     symbol_tail_probe_df: pd.DataFrame,
     symbol_string_promotion_df: pd.DataFrame,
     glyph_query_consistent_df: pd.DataFrame,
+    glyph_exact_df: pd.DataFrame,
     binary_affine_exclude_df: pd.DataFrame,
     binary_affine_manual_df: pd.DataFrame,
     binary_cluster_df: pd.DataFrame,
@@ -1810,6 +2005,31 @@ def build_reports(
     symbol_query_only_ambiguous_count = int(
         (symbol_query_only_rejection_df["rejection_reason"] == "query_format_ambiguous").sum()
     ) if len(symbol_query_only_rejection_df) else 0
+    glyph_exact_summary_df = grouped_counts(
+        glyph_exact_df,
+        ["exact_coarse_status", "multiset_unique", "order_unique"],
+        name="rows",
+    ) if len(glyph_exact_df) else pd.DataFrame(
+        columns=["exact_coarse_status", "multiset_unique", "order_unique", "rows"]
+    )
+    glyph_exact_unseen_count = int((glyph_exact_df["exact_coarse_status"] == "query_has_unseen_chars").sum()) if len(glyph_exact_df) else 0
+    glyph_exact_ambiguous_multiset_count = int((glyph_exact_df["exact_coarse_status"] == "ambiguous_multiset").sum()) if len(glyph_exact_df) else 0
+    glyph_exact_ambiguous_order_count = int((glyph_exact_df["exact_coarse_status"] == "ambiguous_order").sum()) if len(glyph_exact_df) else 0
+    glyph_exact_no_multiset_count = int((glyph_exact_df["exact_coarse_status"] == "no_example_only_multiset").sum()) if len(glyph_exact_df) else 0
+    glyph_exact_unique_count = int((glyph_exact_df["exact_coarse_status"] == "unique_string").sum()) if len(glyph_exact_df) else 0
+    glyph_exact_unique_gold_match_count = int(
+        ((glyph_exact_df["exact_coarse_status"] == "unique_string") & (glyph_exact_df["predicted_answer"] == glyph_exact_df["answer"])).sum()
+    ) if len(glyph_exact_df) else 0
+    glyph_exact_nontrivial_df = glyph_exact_df.loc[
+        glyph_exact_df["exact_coarse_status"] != "query_has_unseen_chars"
+    ].copy() if len(glyph_exact_df) else pd.DataFrame(
+        columns=["id", "exact_coarse_status", "answer", "predicted_answer", "query_raw", "glyph_query_unseen_chars"]
+    )
+    glyph_exact_unseen_df = glyph_exact_df.loc[
+        glyph_exact_df["exact_coarse_status"] == "query_has_unseen_chars"
+    ].copy() if len(glyph_exact_df) else pd.DataFrame(
+        columns=["id", "answer", "query_raw", "glyph_query_unseen_chars"]
+    )
 
     overview_lines = [
         f"# {SCRIPT_VERSION} overview",
@@ -2003,7 +2223,7 @@ def build_reports(
         "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.",
         "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.",
         f"- `symbol_equation/numeric_2x2`: 32 query-only arithmetic lookalikes were rechecked and all rejected from promotion (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities), so the queue size stays unchanged.",
-        "- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping; 46 of them also satisfy a global output-order DAG, but a dedicated pass1 recheck still finds zero safe promotions or exclusions because the coarse model remains non-unique.",
+        f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset), so glyph rows stay manual.",
         "",
     ]
     (reports_dir / "11_latest_snapshot.md").write_text("\n".join(latest_lines) + "\n", encoding="utf-8")
@@ -2118,6 +2338,7 @@ def build_reports(
         "",
         "- every pass1 glyph row still carries `symbol_length_mismatch|symbol_solver_unverified`.",
         "- the strongest 5 rows in `glyph_query_consistent_v1.csv` only show that query+gold is compatible with the coarse multiset+order model; they do **not** make the model unique.",
+        f"- exact examples-only enumeration under the same coarse model yields `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset).",
         "- per `README.md`, leaderboard score is direct final-answer accuracy, so teaching non-unique glyph hypotheses is riskier than leaving these rows manual.",
         "",
         "## Glyph query-consistent rows",
@@ -2186,6 +2407,50 @@ def build_reports(
     ]
     (reports_dir / "17_symbol_query_only_rejection.md").write_text("\n".join(query_only_rejection_lines) + "\n", encoding="utf-8")
 
+    glyph_exact_lines = [
+        f"# {SCRIPT_VERSION} glyph exact coarse enumeration",
+        "",
+        "## Purpose",
+        "",
+        "Recheck the 46 round2 `glyph_len5` rows under the **strictest version of the current coarse glyph abstraction**: each input character either drops out or maps to exactly one output character, and output character order must be globally consistent with the example outputs.",
+        "",
+        "## Decision",
+        "",
+        f"- rows checked: `{len(glyph_exact_df)}`",
+        f"- `query_has_unseen_chars`: `{glyph_exact_unseen_count}`",
+        f"- `ambiguous_multiset`: `{glyph_exact_ambiguous_multiset_count}`",
+        f"- `ambiguous_order`: `{glyph_exact_ambiguous_order_count}`",
+        f"- `no_example_only_multiset`: `{glyph_exact_no_multiset_count}`",
+        f"- `unique_string`: `{glyph_exact_unique_count}`",
+        f"- gold-matching unique strings: `{glyph_exact_unique_gold_match_count}`",
+        "- promoted rows: `0`",
+        "- newly excluded rows: `0`",
+        "",
+        "## Breakdown",
+        "",
+        markdown_table(glyph_exact_summary_df, list(glyph_exact_summary_df.columns)),
+        "",
+        "## Non-trivial rows under the exact coarse model",
+        "",
+        markdown_table(
+            glyph_exact_nontrivial_df,
+            ["id", "exact_coarse_status", "answer", "predicted_answer", "query_raw", "predicted_multiset_json"],
+            limit=30,
+        ),
+        "",
+        "## Query rows with unseen symbols",
+        "",
+        markdown_table(
+            glyph_exact_unseen_df,
+            ["id", "answer", "query_raw", "glyph_query_unseen_chars"],
+            limit=30,
+        ),
+        "",
+        "Interpretation: even after strengthening the current glyph abstraction to an exact examples-only enumeration, the round2 glyph slice still yields **zero** safe recoveries. Most rows immediately fail because the query introduces symbols that never appear in the examples; the rest remain ambiguous or structurally inconsistent. Under the `README.md` accuracy metric, this is negative evidence against trusting the current coarse glyph family as supervision.",
+        "",
+    ]
+    (reports_dir / "24_glyph_exact_coarse_scan.md").write_text("\n".join(glyph_exact_lines) + "\n", encoding="utf-8")
+
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:
     repo_root = repo_root.resolve()
@@ -2244,6 +2509,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         name="rows",
     )
     symbol_tail_probe_df, glyph_query_consistent_df = probe_symbol_tail_cases(analysis_df, v1)
+    glyph_exact_df = enumerate_glyph_query_predictions(analysis_df, v1)
     symbol_string_promotion_df = (
         analysis_df.loc[
             (analysis_df["family"] == "symbol_equation")
@@ -2357,6 +2623,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_tail_probe_df, artifacts_dir / "symbol_tail_probe_summary_v1.csv")
     write_dataframe(symbol_string_promotion_df, artifacts_dir / "symbol_string_template_promotions_v1.csv")
     write_dataframe(glyph_query_consistent_df, artifacts_dir / "glyph_query_consistent_v1.csv")
+    write_dataframe(glyph_exact_df, artifacts_dir / "glyph_exact_coarse_predictions_v1.csv")
     write_dataframe(binary_affine_exclude_df, artifacts_dir / "binary_affine_low_gap_exclude_v1.csv")
     write_dataframe(binary_affine_manual_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
@@ -2405,6 +2672,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         symbol_tail_probe_df,
         symbol_string_promotion_df,
         glyph_query_consistent_df,
+        glyph_exact_df,
         binary_affine_exclude_df,
         binary_affine_manual_df,
         binary_cluster_df,
