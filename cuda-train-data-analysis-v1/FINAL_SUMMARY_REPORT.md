@@ -234,6 +234,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/38_binary_tail_clusters_hold.md` | binary round2 の残り小 cluster を spot-check し、top3 よりさらに曖昧な tail として manual hold に据えた根拠 |
 | `reports/39_symbol_star4_bucket3_hold.md` | `*` の 4-digit bucket3 を再読し、3-shot でも simple product-like family に落ちなかった根拠 |
 | `reports/40_symbol_tiny_tail_hold.md` | 残る singleton / doubleton の symbol operator tail を spot-check し、低shot long tail として manual hold に据えた根拠 |
+| `reports/41_symbol_broader_template_scan.md` | digit-only symbol manual rows 全体へ broader template library を当てたが repeated exact hit が 0 件だった根拠 |
 
 ## 8. 最短の読み順
 
@@ -279,6 +280,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - `*` の 3-digit bucket1（`4` 行）も follow-up したが、各 row が `*` example を 1 本しか持たず、simple product-like probe でも exact match は `0` 件で、こちらも low-shot dead end として manual hold のままだった
 - `*` の 4-digit bucket3（`4` 行）も follow-up したが、3 same-op examples ずつあっても simple product-like probe は `0` 件で、依然 one-family には閉じなかった
 - 残る symbol の singleton / doubleton tail も representative rows を spot-check したが、`# / ) / / / @ / < / ? / ^ / {` など operator-local mini-slicesが並ぶ long tail で、broader family を立てない限り safe promotion の入口は見えなかった
+- さらに digit-only symbol manual rows 全体に broader template library（`x+y`, `|x-y|`, `x*y`, pairwise digit concat 群, reversed / zero-pad variants）を当てても repeated exact hit は `0` 件だった
 - つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 

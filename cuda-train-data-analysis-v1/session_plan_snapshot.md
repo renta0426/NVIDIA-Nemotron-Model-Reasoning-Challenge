@@ -79,4 +79,5 @@
 - `reports/38_binary_tail_clusters_hold.md` を追加し、binary round2 の残り小 cluster も representative rows を再読した。`bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも競合候補が残るタイプが中心で、top3 よりさらに曖昧な tail と判断して manual 維持とした。
 - `reports/39_symbol_star4_bucket3_hold.md` を追加し、`*` の 4-digit bucket3 `4` 行も再読した。3 same-op examples ずつある最後の有望 `*` residual だったが、simple product-like probe は 0 件で、これも manual 維持とした。
 - `reports/40_symbol_tiny_tail_hold.md` を追加し、残る singleton / doubleton の symbol operator tail も representative rows を再読した。ここは broader family なしでは safe promotion の入口が無い long tail と判断し、manual 維持とした。
-- 次ステップは、binary で **より広い boolean/circuit family か non-local byte transform family** を仮説化するか、symbol で mini-slice 単位ではなく cross-operator の broader family を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/41_symbol_broader_template_scan.md` を追加し、digit-only symbol manual rows 全体へ broader template library を当てた。`x+y`, `|x-y|`, `x*y`, pairwise digit concat 群, reversed / zero-pad variants を試しても repeated exact hit は 0 件だった。
+- 次ステップは、binary で **より広い boolean/circuit family か non-local byte transform family** を仮説化するか、symbol で simple template を超える non-linear / cross-operator abstraction を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。
