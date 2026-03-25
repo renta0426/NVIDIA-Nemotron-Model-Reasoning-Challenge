@@ -6,6 +6,9 @@
 - `versions/v4/tests/` was added and the new v4 surface is covered by unit tests.
 - Repository validation is green after the v4 implementation.
 - Real v4 data generation has started on Mac/MLX.
+- Current best local hard-gate candidate is `v5_merge_run3_run6_80_20` with `hard_shadow_256 = 0.5859375`.
+- Current best local shadow-side serious candidate remains `v5_merge_run3_run6_85_15` with `shadow_256 = 0.5625`.
+- Fine-grained merge-ratio sweeps now look diagnostic rather than transformative: `82/18` regressed on quick, so future gains need structural changes on weak families rather than more merge interpolation.
 - `README.md` official evaluation parameters remain fixed during all local scoring:
   - `max_tokens = 7680`
   - `top_p = 1.0`
@@ -177,6 +180,62 @@
     - `symbol_equation = 7.0`
     - `text_decryption = 4.0`
   - the goal is to preserve `run3` hard robustness while strengthening final-answer supervision without reintroducing `run6`-style hard regressions
+
+## 2026-03-25 Consolidated checkpoint
+
+- `v4_rft_stage_c_cleanaccept_hardrobust_run9`
+  - `final_train_loss = 0.5982142687`
+  - `final_val_loss = 0.8202174902`
+  - quick `shadow_128 overall_accuracy = 0.0390625`
+  - `format_fail_rate = 0.90625`
+  - `avg_output_len_chars = 257.4921875`
+  - interpretation:
+    - validation looked superficially acceptable, but local gate quality collapsed almost completely
+    - aggressive weighted-loss / final-answer emphasis can create a “val looks okay, eval is dead” failure mode
+- `v5_merge_run3_run6_80_20`
+  - quick `shadow_128 overall_accuracy = 0.5390625`
+  - `format_fail_rate = 0.9765625`
+  - `boxed_rate = 0.6328125`
+  - `avg_output_len_chars = 10822.484375`
+  - serious `shadow_256 overall_accuracy = 0.5390625`
+  - serious `shadow_256 format_fail_rate = 0.98046875`
+  - serious `shadow_256 boxed_rate = 0.60546875`
+  - serious `shadow_256 avg_output_len_chars = 10448.80859375`
+  - serious `hard_shadow_256 overall_accuracy = 0.5859375`
+  - serious `hard_shadow_256 format_fail_rate = 0.9765625`
+  - serious `hard_shadow_256 boxed_rate = 0.6484375`
+  - serious `hard_shadow_256 avg_output_len_chars = 9960.86328125`
+  - interpretation:
+    - this is the current **best local hard-gate candidate**
+    - it clearly beats `run3 hard_shadow_256 = 0.5703125`
+    - however it does not improve the shadow-side serious score over `75/25`, and it is still below `85/15 shadow_256 = 0.5625`
+- `v5_merge_run3_run6_82_18`
+  - quick `shadow_128 overall_accuracy = 0.4921875`
+  - `format_fail_rate = 0.9765625`
+  - `boxed_rate = 0.5859375`
+  - `avg_output_len_chars = 11293.2421875`
+  - interpretation:
+    - this regressed sharply versus `80/20`
+    - that makes further merge-ratio micro-sweeps look like diminishing-return diagnostics, not the main path to a step-function score gain
+- `v4_rft_stage_c_cleanaccept_symbolboost_run10`
+  - training completed
+  - `final_train_loss = 0.3779761791`
+  - `final_val_loss = 0.9210160971`
+  - `peak_memory_gb = 34.24126099`
+  - left unscored at this checkpoint
+- `v4_rft_stage_c_cleanaccept_balancedrobust_run11`
+  - the first launch accidentally produced a `rendered_only` artifact because `train-stage-c-rft` was invoked without `--execute`
+  - the real training rerun then completed successfully
+  - `final_train_loss = 0.8444767594`
+  - `final_val_loss = 0.7712868452`
+  - `peak_memory_gb = 34.241110838`
+  - left unscored at this checkpoint
+- consolidated read after the current stop point:
+  - best scored single-training checkpoint remains `run3`
+  - best serious hard checkpoint overall is now `80/20`
+  - best serious shadow checkpoint remains `85/15`
+  - the biggest unresolved weak families are still `bit_manipulation`, `symbol_equation`, and `text_decryption`
+  - reaching an official score near `0.9` will require structural improvements on those weak families; merge interpolation alone is not enough
 
 ## Implemented v4 Commands
 
