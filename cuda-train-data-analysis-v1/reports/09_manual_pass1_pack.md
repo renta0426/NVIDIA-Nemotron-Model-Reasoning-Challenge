@@ -1,0 +1,56 @@
+# cuda-train-data-analysis-v1 manual pass1 pack
+
+## Pass1 pack summary
+
+| audit_focus | family | rows |
+| --- | --- | --- |
+| symbol_numeric_same_op | symbol_equation | 448 |
+| binary_low_gap | bit_manipulation | 150 |
+| symbol_glyph_multiset | symbol_equation | 46 |
+
+## Top rows in pass1 pack
+
+| audit_focus | id | family | template_subtype | hard_score | answer | query_raw |
+| --- | --- | --- | --- | --- | --- | --- |
+| binary_low_gap | 4ac6f0cb | bit_manipulation | bit_other | 8.0 | 10100101 | 01010101 |
+| binary_low_gap | 16e151ec | bit_manipulation | bit_other | 6.0 | 00011000 | 10001101 |
+| binary_low_gap | 18544cb0 | bit_manipulation | bit_other | 6.0 | 01111000 | 01100011 |
+| binary_low_gap | 1deaf759 | bit_manipulation | bit_other | 6.0 | 10100111 | 11110100 |
+| binary_low_gap | 25764d5f | bit_manipulation | bit_other | 6.0 | 00001000 | 10001000 |
+| binary_low_gap | 264b2118 | bit_manipulation | bit_other | 6.0 | 00010100 | 00101101 |
+| binary_low_gap | 48db5ccf | bit_manipulation | bit_other | 6.0 | 01101110 | 01110110 |
+| binary_low_gap | 5dec898e | bit_manipulation | bit_other | 6.0 | 11010101 | 10101100 |
+| binary_low_gap | 5fab4df0 | bit_manipulation | bit_other | 6.0 | 00110100 | 10001100 |
+| binary_low_gap | 62dba403 | bit_manipulation | bit_other | 6.0 | 10011001 | 00010011 |
+| binary_low_gap | 6686f0de | bit_manipulation | bit_other | 6.0 | 10110111 | 00111011 |
+| binary_low_gap | 6728c338 | bit_manipulation | bit_other | 6.0 | 00110011 | 10011101 |
+| binary_low_gap | 7a5d00a7 | bit_manipulation | bit_other | 6.0 | 11110011 | 11111101 |
+| binary_low_gap | 835c56b6 | bit_manipulation | bit_other | 6.0 | 01110100 | 10001110 |
+| binary_low_gap | 845fee60 | bit_manipulation | bit_other | 6.0 | 01110000 | 01011100 |
+| binary_low_gap | 89dfa4c2 | bit_manipulation | bit_other | 6.0 | 00111010 | 10101110 |
+| binary_low_gap | 8f07a84d | bit_manipulation | bit_other | 6.0 | 11101000 | 01110100 |
+| binary_low_gap | ae93aec4 | bit_manipulation | bit_other | 6.0 | 00011000 | 00110000 |
+| binary_low_gap | d8457e76 | bit_manipulation | bit_other | 6.0 | 00010010 | 01001000 |
+| binary_low_gap | 034fb629 | bit_manipulation | bit_other | 5.0 | 00111001 | 11001011 |
+| binary_low_gap | 06667a93 | bit_manipulation | bit_other | 5.0 | 10100011 | 01000111 |
+| binary_low_gap | 084a4496 | bit_manipulation | bit_other | 5.0 | 11000111 | 00111110 |
+| binary_low_gap | 0a1326f4 | bit_manipulation | bit_other | 5.0 | 10010110 | 01011001 |
+| binary_low_gap | 14a30d8f | bit_manipulation | bit_other | 5.0 | 00011101 | 11101100 |
+| binary_low_gap | 20052c2f | bit_manipulation | bit_other | 5.0 | 01100110 | 00110011 |
+| binary_low_gap | 368f20dd | bit_manipulation | bit_other | 5.0 | 10000101 | 01010000 |
+| binary_low_gap | 3ebd80e6 | bit_manipulation | bit_other | 5.0 | 00011010 | 00101011 |
+| binary_low_gap | 46dd0f22 | bit_manipulation | bit_other | 5.0 | 01010000 | 00101000 |
+| binary_low_gap | 4736daab | bit_manipulation | bit_other | 5.0 | 01000111 | 11110100 |
+| binary_low_gap | 4e5df314 | bit_manipulation | bit_other | 5.0 | 00100010 | 01000100 |
+| binary_low_gap | 5a0c141c | bit_manipulation | bit_other | 5.0 | 01010000 | 10000100 |
+| binary_low_gap | 6cb5aff2 | bit_manipulation | bit_other | 5.0 | 01111110 | 11111001 |
+| binary_low_gap | 73d0b62c | bit_manipulation | bit_other | 5.0 | 10000111 | 00111010 |
+| binary_low_gap | 7669569d | bit_manipulation | bit_other | 5.0 | 01100010 | 00100110 |
+| binary_low_gap | 78d9d61d | bit_manipulation | bit_other | 5.0 | 00001001 | 00100110 |
+| binary_low_gap | 892d73b5 | bit_manipulation | bit_permutation_inversion | 5.0 | 00010101 | 10101000 |
+| binary_low_gap | 934a2c55 | bit_manipulation | bit_other | 5.0 | 00101011 | 11010101 |
+| binary_low_gap | 98bbac0f | bit_manipulation | bit_other | 5.0 | 01101011 | 10101101 |
+| binary_low_gap | 9ab82dfb | bit_manipulation | bit_other | 5.0 | 10011100 | 11100110 |
+| binary_low_gap | a41a3626 | bit_manipulation | bit_other | 5.0 | 10111011 | 10110011 |
+
+Use `artifacts/manual_pass1_priority_pack_v1.csv` as the first human-review queue.
