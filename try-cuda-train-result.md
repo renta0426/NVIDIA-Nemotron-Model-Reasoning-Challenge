@@ -96,6 +96,10 @@ Apply the rule from the examples to the target.
 </think>
 \boxed{kingdom hides inside mountain}<|im_end|>
 
+---
+
+今回のモデルの結果：LBスコア0.47と、baseline/nvidia-nemotron-sfttrainer-training.ipynbの0.68より大幅悪化。
+
 ーーーー
 考察：
 
