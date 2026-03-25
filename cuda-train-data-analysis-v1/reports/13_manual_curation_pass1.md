@@ -1,6 +1,6 @@
 # cuda-train-data-analysis-v1 manual curation pass1
 
-## Current exact string-template-backed symbol rows
+## Current exact formula-backed symbol rows
 
 | selection_tier | symbol_numeric_formula_name | symbol_same_operator_example_count | rows |
 | --- | --- | --- | --- |
@@ -9,9 +9,11 @@
 | verified_trace_ready | concat_xy | 2 | 16 |
 | verified_trace_ready | concat_yx | 2 | 12 |
 | answer_only_keep | abs_diff_2d | 1 | 8 |
+| answer_only_keep | comp99_abs_diff_2d | 1 | 5 |
 | verified_trace_ready | abs_diff_2d | 2 | 4 |
 | verified_trace_ready | concat_yx | 3 | 4 |
 | verified_trace_ready | abs_diff_2d_op_suffix | 2 | 1 |
+| verified_trace_ready | comp99_abs_diff_2d | 2 | 1 |
 | verified_trace_ready | concat_xy | 3 | 1 |
 | verified_trace_ready | concat_yx | 4 | 1 |
 
@@ -27,6 +29,11 @@
 | bad6f95d | answer_only_keep | - | abs_diff_2d | 1 | 41 | 54-95 |
 | e518256e | answer_only_keep | " | abs_diff_2d | 1 | 84 | 94"10 |
 | e836fb20 | answer_only_keep | - | abs_diff_2d | 1 | 68 | 89-21 |
+| 1bc85bd9 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 93 | 16-22 |
+| 5c008804 | answer_only_keep | @ | comp99_abs_diff_2d | 1 | 52 | 83@36 |
+| c7a7b13a | answer_only_keep | - | comp99_abs_diff_2d | 1 | 35 | 93-29 |
+| cde9f7ba | answer_only_keep | [ | comp99_abs_diff_2d | 1 | 81 | 15[33 |
+| debff779 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 94 | 36-41 |
 | 047c4111 | answer_only_keep | $ | concat_xy | 1 | 2596 | 25$96 |
 | 2a73a462 | answer_only_keep | : | concat_xy | 1 | 9302 | 93:02 |
 | 35a89469 | answer_only_keep | [ | concat_xy | 1 | 9525 | 95[25 |
@@ -70,6 +77,7 @@
 | 878c843c | verified_trace_ready | / | abs_diff_2d | 2 | 35 | 80/45 |
 | c7420a23 | verified_trace_ready | $ | abs_diff_2d | 2 | 33 | 42$75 |
 | 824d4bcb | verified_trace_ready | : | abs_diff_2d_op_suffix | 2 | 64: | 24:88 |
+| cb2fdb6b | verified_trace_ready | - | comp99_abs_diff_2d | 2 | 54 | 08-53 |
 | 6b393b81 | verified_trace_ready | > | concat_xy | 3 | 4046 | 40>46 |
 | 0cd170a0 | verified_trace_ready | ^ | concat_xy | 2 | 9814 | 98^14 |
 | 1c48f9aa | verified_trace_ready | { | concat_xy | 2 | 8610 | 86{10 |
@@ -93,12 +101,6 @@
 | 7c72ad99 | verified_trace_ready | * | concat_yx | 3 | 2733 | 33*27 |
 | 8321a400 | verified_trace_ready | * | concat_yx | 3 | 6915 | 15*69 |
 | 383889e1 | verified_trace_ready | " | concat_yx | 2 | 5185 | 85"51 |
-| 427ba852 | verified_trace_ready | * | concat_yx | 2 | 2214 | 14*22 |
-| 4d8f8111 | verified_trace_ready | + | concat_yx | 2 | 7601 | 01+76 |
-| 791fc537 | verified_trace_ready | ` | concat_yx | 2 | 5342 | 42`53 |
-| 8dea05d7 | verified_trace_ready | + | concat_yx | 2 | 3907 | 07+39 |
-| 9760032a | verified_trace_ready | + | concat_yx | 2 | 9372 | 72+93 |
-| 99e2cf41 | verified_trace_ready | + | concat_yx | 2 | 4415 | 15+44 |
 
 ## Binary rows now excluded
 
@@ -151,5 +153,5 @@
 | a77be9fa | 5.0 | [" | {>\|$[ | symbol_length_mismatch\|symbol_solver_unverified |
 | afdb7326 | 5.0 | %\ | @^%(^ | symbol_length_mismatch\|symbol_solver_unverified |
 
-Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.
+Decision summary: current pass1 safely keeps only exact `numeric_2x2` prompt-backed rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.
 

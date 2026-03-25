@@ -96,6 +96,7 @@ SYMBOL_NUMERIC_FORMULAS = {
     "x_minus_y": lambda x, y: x - y,
     "y_minus_x": lambda x, y: y - x,
     "abs_diff": lambda x, y: abs(x - y),
+    "comp99_abs_diff_2d": lambda x, y: 99 - abs(x - y),
     "x_mul_y": lambda x, y: x * y,
     "x_mul_y_plus1": lambda x, y: x * y + 1,
     "x_mul_y_minus1": lambda x, y: x * y - 1,
@@ -108,6 +109,7 @@ SYMBOL_NUMERIC_FORMULAS = {
 }
 SYMBOL_NUMERIC_FORMATS = {
     "plain": lambda op, n: str(n),
+    "zpad2": lambda op, n: f"{int(n):02d}" if 0 <= int(n) <= 99 else str(n),
     "abs_plain": lambda op, n: str(abs(n)),
     "prefix_always_abs": lambda op, n: f"{op}{abs(n)}",
     "prefix_if_negative": lambda op, n: f"{op}{abs(n)}" if n < 0 else str(n),
@@ -118,6 +120,10 @@ SYMBOL_NUMERIC_STRING_TEMPLATES = {
     "abs_diff_2d": ("diff_t", "diff_o"),
     "abs_diff_2d_op_suffix": ("diff_t", "diff_o", "op"),
 }
+SYMBOL_NUMERIC_FORMAT_OVERRIDES = {
+    "comp99_abs_diff_2d": ("zpad2",),
+}
+SYMBOL_PROMOTION_FORMULA_NAMES = set(SYMBOL_NUMERIC_STRING_TEMPLATES) | set(SYMBOL_NUMERIC_FORMAT_OVERRIDES)
 
 
 def utc_now() -> str:
@@ -260,6 +266,13 @@ def render_symbol_numeric_string_template(template_tokens: tuple[str, ...], x_te
     return "".join(token_map[token] for token in template_tokens)
 
 
+def iter_symbol_numeric_formatters(formula_name: str) -> list[tuple[str, Any]]:
+    format_names = SYMBOL_NUMERIC_FORMAT_OVERRIDES.get(formula_name)
+    if format_names is None:
+        format_names = tuple(name for name in SYMBOL_NUMERIC_FORMATS if name != "zpad2")
+    return [(format_name, SYMBOL_NUMERIC_FORMATS[format_name]) for format_name in format_names]
+
+
 def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
     if query_match is None:
@@ -301,7 +314,7 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
     query_x = int(query_x_text)
     query_y = int(query_y_text)
     for formula_name, formula in SYMBOL_NUMERIC_FORMULAS.items():
-        for format_name, formatter in SYMBOL_NUMERIC_FORMATS.items():
+        for format_name, formatter in iter_symbol_numeric_formatters(formula_name):
             valid = True
             for left_value_text, right_value_text, output_text in same_operator_examples:
                 numeric_value = formula(int(left_value_text), int(right_value_text))
@@ -1797,8 +1810,9 @@ def probe_symbol_tail_cases(analysis_df: pd.DataFrame, v1: Any) -> tuple[pd.Data
             if operator == query_operator
         ]
         candidate_predictions: set[str] = set()
-        for formula in [*SYMBOL_NUMERIC_FORMULAS.values(), *extra_formulas.values()]:
-            for formatter in SYMBOL_NUMERIC_FORMATS.values():
+        all_formula_specs = [*SYMBOL_NUMERIC_FORMULAS.items(), *extra_formulas.items()]
+        for formula_name, formula in all_formula_specs:
+            for _, formatter in iter_symbol_numeric_formatters(formula_name):
                 valid = True
                 for left_value, right_value, output_text in same_operator_examples:
                     numeric_value = formula(left_value, right_value)
@@ -1904,6 +1918,8 @@ def collect_symbol_query_only_arithmetic_rejections(
         abs_diff_zpad = f"{abs(x_value - y_value):02d}"
         if gold_answer in {abs_diff_plain, abs_diff_zpad}:
             matching_families.append("abs_diff_2d")
+        if gold_answer == f"{99 - abs(x_value - y_value):02d}":
+            matching_families.append("comp99_abs_diff_2d")
         if not matching_families:
             continue
 
@@ -1942,6 +1958,118 @@ def collect_symbol_query_only_arithmetic_rejections(
     ).reset_index(drop=True)
 
 
+def load_optional_dataframe(path: Path, columns: list[str]) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame(columns=columns)
+    df = pd.read_csv(path, low_memory=False)
+    for column in columns:
+        if column not in df.columns:
+            df[column] = ""
+    return df.loc[:, columns].copy()
+
+
+def build_symbol_mimic_union(
+    symbol_query_only_rejection_df: pd.DataFrame,
+    known_family_mimic_df: pd.DataFrame,
+) -> pd.DataFrame:
+    base_columns = [
+        "id",
+        "query_raw",
+        "answer",
+        "query_only_matching_families",
+        "same_operator_example_count",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "rejection_reason",
+        "prompt_example_lines",
+        "source",
+    ]
+    query_df = symbol_query_only_rejection_df.copy()
+    if len(query_df):
+        query_df["source"] = "report17"
+        query_df = query_df.loc[:, base_columns]
+    else:
+        query_df = pd.DataFrame(columns=base_columns)
+
+    known_df = known_family_mimic_df.copy()
+    if len(known_df):
+        if "source" not in known_df.columns:
+            known_df["source"] = "known_family"
+        known_df = known_df.loc[:, base_columns]
+    else:
+        known_df = pd.DataFrame(columns=base_columns)
+
+    union_df = pd.concat([query_df, known_df], ignore_index=True)
+    if not len(union_df):
+        return pd.DataFrame(columns=base_columns)
+    union_df = union_df.drop_duplicates(subset=["id"], keep="first")
+    return union_df.sort_values(
+        ["source", "rejection_reason", "same_operator_example_count", "id"],
+        ascending=[True, True, False, True],
+    ).reset_index(drop=True)
+
+
+def same_operator_bucket_label(value: Any) -> str:
+    count = int(value)
+    if count <= 1:
+        return "1"
+    if count == 2:
+        return "2"
+    if count == 3:
+        return "3"
+    return "4+"
+
+
+def build_symbol_round2_cluster_summary(
+    analysis_df: pd.DataFrame,
+    symbol_mimic_union_df: pd.DataFrame,
+) -> pd.DataFrame:
+    columns = [
+        "symbol_query_operator",
+        "answer_len",
+        "answer_has_operator_char",
+        "same_operator_bucket",
+        "rows",
+        "representative_ids",
+    ]
+    subset = analysis_df.loc[
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["symbol_same_operator_example_count"] >= 1)
+    ].copy()
+    if len(symbol_mimic_union_df):
+        subset = subset.loc[~subset["id"].astype(str).isin(set(symbol_mimic_union_df["id"].astype(str)))].copy()
+    if not len(subset):
+        return pd.DataFrame(columns=columns)
+
+    subset["answer_text"] = subset["answer"].astype(str)
+    subset["answer_len"] = subset["answer_text"].str.len()
+    subset["answer_has_operator_char"] = subset["answer_text"].str.contains(r"[+\-*/]", regex=True)
+    subset["same_operator_bucket"] = subset["symbol_same_operator_example_count"].map(same_operator_bucket_label)
+
+    records: list[dict[str, Any]] = []
+    group_cols = ["symbol_query_operator", "answer_len", "answer_has_operator_char", "same_operator_bucket"]
+    for group_key, group in subset.groupby(group_cols, sort=False):
+        representative_ids = ",".join(
+            group.sort_values(["hard_score", "id"], ascending=[False, True])["id"].astype(str).head(5)
+        )
+        records.append(
+            {
+                "symbol_query_operator": group_key[0],
+                "answer_len": int(group_key[1]),
+                "answer_has_operator_char": bool(group_key[2]),
+                "same_operator_bucket": str(group_key[3]),
+                "rows": int(len(group)),
+                "representative_ids": representative_ids,
+            }
+        )
+    return pd.DataFrame(records, columns=columns).sort_values(
+        ["rows", "answer_has_operator_char", "symbol_query_operator", "answer_len", "same_operator_bucket"],
+        ascending=[False, True, True, True, True],
+    ).reset_index(drop=True)
+
+
 def build_reports(
     out_root: Path,
     analysis_df: pd.DataFrame,
@@ -1968,6 +2096,8 @@ def build_reports(
     binary_manual_queue_df: pd.DataFrame,
     manual_pass1_df: pd.DataFrame,
     symbol_query_only_rejection_df: pd.DataFrame,
+    symbol_mimic_union_df: pd.DataFrame,
+    symbol_round2_cluster_df: pd.DataFrame,
 ) -> None:
     reports_dir = out_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -2005,6 +2135,52 @@ def build_reports(
     symbol_query_only_ambiguous_count = int(
         (symbol_query_only_rejection_df["rejection_reason"] == "query_format_ambiguous").sum()
     ) if len(symbol_query_only_rejection_df) else 0
+    symbol_mimic_union_summary_df = grouped_counts(
+        symbol_mimic_union_df,
+        ["query_only_matching_families", "rejection_reason"],
+        name="rows",
+    ) if len(symbol_mimic_union_df) else pd.DataFrame(
+        columns=["query_only_matching_families", "rejection_reason", "rows"]
+    )
+    symbol_mimic_union_total = int(len(symbol_mimic_union_df))
+    symbol_mimic_report17_count = int((symbol_mimic_union_df["source"] == "report17").sum()) if len(symbol_mimic_union_df) else 0
+    symbol_mimic_known_count = int((symbol_mimic_union_df["source"] == "known_family").sum()) if len(symbol_mimic_union_df) else 0
+    symbol_round2_remaining_count = int(symbol_round2_cluster_df["rows"].sum()) if len(symbol_round2_cluster_df) else 0
+    comp99_family_df = (
+        analysis_df.loc[
+            (analysis_df["family"] == "symbol_equation")
+            & (analysis_df["template_subtype"] == "numeric_2x2")
+            & (analysis_df["symbol_numeric_formula_name"] == "comp99_abs_diff_2d")
+        ]
+        .sort_values(["selection_tier", "symbol_same_operator_example_count", "id"], ascending=[True, False, True])
+        .reset_index(drop=True)
+    )
+    comp99_summary_df = grouped_counts(
+        comp99_family_df,
+        ["selection_tier", "symbol_same_operator_example_count", "analysis_notes"],
+        name="rows",
+    ) if len(comp99_family_df) else pd.DataFrame(
+        columns=["selection_tier", "symbol_same_operator_example_count", "analysis_notes", "rows"]
+    )
+    comp99_promoted_df = (
+        comp99_family_df.loc[
+            comp99_family_df["selection_tier"].isin(["verified_trace_ready", "answer_only_keep"])
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
+    comp99_manual_df = (
+        comp99_family_df.loc[comp99_family_df["selection_tier"] == "manual_audit_priority"]
+        .copy()
+        .reset_index(drop=True)
+    )
+    comp99_query_only_rejection_df = (
+        symbol_query_only_rejection_df.loc[
+            symbol_query_only_rejection_df["query_only_matching_families"].fillna("").str.contains("comp99_abs_diff_2d")
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
     glyph_exact_summary_df = grouped_counts(
         glyph_exact_df,
         ["exact_coarse_status", "multiset_unique", "order_unique"],
@@ -2221,8 +2397,8 @@ def build_reports(
         "",
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
         "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.",
-        "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact string-template rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`), shrinking the next symbol-numeric pass1 queue to 373 rows.",
-        f"- `symbol_equation/numeric_2x2`: 32 query-only arithmetic lookalikes were rechecked and all rejected from promotion (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities), so the queue size stays unchanged.",
+        "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact prompt-backed rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`), further shrinking the unresolved symbol-numeric queue.",
+        f"- `symbol_equation/numeric_2x2`: `{len(symbol_query_only_rejection_df)}` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities).",
         f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset), so glyph rows stay manual.",
         "",
     ]
@@ -2258,7 +2434,7 @@ def build_reports(
     manual_curation_lines = [
         f"# {SCRIPT_VERSION} manual curation pass1",
         "",
-        "## Current exact string-template-backed symbol rows",
+        "## Current exact formula-backed symbol rows",
         "",
         markdown_table(promotion_summary_df, list(promotion_summary_df.columns)),
         "",
@@ -2294,7 +2470,7 @@ def build_reports(
             limit=20,
         ),
         "",
-        "Decision summary: current pass1 safely keeps only exact `numeric_2x2` string-template rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.",
+        "Decision summary: current pass1 safely keeps only exact `numeric_2x2` prompt-backed rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.",
         "",
     ]
     (reports_dir / "13_manual_curation_pass1.md").write_text("\n".join(manual_curation_lines) + "\n", encoding="utf-8")
@@ -2372,7 +2548,7 @@ def build_reports(
         "",
         "## Purpose",
         "",
-        "Review manual `symbol_numeric_same_op` rows whose gold query answer superficially matches `x_plus_y`, `x_minus_y`, or `abs_diff_2d`, and verify whether prompt evidence really makes them safe promotions.",
+        "Review manual `symbol_numeric_same_op` rows whose gold query answer superficially matches `x_plus_y`, `x_minus_y`, `abs_diff_2d`, or `comp99_abs_diff_2d`, and verify whether prompt evidence really makes them safe promotions.",
         "",
         "## Decision",
         "",
@@ -2402,10 +2578,121 @@ def build_reports(
             limit=80,
         ),
         "",
-        "Interpretation: these rows look temptingly recoverable if you only inspect the query answer, but that is not enough. Most rows contradict their same-operator examples outright; the rest still leave sign/prefix formatting unresolved, so using the gold answer as a tie-break would be unsafe supervision under the `README.md` accuracy regime.",
+        "Interpretation: these rows look temptingly recoverable if you only inspect the query answer, but that is not enough. Most rows contradict their same-operator examples outright; the rest still leave sign, zero-pad, or complement-formatting unresolved, so using the gold answer as a tie-break would be unsafe supervision under the `README.md` accuracy regime.",
         "",
     ]
     (reports_dir / "17_symbol_query_only_rejection.md").write_text("\n".join(query_only_rejection_lines) + "\n", encoding="utf-8")
+
+    symbol_known_family_lines = [
+        f"# {SCRIPT_VERSION} symbol known-family mimic audit",
+        "",
+        "## Purpose",
+        "",
+        "Collect the full union of query-only and known-family mimic rows so round2 can deprioritize these dead ends before operator-specific manual reading.",
+        "",
+        "## Scope",
+        "",
+        f"- total mimic-union rows: `{symbol_mimic_union_total}`",
+        "- sources: report 17 high-shot arithmetic lookalikes + extra known-family / low-shot mimic rows",
+        "",
+        "## Breakdown",
+        "",
+        markdown_table(symbol_mimic_union_summary_df, list(symbol_mimic_union_summary_df.columns)),
+        "",
+        "## Source split",
+        "",
+        f"- report 17 rows: `{symbol_mimic_report17_count}`",
+        f"- extra known-family rows (union minus report 17): `{symbol_mimic_known_count}`",
+        "",
+        "## Interpretation",
+        "",
+        "- high-shot rows can still be wrong because same-op examples conflict or leave format unresolved.",
+        "- low-shot rows can still be wrong because one example is not enough to prove the intended format, even if the query answer looks familiar.",
+        "- the union now also absorbs the new `comp99_abs_diff_2d` dead-end lookalikes, so excluding it from the round2 reading list keeps the residual cluster map focused on the true unknown core.",
+        "",
+    ]
+    (reports_dir / "23_symbol_known_family_mimics.md").write_text("\n".join(symbol_known_family_lines) + "\n", encoding="utf-8")
+
+    symbol_round2_lines = [
+        f"# {SCRIPT_VERSION} symbol round2 cluster map",
+        "",
+        "## Purpose",
+        "",
+        "After pass1, exclude all manual rows whose query answer only mimics already-known simple families or already-rejected high-shot arithmetic lookalikes, then map the remaining `symbol_numeric_same_op` rows into operator-specific residual clusters for round2 manual reading.",
+        "",
+        "## Scope",
+        "",
+        f"- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `{symbol_round2_remaining_count}`",
+        f"- excluded known/query-only mimic union: `{symbol_mimic_union_total}` rows",
+        "- grouped by operator, answer length, operator-char embedding, and same-operator example count bucket.",
+        "",
+        "## Top clusters",
+        "",
+        markdown_table(symbol_round2_cluster_df.head(25).reset_index(drop=True), list(symbol_round2_cluster_df.columns)),
+        "",
+        "## Reading order",
+        "",
+        "1. `*` with 4-digit answers",
+        "2. `+` with 3-digit answers",
+        "3. `-` with 3-digit answers",
+        "4. clusters whose answers embed the operator character",
+        "",
+        "## Notes",
+        "",
+        "- This map excludes the full union of report 17 plus the extra low-shot/known-family mimic slice.",
+        "- The excluded union now removes many dead-end `abs_diff_2d` / `abs_diff_2d_op_suffix` / `comp99_abs_diff_2d` lookalikes before round2 starts.",
+        "- Use the representative IDs as the first prompts to read when beginning round2 manual clustering.",
+        "",
+    ]
+    (reports_dir / "20_symbol_round2_cluster_map.md").write_text("\n".join(symbol_round2_lines) + "\n", encoding="utf-8")
+
+    comp99_recovery_lines = [
+        f"# {SCRIPT_VERSION} symbol `comp99_abs_diff_2d` recovery",
+        "",
+        "## Purpose",
+        "",
+        "Recheck `numeric_2x2` rows whose same-operator examples support the exact zero-padded family `99 - abs(x-y)` and split safe promotions from unsafe lookalikes under the `README.md` accuracy-first metric.",
+        "",
+        "## Decision",
+        "",
+        f"- rows tagged with `comp99_abs_diff_2d`: `{len(comp99_family_df)}`",
+        f"- promoted to `verified_trace_ready`: `{int((comp99_promoted_df['selection_tier'] == 'verified_trace_ready').sum()) if len(comp99_promoted_df) else 0}`",
+        f"- promoted to `answer_only_keep`: `{int((comp99_promoted_df['selection_tier'] == 'answer_only_keep').sum()) if len(comp99_promoted_df) else 0}`",
+        f"- still manual after exact recheck: `{len(comp99_manual_df)}`",
+        f"- query-only conflicts already captured in report 17: `{len(comp99_query_only_rejection_df)}`",
+        "",
+        "## Breakdown",
+        "",
+        markdown_table(comp99_summary_df, list(comp99_summary_df.columns)),
+        "",
+        "## Promoted rows",
+        "",
+        markdown_table(
+            comp99_promoted_df,
+            ["id", "selection_tier", "symbol_query_operator", "symbol_same_operator_example_count", "answer", "query_raw"],
+            limit=20,
+        ),
+        "",
+        "## Manual rows that still do not qualify",
+        "",
+        markdown_table(
+            comp99_manual_df,
+            ["id", "symbol_same_operator_example_count", "answer", "query_raw", "auto_solver_predicted_answer", "audit_reasons"],
+            limit=20,
+        ),
+        "",
+        "## Query-only conflict rows",
+        "",
+        markdown_table(
+            comp99_query_only_rejection_df,
+            ["id", "query_raw", "answer", "same_operator_example_count", "rejection_reason"],
+            limit=20,
+        ),
+        "",
+        "Interpretation: `comp99_abs_diff_2d` is a real prompt-backed family, but only when the same-operator examples match it exactly. The family also creates many false positives in the query answer alone, so safe recovery requires exact example consistency plus the zero-padded two-digit format; anything weaker stays manual.",
+        "",
+    ]
+    (reports_dir / "31_symbol_comp99_abs_diff_recovery.md").write_text("\n".join(comp99_recovery_lines) + "\n", encoding="utf-8")
 
     glyph_exact_lines = [
         f"# {SCRIPT_VERSION} glyph exact coarse enumeration",
@@ -2514,7 +2801,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         analysis_df.loc[
             (analysis_df["family"] == "symbol_equation")
             & (analysis_df["template_subtype"] == "numeric_2x2")
-            & (analysis_df["symbol_numeric_formula_name"].isin(SYMBOL_NUMERIC_STRING_TEMPLATES.keys()))
+            & (analysis_df["symbol_numeric_formula_name"].isin(SYMBOL_PROMOTION_FORMULA_NAMES))
             & (analysis_df["selection_tier"].isin(["verified_trace_ready", "answer_only_keep"]))
         ]
         .sort_values(["selection_tier", "symbol_numeric_formula_name", "symbol_same_operator_example_count", "id"], ascending=[True, True, False, True])
@@ -2606,6 +2893,22 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     )
     prompt_by_id = dict(zip(train_df["id"].astype(str), train_df["prompt"].astype(str)))
     symbol_query_only_rejection_df = collect_symbol_query_only_arithmetic_rejections(manual_pass1_df, prompt_by_id)
+    known_family_mimic_df = load_optional_dataframe(
+        artifacts_dir / "remaining_symbol_known_family_mimics_v1.csv",
+        [
+            "id",
+            "query_raw",
+            "answer",
+            "query_only_matching_families",
+            "same_operator_example_count",
+            "candidate_prediction_count",
+            "candidate_predictions",
+            "rejection_reason",
+            "prompt_example_lines",
+        ],
+    )
+    symbol_mimic_union_df = build_symbol_mimic_union(symbol_query_only_rejection_df, known_family_mimic_df)
+    symbol_round2_cluster_df = build_symbol_round2_cluster_summary(analysis_df, symbol_mimic_union_df)
 
     write_dataframe(metadata_df, artifacts_dir / "train_metadata_rebuilt_v1.csv")
     write_dataframe(manual_audit_seed_df, artifacts_dir / "manual_audit_seed_v1.csv")
@@ -2629,6 +2932,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
+    write_dataframe(symbol_mimic_union_df, artifacts_dir / "remaining_symbol_mimic_union_v1.csv")
+    write_dataframe(symbol_round2_cluster_df, artifacts_dir / "symbol_round2_cluster_summary_v1.csv")
     write_dataframe(
         analysis_df.loc[analysis_df["selection_tier"] == "verified_trace_ready"].reset_index(drop=True),
         artifacts_dir / "train_verified_trace_ready_v1.csv",
@@ -2682,6 +2987,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         binary_manual_queue_df,
         manual_pass1_df,
         symbol_query_only_rejection_df,
+        symbol_mimic_union_df,
+        symbol_round2_cluster_df,
     )
 
     manifest = {

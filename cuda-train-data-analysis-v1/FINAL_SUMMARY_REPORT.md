@@ -22,15 +22,15 @@
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
-| `verified_trace_ready` | 5,862 | 61.7% |
-| `answer_only_keep` | 1,075 | 11.3% |
-| `manual_audit_priority` | 2,534 | 26.7% |
+| `verified_trace_ready` | 5,863 | 61.7% |
+| `answer_only_keep` | 1,080 | 11.4% |
+| `manual_audit_priority` | 2,528 | 26.6% |
 | `exclude_suspect` | 29 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `5,862 + 1,075 = 6,937` 行（`73.0%`）
-- 未解決 / 要注意: `2,534 + 29 = 2,563` 行（`27.0%`）
+- 安全側の学習コア: `5,863 + 1,080 = 6,943` 行（`73.1%`）
+- 未解決 / 要注意: `2,528 + 29 = 2,557` 行（`26.9%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -42,7 +42,7 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 381 | 0 | 1,202 | 19 | 主要な残課題 |
-| `symbol_equation` | 1,555 | 109 | 104 | 1,332 | 10 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 110 | 109 | 1,326 | 10 | 主要な残課題 |
 
 ### 解釈
 
@@ -90,11 +90,12 @@ symbol は大きく 2 つに分かれました。
 - `numeric_2x2`
 - `glyph_len5`
 
-`numeric_2x2` では、operator-aware の row-local formula search に加えて、pass1 manual curation で exact な文字列テンプレート規則（`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`）を安全側で採用しました。
+`numeric_2x2` では、operator-aware の row-local formula search に加えて、pass1 manual curation で exact な prompt-backed 規則（`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`）を安全側で採用しました。
 
-- `109 verified`
-- `104 answer-only`
-- 直近の residual scan では `824d4bcb` を `verified`、`9cb03277` を `answer_only` に追加し、`4c6cf9d9` を `exclude_suspect` に落とした
+- `110 verified`
+- `109 answer-only`
+- 直近の更新では `comp99_abs_diff_2d` を追加し、`cb2fdb6b` を `verified`、`1bc85bd9`, `c7a7b13a`, `debff779`, `5c008804`, `cde9f7ba` を `answer_only` に昇格した
+- ただし同 family の query-only lookalikes `12` 行は same-op conflict で manual のまま
 
 `glyph_len5` では:
 
@@ -107,9 +108,9 @@ symbol は大きく 2 つに分かれました。
 
 ### 4.4 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **558 行** まで縮みました。
+最優先で人手確認すべき pack は **552 行** まで縮みました。
 
-- `373` 行: `symbol_numeric_same_op`
+- `367` 行: `symbol_numeric_same_op`
 - `139` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
@@ -142,11 +143,11 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_affine_mismatch_candidates_v1.csv` | affine 一意でも gold と衝突したため昇格しなかった binary 行 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 139 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
-| `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した `concat_xy / concat_yx` 行の一覧 |
-| `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 32 行の台帳 |
+| `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した prompt-backed symbol 行（concat / abs-diff / comp99）の一覧 |
+| `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 44 行の台帳 |
 | `artifacts/remaining_symbol_known_family_mimics_v1.csv` | low-shot を含む known-family mimic 行の台帳 |
-| `artifacts/remaining_symbol_mimic_union_v1.csv` | report 17 と known-family mimic を合流した `symbol` dead-end slice の union |
-| `artifacts/symbol_round2_cluster_summary_v1.csv` | query-only / derived-template を除いた残差 symbol を round2 向けに cluster 化した台帳 |
+| `artifacts/remaining_symbol_mimic_union_v1.csv` | report 17 と known-family mimic を合流した current mimic union 68 行の台帳 |
+| `artifacts/symbol_round2_cluster_summary_v1.csv` | mimic union 68 行を除いた current round2 core 299 行を cluster 化した台帳 |
 | `artifacts/glyph_round2_cluster_summary_v1.csv` | glyph 46 行を答え長・重複構造ベースで round2 向けに cluster 化した台帳 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
@@ -182,7 +183,7 @@ symbol は大きく 2 つに分かれました。
 ```bash
 cd /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
-python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
+.venv/bin/python cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
   --repo-root /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge \
   --out-root /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1
 ```
@@ -209,13 +210,13 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/14_symbol_residual_template_scan.md` | residual scan で採用 / 不採用 / suspect 化した symbol 行の根拠 |
 | `reports/15_binary_residual_affine_scan.md` | binary low-gap の residual scan で除外した 11 行と、保留行の根拠 |
 | `reports/16_glyph_manual_hold.md` | glyph pass1 46 行を全件 manual 維持にした根拠 |
-| `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 32 行を、same-op 照合で全却下した根拠 |
+| `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 44 行を、same-op 照合で全却下した根拠 |
 | `reports/18_symbol_next_safe_scan.md` | query-only 却下後の残差に対して次の safe family を探したが、derived template 探索でも 0 件だった記録 |
 | `reports/19_pass1_completion_and_round2.md` | pass1 の完了範囲と、round2 で最初に読むべき残差 cluster をまとめた要約 |
-| `reports/20_symbol_round2_cluster_map.md` | mimic union を除いた `symbol_numeric_same_op` 317 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
+| `reports/20_symbol_round2_cluster_map.md` | mimic union 68 行を除いた current `symbol_numeric_same_op` 299 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
 | `reports/21_glyph_round2_cluster_map.md` | `symbol_glyph_multiset` 46 行を長さ・重複署名で cluster 化した round2 入口 |
 | `reports/22_binary_round2_cluster_map.md` | `binary_low_gap` 139 行を gap / uniqueness 構造で cluster 化した round2 入口 |
-| `reports/23_symbol_known_family_mimics.md` | report 17 と extra known-family mimic を合流した `symbol` mimic union の整理 |
+| `reports/23_symbol_known_family_mimics.md` | report 17 の 44 行と extra known-family mimic を合流した current `symbol` mimic union 68 行の整理 |
 | `reports/24_glyph_exact_coarse_scan.md` | round2 glyph 46 行を exact examples-only coarse model で再列挙し、0 unique string を確認した report |
 | `reports/25_symbol_star4_cluster_hold.md` | round2 `symbol` の `*` 4桁 top 2 cluster（39 行）を再読し、依然 manual hold とした根拠 |
 | `reports/26_symbol_plus3_cluster_hold.md` | round2 `symbol` の `+` 3桁 cluster を再読し、依然 manual hold とした根拠 |
@@ -223,6 +224,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 | `reports/28_symbol_minus3_cluster_hold.md` | round2 `symbol` の `-` 3-character sign-embedded slice を再読し、依然 manual hold とした根拠 |
 | `reports/29_symbol_plus2_cluster_hold.md` | round2 `symbol` の `+` 2-digit slice を再読し、依然 manual hold とした根拠 |
 | `reports/30_binary_second_cluster_hold.md` | round2 `binary` の second-largest 29-row cluster を再読し、依然 manual hold とした根拠 |
+| `reports/31_symbol_comp99_abs_diff_recovery.md` | `comp99_abs_diff_2d` family を確定し、`1 verified + 5 answer-only` を回収した根拠 |
 
 ## 8. 最短の読み順
 
@@ -249,12 +251,13 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 
 ### 9.2 symbol がまだ重い
 
-- `symbol_equation` は `1,332 manual + 10 exclude`
-- `numeric_2x2` は operator-aware と string-template pass1 でかなり整理できたが、まだ `373` 行が pass1 に残る
+- `symbol_equation` は `1,326 manual + 10 exclude`
+- `numeric_2x2` は operator-aware と prompt-backed pass1 でかなり整理でき、`comp99_abs_diff_2d` の追加で `1 verified + 5 answer-only` を新規回収した
+- それでも pass1 にはまだ `367` 行が残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
-- query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d` に見える `32` 行も再照合したが、`27` 行は same-op examples と衝突、`5` 行は符号/prefix format が一意化できず、**追加昇格 0**
+- query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d / comp99_abs_diff_2d` に見える `44` 行も再照合したが、`39` 行は same-op examples と衝突、`5` 行は format が一意化できず、**追加昇格 0**
+- report 17 の高shot mimic `44` 行に、extra known-family / low-shot mimic を足した current mimic union は `68` 行となり、round2 の `symbol` 本丸は `299` 行まで圧縮できた
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
-- report 17 の高shot mimic `32` 行に、extra known-family / low-shot mimic を足した mimic union は `56` 行となり、round2 の `symbol` 本丸は `317` 行まで圧縮できた
 - round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
 - round2 `+` 3桁 cluster も再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 でも同一 prompt 内で `2` 桁出力と `3` 桁出力が混在するため、再利用可能な exact formatter は見つからなかった
 - round2 `-` 3-character sign-embedded slice（`19` 行）も再読したが、負号が query-only になっている行が多く、high-shot rows でも signed/unsigned output や zero-pad が揺れるため、再利用可能な exact family は見つからなかった
@@ -289,7 +292,7 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. round2 `symbol` core `317` 行のうち、次は operator 埋め込み output の残差と未読 small clusters
+2. round2 `symbol` core `299` 行のうち、次は operator 埋め込み output の残差と未読 small clusters
 3. `binary_low_gap` 139 行
 4. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 
@@ -297,9 +300,9 @@ python3 cuda-train-data-analysis-v1/code/train_data_analysis_v1.py \
 
 repo 反映後に次を確認しています。
 
-- `python3 -m py_compile cuda-train-data-analysis-v1/code/train_data_analysis_v1.py`
-- analysis script の smoke rerun
-- `python3 -m pytest -q -k 'not test_scaffold_runbook_and_ablation_failure_logging'`
+- `.venv/bin/python -m py_compile cuda-train-data-analysis-v1/code/train_data_analysis_v1.py`
+- `.venv/bin/python cuda-train-data-analysis-v1/code/train_data_analysis_v1.py --repo-root /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge --out-root /home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1`
+- `.venv/bin/python -m pytest -q -k 'not test_scaffold_runbook_and_ablation_failure_logging'`
 
 確認結果:
 

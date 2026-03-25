@@ -7,13 +7,13 @@
 | verified_trace_ready | gravity_constant | 1597 |
 | verified_trace_ready | unit_conversion | 1594 |
 | verified_trace_ready | roman_numeral | 1576 |
-| manual_audit_priority | symbol_equation | 1332 |
+| manual_audit_priority | symbol_equation | 1326 |
 | manual_audit_priority | bit_manipulation | 1202 |
 | answer_only_keep | text_decryption | 971 |
 | verified_trace_ready | text_decryption | 605 |
 | verified_trace_ready | bit_manipulation | 381 |
-| verified_trace_ready | symbol_equation | 109 |
-| answer_only_keep | symbol_equation | 104 |
+| verified_trace_ready | symbol_equation | 110 |
+| answer_only_keep | symbol_equation | 109 |
 | exclude_suspect | bit_manipulation | 19 |
 | exclude_suspect | symbol_equation | 10 |
 
