@@ -12,10 +12,10 @@
 | numeric_2x2 | @ | manual_audit_priority |  | 14 |
 | numeric_2x2 | % | manual_audit_priority |  | 13 |
 | numeric_2x2 | : | manual_audit_priority |  | 13 |
-| numeric_2x2 | ! | manual_audit_priority |  | 12 |
-| numeric_2x2 | " | manual_audit_priority |  | 11 |
+| numeric_2x2 | ! | manual_audit_priority |  | 11 |
 | numeric_2x2 | + | answer_only_keep | concat_yx | 11 |
 | numeric_2x2 | [ | manual_audit_priority |  | 11 |
+| numeric_2x2 | " | manual_audit_priority |  | 10 |
 | numeric_2x2 | $ | manual_audit_priority |  | 10 |
 | numeric_2x2 | < | manual_audit_priority |  | 10 |
 | numeric_2x2 | ^ | manual_audit_priority |  | 10 |

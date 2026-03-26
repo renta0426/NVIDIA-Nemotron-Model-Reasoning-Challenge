@@ -37,7 +37,7 @@
 | template_subtype | teacher_solver_candidate | selection_tier | analysis_notes | rows |
 | --- | --- | --- | --- | --- |
 | glyph_len5 |  | manual_audit_priority | symbol_audit_needed | 823 |
-| numeric_2x2 |  | manual_audit_priority | symbol_audit_needed | 472 |
+| numeric_2x2 |  | manual_audit_priority | symbol_audit_needed | 470 |
 | numeric_2x2 | symbol_numeric_operator_formula | answer_only_keep | symbol_numeric_formula_low_shot | 114 |
 | numeric_2x2 | symbol_numeric_operator_formula | verified_trace_ready | symbol_numeric_formula_exact | 110 |
 | numeric_2x2 |  | answer_only_keep | symbol_operator_spec_consensus | 16 |
@@ -45,4 +45,5 @@
 | numeric_2x2 |  | answer_only_keep | symbol_minus_direct_plain_subfamily | 3 |
 | numeric_2x2 |  | answer_only_keep | symbol_minus_prefix_subfamily | 3 |
 | numeric_2x2 |  | answer_only_keep | symbol_star_prefix_if_negative_subfamily | 3 |
+| numeric_2x2 |  | answer_only_keep | symbol_thin_support2_subfamily | 2 |
 
