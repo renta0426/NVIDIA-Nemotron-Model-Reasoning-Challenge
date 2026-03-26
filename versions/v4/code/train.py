@@ -4454,6 +4454,17 @@ def build_training_records(frame: Any, *, prompt_instruction: str = DEFAULT_BOXE
     records: list[dict[str, Any]] = []
     skipped = 0
     for row in frame.to_dict(orient='records'):
+        metadata = {
+            'id': normalize_optional_text(row.get('id')),
+            'family': normalize_optional_text(row.get('family')),
+            'source_dataset': normalize_optional_text(row.get('source_dataset'))
+            or normalize_optional_text(row.get('source_kind'))
+            or 'unknown',
+        }
+        text = normalize_optional_text(row.get('text'))
+        if text is not None:
+            records.append({'text': text, 'metadata': metadata})
+            continue
         prompt = normalize_optional_text(row.get('prompt'))
         if prompt is None:
             skipped += 1
@@ -4470,13 +4481,7 @@ def build_training_records(frame: Any, *, prompt_instruction: str = DEFAULT_BOXE
                     resolve_prompt_instruction(row.get('prompt_instruction'), default=prompt_instruction),
                 ),
                 'completion': completion,
-                'metadata': {
-                    'id': normalize_optional_text(row.get('id')),
-                    'family': normalize_optional_text(row.get('family')),
-                    'source_dataset': normalize_optional_text(row.get('source_dataset'))
-                    or normalize_optional_text(row.get('source_kind'))
-                    or 'unknown',
-                },
+                'metadata': metadata,
             }
         )
     return records, skipped
@@ -4663,6 +4668,11 @@ def build_mlx_lora_config(
     return payload
 
 
+def resolve_optimizer_steps_v4(cfg: dict[str, Any], *, total_iters: int) -> int:
+    grad_accumulation_steps = max(1, int(cfg.get('gradient_accumulation_steps', 1)))
+    return max(1, math.ceil(max(int(total_iters), 1) / grad_accumulation_steps))
+
+
 def build_mlx_lr_schedule_config_v4(cfg: dict[str, Any], *, total_iters: int) -> dict[str, Any] | None:
     schedule_cfg = cfg.get('lr_schedule')
     if isinstance(schedule_cfg, dict) and schedule_cfg:
@@ -4671,10 +4681,11 @@ def build_mlx_lr_schedule_config_v4(cfg: dict[str, Any], *, total_iters: int) ->
     if schedule_type is None:
         return None
     if schedule_type in {'cosine', 'cosine_decay'}:
-        warmup_steps = max(0, int(round(float(cfg.get('warmup_ratio', 0.0)) * max(total_iters, 1))))
+        optimizer_steps = resolve_optimizer_steps_v4(cfg, total_iters=total_iters)
+        warmup_steps = max(0, int(round(float(cfg.get('warmup_ratio', 0.0)) * optimizer_steps)))
         return {
             'name': 'cosine_decay',
-            'arguments': [float(cfg.get('learning_rate', 1e-4)), int(max(total_iters, 1))],
+            'arguments': [float(cfg.get('learning_rate', 1e-4)), optimizer_steps],
             'warmup': warmup_steps,
         }
     raise ValueError(f'Unsupported MLX lr_schedule_type: {schedule_type}')
@@ -4844,6 +4855,7 @@ def run_train_sft(args: argparse.Namespace) -> None:
 
 def run_build_baseline_sft_pack_v4(args: argparse.Namespace) -> None:
     import pandas as pd
+    from transformers import AutoTokenizer
 
     input_path = _require_existing_path(args.input_path, label='baseline train csv')
     output_path = Path(args.output_path)
@@ -4856,16 +4868,35 @@ def run_build_baseline_sft_pack_v4(args: argparse.Namespace) -> None:
         frame = frame.sample(n=subsample_size, random_state=subsample_seed).reset_index(drop=True)
     frame['format_policy'] = 'boxed'
     frame['source_dataset'] = 'baseline_notebook'
-    frame['prompt_instruction'] = resolve_prompt_instruction(
+    prompt_instruction = resolve_prompt_instruction(
         getattr(args, 'prompt_instruction', None),
         default=NOTEBOOK_BOXED_PROMPT_INSTRUCTION,
     )
+    frame['prompt_instruction'] = prompt_instruction
+    base_model = resolve_training_base_model(getattr(args, 'base_model', None), load_active_model_manifest_v4())
+    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    def render_notebook_text(row: dict[str, Any]) -> str:
+        prompt = normalize_optional_text(row.get('prompt'))
+        answer = normalize_optional_text(row.get('answer'))
+        if prompt is None or answer is None:
+            raise ValueError('baseline notebook rows must include prompt and answer')
+        messages = [
+            {'role': 'user', 'content': build_training_prompt(prompt, prompt_instruction)},
+            {'role': 'assistant', 'content': render_answer_completion(answer, 'boxed')},
+        ]
+        return str(tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False))
+
+    frame['text'] = [render_notebook_text(row) for row in frame.to_dict(orient='records')]
     frame.to_parquet(output_path, index=False)
     append_experiment_log(
         'build_baseline_sft_pack_v4',
         'completed',
         input_path=str(input_path),
         output_path=str(output_path),
+        base_model=base_model,
         original_rows=original_rows,
         output_rows=len(frame),
         subsample_size=subsample_size,
@@ -4881,6 +4912,7 @@ def run_build_baseline_sft_pack_v4(args: argparse.Namespace) -> None:
                 'subsample_size': subsample_size,
                 'subsample_seed': subsample_seed,
                 'prompt_instruction': frame['prompt_instruction'].iloc[0] if not frame.empty else '',
+                'base_model': base_model,
             },
             ensure_ascii=False,
             indent=2,
@@ -4956,6 +4988,9 @@ def run_train_sft_v4(args: argparse.Namespace) -> None:
     manifest['training']['mask_prompt'] = bool(cfg.get('mask_prompt', True))
     manifest['training']['optimizer'] = str(cfg.get('optimizer', 'adam'))
     manifest['training']['num_layers'] = int(cfg.get('num_layers', 16))
+    manifest['training']['optimizer_steps'] = resolve_optimizer_steps_v4(cfg, total_iters=int(cfg.get('iters', 1)))
+    if 'max_grad_norm' in cfg:
+        manifest['training']['max_grad_norm'] = float(cfg.get('max_grad_norm', 0.0))
     lr_schedule_type = normalize_optional_text(cfg.get('lr_schedule_type'))
     if lr_schedule_type is not None:
         manifest['training']['lr_schedule_type'] = lr_schedule_type
@@ -6127,6 +6162,7 @@ def weighted_training_execute_v4(
     import mlx.nn as nn
     import mlx.optimizers as optim
     import numpy as np
+    from mlx.utils import tree_flatten, tree_map
     from mlx_lm import load as mlx_load
     from mlx_lm.tuner import TrainingArgs, train as tuner_train
     from mlx_lm.tuner.datasets import CacheDataset
@@ -6165,6 +6201,10 @@ def weighted_training_execute_v4(
             return len(self._data)
 
         def process(self, datum: dict[str, Any]) -> tuple[list[int], int, list[float]]:
+            raw_text = normalize_optional_text(datum.get('text'))
+            if raw_text is not None:
+                tokens = list(self.tokenizer.encode(raw_text, add_special_tokens=False))
+                return (tokens, 0, [1.0] * len(tokens))
             prompt = str(datum['prompt'])
             completion = str(datum['completion'])
             messages = [{'role': 'user', 'content': prompt}, {'role': 'assistant', 'content': completion}]
@@ -6232,6 +6272,41 @@ def weighted_training_execute_v4(
         ce = ce.astype(mx.float32).sum() / denom
         return ce, ntoks
 
+    def clip_gradient_tree(grad: Any, max_grad_norm: float) -> Any:
+        if max_grad_norm <= 0:
+            return grad
+        squared_norm = None
+        for _, value in tree_flatten(grad):
+            if value is None:
+                continue
+            value_f32 = value.astype(mx.float32)
+            term = (value_f32 * value_f32).sum()
+            squared_norm = term if squared_norm is None else squared_norm + term
+        if squared_norm is None:
+            return grad
+        grad_norm = mx.sqrt(squared_norm)
+        clip_scale = mx.minimum(
+            mx.array(1.0, dtype=mx.float32),
+            mx.array(float(max_grad_norm), dtype=mx.float32) / (grad_norm + 1e-6),
+        )
+        return tree_map(lambda value: value * clip_scale if value is not None else None, grad)
+
+    class GradientClippedOptimizer:
+        def __init__(self, base_optimizer: Any, max_grad_norm: float) -> None:
+            self._base_optimizer = base_optimizer
+            self._max_grad_norm = float(max_grad_norm)
+
+        @property
+        def state(self) -> Any:
+            return self._base_optimizer.state
+
+        @property
+        def learning_rate(self) -> Any:
+            return self._base_optimizer.learning_rate
+
+        def update(self, model: Any, grad: Any) -> Any:
+            return self._base_optimizer.update(model, clip_gradient_tree(grad, self._max_grad_norm))
+
     callback = MetricsCallback()
     model, tokenizer = mlx_load(base_model)
     model.freeze()
@@ -6272,6 +6347,7 @@ def weighted_training_execute_v4(
             'weighted_loss': weighted_loss_enabled,
             'mask_prompt': mask_prompt,
             'optimizer': str(cfg.get('optimizer', 'adam')),
+            'max_grad_norm': float(cfg.get('max_grad_norm', 0.0)),
             'prompt_instruction': prompt_instruction,
             'rationale_weight': float(cfg.get('rationale_weight', 1.0)),
             'final_line_weight': float(cfg.get('final_line_weight', 3.0)),
@@ -6286,6 +6362,9 @@ def weighted_training_execute_v4(
         total_iters=int(cfg.get('iters', 1)),
         default_learning_rate=1e-4,
     )
+    max_grad_norm = float(cfg.get('max_grad_norm', 0.0))
+    if max_grad_norm > 0:
+        optimizer = GradientClippedOptimizer(optimizer, max_grad_norm=max_grad_norm)
     training_args = TrainingArgs(
         batch_size=int(cfg.get('per_device_train_batch_size', 1)),
         iters=int(cfg.get('iters', 1)),
@@ -7385,6 +7464,7 @@ def build_parser() -> argparse.ArgumentParser:
     build_baseline_sft_pack_parser.add_argument('--output-path', default=str(VERSION_ROOT / 'data' / 'train_packs' / 'baseline_notebook_sft_600.parquet'))
     build_baseline_sft_pack_parser.add_argument('--subsample-size', type=int, default=600)
     build_baseline_sft_pack_parser.add_argument('--subsample-seed', type=int, default=42)
+    build_baseline_sft_pack_parser.add_argument('--base-model', default='model')
     build_baseline_sft_pack_parser.add_argument('--prompt-instruction', default=NOTEBOOK_BOXED_PROMPT_INSTRUCTION)
     build_baseline_sft_pack_parser.set_defaults(func=run_build_baseline_sft_pack_v4)
 
