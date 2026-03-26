@@ -248,6 +248,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/42_binary_hybrid_consensus_recovery.md` | binary の single-missing-bit hybrid consensus で `20 answer-only` を新規回収した根拠 |
 | `reports/43_binary_structured_byte_formula_recovery.md` | structured byte formula family で binary manual `189` 行を新規 `verified` に昇格した根拠 |
 | `reports/45_binary_structured_byte_abstract_recovery.md` | abstract structured-byte family で singleton tail `29` 行を追加 `verified` に昇格した根拠 |
+| `reports/46_binary_structured_byte_threshold_sweep.md` | abstract threshold を緩めても gain が薄いことを確認し、現在の conservative rule を維持した根拠 |
 
 ## 8. 最短の読み順
 
