@@ -6,9 +6,9 @@ Review manual `symbol_numeric_same_op` rows whose gold query answer superficiall
 
 ## Decision
 
-- rows checked: `40`
+- rows checked: `38`
 - `same_operator_examples_conflict`: `38`
-- `query_format_ambiguous`: `2`
+- `query_format_ambiguous`: `0`
 - promoted rows: `0`
 - decision: keep all of these rows in `manual_audit_priority`.
 
@@ -21,13 +21,11 @@ Review manual `symbol_numeric_same_op` rows whose gold query answer superficiall
 | abs_diff_2d\|x_minus_y | same_operator_examples_conflict | 9 |
 | abs_diff_2d | same_operator_examples_conflict | 3 |
 | x_minus_y | same_operator_examples_conflict | 3 |
-| abs_diff_2d\|x_minus_y | query_format_ambiguous | 2 |
 
 ## Representative rows
 
 | id | query_raw | query_only_matching_families | rejection_reason | candidate_predictions | prompt_example_lines |
 | --- | --- | --- | --- | --- | --- |
-| 094bf548 | 80:32 | abs_diff_2d\|x_minus_y | query_format_ambiguous | -48\|48\|:48 | 88(64 = 8864 \|\| 27:81 = 54 \|\| 52:57 = 5 \|\| 25:81 = 56 |
 | 0641ef58 | 54-89 | x_minus_y | same_operator_examples_conflict |  | 76-68 = -91 \|\| 16-61 = -54 \|\| 39-02 = -37 \|\| 36+88 = 151 \|\| 85+12 = 97 |
 | 08d8d7e1 | 65+23 | x_plus_y | same_operator_examples_conflict |  | 41+98 = 301 \|\| 94+07 = 911 \|\| 06*49 = 4906 \|\| 95*27 = 2795 |
 
@@ -35,8 +33,6 @@ Review manual `symbol_numeric_same_op` rows whose gold query answer superficiall
 
 | id | query_raw | answer | query_only_matching_families | same_operator_example_count | candidate_prediction_count | rejection_reason |
 | --- | --- | --- | --- | --- | --- | --- |
-| 094bf548 | 80:32 | 48 | abs_diff_2d\|x_minus_y | 3 | 3 | query_format_ambiguous |
-| 904e3a54 | 76:10 | 66 | abs_diff_2d\|x_minus_y | 2 | 2 | query_format_ambiguous |
 | d78128b2 | 73-21 | 52 | abs_diff_2d\|x_minus_y | 4 | 0 | same_operator_examples_conflict |
 | df309eeb | 02%79 | 77 | abs_diff_2d | 4 | 0 | same_operator_examples_conflict |
 | 0641ef58 | 54-89 | -35 | x_minus_y | 3 | 0 | same_operator_examples_conflict |

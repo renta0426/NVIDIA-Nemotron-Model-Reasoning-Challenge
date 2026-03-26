@@ -18,17 +18,16 @@ Collect the full union of query-only and known-family mimic rows so round2 can d
 | x_plus_y | same_operator_examples_conflict | 11 |
 | abs_diff_2d\|x_minus_y | same_operator_examples_conflict | 9 |
 | abs_diff_2d | low_shot_example_conflict | 4 |
+| abs_diff_2d | query_format_ambiguous | 4 |
 | abs_diff_2d | same_operator_examples_conflict | 3 |
 | x_minus_y | same_operator_examples_conflict | 3 |
-| abs_diff_2d | query_format_ambiguous | 2 |
 | abs_diff_2d_op_suffix | low_shot_example_conflict | 2 |
 | abs_diff_2d_op_suffix | same_operator_examples_conflict | 2 |
-| abs_diff_2d\|x_minus_y | query_format_ambiguous | 2 |
 
 ## Source split
 
-- report 17 rows: `40`
-- extra known-family rows (union minus report 17): `26`
+- report 17 rows: `38`
+- extra known-family rows (union minus report 17): `28`
 
 ## Interpretation
 

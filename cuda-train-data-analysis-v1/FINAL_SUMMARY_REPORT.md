@@ -23,14 +23,14 @@
 | selection_tier | rows | share |
 | --- | ---: | ---: |
 | `verified_trace_ready` | 6,086 | 64.1% |
-| `answer_only_keep` | 1,147 | 12.1% |
-| `manual_audit_priority` | 2,240 | 23.6% |
+| `answer_only_keep` | 1,149 | 12.1% |
+| `manual_audit_priority` | 2,238 | 23.6% |
 | `exclude_suspect` | 27 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,086 + 1,147 = 7,233` 行（`76.1%`）
-- 未解決 / 要注意: `2,240 + 27 = 2,267` 行（`23.9%`）
+- 安全側の学習コア: `6,086 + 1,149 = 7,235` 行（`76.2%`）
+- 未解決 / 要注意: `2,238 + 27 = 2,265` 行（`23.8%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -42,7 +42,7 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 604 | 35 | 947 | 16 | 主要な残課題 |
-| `symbol_equation` | 1,555 | 110 | 141 | 1,293 | 11 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 110 | 143 | 1,291 | 11 | 主要な残課題 |
 
 ### 解釈
 
@@ -107,7 +107,8 @@ symbol では、broader template scan の後に **operator-specific formula-form
 - さらに `*` の `x_minus_y :: prefix_if_negative` を `same_operator_example_count == 1` の zero-error subgroup に絞り、`3 answer-only` を追加回収
 - さらに prompt-exact な direct `-` plain subfamily（signed / abs）を切り分け、`3 answer-only` を追加回収
 - さらに `!` / `"` の prompt-exact thin support-2 subfamily を `2 answer-only` 回収した
-- current symbol は `110 verified / 141 answer_only / 1293 manual / 11 exclude`
+- さらに `:` の manual exact reread で `2 answer-only` を追加回収した
+- current symbol は `110 verified / 143 answer_only / 1291 manual / 11 exclude`
 - これは unique trace ではないので、`verified` ではなく conservative `answer_only` に留めている
 
 ### 4.4 symbol / glyph pass1 の詳細
@@ -135,9 +136,9 @@ symbol は大きく 2 つに分かれました。
 
 ### 4.5 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **497 行** まで縮みました。
+最優先で人手確認すべき pack は **495 行** まで縮みました。
 
-- `334` 行: `symbol_numeric_same_op`
+- `332` 行: `symbol_numeric_same_op`
 - `117` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
@@ -186,6 +187,7 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/symbol_star_prefix_if_negative_candidates_v1.csv` | 新しい `*` subfamily に触れる row の台帳 |
 | `artifacts/symbol_thin_support2_subfamily_support_v1.csv` | `!` / `"` の prompt-exact support-2 subfamily の support 台帳 |
 | `artifacts/symbol_thin_support2_subfamily_candidates_v1.csv` | thin support-2 subfamily に触れる row の台帳 |
+| `artifacts/symbol_manual_prompt_exact_answer_only_candidates_v1.csv` | direct prompt reread で `answer_only_keep` に確定した `:` residual 2 行の台帳 |
 | `artifacts/symbol_operator_specific_formula_support_v1.csv` | operator-specific `(formula, format)` の support / error 集計 |
 | `artifacts/symbol_operator_specific_formula_candidates_v1.csv` | safe operator-local spec に触れる numeric symbol 行の台帳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した prompt-backed symbol 行（concat / abs-diff / comp99）の一覧 |
@@ -294,6 +296,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/54_binary_structured_byte_support3_answer_only.md` | `support=3 / distinct=3 / error=0` の narrow structured-byte family を採用し、binary manual 2 行を追加回収した根拠 |
 | `reports/55_symbol_thin_support2_recovery.md` | `!` / `"` の prompt-exact support-2 subfamily を採用し、symbol manual 2 行を追加回収した根拠 |
 | `reports/56_binary_structured_byte_manual_exact_curation.md` | structured-byte residual の prompt を直接読み、binary manual 5 行を `verified`、1 行を `exclude_suspect` に確定した根拠 |
+| `reports/57_symbol_colon_manual_exact_answer_only.md` | `:` residual を直接読み、symbol manual 2 行を `answer_only_keep` に確定した根拠 |
 
 ## 8. 最短の読み順
 
@@ -329,14 +332,15 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.2 symbol がまだ重い
 
-- `symbol_equation` は `1,293 manual + 11 exclude`
+- `symbol_equation` は `1,291 manual + 11 exclude`
 - `numeric_2x2` は operator-aware と prompt-backed pass1 でかなり整理でき、`comp99_abs_diff_2d` を operator-prefixed zero-pad まで広げたことで累計 `2 verified + 9 answer-only` を回収し、さらに exact mismatch `1` 行を `exclude_suspect` に移した
 - さらに operator-specific formula-format consensus により `16 answer-only` を追加回収できた
 - さらに `-` の prefixed abs-diff near-miss を zero-error subfamily へ切り分け、manual `3` 行を `answer_only_keep` に昇格できた
 - さらに `*` の `x_minus_y :: prefix_if_negative` を `same_operator_example_count == 1` の zero-error subgroup に絞り、manual `3` 行を `answer_only_keep` に昇格できた
 - さらに prompt-exact な direct `-` plain subfamily（signed / abs）を切り分け、manual `3` 行を `answer_only_keep` に昇格できた
 - さらに `!` / `"` の prompt-exact thin support-2 subfamily から manual `2` 行を `answer_only_keep` に昇格できた
-- それでも pass1 にはまだ `334` 行が残る
+- さらに `:` の direct prompt reread から manual `2` 行を `answer_only_keep` に昇格できた
+- それでも pass1 にはまだ `332` 行が残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d / comp99_abs_diff_2d` に見える `43` 行も再照合したが、`38` 行は same-op examples と衝突、`5` 行は format が一意化できず、**追加昇格 0**
 - report 17 の high-shot mimic `43` 行に、extra known-family / low-shot mimic を足した current mimic union は `67` 行となり、round2 の `symbol` 本丸は `282` 行まで圧縮できた

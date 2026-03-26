@@ -3304,6 +3304,97 @@ def apply_symbol_thin_support2_promotions(analysis_df: pd.DataFrame) -> tuple[pd
     return analysis_df, support_df, candidate_df
 
 
+SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS: dict[str, dict[str, str]] = {
+    "094bf548": {
+        "query_operator": ":",
+        "predicted_answer": "48",
+        "decision_note": "colon_manual_abs_diff_answer_only",
+    },
+    "904e3a54": {
+        "query_operator": ":",
+        "predicted_answer": "66",
+        "decision_note": "colon_manual_prefix_branch_answer_only",
+    },
+}
+
+
+def apply_symbol_manual_prompt_exact_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "predicted_answer",
+        "decision_note",
+    ]
+    candidate_df = pd.DataFrame(columns=candidate_columns)
+    candidate_ids = set(SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS)
+    if not candidate_ids:
+        return analysis_df, candidate_df
+
+    expected_operator_map = {
+        row_id: spec["query_operator"] for row_id, spec in SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS.items()
+    }
+    expected_prediction_map = {
+        row_id: spec["predicted_answer"] for row_id, spec in SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS.items()
+    }
+    promote_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & analysis_df["id"].astype(str).isin(candidate_ids)
+        & (
+            analysis_df["id"].astype(str).map(expected_operator_map).fillna("")
+            == analysis_df["symbol_query_operator"].astype(str)
+        )
+        & (
+            analysis_df["id"].astype(str).map(expected_prediction_map).fillna("")
+            == analysis_df["answer"].astype(str)
+        )
+    )
+    if not promote_mask.any():
+        return analysis_df, candidate_df
+
+    candidate_df = analysis_df.loc[
+        promote_mask,
+        [
+            "id",
+            "selection_tier",
+            "symbol_query_operator",
+            "symbol_same_operator_example_count",
+            "query_raw",
+            "answer",
+        ],
+    ].copy()
+    candidate_df = candidate_df.rename(
+        columns={
+            "symbol_query_operator": "query_operator",
+            "symbol_same_operator_example_count": "same_operator_example_count",
+        }
+    )
+    candidate_df["predicted_answer"] = candidate_df["id"].astype(str).map(expected_prediction_map)
+    candidate_df["decision_note"] = candidate_df["id"].astype(str).map(
+        lambda row_id: SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS[row_id]["decision_note"]
+    )
+
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "id"].astype(str).map(expected_prediction_map)
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = "symbol_manual_prompt_exact_answer_only"
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(["query_operator", "same_operator_example_count", "id"], ascending=[True, False, True]).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
 def collect_symbol_star_prefix_if_negative_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     match_info = collect_symbol_numeric_operator_formula_matches(prompt, query_text, answer)
     query_operator = str(match_info["query_operator"])
@@ -4563,6 +4654,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
     analysis_df, symbol_minus_direct_support_df, symbol_minus_direct_candidate_df = apply_symbol_minus_direct_plain_promotions(analysis_df)
     analysis_df, symbol_thin_support2_support_df, symbol_thin_support2_candidate_df = apply_symbol_thin_support2_promotions(analysis_df)
+    analysis_df, symbol_manual_exact_candidate_df = apply_symbol_manual_prompt_exact_answer_only_curation(analysis_df)
     analysis_df, symbol_star_prefix_support_df, symbol_star_prefix_candidate_df = apply_symbol_star_prefix_if_negative_promotions(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
@@ -4786,6 +4878,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_minus_direct_candidate_df, artifacts_dir / "symbol_minus_direct_plain_candidates_v1.csv")
     write_dataframe(symbol_thin_support2_support_df, artifacts_dir / "symbol_thin_support2_subfamily_support_v1.csv")
     write_dataframe(symbol_thin_support2_candidate_df, artifacts_dir / "symbol_thin_support2_subfamily_candidates_v1.csv")
+    write_dataframe(symbol_manual_exact_candidate_df, artifacts_dir / "symbol_manual_prompt_exact_answer_only_candidates_v1.csv")
     write_dataframe(symbol_star_prefix_support_df, artifacts_dir / "symbol_star_prefix_if_negative_support_v1.csv")
     write_dataframe(symbol_star_prefix_candidate_df, artifacts_dir / "symbol_star_prefix_if_negative_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
