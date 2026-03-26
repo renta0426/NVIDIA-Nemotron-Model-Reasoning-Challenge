@@ -11,6 +11,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from functools import lru_cache
+from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +103,11 @@ BIT_HYBRID_BOOLEAN3_OPERATIONS = {
     "or3": lambda a, b, c: 1 if (a | b | c) else 0,
     "and3": lambda a, b, c: 1 if (a & b & c) else 0,
 }
+BIT_STRUCTURED_BYTE_BINARY_OPERATIONS = {
+    "xor": lambda a, b: a ^ b,
+    "and": lambda a, b: a & b,
+    "or": lambda a, b: a | b,
+}
 
 SYMBOL_NUMERIC_EXPRESSION_PATTERN = re.compile(r"^(\d{2})(.)(\d{2})$")
 SYMBOL_NUMERIC_FORMULAS = {
@@ -192,6 +198,25 @@ def answers_match(gold_answer: str, predicted_answer: str) -> bool:
 
 def invert_bit(bit: str) -> str:
     return "1" if bit == "0" else "0"
+
+
+def rotate_left_byte(value: int, shift: int) -> int:
+    shift %= 8
+    return (((value & 0xFF) << shift) & 0xFF) | ((value & 0xFF) >> (8 - shift))
+
+
+def rotate_right_byte(value: int, shift: int) -> int:
+    shift %= 8
+    return ((value & 0xFF) >> shift) | (((value & 0xFF) << (8 - shift)) & 0xFF)
+
+
+def reverse_byte_bits(value: int) -> int:
+    return int(format(value & 0xFF, "08b")[::-1], 2)
+
+
+def nibble_swap_byte(value: int) -> int:
+    bits = format(value & 0xFF, "08b")
+    return int(bits[4:] + bits[:4], 2)
 
 
 def json_dumps(value: Any) -> str:
@@ -1059,6 +1084,48 @@ def infer_bit_byte_transform_answer(examples: list[tuple[str, str]], query_bits:
 
 
 @lru_cache(maxsize=1)
+def build_bit_structured_byte_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    raw_sources = [
+        ("x", lambda value: value & 0xFF),
+        ("reverse", reverse_byte_bits),
+        ("nibble_swap", nibble_swap_byte),
+    ]
+    for shift in range(1, 8):
+        raw_sources.append((f"rol{shift}", lambda value, shift=shift: rotate_left_byte(value, shift)))
+        raw_sources.append((f"ror{shift}", lambda value, shift=shift: rotate_right_byte(value, shift)))
+    for shift in range(1, 4):
+        raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
+        raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
+
+    canonical_sources: dict[tuple[int, ...], str] = {}
+    for name, function in raw_sources:
+        signature = tuple(function(value) & 0xFF for value in range(256))
+        canonical_sources.setdefault(signature, name)
+    sources = [(name, signature) for signature, name in sorted(canonical_sources.items(), key=lambda item: item[1])]
+
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in sources:
+        formulas.setdefault(signature, name)
+    for (name_a, signature_a), (name_b, signature_b) in combinations_with_replacement(sources, 2):
+        for op_name, operation in BIT_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+            signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
+            formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+def infer_bit_structured_byte_formula_matches(examples: list[tuple[str, str]], query_bits: str) -> list[tuple[str, str]]:
+    if len(query_bits) != 8 or not examples:
+        return []
+    pairs = [(int(input_bits, 2), int(output_bits, 2)) for input_bits, output_bits in examples]
+    query_value = int(query_bits, 2)
+    matches: list[tuple[str, str]] = []
+    for formula_name, signature in build_bit_structured_byte_formulas():
+        if all(signature[input_value] == output_value for input_value, output_value in pairs):
+            matches.append((formula_name, format(signature[query_value] & 0xFF, "08b")))
+    return matches
+
+
+@lru_cache(maxsize=1)
 def build_bit_hybrid_boolean_candidates() -> tuple[tuple[str, tuple[int, ...], Any], ...]:
     candidates: list[tuple[str, tuple[int, ...], Any]] = []
 
@@ -1410,6 +1477,13 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
             "bit_hybrid_consensus_varset": "",
             "bit_hybrid_consensus_match_count": 0,
             "bit_hybrid_consensus_prediction_count": 0,
+            "bit_structured_formula_name": "",
+            "bit_structured_formula_prediction": "",
+            "bit_structured_formula_matches_gold": False,
+            "bit_structured_formula_match_count": 0,
+            "bit_structured_formula_prediction_count": 0,
+            "bit_structured_formula_safe_support": 0,
+            "bit_structured_formula_safe": False,
         }
     candidate_sets = build_bit_candidate_sets(examples)
     independent_answer, independent_choice_counts = infer_bit_independent_answer(candidate_sets, query_bits)
@@ -1419,6 +1493,10 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     boolean3_answer, boolean3_value_counts, boolean3_support_counts = infer_bit_three_bit_boolean_answer(examples, query_bits)
     affine_answer, affine_free_var_counts = infer_bit_affine_xor_answer(examples, query_bits)
     byte_transform_answer, byte_transform_names = infer_bit_byte_transform_answer(examples, query_bits)
+    structured_formula_matches = infer_bit_structured_byte_formula_matches(examples, query_bits)
+    structured_formula_predictions = sorted({prediction for _, prediction in structured_formula_matches})
+    structured_formula_name = structured_formula_matches[0][0] if len(structured_formula_matches) == 1 else ""
+    structured_formula_prediction = structured_formula_predictions[0] if len(structured_formula_predictions) == 1 else ""
     hybrid_answer, hybrid_info = infer_bit_hybrid_consensus_answer(examples, candidate_sets, query_bits)
     strict_prediction = bijection_answer or (independent_answer or "")
     fallback_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (hybrid_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
@@ -1537,6 +1615,11 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
                 "hybrid_consensus_prediction_count": hybrid_info["prediction_count"],
                 "hybrid_consensus_varset": hybrid_info["varset"],
                 "hybrid_consensus_sample_matches": hybrid_info["sample_matches"],
+                "structured_formula_name": structured_formula_name,
+                "structured_formula_match_count": len(structured_formula_matches),
+                "structured_formula_prediction_count": len(structured_formula_predictions),
+                "structured_formula_prediction": structured_formula_prediction,
+                "structured_formula_sample_matches": [name for name, _ in structured_formula_matches[:8]],
                 "affine_low_gap_mismatch": affine_low_gap_mismatch,
             }
         ),
@@ -1559,6 +1642,13 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "bit_hybrid_consensus_varset": str(hybrid_info["varset"]),
         "bit_hybrid_consensus_match_count": int(hybrid_info["match_count"]),
         "bit_hybrid_consensus_prediction_count": int(hybrid_info["prediction_count"]),
+        "bit_structured_formula_name": structured_formula_name,
+        "bit_structured_formula_prediction": structured_formula_prediction,
+        "bit_structured_formula_matches_gold": bool(structured_formula_prediction and structured_formula_prediction == str(answer)),
+        "bit_structured_formula_match_count": int(len(structured_formula_matches)),
+        "bit_structured_formula_prediction_count": int(len(structured_formula_predictions)),
+        "bit_structured_formula_safe_support": 0,
+        "bit_structured_formula_safe": False,
     }
 
 
@@ -1847,6 +1937,13 @@ def analyze_row(v1: Any, metadata_record: dict[str, Any]) -> dict[str, Any]:
         "bit_hybrid_consensus_varset": family_result.get("bit_hybrid_consensus_varset", ""),
         "bit_hybrid_consensus_match_count": int(family_result.get("bit_hybrid_consensus_match_count", 0)),
         "bit_hybrid_consensus_prediction_count": int(family_result.get("bit_hybrid_consensus_prediction_count", 0)),
+        "bit_structured_formula_name": family_result.get("bit_structured_formula_name", ""),
+        "bit_structured_formula_prediction": family_result.get("bit_structured_formula_prediction", ""),
+        "bit_structured_formula_matches_gold": bool(family_result.get("bit_structured_formula_matches_gold", False)),
+        "bit_structured_formula_match_count": int(family_result.get("bit_structured_formula_match_count", 0)),
+        "bit_structured_formula_prediction_count": int(family_result.get("bit_structured_formula_prediction_count", 0)),
+        "bit_structured_formula_safe_support": int(family_result.get("bit_structured_formula_safe_support", 0)),
+        "bit_structured_formula_safe": bool(family_result.get("bit_structured_formula_safe", False)),
         "text_wordmap_predicted_answer": family_result.get("text_wordmap_predicted_answer", ""),
         "text_unknown_char_count": int(family_result.get("text_unknown_char_count", 0)),
         "text_unknown_chars": family_result.get("text_unknown_chars", ""),
@@ -1870,6 +1967,92 @@ def grouped_counts(frame: pd.DataFrame, group_columns: list[str], name: str = "r
         .sort_values([name] + group_columns, ascending=[False] + [True] * len(group_columns))
         .reset_index(drop=True)
     )
+
+
+def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    bit_mask = analysis_df["family"] == "bit_manipulation"
+    unique_formula_mask = (
+        bit_mask
+        & (analysis_df["bit_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_structured_formula_name"].astype(str) != "")
+    )
+    unique_formula_df = analysis_df.loc[unique_formula_mask].copy()
+    support_df = pd.DataFrame(
+        columns=[
+            "bit_structured_formula_name",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "safe_formula",
+        ]
+    )
+    safe_formula_names: set[str] = set()
+    if not unique_formula_df.empty:
+        support_df = (
+            unique_formula_df.groupby("bit_structured_formula_name", dropna=False)
+            .agg(
+                support_rows=("id", "size"),
+                gold_match_rows=("bit_structured_formula_matches_gold", "sum"),
+            )
+            .reset_index()
+        )
+        support_df["support_rows"] = support_df["support_rows"].astype(int)
+        support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+        support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+        support_df["safe_formula"] = (support_df["support_rows"] >= 2) & (support_df["error_rows"] == 0)
+        safe_formula_names = set(support_df.loc[support_df["safe_formula"], "bit_structured_formula_name"].astype(str))
+
+    safe_support_map = {
+        str(row["bit_structured_formula_name"]): int(row["support_rows"])
+        for row in support_df.to_dict(orient="records")
+    }
+    analysis_df["bit_structured_formula_safe_support"] = (
+        analysis_df["bit_structured_formula_name"].map(safe_support_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_structured_formula_safe"] = analysis_df["bit_structured_formula_name"].astype(str).isin(safe_formula_names)
+
+    promote_mask = (
+        bit_mask
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & analysis_df["bit_structured_formula_safe"]
+        & analysis_df["bit_structured_formula_matches_gold"]
+        & (analysis_df["bit_structured_formula_match_count"] == 1)
+    )
+    analysis_df.loc[promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+    analysis_df.loc[promote_mask, "teacher_solver_candidate"] = "binary_structured_byte_formula"
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "bit_structured_formula_prediction"]
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = "bit_structured_byte_exact"
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = (
+        analysis_df.loc[bit_mask & (analysis_df["bit_structured_formula_match_count"] > 0)]
+        .sort_values(
+            [
+                "selection_tier",
+                "bit_structured_formula_safe_support",
+                "bit_structured_formula_match_count",
+                "id",
+            ],
+            ascending=[True, False, True, True],
+        )
+        .reset_index(drop=True)
+    )
+    support_df = support_df.sort_values(
+        ["safe_formula", "support_rows", "gold_match_rows", "bit_structured_formula_name"],
+        ascending=[False, False, False, True],
+    ).reset_index(drop=True)
+    analysis_df = (
+        analysis_df.sort_values(["family", "selection_tier", "audit_priority_score", "id"], ascending=[True, True, False, True])
+        .reset_index(drop=True)
+    )
+    return analysis_df, support_df, candidate_df
 
 
 def write_dataframe(frame: pd.DataFrame, path: Path) -> None:
@@ -2934,7 +3117,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     manual_audit_seed_df = v1.build_manual_audit_frame(metadata_df)
 
     analysis_records = [analyze_row(v1, record) for record in metadata_df.to_dict(orient="records")]
-    analysis_df = pd.DataFrame(analysis_records).sort_values(["family", "selection_tier", "audit_priority_score", "id"], ascending=[True, True, False, True]).reset_index(drop=True)
+    analysis_df = pd.DataFrame(analysis_records)
+    analysis_df, structured_formula_support_df, structured_formula_candidate_df = apply_bit_structured_formula_promotions(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -3027,6 +3211,17 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         ]
         .sort_values(["selection_tier", "bit_hybrid_consensus_varset", "bit_hybrid_consensus_match_count", "id"], ascending=[True, True, False, True])
         .reset_index(drop=True)
+    )
+    binary_structured_formula_df = (
+        structured_formula_candidate_df.sort_values(
+            [
+                "selection_tier",
+                "bit_structured_formula_safe_support",
+                "bit_structured_formula_name",
+                "id",
+            ],
+            ascending=[True, False, True, True],
+        ).reset_index(drop=True)
     )
     glyph_summary_df = grouped_counts(
         analysis_df.loc[
@@ -3131,6 +3326,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_affine_exclude_df, artifacts_dir / "binary_affine_low_gap_exclude_v1.csv")
     write_dataframe(binary_affine_manual_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
     write_dataframe(binary_hybrid_consensus_df, artifacts_dir / "binary_hybrid_consensus_candidates_v1.csv")
+    write_dataframe(binary_structured_formula_df, artifacts_dir / "binary_structured_byte_formula_candidates_v1.csv")
+    write_dataframe(structured_formula_support_df, artifacts_dir / "binary_structured_byte_formula_support_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")

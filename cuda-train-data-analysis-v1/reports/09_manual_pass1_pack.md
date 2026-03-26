@@ -5,7 +5,7 @@
 | audit_focus | family | rows |
 | --- | --- | --- |
 | symbol_numeric_same_op | symbol_equation | 361 |
-| binary_low_gap | bit_manipulation | 123 |
+| binary_low_gap | bit_manipulation | 118 |
 | symbol_glyph_multiset | symbol_equation | 46 |
 
 ## Top rows in pass1 pack
@@ -37,7 +37,6 @@
 | binary_low_gap | 73d0b62c | bit_manipulation | bit_other | 5.0 | 10000111 | 00111010 |
 | binary_low_gap | 7669569d | bit_manipulation | bit_other | 5.0 | 01100010 | 00100110 |
 | binary_low_gap | 78d9d61d | bit_manipulation | bit_other | 5.0 | 00001001 | 00100110 |
-| binary_low_gap | 892d73b5 | bit_manipulation | bit_permutation_inversion | 5.0 | 00010101 | 10101000 |
 | binary_low_gap | 98bbac0f | bit_manipulation | bit_other | 5.0 | 01101011 | 10101101 |
 | binary_low_gap | 9ab82dfb | bit_manipulation | bit_other | 5.0 | 10011100 | 11100110 |
 | binary_low_gap | c23fca57 | bit_manipulation | bit_other | 5.0 | 00101100 | 01000001 |
@@ -52,5 +51,6 @@
 | binary_low_gap | 0f1bc0ff | bit_manipulation | bit_other | 3.0 | 01100100 | 10010110 |
 | binary_low_gap | 114a7439 | bit_manipulation | bit_other | 3.0 | 01110001 | 00111110 |
 | binary_low_gap | 12897b38 | bit_manipulation | bit_other | 3.0 | 00100110 | 00110101 |
+| binary_low_gap | 132ec6ae | bit_manipulation | bit_other | 3.0 | 11101100 | 00100111 |
 
 Use `artifacts/manual_pass1_priority_pack_v1.csv` as the first human-review queue.
