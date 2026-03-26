@@ -316,20 +316,14 @@ def iter_symbol_numeric_formatters(formula_name: str) -> list[tuple[str, Any]]:
     return [(format_name, SYMBOL_NUMERIC_FORMATS[format_name]) for format_name in format_names]
 
 
-def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+def collect_symbol_numeric_operator_formula_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
     if query_match is None:
         return {
-            "solver_name": "",
-            "predicted_answer": "",
-            "matches_gold": False,
-            "same_operator_example_count": 0,
-            "candidate_prediction_count": 0,
-            "candidate_predictions": [],
-            "formula_name": "",
-            "format_name": "",
             "query_operator": "",
-            "low_shot": False,
+            "same_operator_example_count": 0,
+            "candidate_predictions": [],
+            "winning_specs": [],
         }
     query_x_text = query_match.group(1)
     query_operator = query_match.group(2)
@@ -372,6 +366,32 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
             predicted_answer = formatter(query_operator, query_numeric_value)
             candidate_predictions.add(predicted_answer)
             winning_specs.append((formula_name, format_name, predicted_answer))
+    return {
+        "query_operator": query_operator,
+        "same_operator_example_count": len(same_operator_examples),
+        "candidate_predictions": sorted(candidate_predictions),
+        "winning_specs": winning_specs,
+    }
+
+
+def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+    match_info = collect_symbol_numeric_operator_formula_matches(prompt, query_text, answer)
+    if not match_info["query_operator"]:
+        return {
+            "solver_name": "",
+            "predicted_answer": "",
+            "matches_gold": False,
+            "same_operator_example_count": 0,
+            "candidate_prediction_count": 0,
+            "candidate_predictions": [],
+            "formula_name": "",
+            "format_name": "",
+            "query_operator": "",
+            "low_shot": False,
+        }
+    query_operator = str(match_info["query_operator"])
+    candidate_predictions = set(str(value) for value in match_info["candidate_predictions"])
+    winning_specs = [(str(formula_name), str(format_name), str(predicted_answer)) for formula_name, format_name, predicted_answer in match_info["winning_specs"]]
     chosen_formula_name = ""
     chosen_format_name = ""
     predicted_answer = ""
@@ -387,13 +407,13 @@ def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: 
         "solver_name": "symbol_numeric_operator_formula" if matches_gold else "",
         "predicted_answer": predicted_answer,
         "matches_gold": matches_gold,
-        "same_operator_example_count": len(same_operator_examples),
+        "same_operator_example_count": int(match_info["same_operator_example_count"]),
         "candidate_prediction_count": len(candidate_predictions),
         "candidate_predictions": sorted(candidate_predictions),
         "formula_name": chosen_formula_name,
         "format_name": chosen_format_name,
         "query_operator": query_operator,
-        "low_shot": bool(matches_gold and len(same_operator_examples) <= 1),
+        "low_shot": bool(matches_gold and int(match_info["same_operator_example_count"]) <= 1),
     }
 
 
@@ -2209,6 +2229,162 @@ def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[
     return analysis_df, support_df, abstract_support_df, candidate_df
 
 
+def apply_symbol_operator_consensus_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    numeric_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+    )
+    support_df = pd.DataFrame(
+        columns=[
+            "query_operator",
+            "formula_name",
+            "format_name",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "safe_operator_spec",
+        ]
+    )
+    candidate_df = pd.DataFrame(
+        columns=[
+            "id",
+            "selection_tier",
+            "query_operator",
+            "same_operator_example_count",
+            "answer",
+            "query_raw",
+            "safe_prediction",
+            "safe_prediction_count",
+            "safe_spec_count",
+            "safe_support_max",
+            "safe_specs",
+            "all_predictions",
+        ]
+    )
+    if not numeric_mask.any():
+        return analysis_df, support_df, candidate_df
+
+    match_records: list[dict[str, Any]] = []
+    row_match_map: dict[str, dict[str, Any]] = {}
+    for row in analysis_df.loc[numeric_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        if int(match_info["same_operator_example_count"]) <= 0:
+            continue
+        row_match_map[str(row["id"])] = {
+            "selection_tier": str(row["selection_tier"]),
+            "answer": str(row["answer"]),
+            "query_raw": str(row["query_raw"]),
+            "query_operator": str(match_info["query_operator"]),
+            "same_operator_example_count": int(match_info["same_operator_example_count"]),
+            "winning_specs": [(str(formula_name), str(format_name), str(predicted_answer)) for formula_name, format_name, predicted_answer in match_info["winning_specs"]],
+        }
+        for formula_name, format_name, predicted_answer in match_info["winning_specs"]:
+            match_records.append(
+                {
+                    "id": str(row["id"]),
+                    "query_operator": str(match_info["query_operator"]),
+                    "formula_name": str(formula_name),
+                    "format_name": str(format_name),
+                    "predicted_answer": str(predicted_answer),
+                    "matches_gold": bool(str(predicted_answer) == str(row["answer"])),
+                    "same_operator_example_count": int(match_info["same_operator_example_count"]),
+                }
+            )
+    if not match_records:
+        return analysis_df, support_df, candidate_df
+
+    match_df = pd.DataFrame(match_records)
+    support_df = (
+        match_df.groupby(["query_operator", "formula_name", "format_name"], dropna=False)
+        .agg(
+            support_rows=("id", "size"),
+            gold_match_rows=("matches_gold", "sum"),
+        )
+        .reset_index()
+    )
+    support_df["support_rows"] = support_df["support_rows"].astype(int)
+    support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+    support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+    support_df["safe_operator_spec"] = (support_df["support_rows"] >= 2) & (support_df["error_rows"] == 0)
+    safe_spec_keys = {
+        (str(row["query_operator"]), str(row["formula_name"]), str(row["format_name"]))
+        for row in support_df.loc[support_df["safe_operator_spec"]].to_dict(orient="records")
+    }
+    support_map = {
+        (str(row["query_operator"]), str(row["formula_name"]), str(row["format_name"])): int(row["support_rows"])
+        for row in support_df.to_dict(orient="records")
+    }
+
+    candidate_rows: list[dict[str, Any]] = []
+    promote_predictions: dict[str, str] = {}
+    for row_id, info in row_match_map.items():
+        safe_matches = [
+            (formula_name, format_name, predicted_answer)
+            for formula_name, format_name, predicted_answer in info["winning_specs"]
+            if (info["query_operator"], formula_name, format_name) in safe_spec_keys
+        ]
+        if not safe_matches:
+            continue
+        safe_prediction_set = sorted({predicted_answer for _, _, predicted_answer in safe_matches})
+        safe_support_max = max(
+            support_map[(info["query_operator"], formula_name, format_name)]
+            for formula_name, format_name, _ in safe_matches
+        )
+        candidate_rows.append(
+            {
+                "id": row_id,
+                "selection_tier": info["selection_tier"],
+                "query_operator": info["query_operator"],
+                "same_operator_example_count": info["same_operator_example_count"],
+                "answer": info["answer"],
+                "query_raw": info["query_raw"],
+                "safe_prediction": safe_prediction_set[0] if len(safe_prediction_set) == 1 else "",
+                "safe_prediction_count": len(safe_prediction_set),
+                "safe_spec_count": len(safe_matches),
+                "safe_support_max": int(safe_support_max),
+                "safe_specs": "|".join(
+                    sorted(f"{info['query_operator']}::{formula_name}::{format_name}" for formula_name, format_name, _ in safe_matches)
+                ),
+                "all_predictions": "|".join(sorted({predicted_answer for _, _, predicted_answer in info["winning_specs"]})),
+            }
+        )
+        if (
+            info["selection_tier"] == "manual_audit_priority"
+            and len(safe_prediction_set) == 1
+            and safe_prediction_set[0] == info["answer"]
+        ):
+            promote_predictions[row_id] = safe_prediction_set[0]
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=list(candidate_df.columns))
+    if promote_predictions:
+        promote_mask = analysis_df["id"].astype(str).isin(set(promote_predictions))
+        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "id"].astype(str).map(promote_predictions)
+        analysis_df.loc[promote_mask, "auto_solver_match"] = True
+        analysis_df.loc[promote_mask, "answer_only_ready"] = True
+        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+        analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[promote_mask, "audit_reasons"] = ""
+        analysis_df.loc[promote_mask, "analysis_notes"] = "symbol_operator_spec_consensus"
+        analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    support_df = support_df.sort_values(
+        ["safe_operator_spec", "support_rows", "gold_match_rows", "query_operator", "formula_name", "format_name"],
+        ascending=[False, False, False, True, True, True],
+    ).reset_index(drop=True)
+    if not candidate_df.empty:
+        candidate_df = candidate_df.sort_values(
+            ["selection_tier", "safe_support_max", "safe_prediction_count", "same_operator_example_count", "id"],
+            ascending=[True, False, True, False, True],
+        ).reset_index(drop=True)
+    return analysis_df, support_df, candidate_df
+
+
 def write_dataframe(frame: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(path, index=False)
@@ -3273,6 +3449,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_records = [analyze_row(v1, record) for record in metadata_df.to_dict(orient="records")]
     analysis_df = pd.DataFrame(analysis_records)
     analysis_df, structured_formula_support_df, structured_formula_abstract_support_df, structured_formula_candidate_df = apply_bit_structured_formula_promotions(analysis_df)
+    analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -3483,6 +3660,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_structured_formula_df, artifacts_dir / "binary_structured_byte_formula_candidates_v1.csv")
     write_dataframe(structured_formula_support_df, artifacts_dir / "binary_structured_byte_formula_support_v1.csv")
     write_dataframe(structured_formula_abstract_support_df, artifacts_dir / "binary_structured_byte_abstract_support_v1.csv")
+    write_dataframe(symbol_operator_spec_support_df, artifacts_dir / "symbol_operator_specific_formula_support_v1.csv")
+    write_dataframe(symbol_operator_spec_candidate_df, artifacts_dir / "symbol_operator_specific_formula_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")

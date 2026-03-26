@@ -23,14 +23,14 @@
 | selection_tier | rows | share |
 | --- | ---: | ---: |
 | `verified_trace_ready` | 6,081 | 64.0% |
-| `answer_only_keep` | 1,107 | 11.7% |
-| `manual_audit_priority` | 2,286 | 24.1% |
+| `answer_only_keep` | 1,123 | 11.8% |
+| `manual_audit_priority` | 2,270 | 23.9% |
 | `exclude_suspect` | 26 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,081 + 1,105 = 7,186` 行（`75.6%`）
-- 未解決 / 要注意: `2,288 + 26 = 2,314` 行（`24.4%`）
+- 安全側の学習コア: `6,081 + 1,123 = 7,204` 行（`75.8%`）
+- 未解決 / 要注意: `2,270 + 26 = 2,296` 行（`24.2%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -42,7 +42,7 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 599 | 22 | 966 | 15 | 主要な残課題 |
-| `symbol_equation` | 1,555 | 110 | 114 | 1,320 | 11 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 110 | 130 | 1,304 | 11 | 主要な残課題 |
 
 ### 解釈
 
@@ -88,6 +88,20 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 
 - `605 verified`
 - `971 answer-only`
+
+### 4.3 symbol の改善
+
+symbol では、broader template scan の後に **operator-specific formula-format consensus** を追加しました。
+
+- operator ごとに `(formula_name, format_name)` の support / error を再集計
+- `support_rows >= 2` かつ `error_rows = 0` の spec だけを safe operator-local spec として採用
+- manual `numeric_2x2` 行について、safe spec 群が 1 つの query answer に一致する場合だけ `answer_only_keep` に昇格
+
+結果:
+
+- safe operator-specific consensus で `16 answer-only` を追加回収
+- current symbol は `110 verified / 130 answer_only / 1304 manual / 11 exclude`
+- これは unique trace ではないので、`verified` ではなく conservative `answer_only` に留めている
 - `0 manual`
 
 ### 4.3 symbol の改善
@@ -154,6 +168,8 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_structured_byte_abstract_support_v1.csv` | abstract structured-byte family の support / distinct-exact / error 集計 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 118 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
+| `artifacts/symbol_operator_specific_formula_support_v1.csv` | operator-specific `(formula, format)` の support / error 集計 |
+| `artifacts/symbol_operator_specific_formula_candidates_v1.csv` | safe operator-local spec に触れる numeric symbol 行の台帳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した prompt-backed symbol 行（concat / abs-diff / comp99）の一覧 |
 | `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 43 行の台帳 |
 | `artifacts/remaining_symbol_known_family_mimics_v1.csv` | low-shot を含む known-family mimic 行の台帳 |
@@ -251,6 +267,8 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/45_binary_structured_byte_abstract_recovery.md` | abstract structured-byte family で singleton tail `29` 行を追加 `verified` に昇格した根拠 |
 | `reports/46_binary_structured_byte_threshold_sweep.md` | abstract threshold を緩めても gain が薄いことを確認し、現在の conservative rule を維持した根拠 |
 | `reports/47_binary_structured_byte_multi_consensus_recovery.md` | safe abstract family を伴う same-pred multi-formula 2 行を `answer_only_keep` に昇格した根拠 |
+| `reports/48_symbol_operator_embedded_scan.md` | symbol の operator-embedded output を cross-operator prefix/suffix で再走査し、near-miss だが未採用と判断した根拠 |
+| `reports/49_symbol_operator_specific_consensus_recovery.md` | operator-specific formula-format consensus で symbol manual 16 行を `answer_only_keep` に昇格した根拠 |
 
 ## 8. 最短の読み順
 
@@ -282,8 +300,9 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.2 symbol がまだ重い
 
-- `symbol_equation` は `1,320 manual + 11 exclude`
+- `symbol_equation` は `1,304 manual + 11 exclude`
 - `numeric_2x2` は operator-aware と prompt-backed pass1 でかなり整理でき、`comp99_abs_diff_2d` を operator-prefixed zero-pad まで広げたことで累計 `2 verified + 9 answer-only` を回収し、さらに exact mismatch `1` 行を `exclude_suspect` に移した
+- さらに operator-specific formula-format consensus により `16 answer-only` を追加回収できた
 - それでも pass1 にはまだ `361` 行が残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d / comp99_abs_diff_2d` に見える `43` 行も再照合したが、`38` 行は same-op examples と衝突、`5` 行は format が一意化できず、**追加昇格 0**
@@ -300,7 +319,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - `*` の 4-digit bucket3（`4` 行）も follow-up したが、3 same-op examples ずつあっても simple product-like probe は `0` 件で、依然 one-family には閉じなかった
 - 残る symbol の singleton / doubleton tail も representative rows を spot-check したが、`# / ) / / / @ / < / ? / ^ / {` など operator-local mini-slicesが並ぶ long tail で、broader family を立てない限り safe promotion の入口は見えなかった
 - さらに digit-only symbol manual rows 全体に broader template library（`x+y`, `|x-y|`, `x*y`, pairwise digit concat 群, reversed / zero-pad variants）を当てても repeated exact hit は `0` 件だった
-- つまり残りは、より operator-specific な式族か、非線形規則の可能性が高い
+- つまり残りは、より operator-specific だがまだ consensus に乗らない式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
 ### 9.3 glyph_len5 は coarse 仮説止まり

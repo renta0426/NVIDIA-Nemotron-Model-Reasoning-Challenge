@@ -6,8 +6,8 @@ After pass1, exclude all manual rows whose query answer only mimics already-know
 
 ## Scope
 
-- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `294`
-- excluded known/query-only mimic union: `67` rows
+- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `287`
+- excluded known/query-only mimic union: `66` rows
 - grouped by operator, answer length, operator-char embedding, and same-operator example count bucket.
 
 ## Top clusters
@@ -27,18 +27,18 @@ After pass1, exclude all manual rows whose query answer only mimics already-know
 | - | 1 | False | 2 | 4 | 333d93ec,3b2e0cc3,58fed63a,b73d0898 |
 | - | 2 | False | 1 | 4 | 8373daa8,3383d4ec,5d834875,fb3f7b77 |
 | @ | 3 | False | 2 | 4 | 286135d3,518d8529,bf4bd858,e4b6ce82 |
-| } | 3 | False | 1 | 4 | e9afa4a0,17c98340,912c6ea5,b3ae7f39 |
 | - | 2 | True | 1 | 4 | 4179c322,812c12cb,d3092ac1,12d4a2df |
 | $ | 3 | False | 1 | 3 | 50630ad8,11f62c83,db4383f3 |
 | $ | 4 | False | 2 | 3 | 6bd59a1f,9f2fae58,bd4c584a |
 | % | 4 | False | 3 | 3 | 6c9e4485,3b51288b,69197d42 |
-| & | 3 | False | 1 | 3 | 2c8e2e06,1d92ba5d,bc7f14d1 |
 | * | 2 | False | 1 | 3 | 49919931,49ac9daf,614408ea |
 | [ | 4 | False | 1 | 3 | b3f9a15c,4f660f4b,61766c6f |
+| } | 3 | False | 1 | 3 | 17c98340,912c6ea5,b3ae7f39 |
 | - | 3 | True | 4+ | 3 | 4245e455,7688e06e,c541eb82 |
 | ! | 4 | False | 1 | 2 | 379d18b7,3b7e71b2 |
 | ! | 4 | False | 3 | 2 | 1cb4d524,7ecdae14 |
 | " | 4 | False | 1 | 2 | 5f5a73ff,ddb9aafd |
+| # | 3 | False | 1 | 2 | 9b9e024b,4d92de08 |
 
 ## Reading order
 

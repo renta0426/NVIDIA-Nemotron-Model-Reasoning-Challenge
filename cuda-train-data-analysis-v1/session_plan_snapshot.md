@@ -35,8 +35,8 @@
 - 単一スクリプト `files/cuda-train-data-analysis-v1/code/train_data_analysis_v1.py` を作成し、`data/train.csv` 9,500 件を全件解析済み。
 - 現時点の厳密カテゴリ分け:
   - `verified_trace_ready`: 6,081
-  - `manual_audit_priority`: 2,286
-  - `answer_only_keep`: 1,107
+  - `manual_audit_priority`: 2,270
+  - `answer_only_keep`: 1,123
   - `exclude_suspect`: 26
 - family ごとの厳密 verified:
   - roman: 1,576 / 1,576
@@ -87,4 +87,6 @@
 - `reports/46_binary_structured_byte_threshold_sweep.md` を追加し、abstract structured-byte threshold を緩めた場合の gain を測った。`support>=12 / distinct>=6` から `support>=5 / distinct>=4` に緩めても追加 gain は `5` 行だけで、`and(ror,shr)` と `or(rol,shl)` の薄い family に限られたため、現時点では採用しない判断にした。
 - `reports/47_binary_structured_byte_multi_consensus_recovery.md` を追加し、same-pred multi-formula 行のうち safe abstract family に anchor を持つ `8b4c71ba` / `cc5011ac` を `answer_only_keep` として回収した。これで structured byte residual は `20 manual + 4 exclude` になり、残る multi-formula 行は `5a6dd286` のみ。
 - これで `binary` は `599 verified / 22 answer_only / 966 manual / 15 exclude` になった。
+- `reports/48_symbol_operator_embedded_scan.md` を追加し、symbol の operator-embedded output へ cross-operator prefix/suffix scan を当てた。`op_prefix_abs_diff_2d` は `81c7ba7a` / `2dd48cac` / `45dbc1cc` / `4cb5e927` を説明する near-miss だったが、`8c1529e1` の hard conflict があるため safe promotion / exclude には使わない判断にした。
+- `reports/49_symbol_operator_specific_consensus_recovery.md` を追加し、operator ごとに clean support を持つ `(formula, format)` spec を足場に low-shot/ambiguous `numeric_2x2` manual 16 行を `answer_only_keep` として回収した。これで `symbol` は `110 verified / 130 answer_only / 1304 manual / 11 exclude` になった。
 - 次ステップは、structured byte formula の residual `20 manual + 4 exclude` を `19 singleton / 1 ambiguous multi-pred` に割って詰めるか、symbol で simple template を超える non-linear / cross-operator abstraction を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。
