@@ -299,6 +299,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/56_binary_structured_byte_manual_exact_curation.md` | structured-byte residual の prompt を直接読み、binary manual 5 行を `verified`、1 行を `exclude_suspect` に確定した根拠 |
 | `reports/57_symbol_colon_manual_exact_answer_only.md` | `:` residual を直接読み、symbol manual 2 行を `answer_only_keep` に確定した根拠 |
 | `reports/58_symbol_prefix_always_abs_tail.md` | `"` / `[` tail を直接読み、symbol manual 2 行を `answer_only_keep` に確定し、multi-example gold-hit tail の枯渇を確認した根拠 |
+| `reports/59_symbol_single_example_tail_hold.md` | single-example gold-hit tail 8 行を全件再読し、safe promotion / exclude ともに 0 で hold に据えた根拠 |
 
 ## 8. 最短の読み順
 
@@ -361,6 +362,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - さらに digit-only symbol manual rows 全体に broader template library（`x+y`, `|x-y|`, `x*y`, pairwise digit concat 群, reversed / zero-pad variants）を当てても repeated exact hit は `0` 件だった
 - さらに post-report-54 の subgroup search で `!` / `"` の thin support-2 subfamily を `2` 行だけ回収できたが、その後に残った機械的 near-miss は `45dbc1cc` のみで、こちらは `sum>=100` の偶然っぽい split に依存するため未採用とした
 - さらに `"` / `[` の multi-example prefix-always-abs tail から `2` 行を追加回収した結果、manual `numeric_2x2` のうち「same-op examples が 2 本以上あり、既存 formula library で gold をそのまま支持できる行」は枯渇した
+- 残る single-example gold-hit tail `8` 行も全件再読したが、いずれも one-shot ambiguity が解けず、safe promotion / exclude は `0` だった
 - つまり残りは、より operator-specific だがまだ consensus に乗らない式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
