@@ -23,14 +23,14 @@
 | selection_tier | rows | share |
 | --- | ---: | ---: |
 | `verified_trace_ready` | 6,081 | 64.0% |
-| `answer_only_keep` | 1,123 | 11.8% |
-| `manual_audit_priority` | 2,270 | 23.9% |
+| `answer_only_keep` | 1,126 | 11.9% |
+| `manual_audit_priority` | 2,267 | 23.9% |
 | `exclude_suspect` | 26 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,081 + 1,123 = 7,204` 行（`75.8%`）
-- 未解決 / 要注意: `2,270 + 26 = 2,296` 行（`24.2%`）
+- 安全側の学習コア: `6,081 + 1,126 = 7,207` 行（`75.9%`）
+- 未解決 / 要注意: `2,267 + 26 = 2,293` 行（`24.1%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -42,7 +42,7 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 599 | 22 | 966 | 15 | 主要な残課題 |
-| `symbol_equation` | 1,555 | 110 | 130 | 1,304 | 11 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 110 | 133 | 1,301 | 11 | 主要な残課題 |
 
 ### 解釈
 
@@ -100,9 +100,9 @@ symbol では、broader template scan の後に **operator-specific formula-form
 結果:
 
 - safe operator-specific consensus で `16 answer-only` を追加回収
-- current symbol は `110 verified / 130 answer_only / 1304 manual / 11 exclude`
+- さらに `-` の prefixed abs-diff near-miss を zero-error subfamily に切り分け、`3 answer-only` を追加回収
+- current symbol は `110 verified / 133 answer_only / 1301 manual / 11 exclude`
 - これは unique trace ではないので、`verified` ではなく conservative `answer_only` に留めている
-- `0 manual`
 
 ### 4.3 symbol の改善
 
@@ -129,9 +129,9 @@ symbol は大きく 2 つに分かれました。
 
 ### 4.4 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **525 行** まで縮みました。
+最優先で人手確認すべき pack は **506 行** まで縮みました。
 
-- `361` 行: `symbol_numeric_same_op`
+- `342` 行: `symbol_numeric_same_op`
 - `118` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
@@ -168,13 +168,15 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_structured_byte_abstract_support_v1.csv` | abstract structured-byte family の support / distinct-exact / error 集計 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 118 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
+| `artifacts/symbol_minus_prefix_subfamily_support_v1.csv` | `-` の prefixed abs-diff near-miss を zero-error subfamily に切った support 台帳 |
+| `artifacts/symbol_minus_prefix_subfamily_candidates_v1.csv` | 新しい `-` subfamily に触れる row の台帳 |
 | `artifacts/symbol_operator_specific_formula_support_v1.csv` | operator-specific `(formula, format)` の support / error 集計 |
 | `artifacts/symbol_operator_specific_formula_candidates_v1.csv` | safe operator-local spec に触れる numeric symbol 行の台帳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した prompt-backed symbol 行（concat / abs-diff / comp99）の一覧 |
 | `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 43 行の台帳 |
 | `artifacts/remaining_symbol_known_family_mimics_v1.csv` | low-shot を含む known-family mimic 行の台帳 |
 | `artifacts/remaining_symbol_mimic_union_v1.csv` | report 17 と known-family mimic を合流した current mimic union 67 行の台帳 |
-| `artifacts/symbol_round2_cluster_summary_v1.csv` | mimic union 67 行を除いた current round2 core 294 行を cluster 化した台帳 |
+| `artifacts/symbol_round2_cluster_summary_v1.csv` | mimic union 67 行を除いた current round2 core 284 行を cluster 化した台帳 |
 | `artifacts/glyph_round2_cluster_summary_v1.csv` | glyph 46 行を答え長・重複構造ベースで round2 向けに cluster 化した台帳 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
@@ -240,7 +242,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 43 行を、same-op 照合で全却下した根拠 |
 | `reports/18_symbol_next_safe_scan.md` | query-only 却下後の残差に対して次の safe family を探したが、derived template 探索でも 0 件だった記録 |
 | `reports/19_pass1_completion_and_round2.md` | pass1 の完了範囲と、round2 で最初に読むべき残差 cluster をまとめた要約 |
-| `reports/20_symbol_round2_cluster_map.md` | mimic union 67 行を除いた current `symbol_numeric_same_op` 294 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
+| `reports/20_symbol_round2_cluster_map.md` | mimic union 67 行を除いた current `symbol_numeric_same_op` 284 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
 | `reports/21_glyph_round2_cluster_map.md` | `symbol_glyph_multiset` 46 行を長さ・重複署名で cluster 化した round2 入口 |
 | `reports/22_binary_round2_cluster_map.md` | `binary_low_gap` 139 行を gap / uniqueness 構造で cluster 化した round2 入口 |
 | `reports/23_symbol_known_family_mimics.md` | report 17 の 43 行と extra known-family mimic を合流した current `symbol` mimic union 67 行の整理 |
@@ -269,6 +271,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/47_binary_structured_byte_multi_consensus_recovery.md` | safe abstract family を伴う same-pred multi-formula 2 行を `answer_only_keep` に昇格した根拠 |
 | `reports/48_symbol_operator_embedded_scan.md` | symbol の operator-embedded output を cross-operator prefix/suffix で再走査し、near-miss だが未採用と判断した根拠 |
 | `reports/49_symbol_operator_specific_consensus_recovery.md` | operator-specific formula-format consensus で symbol manual 16 行を `answer_only_keep` に昇格した根拠 |
+| `reports/50_symbol_minus_prefix_subfamily_recovery.md` | `-` の prefixed abs-diff near-miss を zero-error subfamily に切り分け、manual 3 行を `answer_only_keep` に昇格した根拠 |
 
 ## 8. 最短の読み順
 
@@ -300,13 +303,14 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.2 symbol がまだ重い
 
-- `symbol_equation` は `1,304 manual + 11 exclude`
+- `symbol_equation` は `1,301 manual + 11 exclude`
 - `numeric_2x2` は operator-aware と prompt-backed pass1 でかなり整理でき、`comp99_abs_diff_2d` を operator-prefixed zero-pad まで広げたことで累計 `2 verified + 9 answer-only` を回収し、さらに exact mismatch `1` 行を `exclude_suspect` に移した
 - さらに operator-specific formula-format consensus により `16 answer-only` を追加回収できた
-- それでも pass1 にはまだ `361` 行が残る
+- さらに `-` の prefixed abs-diff near-miss を zero-error subfamily へ切り分け、manual `3` 行を `answer_only_keep` に昇格できた
+- それでも pass1 にはまだ `342` 行が残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d / comp99_abs_diff_2d` に見える `43` 行も再照合したが、`38` 行は same-op examples と衝突、`5` 行は format が一意化できず、**追加昇格 0**
-- report 17 の high-shot mimic `43` 行に、extra known-family / low-shot mimic を足した current mimic union は `67` 行となり、round2 の `symbol` 本丸は `294` 行まで圧縮できた
+- report 17 の high-shot mimic `43` 行に、extra known-family / low-shot mimic を足した current mimic union は `67` 行となり、round2 の `symbol` 本丸は `284` 行まで圧縮できた
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
 - round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
 - round2 `+` 3桁 cluster も再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 でも同一 prompt 内で `2` 桁出力と `3` 桁出力が混在するため、再利用可能な exact formatter は見つからなかった
@@ -350,7 +354,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
 2. structured byte formula の residual `20 manual + 4 exclude` を、`19 singleton / 1 ambiguous multi-pred` に分けて再点検
-3. round2 `symbol` core `294` 行のうち、残る low-shot operator-specific tail
+3. round2 `symbol` core `284` 行のうち、残る low-shot operator-specific tail
 4. `binary_low_gap` 118 行
 5. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 

@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- |
 | glyph_len5 |  | manual_audit_priority |  | 823 |
 | numeric_2x2 | + | manual_audit_priority |  | 87 |
-| numeric_2x2 | - | manual_audit_priority |  | 83 |
+| numeric_2x2 | - | manual_audit_priority |  | 81 |
 | numeric_2x2 | * | manual_audit_priority |  | 73 |
 | numeric_2x2 | / | manual_audit_priority |  | 16 |
 | numeric_2x2 | @ | manual_audit_priority |  | 14 |
@@ -37,13 +37,13 @@
 | numeric_2x2 | ( | manual_audit_priority |  | 4 |
 | numeric_2x2 | - | answer_only_keep | abs_diff_2d | 4 |
 | numeric_2x2 | - | answer_only_keep | comp99_abs_diff_2d | 4 |
+| numeric_2x2 | - | answer_only_keep | x_minus_y | 4 |
 | numeric_2x2 | - | manual_audit_priority | comp99_abs_diff_2d | 4 |
 | numeric_2x2 | ( | verified_trace_ready | x_minus_y | 3 |
 | numeric_2x2 | * | exclude_suspect | x_plus_y | 3 |
 | numeric_2x2 | + | answer_only_keep | x_plus_y | 3 |
-| numeric_2x2 | - | answer_only_keep | x_minus_y | 3 |
-| numeric_2x2 | - | manual_audit_priority | x_minus_y | 3 |
 | numeric_2x2 | - | verified_trace_ready | x_minus_y | 3 |
+| numeric_2x2 | ? | verified_trace_ready | concat_xy | 3 |
 
 ## Glyph multiset summary
 
