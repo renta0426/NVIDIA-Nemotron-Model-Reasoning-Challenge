@@ -1,3 +1,34 @@
+## 実装反映状況（2026-03-26）
+
+このメモの方針は、`README.md` の official evaluation 条件（`enable_thinking=True`, boxed answer, `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_model_len=8192`）と、`cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md` の curated 結果を前提に、実コード `code/Nemotron Reasoning Challenge - QLoRA Baseline.py` へ反映済みです。
+
+現行実装の要点:
+
+- 教師ソースは `cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv` のみ
+- 学習対象は `verified_trace_ready + answer_only_keep` の `7,237` 行に限定
+- `verified_trace_ready` は family ごとの短い `<think> ... </think>` trace を付与
+- `answer_only_keep` は analysis で安全確認済みの conservative completion を付与
+- loss は completion-only だが、final line / final answer span を family 別 weight で強化
+- boxed unsafe な `2` 行だけ `Final answer:` fallback、それ以外は boxed final line
+- PEFT target は official BF16 base 向け (`q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj`, rank cap `<=32`)
+- `--dry-run-dataset` で curated manifest / preview / jsonl を先に検証可能
+
+重要な差分:
+
+- 下の初期案にある「700–1000件程度へ quota で圧縮する」案は採用していません
+- 実装では、analysis で安全側に切り出した全 `7,237` 行を使い、family imbalance は `sample_weight` と token weighting で調整します
+- したがって、この md の本文は**設計の背景説明**として残しつつ、実際に使うコードは上記 Python スクリプトが正です
+
+dry-run 例:
+
+```bash
+.venv/bin/python 'code/Nemotron Reasoning Challenge - QLoRA Baseline.py' \
+  --dry-run-dataset \
+  --output-root /tmp/nemotron_curated_dryrun
+```
+
+---
+
 ここではbaseline/nvidia-nemotron-sfttrainer-training.ipynbを大幅に改善する実装を考える。
 
 baseline/nvidia-nemotron-sfttrainer-training.ipynbの結果を見る限り、**前回の改善は「学習の形」は少し良くなったが、スコアを動かす本丸には届いていない**です。  
@@ -1658,4 +1689,3 @@ for i, row in test_df.head(3).iterrows():
    - family stratified split で submit 前に期待値を見積もる
 
 必要なら次は **「Cell 11 の coverage が低かった時の強化版」** をそのまま実装します。
-
