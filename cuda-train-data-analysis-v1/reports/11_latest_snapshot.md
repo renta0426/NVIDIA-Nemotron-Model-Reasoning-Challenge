@@ -1,9 +1,9 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-03-26T06:18:11.495810+00:00`
+- generated_at_utc: `2026-03-26T06:33:29.190025+00:00`
 - verified_trace_ready: `6081`
-- answer_only_keep: `1140`
-- manual_audit_priority: `2253`
+- answer_only_keep: `1143`
+- manual_audit_priority: `2250`
 - exclude_suspect: `26`
 
 ## Family summary
@@ -13,7 +13,7 @@
 | bit_manipulation | 1602 | 1.0 | 599 | 33 | 955 | 15 | 19 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
-| symbol_equation | 1555 | 1.0 | 110 | 136 | 1298 | 11 | 11 | 3.1775 |
+| symbol_equation | 1555 | 1.0 | 110 | 139 | 1295 | 11 | 11 | 3.1775 |
 | text_decryption | 1576 | 1.0 | 605 | 971 | 0 | 0 | 0 | 1.7411 |
 | unit_conversion | 1594 | 1.0 | 1594 | 0 | 0 | 0 | 0 | 1.5276 |
 
@@ -21,7 +21,7 @@
 
 | audit_focus | family | rows |
 | --- | --- | --- |
-| symbol_numeric_same_op | symbol_equation | 339 |
+| symbol_numeric_same_op | symbol_equation | 336 |
 | binary_low_gap | bit_manipulation | 118 |
 | symbol_glyph_multiset | symbol_equation | 46 |
 

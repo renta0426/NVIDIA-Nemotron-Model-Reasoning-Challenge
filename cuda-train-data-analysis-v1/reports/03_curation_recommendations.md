@@ -7,12 +7,12 @@
 | verified_trace_ready | gravity_constant | 1597 |
 | verified_trace_ready | unit_conversion | 1594 |
 | verified_trace_ready | roman_numeral | 1576 |
-| manual_audit_priority | symbol_equation | 1298 |
+| manual_audit_priority | symbol_equation | 1295 |
 | answer_only_keep | text_decryption | 971 |
 | manual_audit_priority | bit_manipulation | 955 |
 | verified_trace_ready | text_decryption | 605 |
 | verified_trace_ready | bit_manipulation | 599 |
-| answer_only_keep | symbol_equation | 136 |
+| answer_only_keep | symbol_equation | 139 |
 | verified_trace_ready | symbol_equation | 110 |
 | answer_only_keep | bit_manipulation | 33 |
 | exclude_suspect | bit_manipulation | 15 |

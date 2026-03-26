@@ -6,7 +6,7 @@ After pass1, exclude all manual rows whose query answer only mimics already-know
 
 ## Scope
 
-- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `283`
+- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `282`
 - excluded known/query-only mimic union: `66` rows
 - grouped by operator, answer length, operator-char embedding, and same-operator example count bucket.
 
@@ -18,7 +18,7 @@ After pass1, exclude all manual rows whose query answer only mimics already-know
 | * | 4 | False | 2 | 17 | 1580f498,4d39d098,837af955,88fe5a52,98bb54f7 |
 | + | 3 | False | 1 | 14 | 4dbec546,56343b77,a7454fdb,1f0674b0,25f2f2cd |
 | + | 3 | False | 2 | 14 | 50c0b6f8,5fe8d710,912d2b79,94bf323a,1497f970 |
-| - | 3 | True | 1 | 13 | e102a09d,10fdae00,33093ed0,45dbc1cc,4cb5e927 |
+| - | 3 | True | 1 | 12 | e102a09d,33093ed0,45dbc1cc,4cb5e927,50adfd54 |
 | + | 2 | False | 1 | 10 | 3013265c,30c0d5a2,49578b02,4a569495,4cf073bf |
 | + | 3 | False | 3 | 8 | 0819520a,163db2d8,3ec77e36,1f4c8169,59b2cbbf |
 | + | 2 | False | 2 | 7 | 2423926d,c81411a2,d033513f,2e2d60b2,3937cbf8 |
