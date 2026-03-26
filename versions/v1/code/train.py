@@ -337,7 +337,30 @@ class MLXBackend:
 
         import mlx.core as mx  # type: ignore
         from mlx_lm import batch_generate as mlx_batch_generate, generate as mlx_generate, load as mlx_load  # type: ignore
+        from mlx_lm.generate import BatchGenerator  # type: ignore
         from mlx_lm.sample_utils import make_sampler as mlx_make_sampler  # type: ignore
+
+        # mlx_lm.batch_generate() can finish generation successfully and then crash while
+        # computing throughput stats if the measured elapsed time is zero. Keep evaluation
+        # running by clamping those derived TPS fields instead of raising ZeroDivisionError.
+        if not getattr(BatchGenerator.stats, '_copilot_zero_time_safe', False):
+            def _safe_batch_generator_stats(self: Any) -> Any:
+                stats = self._stats
+                prompt_time = float(getattr(stats, 'prompt_time', 0.0) or 0.0)
+                generation_time = float(getattr(stats, 'generation_time', 0.0) or 0.0)
+                stats.prompt_tps = (
+                    float(getattr(stats, 'prompt_tokens', 0) or 0) / prompt_time if prompt_time > 0.0 else 0.0
+                )
+                stats.generation_tps = (
+                    float(getattr(stats, 'generation_tokens', 0) or 0) / generation_time
+                    if generation_time > 0.0
+                    else 0.0
+                )
+                stats.peak_memory = mx.get_peak_memory() / 1e9
+                return stats
+
+            setattr(_safe_batch_generator_stats, '_copilot_zero_time_safe', True)
+            BatchGenerator.stats = _safe_batch_generator_stats
 
         return mx, mlx_load, mlx_generate, mlx_batch_generate, mlx_make_sampler
 
