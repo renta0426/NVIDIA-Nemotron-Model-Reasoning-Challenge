@@ -35,8 +35,8 @@
 - 単一スクリプト `files/cuda-train-data-analysis-v1/code/train_data_analysis_v1.py` を作成し、`data/train.csv` 9,500 件を全件解析済み。
 - 現時点の厳密カテゴリ分け:
   - `verified_trace_ready`: 6,081
-  - `manual_audit_priority`: 2,270
-  - `answer_only_keep`: 1,123
+  - `manual_audit_priority`: 2,253
+  - `answer_only_keep`: 1,140
   - `exclude_suspect`: 26
 - family ごとの厳密 verified:
   - roman: 1,576 / 1,576
@@ -91,4 +91,5 @@
 - `reports/49_symbol_operator_specific_consensus_recovery.md` を追加し、operator ごとに clean support を持つ `(formula, format)` spec を足場に low-shot/ambiguous `numeric_2x2` manual 16 行を `answer_only_keep` として回収した。これで `symbol` は `110 verified / 130 answer_only / 1304 manual / 11 exclude` になった。
 - `reports/50_symbol_minus_prefix_subfamily_recovery.md` を追加し、report 48 の `op_prefix_abs_diff_2d` near-miss を `-` operator の zero-error subfamily に切り分けた。`22-27 -> -05`, `15-75 -> -6`, `09-19 -> -1` の 3 行を `answer_only_keep` として追加回収し、current symbol は `110 verified / 133 answer_only / 1301 manual / 11 exclude`、overall は `6081 verified / 1126 answer_only / 2267 manual / 26 exclude` になった。
 - `reports/51_binary_structured_byte_low_support_answer_only.md` を追加し、structured-byte singleton tail のうち zero-error だが thin な abstract family を `answer_only_keep` として採用した。binary manual 11 行を追加回収し、current binary は `599 verified / 33 answer_only / 955 manual / 15 exclude`、overall は `6081 verified / 1137 answer_only / 2256 manual / 26 exclude` になった。structured-byte residual は `9 manual + 4 exclude` まで縮小した。
-- 次ステップは、structured byte formula の残る `9 manual + 4 exclude` を contaminated family / singleton family / ambiguous multi-pred に割って詰めるか、current `symbol` round2 core `284` 行のうち custom-op / operator-embedded tail をさらに切ること。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/52_symbol_star_prefix_if_negative_recovery.md` を追加し、generalized subfamily search で `* :: x_minus_y :: prefix_if_negative` のうち `same_operator_example_count == 1` だけが `3 support / 0 error` の zero-error subgroup になることを確認した。`50*15 -> 35`, `45*32 -> 13`, `47*73 -> *26` の 3 行を `answer_only_keep` として追加回収し、current symbol は `110 verified / 136 answer_only / 1298 manual / 11 exclude`、overall は `6081 verified / 1140 answer_only / 2253 manual / 26 exclude` になった。manual pass1 pack は `503` 行（`339 symbol_numeric_same_op / 118 binary_low_gap / 46 symbol_glyph_multiset`）、current `symbol` round2 core は `283` 行。
+- 次ステップは、structured byte formula の残る `9 manual + 4 exclude` を contaminated family / singleton family / ambiguous multi-pred に割って詰めるか、current `symbol` round2 core `283` 行のうち `-` / `:` / custom-op / operator-embedded tail をさらに切ること。glyph 46 行は、新しい family 仮説が出るまで hold。

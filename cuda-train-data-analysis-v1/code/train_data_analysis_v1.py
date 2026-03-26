@@ -2645,6 +2645,194 @@ def apply_symbol_minus_prefix_subfamily_promotions(analysis_df: pd.DataFrame) ->
     return analysis_df, support_df, candidate_df
 
 
+def collect_symbol_star_prefix_if_negative_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+    match_info = collect_symbol_numeric_operator_formula_matches(prompt, query_text, answer)
+    query_operator = str(match_info["query_operator"])
+    same_operator_example_count = int(match_info["same_operator_example_count"])
+    if query_operator != "*":
+        return {
+            "query_operator": "",
+            "same_operator_example_count": 0,
+            "candidate_predictions": [],
+            "all_predictions": [],
+            "winning_specs": [],
+        }
+    if same_operator_example_count != 1:
+        return {
+            "query_operator": query_operator,
+            "same_operator_example_count": same_operator_example_count,
+            "candidate_predictions": [],
+            "all_predictions": sorted({str(prediction) for prediction in match_info["candidate_predictions"]}),
+            "winning_specs": [],
+        }
+
+    winning_specs = [
+        ("star_prefix_if_negative_same_bucket1", "string_template", str(predicted_answer))
+        for formula_name, format_name, predicted_answer in match_info["winning_specs"]
+        if str(formula_name) == "x_minus_y" and str(format_name) == "prefix_if_negative"
+    ]
+    return {
+        "query_operator": query_operator,
+        "same_operator_example_count": same_operator_example_count,
+        "candidate_predictions": sorted({predicted_answer for _, _, predicted_answer in winning_specs}),
+        "all_predictions": sorted({str(prediction) for prediction in match_info["candidate_predictions"]}),
+        "winning_specs": winning_specs,
+    }
+
+
+def apply_symbol_star_prefix_if_negative_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    numeric_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+    )
+    support_df = pd.DataFrame(
+        columns=[
+            "query_operator",
+            "subfamily_name",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "safe_subfamily",
+        ]
+    )
+    candidate_df = pd.DataFrame(
+        columns=[
+            "id",
+            "selection_tier",
+            "query_operator",
+            "same_operator_example_count",
+            "answer",
+            "query_raw",
+            "safe_prediction",
+            "safe_support_rows",
+            "safe_subfamily_name",
+            "all_predictions",
+        ]
+    )
+    if not numeric_mask.any():
+        return analysis_df, support_df, candidate_df
+
+    match_records: list[dict[str, Any]] = []
+    row_match_map: dict[str, dict[str, Any]] = {}
+    for row in analysis_df.loc[numeric_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_star_prefix_if_negative_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        if int(match_info["same_operator_example_count"]) <= 0 or not match_info["winning_specs"]:
+            continue
+        row_match_map[str(row["id"])] = {
+            "selection_tier": str(row["selection_tier"]),
+            "answer": str(row["answer"]),
+            "query_raw": str(row["query_raw"]),
+            "query_operator": str(match_info["query_operator"]),
+            "same_operator_example_count": int(match_info["same_operator_example_count"]),
+            "all_predictions": [str(prediction) for prediction in match_info["all_predictions"]],
+            "winning_specs": [
+                (str(subfamily_name), str(format_name), str(predicted_answer))
+                for subfamily_name, format_name, predicted_answer in match_info["winning_specs"]
+            ],
+        }
+        for subfamily_name, format_name, predicted_answer in match_info["winning_specs"]:
+            match_records.append(
+                {
+                    "id": str(row["id"]),
+                    "query_operator": str(match_info["query_operator"]),
+                    "subfamily_name": str(subfamily_name),
+                    "format_name": str(format_name),
+                    "predicted_answer": str(predicted_answer),
+                    "matches_gold": bool(str(predicted_answer) == str(row["answer"])),
+                }
+            )
+    if not match_records:
+        return analysis_df, support_df, candidate_df
+
+    match_df = pd.DataFrame(match_records)
+    support_df = (
+        match_df.groupby(["query_operator", "subfamily_name"], dropna=False)
+        .agg(
+            support_rows=("id", "size"),
+            gold_match_rows=("matches_gold", "sum"),
+        )
+        .reset_index()
+    )
+    support_df["support_rows"] = support_df["support_rows"].astype(int)
+    support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+    support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+    support_df["safe_subfamily"] = (support_df["support_rows"] >= 3) & (support_df["error_rows"] == 0)
+    safe_keys = {
+        (str(row["query_operator"]), str(row["subfamily_name"]))
+        for row in support_df.loc[support_df["safe_subfamily"]].to_dict(orient="records")
+    }
+    support_map = {
+        (str(row["query_operator"]), str(row["subfamily_name"])): int(row["support_rows"])
+        for row in support_df.to_dict(orient="records")
+    }
+
+    candidate_rows: list[dict[str, Any]] = []
+    promote_predictions: dict[str, str] = {}
+    for row_id, info in row_match_map.items():
+        safe_matches = [
+            (subfamily_name, predicted_answer)
+            for subfamily_name, _, predicted_answer in info["winning_specs"]
+            if (info["query_operator"], subfamily_name) in safe_keys
+        ]
+        if not safe_matches:
+            continue
+        safe_prediction_set = sorted({predicted_answer for _, predicted_answer in safe_matches})
+        safe_subfamily_names = sorted({subfamily_name for subfamily_name, _ in safe_matches})
+        safe_support_rows = max(
+            support_map[(info["query_operator"], subfamily_name)]
+            for subfamily_name in safe_subfamily_names
+        )
+        candidate_rows.append(
+            {
+                "id": row_id,
+                "selection_tier": info["selection_tier"],
+                "query_operator": info["query_operator"],
+                "same_operator_example_count": info["same_operator_example_count"],
+                "answer": info["answer"],
+                "query_raw": info["query_raw"],
+                "safe_prediction": safe_prediction_set[0] if len(safe_prediction_set) == 1 else "",
+                "safe_support_rows": int(safe_support_rows),
+                "safe_subfamily_name": "|".join(safe_subfamily_names),
+                "all_predictions": "|".join(info["all_predictions"]),
+            }
+        )
+        if (
+            info["selection_tier"] == "manual_audit_priority"
+            and len(safe_prediction_set) == 1
+            and safe_prediction_set[0] == info["answer"]
+        ):
+            promote_predictions[row_id] = safe_prediction_set[0]
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=list(candidate_df.columns))
+    if promote_predictions:
+        promote_mask = analysis_df["id"].astype(str).isin(set(promote_predictions))
+        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "id"].astype(str).map(promote_predictions)
+        analysis_df.loc[promote_mask, "auto_solver_match"] = True
+        analysis_df.loc[promote_mask, "answer_only_ready"] = True
+        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+        analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[promote_mask, "audit_reasons"] = ""
+        analysis_df.loc[promote_mask, "analysis_notes"] = "symbol_star_prefix_if_negative_subfamily"
+        analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    support_df = support_df.sort_values(
+        ["safe_subfamily", "support_rows", "gold_match_rows", "query_operator", "subfamily_name"],
+        ascending=[False, False, False, True, True],
+    ).reset_index(drop=True)
+    if not candidate_df.empty:
+        candidate_df = candidate_df.sort_values(
+            ["selection_tier", "safe_support_rows", "same_operator_example_count", "id"],
+            ascending=[True, False, False, True],
+        ).reset_index(drop=True)
+    return analysis_df, support_df, candidate_df
+
+
 def write_dataframe(frame: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(path, index=False)
@@ -3712,6 +3900,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df, structured_low_support_candidate_df = apply_bit_structured_low_support_answer_only_promotions(analysis_df)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
+    analysis_df, symbol_star_prefix_support_df, symbol_star_prefix_candidate_df = apply_symbol_star_prefix_if_negative_promotions(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -3927,6 +4116,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_operator_spec_candidate_df, artifacts_dir / "symbol_operator_specific_formula_candidates_v1.csv")
     write_dataframe(symbol_minus_prefix_support_df, artifacts_dir / "symbol_minus_prefix_subfamily_support_v1.csv")
     write_dataframe(symbol_minus_prefix_candidate_df, artifacts_dir / "symbol_minus_prefix_subfamily_candidates_v1.csv")
+    write_dataframe(symbol_star_prefix_support_df, artifacts_dir / "symbol_star_prefix_if_negative_support_v1.csv")
+    write_dataframe(symbol_star_prefix_candidate_df, artifacts_dir / "symbol_star_prefix_if_negative_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
