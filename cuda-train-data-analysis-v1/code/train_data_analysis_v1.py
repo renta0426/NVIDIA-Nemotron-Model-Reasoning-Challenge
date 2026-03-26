@@ -2494,6 +2494,167 @@ def apply_bit_structured_support3_answer_only_promotions(analysis_df: pd.DataFra
     return analysis_df, candidate_df
 
 
+BIT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS: dict[str, dict[str, str]] = {
+    "1bf84ce3": {"formula_name": "and(nibble_swap,ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "2aa6ce6a": {"formula_name": "xor(ror1,shr3)", "decision_note": "manual_prompt_exact_verified"},
+    "26df9536": {"formula_name": "xor(ror3,shr2)", "decision_note": "manual_prompt_exact_verified"},
+    "d5a28743": {"formula_name": "and(ror1,ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "9bfb1cc6": {"formula_name": "ror2", "decision_note": "manual_prompt_exact_verified"},
+}
+
+
+BIT_STRUCTURED_MANUAL_EXACT_EXCLUDE_SPECS: dict[str, dict[str, str]] = {
+    "8631d7b6": {"formula_name": "xor(ror1,shr1)", "decision_note": "manual_prompt_exact_exclude"},
+}
+
+
+def apply_bit_structured_manual_prompt_curation(
+    analysis_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    promote_columns = [
+        "id",
+        "selection_tier",
+        "query_raw",
+        "answer",
+        "bit_structured_formula_name",
+        "bit_structured_formula_prediction",
+        "bit_structured_formula_match_count",
+        "bit_structured_formula_prediction_count",
+        "bit_structured_formula_safe_support",
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_abstract_support",
+        "bit_structured_formula_abstract_error_rows",
+        "decision_note",
+    ]
+    exclude_columns = [
+        "id",
+        "selection_tier",
+        "query_raw",
+        "answer",
+        "bit_structured_formula_name",
+        "bit_structured_formula_prediction",
+        "bit_structured_formula_match_count",
+        "bit_structured_formula_prediction_count",
+        "bit_structured_formula_safe_support",
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_abstract_support",
+        "bit_structured_formula_abstract_error_rows",
+        "decision_note",
+    ]
+    promote_df = pd.DataFrame(columns=promote_columns)
+    exclude_df = pd.DataFrame(columns=exclude_columns)
+
+    bit_mask = analysis_df["family"] == "bit_manipulation"
+    manual_mask = analysis_df["selection_tier"] == "manual_audit_priority"
+    unique_formula_mask = (
+        (analysis_df["bit_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_structured_formula_prediction_count"] == 1)
+    )
+
+    promote_ids = set(BIT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS)
+    promote_formula_map = {
+        row_id: spec["formula_name"] for row_id, spec in BIT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS.items()
+    }
+    promote_mask = (
+        bit_mask
+        & manual_mask
+        & unique_formula_mask
+        & analysis_df["id"].astype(str).isin(promote_ids)
+        & (
+            analysis_df["id"].astype(str).map(promote_formula_map).fillna("")
+            == analysis_df["bit_structured_formula_name"].astype(str)
+        )
+        & (analysis_df["bit_structured_formula_prediction"] == analysis_df["answer"])
+    )
+    if promote_mask.any():
+        promote_df = analysis_df.loc[
+            promote_mask,
+            [
+                "id",
+                "selection_tier",
+                "query_raw",
+                "answer",
+                "bit_structured_formula_name",
+                "bit_structured_formula_prediction",
+                "bit_structured_formula_match_count",
+                "bit_structured_formula_prediction_count",
+                "bit_structured_formula_safe_support",
+                "bit_structured_formula_abstract_family",
+                "bit_structured_formula_abstract_support",
+                "bit_structured_formula_abstract_error_rows",
+            ],
+        ].copy()
+        promote_df["decision_note"] = promote_df["id"].astype(str).map(
+            lambda row_id: BIT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS[row_id]["decision_note"]
+        )
+        analysis_df.loc[promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+        analysis_df.loc[promote_mask, "teacher_solver_candidate"] = "binary_structured_byte_formula_manual"
+        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "bit_structured_formula_prediction"]
+        analysis_df.loc[promote_mask, "auto_solver_match"] = True
+        analysis_df.loc[promote_mask, "verified_trace_ready"] = True
+        analysis_df.loc[promote_mask, "answer_only_ready"] = False
+        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+        analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
+        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[promote_mask, "audit_reasons"] = ""
+        analysis_df.loc[promote_mask, "analysis_notes"] = "bit_structured_manual_prompt_exact"
+        analysis_df.loc[promote_mask, "suspect_label"] = False
+        promote_df = promote_df.sort_values(["bit_structured_formula_name", "id"], ascending=[True, True]).reset_index(drop=True)
+
+    exclude_ids = set(BIT_STRUCTURED_MANUAL_EXACT_EXCLUDE_SPECS)
+    exclude_formula_map = {
+        row_id: spec["formula_name"] for row_id, spec in BIT_STRUCTURED_MANUAL_EXACT_EXCLUDE_SPECS.items()
+    }
+    exclude_mask = (
+        bit_mask
+        & manual_mask
+        & unique_formula_mask
+        & analysis_df["id"].astype(str).isin(exclude_ids)
+        & (
+            analysis_df["id"].astype(str).map(exclude_formula_map).fillna("")
+            == analysis_df["bit_structured_formula_name"].astype(str)
+        )
+        & (analysis_df["bit_structured_formula_prediction"] != analysis_df["answer"])
+    )
+    if exclude_mask.any():
+        exclude_df = analysis_df.loc[
+            exclude_mask,
+            [
+                "id",
+                "selection_tier",
+                "query_raw",
+                "answer",
+                "bit_structured_formula_name",
+                "bit_structured_formula_prediction",
+                "bit_structured_formula_match_count",
+                "bit_structured_formula_prediction_count",
+                "bit_structured_formula_safe_support",
+                "bit_structured_formula_abstract_family",
+                "bit_structured_formula_abstract_support",
+                "bit_structured_formula_abstract_error_rows",
+            ],
+        ].copy()
+        exclude_df["decision_note"] = exclude_df["id"].astype(str).map(
+            lambda row_id: BIT_STRUCTURED_MANUAL_EXACT_EXCLUDE_SPECS[row_id]["decision_note"]
+        )
+        analysis_df.loc[exclude_mask, "template_subtype"] = "bit_structured_byte_formula"
+        analysis_df.loc[exclude_mask, "teacher_solver_candidate"] = "binary_structured_byte_formula_manual"
+        analysis_df.loc[exclude_mask, "auto_solver_predicted_answer"] = analysis_df.loc[exclude_mask, "bit_structured_formula_prediction"]
+        analysis_df.loc[exclude_mask, "auto_solver_match"] = False
+        analysis_df.loc[exclude_mask, "verified_trace_ready"] = False
+        analysis_df.loc[exclude_mask, "answer_only_ready"] = False
+        analysis_df.loc[exclude_mask, "example_consistency_ok"] = True
+        analysis_df.loc[exclude_mask, "selection_tier"] = "exclude_suspect"
+        analysis_df.loc[exclude_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[exclude_mask, "audit_reasons"] = ""
+        analysis_df.loc[exclude_mask, "analysis_notes"] = "bit_structured_manual_prompt_exact_exclude"
+        analysis_df.loc[exclude_mask, "suspect_label"] = True
+        exclude_df = exclude_df.sort_values(["bit_structured_formula_name", "id"], ascending=[True, True]).reset_index(drop=True)
+
+    return analysis_df, promote_df, exclude_df
+
+
 def collect_symbol_minus_prefix_subfamily_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
     if query_match is None or query_match.group(2) != "-":
@@ -4397,6 +4558,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df, structured_formula_support_df, structured_formula_abstract_support_df, structured_formula_candidate_df = apply_bit_structured_formula_promotions(analysis_df)
     analysis_df, structured_low_support_candidate_df = apply_bit_structured_low_support_answer_only_promotions(analysis_df)
     analysis_df, structured_support3_candidate_df = apply_bit_structured_support3_answer_only_promotions(analysis_df)
+    analysis_df, structured_manual_exact_promote_df, structured_manual_exact_exclude_df = apply_bit_structured_manual_prompt_curation(analysis_df)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
     analysis_df, symbol_minus_direct_support_df, symbol_minus_direct_candidate_df = apply_symbol_minus_direct_plain_promotions(analysis_df)
@@ -4612,6 +4774,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_structured_formula_df, artifacts_dir / "binary_structured_byte_formula_candidates_v1.csv")
     write_dataframe(structured_low_support_candidate_df, artifacts_dir / "binary_structured_byte_low_support_answer_only_candidates_v1.csv")
     write_dataframe(structured_support3_candidate_df, artifacts_dir / "binary_structured_byte_support3_answer_only_candidates_v1.csv")
+    write_dataframe(structured_manual_exact_promote_df, artifacts_dir / "binary_structured_byte_manual_exact_verified_v1.csv")
+    write_dataframe(structured_manual_exact_exclude_df, artifacts_dir / "binary_structured_byte_manual_exact_excludes_v1.csv")
     write_dataframe(structured_formula_support_df, artifacts_dir / "binary_structured_byte_formula_support_v1.csv")
     write_dataframe(structured_formula_abstract_support_df, artifacts_dir / "binary_structured_byte_abstract_support_v1.csv")
     write_dataframe(symbol_operator_spec_support_df, artifacts_dir / "symbol_operator_specific_formula_support_v1.csv")

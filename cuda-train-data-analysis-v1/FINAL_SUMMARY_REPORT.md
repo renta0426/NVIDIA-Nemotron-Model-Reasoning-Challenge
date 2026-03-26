@@ -22,15 +22,15 @@
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
-| `verified_trace_ready` | 6,081 | 64.0% |
+| `verified_trace_ready` | 6,086 | 64.1% |
 | `answer_only_keep` | 1,147 | 12.1% |
-| `manual_audit_priority` | 2,246 | 23.6% |
-| `exclude_suspect` | 26 | 0.3% |
+| `manual_audit_priority` | 2,240 | 23.6% |
+| `exclude_suspect` | 27 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,081 + 1,147 = 7,228` 行（`76.1%`）
-- 未解決 / 要注意: `2,246 + 26 = 2,272` 行（`23.9%`）
+- 安全側の学習コア: `6,086 + 1,147 = 7,233` 行（`76.1%`）
+- 未解決 / 要注意: `2,240 + 27 = 2,267` 行（`23.9%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -41,7 +41,7 @@
 | `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
-| `bit_manipulation` | 1,602 | 599 | 35 | 953 | 15 | 主要な残課題 |
+| `bit_manipulation` | 1,602 | 604 | 35 | 947 | 16 | 主要な残課題 |
 | `symbol_equation` | 1,555 | 110 | 141 | 1,293 | 11 | 主要な残課題 |
 
 ### 解釈
@@ -76,7 +76,8 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 - さらに conservative hybrid consensus で `20` 行を `answer_only_keep` に昇格した
 - さらに thin zero-error abstract family を `answer_only_keep` として `11` 行追加回収した
 - さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family を `answer_only_keep` として `2` 行追加回収した
-- current binary は `599 verified / 35 answer_only / 953 manual / 15 exclude`
+- さらに direct prompt reread により structured-byte residual `5` 行を `verified_trace_ready`、`1` 行を `exclude_suspect` に手動確定した
+- current binary は `604 verified / 35 answer_only / 947 manual / 16 exclude`
 
 ### 4.2 text の改善
 
@@ -109,7 +110,7 @@ symbol では、broader template scan の後に **operator-specific formula-form
 - current symbol は `110 verified / 141 answer_only / 1293 manual / 11 exclude`
 - これは unique trace ではないので、`verified` ではなく conservative `answer_only` に留めている
 
-### 4.3 symbol の改善
+### 4.4 symbol / glyph pass1 の詳細
 
 symbol は大きく 2 つに分かれました。
 
@@ -132,12 +133,12 @@ symbol は大きく 2 つに分かれました。
 - この `46` 行は、引き続き glyph 系 manual audit の最優先候補です
 - つまり、現行の multiset/order 系 coarse family は round2 glyph に対して **追加回収源としてはほぼ枯れている** と判断できる
 
-### 4.4 pass1 manual pack の圧縮
+### 4.5 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **498 行** まで縮みました。
+最優先で人手確認すべき pack は **497 行** まで縮みました。
 
 - `334` 行: `symbol_numeric_same_op`
-- `118` 行: `binary_low_gap`
+- `117` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
 次の curation ループはここから始めるのが最短です。
@@ -173,7 +174,9 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_structured_byte_abstract_support_v1.csv` | abstract structured-byte family の support / distinct-exact / error 集計 |
 | `artifacts/binary_structured_byte_low_support_answer_only_candidates_v1.csv` | thin zero-error abstract family から `answer_only_keep` に昇格した binary 11 行の台帳 |
 | `artifacts/binary_structured_byte_support3_answer_only_candidates_v1.csv` | `support=3 / distinct=3 / error=0` の narrow structured-byte family から `answer_only_keep` に昇格した binary 2 行の台帳 |
-| `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 118 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
+| `artifacts/binary_structured_byte_manual_exact_verified_v1.csv` | direct prompt reread で `verified_trace_ready` に確定した structured-byte residual 5 行の台帳 |
+| `artifacts/binary_structured_byte_manual_exact_excludes_v1.csv` | direct prompt reread で `exclude_suspect` に確定した structured-byte residual 1 行の台帳 |
+| `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 117 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_minus_direct_plain_support_v1.csv` | prompt-exact な direct `-` plain subfamily の support 台帳 |
 | `artifacts/symbol_minus_direct_plain_candidates_v1.csv` | 新しい direct `-` subfamily に触れる row の台帳 |
@@ -290,6 +293,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/53_symbol_minus_direct_plain_recovery.md` | prompt-exact な direct `-` plain subfamily を切り分け、manual 3 行を `answer_only_keep` に昇格した根拠 |
 | `reports/54_binary_structured_byte_support3_answer_only.md` | `support=3 / distinct=3 / error=0` の narrow structured-byte family を採用し、binary manual 2 行を追加回収した根拠 |
 | `reports/55_symbol_thin_support2_recovery.md` | `!` / `"` の prompt-exact support-2 subfamily を採用し、symbol manual 2 行を追加回収した根拠 |
+| `reports/56_binary_structured_byte_manual_exact_curation.md` | structured-byte residual の prompt を直接読み、binary manual 5 行を `verified`、1 行を `exclude_suspect` に確定した根拠 |
 
 ## 8. 最短の読み順
 
@@ -306,7 +310,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.1 binary がまだ重い
 
-- `bit_manipulation` はまだ `953 manual + 15 exclude`
+- `bit_manipulation` はまだ `947 manual + 16 exclude`
 - 2-bit / 3-bit / affine XOR / byte transform まで当てても、なお多数が未解決
 - structured byte formula により `189 verified`、さらに abstract structured-byte family により `29 verified`、さらに multi-consensus で `2 answer_only` を追加回収できた
 - 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
@@ -314,12 +318,14 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - single-missing-bit / shared-varset hybrid consensus により `20 answer_only` を追加回収できたが、これは unique trace ではなく conservative answer-only recovery である
 - さらに thin zero-error abstract family から `11 answer_only` を追加回収できた
 - さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family から `2 answer_only` を追加回収できた
-- structured byte formula の残差は現在 `7 manual + 4 exclude` まで縮んだ
+- さらに direct prompt reread により structured-byte residual `5` 行を `verified`、`1` 行を `exclude_suspect` に確定できた
+- structured byte formula の残差は現在 `1 manual + 5 exclude` まで縮んだ
 - round2 の top binary cluster（`34` 行, `7 examples / 1 no-candidate / 0 multi-candidate`）も再読したが、affine / boolean / byte family のどれも unique ではなく、consensus mismatch も無いので safe promotion / safe exclusion の両方ができない
 - second-largest binary cluster（`29` 行, `8 examples / 1 no-candidate / 0 multi-candidate`）も同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができない
 - third-largest binary cluster（`17` 行, `9 examples / 1 no-candidate / 0 multi-candidate`）も follow-up したが、shift-like / inversion-like fragments が row ごとに別方向へ散っており、やはり no unique solver / no safe exclusion のままだった
 - 残る binary の小 cluster も representative rows を再読したが、今度は `bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも複数候補競合が残るタイプが中心で、top3 よりさらに曖昧だった
-- つまり次は、structured byte formula の残る `7 manual + 4 exclude` を contaminated family / singleton family / ambiguous multi-pred に分けてさらに切るか、hybrid consensus を超える **unique trace-ready** な boolean/circuit family を考える必要がある
+- structured-byte 側で残る manual は `5a6dd286` ただ 1 行で、これは `or(rol1,rol3)` と `or(rol3,shl1)` の multi-pred ambiguity が解けない限り動かせない
+- つまり次の binary work は、structured-byte residual そのものよりも、hybrid consensus を超える **unique trace-ready** な boolean/circuit family か、`5a6dd286` を割る新しい disambiguation 証拠を探す方向になる
 
 ### 9.2 symbol がまだ重い
 
@@ -368,7 +374,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.5 exclude 行は少数だが重要
 
-- `exclude_suspect = 26`
+- `exclude_suspect = 27`
 - 数は少ないが、こうした行を無理に学習へ混ぜると `README.md` の accuracy 評価に対して逆効果になりやすい
 - ここは「少ないから無視」ではなく、今後も別管理を維持するのが安全
 
@@ -377,9 +383,9 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. structured byte formula の residual `9 manual + 4 exclude` を、`singleton / contaminated family / 1 ambiguous multi-pred` に分けて再点検
-3. round2 `symbol` core `284` 行のうち、残る low-shot operator-specific tail
-4. `binary_low_gap` 118 行
+2. round2 `symbol` core `282` 行のうち、残る low-shot operator-specific tail
+3. `binary_low_gap` 117 行
+4. structured byte formula の残る `5a6dd286` 1 行と `5 exclude` の扱いを別管理で維持
 5. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
 
 ## 10. 検証メモ

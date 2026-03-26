@@ -5,7 +5,7 @@
 | audit_focus | family | rows |
 | --- | --- | --- |
 | symbol_numeric_same_op | symbol_equation | 334 |
-| binary_low_gap | bit_manipulation | 118 |
+| binary_low_gap | bit_manipulation | 117 |
 | symbol_glyph_multiset | symbol_equation | 46 |
 
 ## Top rows in pass1 pack
