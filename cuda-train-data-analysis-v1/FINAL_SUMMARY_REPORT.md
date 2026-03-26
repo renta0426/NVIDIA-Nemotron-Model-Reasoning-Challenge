@@ -22,15 +22,15 @@
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
-| `verified_trace_ready` | 6,052 | 63.7% |
+| `verified_trace_ready` | 6,081 | 64.0% |
 | `answer_only_keep` | 1,105 | 11.6% |
-| `manual_audit_priority` | 2,317 | 24.4% |
+| `manual_audit_priority` | 2,288 | 24.1% |
 | `exclude_suspect` | 26 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,052 + 1,105 = 7,157` 行（`75.3%`）
-- 未解決 / 要注意: `2,317 + 26 = 2,343` 行（`24.7%`）
+- 安全側の学習コア: `6,081 + 1,105 = 7,186` 行（`75.6%`）
+- 未解決 / 要注意: `2,288 + 26 = 2,314` 行（`24.4%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -41,7 +41,7 @@
 | `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
-| `bit_manipulation` | 1,602 | 570 | 20 | 997 | 15 | 主要な残課題 |
+| `bit_manipulation` | 1,602 | 599 | 20 | 968 | 15 | 主要な残課題 |
 | `symbol_equation` | 1,555 | 110 | 114 | 1,320 | 11 | 主要な残課題 |
 
 ### 解釈
@@ -67,12 +67,13 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 結果:
 
 - 以前の solved 参照値: `306`
-- 最終 verified binary: `570`
-- 改善幅: `+264`
+- 最終 verified binary: `599`
+- 改善幅: `+293`
 - semantic-dedup 後の structured byte formula library から、`71` 個の repeated zero-error family を確定した
 - その conservative support rule により、manual binary `189` 行を新規 `verified_trace_ready` に昇格した
+- さらに abstract family pass（`support>=12`, `distinct exact>=6`, `0 error`）で singleton structured rows `29` 行を追加 `verified_trace_ready` に昇格した
 - さらに conservative hybrid consensus で `20` 行を `answer_only_keep` に昇格した
-- current binary は `570 verified / 20 answer_only / 997 manual / 15 exclude`
+- current binary は `599 verified / 20 answer_only / 968 manual / 15 exclude`
 
 ### 4.2 text の改善
 
@@ -147,8 +148,9 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_affine_low_gap_exclude_v1.csv` | 一意 affine だが gold と衝突したため `exclude_suspect` に移した binary 行 |
 | `artifacts/binary_affine_mismatch_candidates_v1.csv` | affine 一意でも gold と衝突したため昇格しなかった binary 行 |
 | `artifacts/binary_hybrid_consensus_candidates_v1.csv` | single-missing-bit hybrid consensus に乗る binary 行（既存 verified 25 + 新規 answer-only 20）の台帳 |
-| `artifacts/binary_structured_byte_formula_candidates_v1.csv` | structured byte formula に一致する binary 403 行の台帳（新規 verified 189 を含む） |
+| `artifacts/binary_structured_byte_formula_candidates_v1.csv` | structured byte formula に一致する binary 403 行の台帳（exact回収189 + abstract回収29 を含む） |
 | `artifacts/binary_structured_byte_formula_support_v1.csv` | structured byte formula 71 family の support / error 集計 |
+| `artifacts/binary_structured_byte_abstract_support_v1.csv` | abstract structured-byte family の support / distinct-exact / error 集計 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 118 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した prompt-backed symbol 行（concat / abs-diff / comp99）の一覧 |
@@ -245,6 +247,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/41_symbol_broader_template_scan.md` | digit-only symbol manual rows 全体へ broader template library を当てたが repeated exact hit が 0 件だった根拠 |
 | `reports/42_binary_hybrid_consensus_recovery.md` | binary の single-missing-bit hybrid consensus で `20 answer-only` を新規回収した根拠 |
 | `reports/43_binary_structured_byte_formula_recovery.md` | structured byte formula family で binary manual `189` 行を新規 `verified` に昇格した根拠 |
+| `reports/45_binary_structured_byte_abstract_recovery.md` | abstract structured-byte family で singleton tail `29` 行を追加 `verified` に昇格した根拠 |
 
 ## 8. 最短の読み順
 
@@ -261,18 +264,18 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.1 binary がまだ重い
 
-- `bit_manipulation` はまだ `997 manual + 15 exclude`
+- `bit_manipulation` はまだ `968 manual + 15 exclude`
 - 2-bit / 3-bit / affine XOR / byte transform まで当てても、なお多数が未解決
-- structured byte formula により `189 verified` を追加回収できたが、まだ `51 manual + 4 exclude` は formula candidate があるのに safe rule に乗らず残っている
+- structured byte formula により `189 verified`、さらに abstract structured-byte family により `29 verified` を追加回収できた
 - 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
 - low-gap で一意 affine と gold が衝突する `11` 行は今回除外できたが、それ以外の affine mismatch は gap が大きく、まだ安全に切れない
 - single-missing-bit / shared-varset hybrid consensus により `20 answer_only` を追加回収できたが、これは unique trace ではなく conservative answer-only recovery である
-- structured byte formula の残差では、`support=1` の singleton formula と `2` formula same-pred / ambiguous-pred rows がまだ混ざっており、そのままでは安全昇格できない
+- structured byte formula の残差は現在 `22 manual + 4 exclude` まで縮んだが、まだ `19 singleton + 2 same-pred multi + 1 ambiguous-pred` が残る
 - round2 の top binary cluster（`34` 行, `7 examples / 1 no-candidate / 0 multi-candidate`）も再読したが、affine / boolean / byte family のどれも unique ではなく、consensus mismatch も無いので safe promotion / safe exclusion の両方ができない
 - second-largest binary cluster（`29` 行, `8 examples / 1 no-candidate / 0 multi-candidate`）も同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができない
 - third-largest binary cluster（`17` 行, `9 examples / 1 no-candidate / 0 multi-candidate`）も follow-up したが、shift-like / inversion-like fragments が row ごとに別方向へ散っており、やはり no unique solver / no safe exclusion のままだった
 - 残る binary の小 cluster も representative rows を再読したが、今度は `bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも複数候補競合が残るタイプが中心で、top3 よりさらに曖昧だった
-- つまり次は、structured byte formula の singleton / multi-formula tail をさらに切り分けるか、hybrid consensus を超える **unique trace-ready** な boolean/circuit family を考える必要がある
+- つまり次は、structured byte formula の残る `19 singleton + 2 same-pred multi + 1 ambiguous-pred` をさらに切るか、hybrid consensus を超える **unique trace-ready** な boolean/circuit family を考える必要がある
 
 ### 9.2 symbol がまだ重い
 
@@ -324,7 +327,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. structured byte formula の residual `51 manual + 4 exclude` を、support=1 / multi-formula 同 prediction / ambiguous prediction に分けて再点検
+2. structured byte formula の residual `22 manual + 4 exclude` を、`19 singleton / 2 same-pred multi-formula / 1 ambiguous-pred` に分けて再点検
 3. round2 `symbol` core `294` 行のうち、残る low-shot operator-specific tail
 4. `binary_low_gap` 118 行
 5. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold

@@ -34,8 +34,8 @@
 
 - 単一スクリプト `files/cuda-train-data-analysis-v1/code/train_data_analysis_v1.py` を作成し、`data/train.csv` 9,500 件を全件解析済み。
 - 現時点の厳密カテゴリ分け:
-  - `verified_trace_ready`: 6,052
-  - `manual_audit_priority`: 2,317
+  - `verified_trace_ready`: 6,081
+  - `manual_audit_priority`: 2,288
   - `answer_only_keep`: 1,105
   - `exclude_suspect`: 26
 - family ごとの厳密 verified:
@@ -43,7 +43,7 @@
   - gravity: 1,597 / 1,597
   - unit: 1,594 / 1,594
   - text: 605 / 1,576
-  - binary: 570 / 1,602
+  - binary: 599 / 1,602
   - symbol: 110 / 1,555
 - `binary` は affine XOR と simple byte transform（shift / rotate / mask）を足したことで 381 verified まで伸び、baseline の 306 solved を上回った。
 - `binary` の residual low-gap scan では、一意 affine・他候補なし・`bit_no_candidate_positions<=1`・gold 不一致の 11 行を `exclude_suspect` へ降格した。その後、single-missing-bit / shared-varset の conservative hybrid consensus を追加し、`20` 行を `answer_only_keep` に昇格した。これで `binary` は `381 verified / 20 answer_only / 1186 manual / 15 exclude` になった。
@@ -83,4 +83,5 @@
 - `reports/42_binary_hybrid_consensus_recovery.md` を追加し、single-missing-bit / shared-varset の conservative hybrid consensus を binary へ追加した。`45` 行が hybrid-ready で、そのうち既存 verified とは別に `20` 行を新規 `answer_only_keep` として安全側で回収できた。
 - `reports/43_binary_structured_byte_formula_recovery.md` を追加し、structured byte formula family を binary へ追加した。semantic-dedup 後の `311` formula / `71` safe formula を使い、manual binary `189` 行を新規 `verified_trace_ready` として回収した。
 - `reports/44_binary_structured_byte_tail_map.md` を追加し、structured byte residual `55` 行を category 化した。`46` 行が singleton support=1、`2` 行が same-pred multi-formula、`1` 行が ambiguous-pred、`4` 行が structured mismatch exclude で、さらに singleton のうち `37` 行は zero-error abstract family 候補だがまだ rule 化していない。
-- 次ステップは、structured byte formula の residual `51 manual + 4 exclude` を `support=1 / same-pred multi-formula / ambiguous-pred` に割って詰めるか、symbol で simple template を超える non-linear / cross-operator abstraction を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/45_binary_structured_byte_abstract_recovery.md` を追加し、abstract structured-byte family を binary へ追加した。safe abstract family `10` 個を使い、singleton structured rows `29` 行を追加 `verified_trace_ready` として回収した。
+- 次ステップは、structured byte formula の residual `22 manual + 4 exclude` を `19 singleton / 2 same-pred multi-formula / 1 ambiguous-pred` に割って詰めるか、symbol で simple template を超える non-linear / cross-operator abstraction を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。

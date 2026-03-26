@@ -1,18 +1,18 @@
 # cuda-train-data-analysis-v1 overview
 
-- generated_at_utc: `2026-03-26T00:16:07.822016+00:00`
+- generated_at_utc: `2026-03-26T00:33:34.774509+00:00`
 - grounded_in: `README.md`, `try-cuda-train-data-analyst-plan.md`, `try-cuda-train-result.md`, `try-cuda-train.md`
 - analyzed_rows: `9500`
-- verified_trace_ready: `6052`
+- verified_trace_ready: `6081`
 - answer_only_keep: `1105`
-- manual_audit_priority: `2317`
+- manual_audit_priority: `2288`
 - exclude_suspect: `26`
 
 ## Family summary
 
 | family | rows | parse_ok_rate | verified_trace_ready | answer_only_keep | manual_audit_priority | exclude_suspect | suspect_labels | avg_hard_score |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_manipulation | 1602 | 1.0 | 570 | 20 | 997 | 15 | 19 | 4.2166 |
+| bit_manipulation | 1602 | 1.0 | 599 | 20 | 968 | 15 | 19 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
 | symbol_equation | 1555 | 1.0 | 110 | 114 | 1320 | 11 | 11 | 3.1775 |
@@ -23,7 +23,7 @@
 
 | family | total | baseline_solved | baseline_coverage | recovered_solved | recovered_coverage | delta_solved |
 | --- | --- | --- | --- | --- | --- | --- |
-| bit_manipulation | 1602 | 306 | 0.191 | 570 | 0.3558 | 264 |
+| bit_manipulation | 1602 | 306 | 0.191 | 599 | 0.3739 | 293 |
 | gravity_constant | 1597 | 0 | 0.0 | 1597 | 1.0 | 1597 |
 | roman_numeral | 1576 | 1576 | 1.0 | 1576 | 1.0 | 0 |
 | symbol_equation | 1555 | 0 | 0.0 | 110 | 0.0707 | 110 |
@@ -38,10 +38,10 @@
 | unit_conversion | unit_fixed_ratio | 1594 |
 | roman_numeral | roman_standard | 1576 |
 | text_decryption | text_monoalphabetic | 1576 |
-| bit_manipulation | bit_other | 1314 |
+| bit_manipulation | bit_other | 1285 |
 | symbol_equation | glyph_len5 | 823 |
 | symbol_equation | numeric_2x2 | 732 |
-| bit_manipulation | bit_structured_byte_formula | 189 |
+| bit_manipulation | bit_structured_byte_formula | 218 |
 | bit_manipulation | bit_permutation_inversion | 99 |
 
 ## Highest-priority manual audit rows

@@ -108,6 +108,8 @@ BIT_STRUCTURED_BYTE_BINARY_OPERATIONS = {
     "and": lambda a, b: a & b,
     "or": lambda a, b: a | b,
 }
+BIT_STRUCTURED_ABSTRACT_MIN_SUPPORT = 12
+BIT_STRUCTURED_ABSTRACT_MIN_DISTINCT = 6
 
 SYMBOL_NUMERIC_EXPRESSION_PATTERN = re.compile(r"^(\d{2})(.)(\d{2})$")
 SYMBOL_NUMERIC_FORMULAS = {
@@ -1125,6 +1127,29 @@ def infer_bit_structured_byte_formula_matches(examples: list[tuple[str, str]], q
     return matches
 
 
+def abstract_bit_structured_source_name(name: str) -> str:
+    if re.fullmatch(r"rol\d+", str(name)):
+        return "rol"
+    if re.fullmatch(r"ror\d+", str(name)):
+        return "ror"
+    if re.fullmatch(r"shl\d+", str(name)):
+        return "shl"
+    if re.fullmatch(r"shr\d+", str(name)):
+        return "shr"
+    return str(name)
+
+
+def abstract_bit_structured_formula_name(name: str) -> str:
+    formula_name = str(name)
+    if not formula_name:
+        return ""
+    if "(" not in formula_name:
+        return abstract_bit_structured_source_name(formula_name)
+    operation, remainder = formula_name.split("(", 1)
+    arguments = [abstract_bit_structured_source_name(part) for part in remainder[:-1].split(",")]
+    return f"{operation}({','.join(sorted(arguments))})"
+
+
 @lru_cache(maxsize=1)
 def build_bit_hybrid_boolean_candidates() -> tuple[tuple[str, tuple[int, ...], Any], ...]:
     candidates: list[tuple[str, tuple[int, ...], Any]] = []
@@ -1969,7 +1994,7 @@ def grouped_counts(frame: pd.DataFrame, group_columns: list[str], name: str = "r
     )
 
 
-def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     analysis_df = analysis_df.copy()
     bit_mask = analysis_df["family"] == "bit_manipulation"
     unique_formula_mask = (
@@ -1987,7 +2012,18 @@ def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[
             "safe_formula",
         ]
     )
+    abstract_support_df = pd.DataFrame(
+        columns=[
+            "bit_structured_formula_abstract_family",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "distinct_exact_formula_count",
+            "safe_abstract_family",
+        ]
+    )
     safe_formula_names: set[str] = set()
+    safe_abstract_family_names: set[str] = set()
     if not unique_formula_df.empty:
         support_df = (
             unique_formula_df.groupby("bit_structured_formula_name", dropna=False)
@@ -2003,6 +2039,31 @@ def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[
         support_df["safe_formula"] = (support_df["support_rows"] >= 2) & (support_df["error_rows"] == 0)
         safe_formula_names = set(support_df.loc[support_df["safe_formula"], "bit_structured_formula_name"].astype(str))
 
+        unique_formula_df["bit_structured_formula_abstract_family"] = unique_formula_df["bit_structured_formula_name"].map(
+            abstract_bit_structured_formula_name
+        )
+        abstract_support_df = (
+            unique_formula_df.groupby("bit_structured_formula_abstract_family", dropna=False)
+            .agg(
+                support_rows=("id", "size"),
+                gold_match_rows=("bit_structured_formula_matches_gold", "sum"),
+                distinct_exact_formula_count=("bit_structured_formula_name", "nunique"),
+            )
+            .reset_index()
+        )
+        abstract_support_df["support_rows"] = abstract_support_df["support_rows"].astype(int)
+        abstract_support_df["gold_match_rows"] = abstract_support_df["gold_match_rows"].astype(int)
+        abstract_support_df["distinct_exact_formula_count"] = abstract_support_df["distinct_exact_formula_count"].astype(int)
+        abstract_support_df["error_rows"] = abstract_support_df["support_rows"] - abstract_support_df["gold_match_rows"]
+        abstract_support_df["safe_abstract_family"] = (
+            (abstract_support_df["support_rows"] >= BIT_STRUCTURED_ABSTRACT_MIN_SUPPORT)
+            & (abstract_support_df["error_rows"] == 0)
+            & (abstract_support_df["distinct_exact_formula_count"] >= BIT_STRUCTURED_ABSTRACT_MIN_DISTINCT)
+        )
+        safe_abstract_family_names = set(
+            abstract_support_df.loc[abstract_support_df["safe_abstract_family"], "bit_structured_formula_abstract_family"].astype(str)
+        )
+
     safe_support_map = {
         str(row["bit_structured_formula_name"]): int(row["support_rows"])
         for row in support_df.to_dict(orient="records")
@@ -2011,6 +2072,33 @@ def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[
         analysis_df["bit_structured_formula_name"].map(safe_support_map).fillna(0).astype(int)
     )
     analysis_df["bit_structured_formula_safe"] = analysis_df["bit_structured_formula_name"].astype(str).isin(safe_formula_names)
+    analysis_df["bit_structured_formula_abstract_family"] = analysis_df["bit_structured_formula_name"].map(
+        abstract_bit_structured_formula_name
+    )
+    abstract_support_map = {
+        str(row["bit_structured_formula_abstract_family"]): int(row["support_rows"])
+        for row in abstract_support_df.to_dict(orient="records")
+    }
+    abstract_error_map = {
+        str(row["bit_structured_formula_abstract_family"]): int(row["error_rows"])
+        for row in abstract_support_df.to_dict(orient="records")
+    }
+    abstract_distinct_map = {
+        str(row["bit_structured_formula_abstract_family"]): int(row["distinct_exact_formula_count"])
+        for row in abstract_support_df.to_dict(orient="records")
+    }
+    analysis_df["bit_structured_formula_abstract_support"] = (
+        analysis_df["bit_structured_formula_abstract_family"].map(abstract_support_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_structured_formula_abstract_error_rows"] = (
+        analysis_df["bit_structured_formula_abstract_family"].map(abstract_error_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_structured_formula_abstract_distinct_exact"] = (
+        analysis_df["bit_structured_formula_abstract_family"].map(abstract_distinct_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_structured_formula_abstract_safe"] = analysis_df["bit_structured_formula_abstract_family"].astype(str).isin(
+        safe_abstract_family_names
+    )
 
     promote_mask = (
         bit_mask
@@ -2031,16 +2119,39 @@ def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[
     analysis_df.loc[promote_mask, "analysis_notes"] = "bit_structured_byte_exact"
     analysis_df.loc[promote_mask, "suspect_label"] = False
 
+    abstract_promote_mask = (
+        bit_mask
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["bit_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_structured_formula_safe_support"] == 1)
+        & analysis_df["bit_structured_formula_matches_gold"]
+        & analysis_df["bit_structured_formula_abstract_safe"]
+    )
+    analysis_df.loc[abstract_promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+    analysis_df.loc[abstract_promote_mask, "teacher_solver_candidate"] = "binary_structured_byte_formula_abstract"
+    analysis_df.loc[abstract_promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[
+        abstract_promote_mask, "bit_structured_formula_prediction"
+    ]
+    analysis_df.loc[abstract_promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[abstract_promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[abstract_promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[abstract_promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[abstract_promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[abstract_promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[abstract_promote_mask, "analysis_notes"] = "bit_structured_byte_abstract_exact"
+    analysis_df.loc[abstract_promote_mask, "suspect_label"] = False
+
     candidate_df = (
         analysis_df.loc[bit_mask & (analysis_df["bit_structured_formula_match_count"] > 0)]
         .sort_values(
             [
                 "selection_tier",
+                "bit_structured_formula_abstract_support",
                 "bit_structured_formula_safe_support",
                 "bit_structured_formula_match_count",
                 "id",
             ],
-            ascending=[True, False, True, True],
+            ascending=[True, False, False, True, True],
         )
         .reset_index(drop=True)
     )
@@ -2048,11 +2159,15 @@ def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[
         ["safe_formula", "support_rows", "gold_match_rows", "bit_structured_formula_name"],
         ascending=[False, False, False, True],
     ).reset_index(drop=True)
+    abstract_support_df = abstract_support_df.sort_values(
+        ["safe_abstract_family", "support_rows", "distinct_exact_formula_count", "gold_match_rows", "bit_structured_formula_abstract_family"],
+        ascending=[False, False, False, False, True],
+    ).reset_index(drop=True)
     analysis_df = (
         analysis_df.sort_values(["family", "selection_tier", "audit_priority_score", "id"], ascending=[True, True, False, True])
         .reset_index(drop=True)
     )
-    return analysis_df, support_df, candidate_df
+    return analysis_df, support_df, abstract_support_df, candidate_df
 
 
 def write_dataframe(frame: pd.DataFrame, path: Path) -> None:
@@ -3118,7 +3233,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
 
     analysis_records = [analyze_row(v1, record) for record in metadata_df.to_dict(orient="records")]
     analysis_df = pd.DataFrame(analysis_records)
-    analysis_df, structured_formula_support_df, structured_formula_candidate_df = apply_bit_structured_formula_promotions(analysis_df)
+    analysis_df, structured_formula_support_df, structured_formula_abstract_support_df, structured_formula_candidate_df = apply_bit_structured_formula_promotions(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -3328,6 +3443,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_hybrid_consensus_df, artifacts_dir / "binary_hybrid_consensus_candidates_v1.csv")
     write_dataframe(binary_structured_formula_df, artifacts_dir / "binary_structured_byte_formula_candidates_v1.csv")
     write_dataframe(structured_formula_support_df, artifacts_dir / "binary_structured_byte_formula_support_v1.csv")
+    write_dataframe(structured_formula_abstract_support_df, artifacts_dir / "binary_structured_byte_abstract_support_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
