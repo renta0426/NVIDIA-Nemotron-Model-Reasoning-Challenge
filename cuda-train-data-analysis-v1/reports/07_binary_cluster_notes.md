@@ -6,8 +6,8 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 10 | unknown | 8 | 0 | False | False | False | False | 49 |
 | 9 | unknown | 7 | 0 | False | False | False | False | 39 |
-| 8 | unknown | 2 | 0 | False | False | False | False | 33 |
 | 7 | unknown | 1 | 0 | False | False | False | False | 32 |
+| 8 | unknown | 2 | 0 | False | False | False | False | 32 |
 | 7 | unknown | 2 | 0 | False | False | False | False | 31 |
 | 8 | unknown | 8 | 0 | False | False | False | False | 30 |
 | 7 | unknown | 3 | 0 | False | False | False | False | 27 |

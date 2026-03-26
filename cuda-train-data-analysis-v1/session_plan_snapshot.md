@@ -35,8 +35,8 @@
 - 単一スクリプト `files/cuda-train-data-analysis-v1/code/train_data_analysis_v1.py` を作成し、`data/train.csv` 9,500 件を全件解析済み。
 - 現時点の厳密カテゴリ分け:
   - `verified_trace_ready`: 6,081
-  - `manual_audit_priority`: 2,288
-  - `answer_only_keep`: 1,105
+  - `manual_audit_priority`: 2,286
+  - `answer_only_keep`: 1,107
   - `exclude_suspect`: 26
 - family ごとの厳密 verified:
   - roman: 1,576 / 1,576
@@ -85,4 +85,6 @@
 - `reports/44_binary_structured_byte_tail_map.md` を追加し、structured byte residual `55` 行を category 化した。`46` 行が singleton support=1、`2` 行が same-pred multi-formula、`1` 行が ambiguous-pred、`4` 行が structured mismatch exclude で、さらに singleton のうち `37` 行は zero-error abstract family 候補だがまだ rule 化していない。
 - `reports/45_binary_structured_byte_abstract_recovery.md` を追加し、abstract structured-byte family を binary へ追加した。safe abstract family `10` 個を使い、singleton structured rows `29` 行を追加 `verified_trace_ready` として回収した。
 - `reports/46_binary_structured_byte_threshold_sweep.md` を追加し、abstract structured-byte threshold を緩めた場合の gain を測った。`support>=12 / distinct>=6` から `support>=5 / distinct>=4` に緩めても追加 gain は `5` 行だけで、`and(ror,shr)` と `or(rol,shl)` の薄い family に限られたため、現時点では採用しない判断にした。
-- 次ステップは、structured byte formula の residual `22 manual + 4 exclude` を `19 singleton / 2 same-pred multi-formula / 1 ambiguous-pred` に割って詰めるか、symbol で simple template を超える non-linear / cross-operator abstraction を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。
+- `reports/47_binary_structured_byte_multi_consensus_recovery.md` を追加し、same-pred multi-formula 行のうち safe abstract family に anchor を持つ `8b4c71ba` / `cc5011ac` を `answer_only_keep` として回収した。これで structured byte residual は `20 manual + 4 exclude` になり、残る multi-formula 行は `5a6dd286` のみ。
+- これで `binary` は `599 verified / 22 answer_only / 966 manual / 15 exclude` になった。
+- 次ステップは、structured byte formula の residual `20 manual + 4 exclude` を `19 singleton / 1 ambiguous multi-pred` に割って詰めるか、symbol で simple template を超える non-linear / cross-operator abstraction を探すこと。glyph 46 行は、新しい family 仮説が出るまで hold。

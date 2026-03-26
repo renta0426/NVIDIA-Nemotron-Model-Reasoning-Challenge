@@ -1,18 +1,18 @@
 # cuda-train-data-analysis-v1 overview
 
-- generated_at_utc: `2026-03-26T00:33:34.774509+00:00`
+- generated_at_utc: `2026-03-26T00:51:47.138981+00:00`
 - grounded_in: `README.md`, `try-cuda-train-data-analyst-plan.md`, `try-cuda-train-result.md`, `try-cuda-train.md`
 - analyzed_rows: `9500`
 - verified_trace_ready: `6081`
-- answer_only_keep: `1105`
-- manual_audit_priority: `2288`
+- answer_only_keep: `1107`
+- manual_audit_priority: `2286`
 - exclude_suspect: `26`
 
 ## Family summary
 
 | family | rows | parse_ok_rate | verified_trace_ready | answer_only_keep | manual_audit_priority | exclude_suspect | suspect_labels | avg_hard_score |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_manipulation | 1602 | 1.0 | 599 | 20 | 968 | 15 | 19 | 4.2166 |
+| bit_manipulation | 1602 | 1.0 | 599 | 22 | 966 | 15 | 19 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
 | symbol_equation | 1555 | 1.0 | 110 | 114 | 1320 | 11 | 11 | 3.1775 |
@@ -38,10 +38,10 @@
 | unit_conversion | unit_fixed_ratio | 1594 |
 | roman_numeral | roman_standard | 1576 |
 | text_decryption | text_monoalphabetic | 1576 |
-| bit_manipulation | bit_other | 1285 |
+| bit_manipulation | bit_other | 1283 |
 | symbol_equation | glyph_len5 | 823 |
 | symbol_equation | numeric_2x2 | 732 |
-| bit_manipulation | bit_structured_byte_formula | 218 |
+| bit_manipulation | bit_structured_byte_formula | 220 |
 | bit_manipulation | bit_permutation_inversion | 99 |
 
 ## Highest-priority manual audit rows

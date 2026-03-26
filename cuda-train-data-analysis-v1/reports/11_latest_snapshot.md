@@ -1,16 +1,16 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-03-26T00:33:34.795095+00:00`
+- generated_at_utc: `2026-03-26T00:51:47.157302+00:00`
 - verified_trace_ready: `6081`
-- answer_only_keep: `1105`
-- manual_audit_priority: `2288`
+- answer_only_keep: `1107`
+- manual_audit_priority: `2286`
 - exclude_suspect: `26`
 
 ## Family summary
 
 | family | rows | parse_ok_rate | verified_trace_ready | answer_only_keep | manual_audit_priority | exclude_suspect | suspect_labels | avg_hard_score |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_manipulation | 1602 | 1.0 | 599 | 20 | 968 | 15 | 19 | 4.2166 |
+| bit_manipulation | 1602 | 1.0 | 599 | 22 | 966 | 15 | 19 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
 | symbol_equation | 1555 | 1.0 | 110 | 114 | 1320 | 11 | 11 | 3.1775 |
