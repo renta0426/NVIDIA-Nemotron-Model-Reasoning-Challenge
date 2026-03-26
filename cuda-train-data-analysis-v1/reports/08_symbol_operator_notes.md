@@ -14,12 +14,12 @@
 | numeric_2x2 | ! | manual_audit_priority |  | 11 |
 | numeric_2x2 | + | answer_only_keep | concat_yx | 11 |
 | numeric_2x2 | : | manual_audit_priority |  | 11 |
-| numeric_2x2 | [ | manual_audit_priority |  | 11 |
-| numeric_2x2 | " | manual_audit_priority |  | 10 |
 | numeric_2x2 | $ | manual_audit_priority |  | 10 |
 | numeric_2x2 | < | manual_audit_priority |  | 10 |
+| numeric_2x2 | [ | manual_audit_priority |  | 10 |
 | numeric_2x2 | ^ | manual_audit_priority |  | 10 |
 | numeric_2x2 | ` | manual_audit_priority |  | 10 |
+| numeric_2x2 | " | manual_audit_priority |  | 9 |
 | numeric_2x2 | + | verified_trace_ready | concat_yx | 9 |
 | numeric_2x2 | \ | manual_audit_priority |  | 9 |
 | numeric_2x2 | { | manual_audit_priority |  | 9 |

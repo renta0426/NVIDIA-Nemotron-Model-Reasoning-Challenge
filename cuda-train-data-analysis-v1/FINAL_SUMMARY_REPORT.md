@@ -23,14 +23,14 @@
 | selection_tier | rows | share |
 | --- | ---: | ---: |
 | `verified_trace_ready` | 6,086 | 64.1% |
-| `answer_only_keep` | 1,149 | 12.1% |
-| `manual_audit_priority` | 2,238 | 23.6% |
+| `answer_only_keep` | 1,151 | 12.1% |
+| `manual_audit_priority` | 2,236 | 23.5% |
 | `exclude_suspect` | 27 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,086 + 1,149 = 7,235` 行（`76.2%`）
-- 未解決 / 要注意: `2,238 + 27 = 2,265` 行（`23.8%`）
+- 安全側の学習コア: `6,086 + 1,151 = 7,237` 行（`76.2%`）
+- 未解決 / 要注意: `2,236 + 27 = 2,263` 行（`23.8%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ## 3. family ごとの最終結果
@@ -42,7 +42,7 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 604 | 35 | 947 | 16 | 主要な残課題 |
-| `symbol_equation` | 1,555 | 110 | 143 | 1,291 | 11 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 110 | 145 | 1,289 | 11 | 主要な残課題 |
 
 ### 解釈
 
@@ -108,7 +108,8 @@ symbol では、broader template scan の後に **operator-specific formula-form
 - さらに prompt-exact な direct `-` plain subfamily（signed / abs）を切り分け、`3 answer-only` を追加回収
 - さらに `!` / `"` の prompt-exact thin support-2 subfamily を `2 answer-only` 回収した
 - さらに `:` の manual exact reread で `2 answer-only` を追加回収した
-- current symbol は `110 verified / 143 answer_only / 1291 manual / 11 exclude`
+- さらに `"` / `[` の prefix-always-abs tail から `2 answer-only` を追加回収した
+- current symbol は `110 verified / 145 answer_only / 1289 manual / 11 exclude`
 - これは unique trace ではないので、`verified` ではなく conservative `answer_only` に留めている
 
 ### 4.4 symbol / glyph pass1 の詳細
@@ -136,9 +137,9 @@ symbol は大きく 2 つに分かれました。
 
 ### 4.5 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **495 行** まで縮みました。
+最優先で人手確認すべき pack は **493 行** まで縮みました。
 
-- `332` 行: `symbol_numeric_same_op`
+- `330` 行: `symbol_numeric_same_op`
 - `117` 行: `binary_low_gap`
 - `46` 行: `symbol_glyph_multiset`
 
@@ -297,6 +298,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/55_symbol_thin_support2_recovery.md` | `!` / `"` の prompt-exact support-2 subfamily を採用し、symbol manual 2 行を追加回収した根拠 |
 | `reports/56_binary_structured_byte_manual_exact_curation.md` | structured-byte residual の prompt を直接読み、binary manual 5 行を `verified`、1 行を `exclude_suspect` に確定した根拠 |
 | `reports/57_symbol_colon_manual_exact_answer_only.md` | `:` residual を直接読み、symbol manual 2 行を `answer_only_keep` に確定した根拠 |
+| `reports/58_symbol_prefix_always_abs_tail.md` | `"` / `[` tail を直接読み、symbol manual 2 行を `answer_only_keep` に確定し、multi-example gold-hit tail の枯渇を確認した根拠 |
 
 ## 8. 最短の読み順
 
@@ -332,7 +334,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.2 symbol がまだ重い
 
-- `symbol_equation` は `1,291 manual + 11 exclude`
+- `symbol_equation` は `1,289 manual + 11 exclude`
 - `numeric_2x2` は operator-aware と prompt-backed pass1 でかなり整理でき、`comp99_abs_diff_2d` を operator-prefixed zero-pad まで広げたことで累計 `2 verified + 9 answer-only` を回収し、さらに exact mismatch `1` 行を `exclude_suspect` に移した
 - さらに operator-specific formula-format consensus により `16 answer-only` を追加回収できた
 - さらに `-` の prefixed abs-diff near-miss を zero-error subfamily へ切り分け、manual `3` 行を `answer_only_keep` に昇格できた
@@ -340,7 +342,8 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - さらに prompt-exact な direct `-` plain subfamily（signed / abs）を切り分け、manual `3` 行を `answer_only_keep` に昇格できた
 - さらに `!` / `"` の prompt-exact thin support-2 subfamily から manual `2` 行を `answer_only_keep` に昇格できた
 - さらに `:` の direct prompt reread から manual `2` 行を `answer_only_keep` に昇格できた
-- それでも pass1 にはまだ `332` 行が残る
+- さらに `"` / `[` の prefix-always-abs tail から manual `2` 行を `answer_only_keep` に昇格できた
+- それでも pass1 にはまだ `330` 行が残る
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d / comp99_abs_diff_2d` に見える `43` 行も再照合したが、`38` 行は same-op examples と衝突、`5` 行は format が一意化できず、**追加昇格 0**
 - report 17 の high-shot mimic `43` 行に、extra known-family / low-shot mimic を足した current mimic union は `67` 行となり、round2 の `symbol` 本丸は `282` 行まで圧縮できた
@@ -357,6 +360,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - 残る symbol の singleton / doubleton tail も representative rows を spot-check したが、`# / ) / / / @ / < / ? / ^ / {` など operator-local mini-slicesが並ぶ long tail で、broader family を立てない限り safe promotion の入口は見えなかった
 - さらに digit-only symbol manual rows 全体に broader template library（`x+y`, `|x-y|`, `x*y`, pairwise digit concat 群, reversed / zero-pad variants）を当てても repeated exact hit は `0` 件だった
 - さらに post-report-54 の subgroup search で `!` / `"` の thin support-2 subfamily を `2` 行だけ回収できたが、その後に残った機械的 near-miss は `45dbc1cc` のみで、こちらは `sum>=100` の偶然っぽい split に依存するため未採用とした
+- さらに `"` / `[` の multi-example prefix-always-abs tail から `2` 行を追加回収した結果、manual `numeric_2x2` のうち「same-op examples が 2 本以上あり、既存 formula library で gold をそのまま支持できる行」は枯渇した
 - つまり残りは、より operator-specific だがまだ consensus に乗らない式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
@@ -387,7 +391,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 次に触る順番は、現状では次が合理的です。
 
 1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. round2 `symbol` core `282` 行のうち、残る low-shot operator-specific tail
+2. round2 `symbol` core `280` 行のうち、残る low-shot operator-specific tail
 3. `binary_low_gap` 117 行
 4. structured byte formula の残る `5a6dd286` 1 行と `5 exclude` の扱いを別管理で維持
 5. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold

@@ -3315,6 +3315,16 @@ SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS: dict[str, dict[str, str]] = {
         "predicted_answer": "66",
         "decision_note": "colon_manual_prefix_branch_answer_only",
     },
+    "31eb8247": {
+        "query_operator": '"',
+        "predicted_answer": '"12',
+        "decision_note": "quote_manual_prefix_always_abs_answer_only",
+    },
+    "4c57a53f": {
+        "query_operator": "[",
+        "predicted_answer": "[4",
+        "decision_note": "bracket_manual_prefix_always_abs_answer_only",
+    },
 }
 
 

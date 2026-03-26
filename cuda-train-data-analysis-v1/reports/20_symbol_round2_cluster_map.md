@@ -6,7 +6,7 @@ After pass1, exclude all manual rows whose query answer only mimics already-know
 
 ## Scope
 
-- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `282`
+- remaining post-mimic-exclusion `symbol_numeric_same_op` rows: `280`
 - excluded known/query-only mimic union: `66` rows
 - grouped by operator, answer length, operator-char embedding, and same-operator example count bucket.
 

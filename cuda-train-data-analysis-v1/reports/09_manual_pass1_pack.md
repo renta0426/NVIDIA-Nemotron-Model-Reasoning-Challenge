@@ -4,7 +4,7 @@
 
 | audit_focus | family | rows |
 | --- | --- | --- |
-| symbol_numeric_same_op | symbol_equation | 332 |
+| symbol_numeric_same_op | symbol_equation | 330 |
 | binary_low_gap | bit_manipulation | 117 |
 | symbol_glyph_multiset | symbol_equation | 46 |
 
