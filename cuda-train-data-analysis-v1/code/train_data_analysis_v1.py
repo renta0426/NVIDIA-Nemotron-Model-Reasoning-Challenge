@@ -2447,6 +2447,53 @@ def apply_bit_structured_low_support_answer_only_promotions(analysis_df: pd.Data
     return analysis_df, candidate_df
 
 
+def apply_bit_structured_support3_answer_only_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["bit_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_structured_formula_prediction_count"] == 1)
+        & (analysis_df["bit_structured_formula_prediction"] == analysis_df["answer"])
+        & (analysis_df["bit_structured_formula_abstract_error_rows"] == 0)
+        & (analysis_df["bit_structured_formula_abstract_support"] == 3)
+        & (analysis_df["bit_structured_formula_abstract_distinct_exact"] == 3)
+    )
+    candidate_df = analysis_df.loc[
+        candidate_mask,
+        [
+            "id",
+            "selection_tier",
+            "query_raw",
+            "answer",
+            "bit_structured_formula_name",
+            "bit_structured_formula_prediction",
+            "bit_structured_formula_abstract_family",
+            "bit_structured_formula_abstract_support",
+            "bit_structured_formula_abstract_distinct_exact",
+        ],
+    ].copy()
+    if candidate_df.empty:
+        return analysis_df, candidate_df.reset_index(drop=True)
+
+    promote_ids = set(candidate_df["id"].astype(str))
+    promote_mask = analysis_df["id"].astype(str).isin(promote_ids)
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "bit_structured_formula_prediction"]
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = "bit_structured_support3_answer_only"
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+    candidate_df = candidate_df.sort_values(
+        ["bit_structured_formula_abstract_family", "bit_structured_formula_name", "id"],
+        ascending=[True, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
 def collect_symbol_minus_prefix_subfamily_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
     if query_match is None or query_match.group(2) != "-":
@@ -4120,6 +4167,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df = pd.DataFrame(analysis_records)
     analysis_df, structured_formula_support_df, structured_formula_abstract_support_df, structured_formula_candidate_df = apply_bit_structured_formula_promotions(analysis_df)
     analysis_df, structured_low_support_candidate_df = apply_bit_structured_low_support_answer_only_promotions(analysis_df)
+    analysis_df, structured_support3_candidate_df = apply_bit_structured_support3_answer_only_promotions(analysis_df)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
     analysis_df, symbol_minus_direct_support_df, symbol_minus_direct_candidate_df = apply_symbol_minus_direct_plain_promotions(analysis_df)
@@ -4333,6 +4381,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_hybrid_consensus_df, artifacts_dir / "binary_hybrid_consensus_candidates_v1.csv")
     write_dataframe(binary_structured_formula_df, artifacts_dir / "binary_structured_byte_formula_candidates_v1.csv")
     write_dataframe(structured_low_support_candidate_df, artifacts_dir / "binary_structured_byte_low_support_answer_only_candidates_v1.csv")
+    write_dataframe(structured_support3_candidate_df, artifacts_dir / "binary_structured_byte_support3_answer_only_candidates_v1.csv")
     write_dataframe(structured_formula_support_df, artifacts_dir / "binary_structured_byte_formula_support_v1.csv")
     write_dataframe(structured_formula_abstract_support_df, artifacts_dir / "binary_structured_byte_abstract_support_v1.csv")
     write_dataframe(symbol_operator_spec_support_df, artifacts_dir / "symbol_operator_specific_formula_support_v1.csv")

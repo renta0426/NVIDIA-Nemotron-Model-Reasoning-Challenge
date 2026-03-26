@@ -4,7 +4,7 @@
 
 | template_subtype | bit_simple_family | bit_independent_unique | bit_bijection_unique | bit_boolean2_unique | bit_boolean3_unique | bit_affine_unique | bit_byte_transform_unique | bit_hybrid_consensus_ready | selection_tier | analysis_notes | teacher_solver_candidate | rows |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_other | unknown | False | False | False | False | False | False | False | manual_audit_priority | bit_audit_needed |  | 843 |
+| bit_other | unknown | False | False | False | False | False | False | False | manual_audit_priority | bit_audit_needed |  | 841 |
 | bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | verified_trace_ready | bit_structured_byte_exact | binary_structured_byte_formula | 174 |
 | bit_other | unknown | False | False | False | False | True | False | False | verified_trace_ready | bit_exact | binary_affine_xor | 112 |
 | bit_other | unknown | False | False | False | False | True | False | False | manual_audit_priority | bit_audit_needed |  | 105 |
