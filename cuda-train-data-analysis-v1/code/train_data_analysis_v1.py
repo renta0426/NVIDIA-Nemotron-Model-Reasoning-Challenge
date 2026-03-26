@@ -87,6 +87,21 @@ BIT_BYTE_TRANSFORMS = {
     "reverse": lambda value, _: int(format(value & 0xFF, "08b")[::-1], 2),
     "nibble_swap": lambda value, _: int(format(value & 0xFF, "08b")[4:] + format(value & 0xFF, "08b")[:4], 2),
 }
+BIT_HYBRID_BOOLEAN2_OPERATIONS = {
+    "xor": lambda a, b: a ^ b,
+    "and": lambda a, b: a & b,
+    "or": lambda a, b: a | b,
+    "eq": lambda a, b: 1 if a == b else 0,
+    "neq": lambda a, b: 1 if a != b else 0,
+    "nand": lambda a, b: 1 - (a & b),
+    "nor": lambda a, b: 1 - (a | b),
+}
+BIT_HYBRID_BOOLEAN3_OPERATIONS = {
+    "maj": lambda a, b, c: 1 if (a + b + c) >= 2 else 0,
+    "xor3": lambda a, b, c: a ^ b ^ c,
+    "or3": lambda a, b, c: 1 if (a | b | c) else 0,
+    "and3": lambda a, b, c: 1 if (a & b & c) else 0,
+}
 
 SYMBOL_NUMERIC_EXPRESSION_PATTERN = re.compile(r"^(\d{2})(.)(\d{2})$")
 SYMBOL_NUMERIC_FORMULAS = {
@@ -1043,6 +1058,134 @@ def infer_bit_byte_transform_answer(examples: list[tuple[str, str]], query_bits:
     return None, candidate_names
 
 
+@lru_cache(maxsize=1)
+def build_bit_hybrid_boolean_candidates() -> tuple[tuple[str, tuple[int, ...], Any], ...]:
+    candidates: list[tuple[str, tuple[int, ...], Any]] = []
+
+    def make_unary(index: int, invert: bool) -> Any:
+        def fn(input_bits: str, index: int = index, invert: bool = invert) -> int:
+            bit = int(input_bits[index])
+            return 1 - bit if invert else bit
+
+        return fn
+
+    def make_binary(index_a: int, invert_a: bool, index_b: int, invert_b: bool, operation: Any) -> Any:
+        def fn(
+            input_bits: str,
+            index_a: int = index_a,
+            invert_a: bool = invert_a,
+            index_b: int = index_b,
+            invert_b: bool = invert_b,
+            operation: Any = operation,
+        ) -> int:
+            left_bit = int(input_bits[index_a])
+            right_bit = int(input_bits[index_b])
+            if invert_a:
+                left_bit = 1 - left_bit
+            if invert_b:
+                right_bit = 1 - right_bit
+            return int(operation(left_bit, right_bit))
+
+        return fn
+
+    def make_ternary(index_a: int, index_b: int, index_c: int, operation: Any) -> Any:
+        def fn(
+            input_bits: str,
+            index_a: int = index_a,
+            index_b: int = index_b,
+            index_c: int = index_c,
+            operation: Any = operation,
+        ) -> int:
+            return int(operation(int(input_bits[index_a]), int(input_bits[index_b]), int(input_bits[index_c])))
+
+        return fn
+
+    for input_index in range(8):
+        candidates.append((f"i{input_index + 1}", (input_index + 1,), make_unary(input_index, False)))
+        candidates.append((f"i{input_index + 1}^", (input_index + 1,), make_unary(input_index, True)))
+
+    for first_index in range(8):
+        for second_index in range(first_index + 1, 8):
+            for op_name, operation in BIT_HYBRID_BOOLEAN2_OPERATIONS.items():
+                for invert_first, first_suffix in ((False, ""), (True, "^")):
+                    for invert_second, second_suffix in ((False, ""), (True, "^")):
+                        name = f"{op_name}(i{first_index + 1}{first_suffix},i{second_index + 1}{second_suffix})"
+                        varset = tuple(sorted({first_index + 1, second_index + 1}))
+                        candidates.append(
+                            (
+                                name,
+                                varset,
+                                make_binary(first_index, invert_first, second_index, invert_second, operation),
+                            )
+                        )
+
+    for first_index in range(8):
+        for second_index in range(first_index + 1, 8):
+            for third_index in range(second_index + 1, 8):
+                for op_name, operation in BIT_HYBRID_BOOLEAN3_OPERATIONS.items():
+                    name = f"{op_name}(i{first_index + 1},i{second_index + 1},i{third_index + 1})"
+                    varset = (first_index + 1, second_index + 1, third_index + 1)
+                    candidates.append((name, varset, make_ternary(first_index, second_index, third_index, operation)))
+
+    return tuple(candidates)
+
+
+def infer_bit_hybrid_consensus_answer(
+    examples: list[tuple[str, str]], candidate_sets: list[list[tuple[int, int]]], query_bits: str
+) -> tuple[str | None, dict[str, Any]]:
+    info = {
+        "ready": False,
+        "missing_position": 0,
+        "match_count": 0,
+        "prediction_count": 0,
+        "varset": "",
+        "sample_matches": [],
+    }
+    if len(query_bits) != 8 or len(examples) < 7:
+        return None, info
+    missing_positions = [index for index, candidates in enumerate(candidate_sets) if not candidates]
+    if len(missing_positions) != 1:
+        return None, info
+    if any(len(candidates) != 1 for index, candidates in enumerate(candidate_sets) if index not in missing_positions):
+        return None, info
+    missing_index = missing_positions[0]
+    info["missing_position"] = missing_index + 1
+    fixed_specs = [candidates[0] if candidates else None for candidates in candidate_sets]
+
+    matching_candidates: list[tuple[str, tuple[int, ...], Any]] = []
+    for name, varset, function in build_bit_hybrid_boolean_candidates():
+        if all(function(input_bits) == int(output_bits[missing_index]) for input_bits, output_bits in examples):
+            matching_candidates.append((name, varset, function))
+
+    info["match_count"] = len(matching_candidates)
+    info["sample_matches"] = [name for name, _, _ in matching_candidates[:8]]
+    if not matching_candidates:
+        return None, info
+
+    varsets = {varset for _, varset, _ in matching_candidates}
+    predicted_outputs: set[str] = set()
+    for _, _, function in matching_candidates:
+        predicted_bits: list[str] = []
+        for output_index, spec in enumerate(fixed_specs):
+            if output_index == missing_index:
+                predicted_bits.append(str(function(query_bits)))
+            else:
+                input_index, flip = spec
+                source_bit = query_bits[input_index]
+                predicted_bits.append(invert_bit(source_bit) if flip else source_bit)
+        predicted_outputs.add("".join(predicted_bits))
+
+    info["prediction_count"] = len(predicted_outputs)
+    if len(varsets) == 1:
+        info["varset"] = ",".join(f"i{index}" for index in next(iter(varsets)))
+
+    if len(predicted_outputs) != 1 or len(varsets) != 1 or len(next(iter(varsets))) != 2:
+        return None, info
+
+    info["ready"] = True
+    return next(iter(predicted_outputs)), info
+
+
 def analyze_roman_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     examples = extract_examples(parsed)
     query_value = getattr(parsed, "roman_query_value", None)
@@ -1262,6 +1405,11 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
             "bit_affine_unique": False,
             "bit_byte_transform_unique": False,
             "bit_byte_transform_names": "",
+            "answer_only_ready": False,
+            "bit_hybrid_consensus_ready": False,
+            "bit_hybrid_consensus_varset": "",
+            "bit_hybrid_consensus_match_count": 0,
+            "bit_hybrid_consensus_prediction_count": 0,
         }
     candidate_sets = build_bit_candidate_sets(examples)
     independent_answer, independent_choice_counts = infer_bit_independent_answer(candidate_sets, query_bits)
@@ -1271,8 +1419,9 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     boolean3_answer, boolean3_value_counts, boolean3_support_counts = infer_bit_three_bit_boolean_answer(examples, query_bits)
     affine_answer, affine_free_var_counts = infer_bit_affine_xor_answer(examples, query_bits)
     byte_transform_answer, byte_transform_names = infer_bit_byte_transform_answer(examples, query_bits)
+    hybrid_answer, hybrid_info = infer_bit_hybrid_consensus_answer(examples, candidate_sets, query_bits)
     strict_prediction = bijection_answer or (independent_answer or "")
-    fallback_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
+    fallback_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (hybrid_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
     no_candidate_positions = sum(1 for candidates in candidate_sets if not candidates)
     multi_candidate_positions = sum(1 for candidates in candidate_sets if len(candidates) > 1)
     reasons: list[str] = []
@@ -1298,6 +1447,10 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         reasons.append("bit_byte_transform_ambiguous")
     elif not strict_prediction and not boolean2_answer and not boolean3_answer and not affine_answer and byte_transform_answer != str(answer):
         reasons.append("bit_byte_transform_mismatch")
+    if hybrid_answer is None:
+        reasons.append("bit_hybrid_consensus_ambiguous")
+    elif not strict_prediction and not boolean2_answer and not boolean3_answer and hybrid_answer != str(answer):
+        reasons.append("bit_hybrid_consensus_mismatch")
     if strict_prediction and strict_prediction != str(answer):
         reasons.append("bit_answer_mismatch")
     simple_family = str(v1.detect_bit_fit_family(getattr(parsed, "examples", [])))
@@ -1316,6 +1469,12 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     elif byte_transform_answer and byte_transform_answer == str(answer):
         teacher_solver = "binary_byte_transform"
     verified = bool(teacher_solver)
+    answer_only_ready = bool(
+        not verified
+        and hybrid_answer
+        and hybrid_answer == str(answer)
+        and hybrid_info.get("ready", False)
+    )
     affine_low_gap_mismatch = bool(
         not verified
         and not strict_prediction
@@ -1343,6 +1502,8 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         best_prediction = affine_answer or ""
     elif teacher_solver == "binary_byte_transform":
         best_prediction = byte_transform_answer or ""
+    elif answer_only_ready:
+        best_prediction = hybrid_answer or ""
     matches_gold = bool(best_prediction and best_prediction == str(answer))
     return {
         "template_subtype": template_subtype,
@@ -1351,7 +1512,11 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "auto_solver_match": bool(matches_gold),
         "verified_trace_ready": verified,
         "example_consistency_ok": bool(all(candidate_sets)),
-        "analysis_notes": "bit_exact" if verified else ("bit_affine_low_gap_mismatch" if affine_low_gap_mismatch else "bit_audit_needed"),
+        "analysis_notes": (
+            "bit_exact"
+            if verified
+            else ("bit_hybrid_consensus" if answer_only_ready else ("bit_affine_low_gap_mismatch" if affine_low_gap_mismatch else "bit_audit_needed"))
+        ),
         "family_analysis_json": json_dumps(
             {
                 "example_count": len(examples),
@@ -1367,11 +1532,17 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
                 "byte_transform_names": byte_transform_names,
                 "no_candidate_positions": no_candidate_positions,
                 "multi_candidate_positions": multi_candidate_positions,
+                "hybrid_consensus_missing_position": hybrid_info["missing_position"],
+                "hybrid_consensus_match_count": hybrid_info["match_count"],
+                "hybrid_consensus_prediction_count": hybrid_info["prediction_count"],
+                "hybrid_consensus_varset": hybrid_info["varset"],
+                "hybrid_consensus_sample_matches": hybrid_info["sample_matches"],
                 "affine_low_gap_mismatch": affine_low_gap_mismatch,
             }
         ),
         "audit_reasons": "|".join(reasons),
         "suspect_label": bool((strict_prediction and strict_prediction != str(answer)) or affine_low_gap_mismatch),
+        "answer_only_ready": answer_only_ready,
         "bit_simple_family": simple_family,
         "bit_candidate_signature": bit_candidate_signature(candidate_sets),
         "bit_independent_unique": bool(independent_answer is not None),
@@ -1384,6 +1555,10 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "bit_no_candidate_positions": int(no_candidate_positions),
         "bit_multi_candidate_positions": int(multi_candidate_positions),
         "bit_byte_transform_names": "|".join(byte_transform_names),
+        "bit_hybrid_consensus_ready": bool(hybrid_info["ready"]),
+        "bit_hybrid_consensus_varset": str(hybrid_info["varset"]),
+        "bit_hybrid_consensus_match_count": int(hybrid_info["match_count"]),
+        "bit_hybrid_consensus_prediction_count": int(hybrid_info["prediction_count"]),
     }
 
 
@@ -1668,6 +1843,10 @@ def analyze_row(v1: Any, metadata_record: dict[str, Any]) -> dict[str, Any]:
         "bit_no_candidate_positions": int(family_result.get("bit_no_candidate_positions", 0)),
         "bit_multi_candidate_positions": int(family_result.get("bit_multi_candidate_positions", 0)),
         "bit_byte_transform_names": family_result.get("bit_byte_transform_names", ""),
+        "bit_hybrid_consensus_ready": bool(family_result.get("bit_hybrid_consensus_ready", False)),
+        "bit_hybrid_consensus_varset": family_result.get("bit_hybrid_consensus_varset", ""),
+        "bit_hybrid_consensus_match_count": int(family_result.get("bit_hybrid_consensus_match_count", 0)),
+        "bit_hybrid_consensus_prediction_count": int(family_result.get("bit_hybrid_consensus_prediction_count", 0)),
         "text_wordmap_predicted_answer": family_result.get("text_wordmap_predicted_answer", ""),
         "text_unknown_char_count": int(family_result.get("text_unknown_char_count", 0)),
         "text_unknown_chars": family_result.get("text_unknown_chars", ""),
@@ -2764,7 +2943,20 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     selection_df = grouped_counts(analysis_df, ["selection_tier", "family"], name="rows")
     bit_df = grouped_counts(
         analysis_df.loc[analysis_df["family"] == "bit_manipulation"],
-        ["template_subtype", "bit_simple_family", "bit_independent_unique", "bit_bijection_unique", "bit_boolean2_unique", "bit_boolean3_unique", "bit_affine_unique", "bit_byte_transform_unique", "teacher_solver_candidate"],
+        [
+            "template_subtype",
+            "bit_simple_family",
+            "bit_independent_unique",
+            "bit_bijection_unique",
+            "bit_boolean2_unique",
+            "bit_boolean3_unique",
+            "bit_affine_unique",
+            "bit_byte_transform_unique",
+            "bit_hybrid_consensus_ready",
+            "selection_tier",
+            "analysis_notes",
+            "teacher_solver_candidate",
+        ],
         name="rows",
     )
     text_df = grouped_counts(
@@ -2826,6 +3018,14 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
             & (~analysis_df["auto_solver_match"])
         ]
         .sort_values(["hard_score", "id"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    binary_hybrid_consensus_df = (
+        analysis_df.loc[
+            (analysis_df["family"] == "bit_manipulation")
+            & (analysis_df["bit_hybrid_consensus_ready"])
+        ]
+        .sort_values(["selection_tier", "bit_hybrid_consensus_varset", "bit_hybrid_consensus_match_count", "id"], ascending=[True, True, False, True])
         .reset_index(drop=True)
     )
     glyph_summary_df = grouped_counts(
@@ -2930,6 +3130,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(glyph_exact_df, artifacts_dir / "glyph_exact_coarse_predictions_v1.csv")
     write_dataframe(binary_affine_exclude_df, artifacts_dir / "binary_affine_low_gap_exclude_v1.csv")
     write_dataframe(binary_affine_manual_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
+    write_dataframe(binary_hybrid_consensus_df, artifacts_dir / "binary_hybrid_consensus_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")

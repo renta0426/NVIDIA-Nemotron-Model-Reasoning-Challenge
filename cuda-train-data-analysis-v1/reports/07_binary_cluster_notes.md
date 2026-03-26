@@ -13,17 +13,17 @@
 | 10 | unknown | 7 | 0 | False | False | False | False | 36 |
 | 7 | unknown | 5 | 0 | False | False | False | False | 35 |
 | 7 | unknown | 6 | 0 | False | False | False | False | 35 |
-| 7 | unknown | 1 | 0 | False | False | False | False | 34 |
 | 7 | unknown | 2 | 0 | False | False | False | False | 34 |
 | 7 | unknown | 3 | 0 | False | False | False | False | 34 |
 | 7 | unknown | 7 | 0 | False | False | False | False | 33 |
+| 7 | unknown | 1 | 0 | False | False | False | False | 32 |
 | 8 | unknown | 8 | 0 | False | False | False | False | 32 |
 | 8 | unknown | 3 | 0 | False | False | False | False | 30 |
 | 8 | unknown | 6 | 0 | False | False | False | False | 30 |
 | 8 | unknown | 7 | 0 | False | False | False | False | 30 |
 | 9 | unknown | 5 | 0 | False | False | False | False | 30 |
-| 8 | unknown | 1 | 0 | False | False | False | False | 29 |
 | 9 | unknown | 6 | 0 | False | False | False | False | 28 |
+| 8 | unknown | 1 | 0 | False | False | False | False | 26 |
 | 9 | unknown | 3 | 0 | False | False | False | False | 26 |
 | 10 | unknown | 3 | 0 | False | False | False | False | 24 |
 | 7 | unknown | 8 | 0 | False | False | False | False | 23 |
@@ -45,13 +45,8 @@
 | f8640728 | 8 | unknown | 0 | 5 | 3.0 | 00000000 |
 | 4ac6f0cb | 10 | unknown | 1 | 0 | 8.0 | 10100101 |
 | 16e151ec | 10 | unknown | 1 | 0 | 6.0 | 00011000 |
-| 1deaf759 | 10 | unknown | 1 | 0 | 6.0 | 10100111 |
 | 25764d5f | 10 | unknown | 1 | 0 | 6.0 | 00001000 |
 | 264b2118 | 10 | unknown | 1 | 0 | 6.0 | 00010100 |
-| 48db5ccf | 10 | unknown | 1 | 0 | 6.0 | 01101110 |
-| 62dba403 | 10 | unknown | 1 | 0 | 6.0 | 10011001 |
-| 6686f0de | 10 | unknown | 1 | 0 | 6.0 | 10110111 |
-| 7a5d00a7 | 10 | unknown | 1 | 0 | 6.0 | 11110011 |
 | 835c56b6 | 10 | unknown | 1 | 0 | 6.0 | 01110100 |
 | 845fee60 | 10 | unknown | 1 | 0 | 6.0 | 01110000 |
 | 89dfa4c2 | 10 | unknown | 1 | 0 | 6.0 | 00111010 |
@@ -59,5 +54,10 @@
 | 06667a93 | 9 | unknown | 1 | 0 | 5.0 | 10100011 |
 | 0a1326f4 | 9 | unknown | 1 | 0 | 5.0 | 10010110 |
 | 20052c2f | 9 | unknown | 1 | 0 | 5.0 | 01100110 |
+| 46dd0f22 | 9 | unknown | 1 | 0 | 5.0 | 01010000 |
+| 4e5df314 | 9 | unknown | 1 | 0 | 5.0 | 00100010 |
+| 6cb5aff2 | 9 | unknown | 1 | 0 | 5.0 | 01111110 |
+| 73d0b62c | 9 | unknown | 1 | 0 | 5.0 | 10000111 |
+| c23fca57 | 9 | unknown | 1 | 0 | 5.0 | 00101100 |
 
 Observation: simple byte transforms (shift/rotate/mask) recover a small extra slice, but the dominant unresolved cluster still has no single-bit candidate on at least one output position, so the remaining rules likely need broader boolean/circuit families or richer non-local byte transforms.
