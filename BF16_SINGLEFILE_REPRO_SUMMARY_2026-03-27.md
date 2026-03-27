@@ -1052,3 +1052,60 @@ official_mini row-level diff vs parent:
   - `dropout0`
   - `warmup05`
   を full-data specialist として継続比較する
+
+
+### 8.17 `dropout0` は `official_mini` / `shadow_256` では最良クラスだが `hard_shadow_256` は少し落とす
+
+`official_ultra` 派生の近傍探索のうち、次に完了したのが `dropout0` branch:
+
+- specialist:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_dropout0_run1`
+  - diff vs original `official_ultra`:
+    - `lora_dropout = 0.0`
+- merged candidate:
+  - `v5_merge_officiallowlr_officialultra_dropout0_97_03_bf16`
+
+学習結果:
+
+- `final_train_loss = 0.4766260087`
+- `final_val_loss = null`
+- `peak_memory_gb = 81.974462532`
+
+README-faithful gate results:
+
+1. `official_mini`
+   - `dropout0_97_03 = 0.75`
+   - `epoch075_97_03 = 0.7083333333`
+   - current mainline `officialultra_97_03 = 0.6875`
+   - `format_fail_rate = 0.0`
+   - `boxed_rate = 1.0`
+
+2. `quick`
+   - `dropout0_97_03 = 0.6640625`
+   - current mainline `officialultra_97_03 = 0.6640625`
+   - `format_fail_rate = 0.0078125`
+   - current mainline より slightly cleaner (`0.015625 -> 0.0078125`)
+
+3. `serious`
+   - `shadow_256 = 0.66796875`
+   - `hard_shadow_256 = 0.625`
+   - `shadow_256 format_fail_rate = 0.00390625`
+   - `hard_shadow_256 format_fail_rate = 0.015625`
+
+mainline との比較:
+
+- current mainline `97/3`
+  - `quick = 0.6640625`
+  - `shadow_256 = 0.65625`
+  - `hard_shadow_256 = 0.6328125`
+
+解釈:
+
+- `dropout0` は `official_mini` で明確に上振れし、`quick` でも score を落とさず format を改善した
+- `shadow_256` では current mainline を上回った
+- ただし `hard_shadow_256` では `0.625` と、mainline `0.6328125` / parent `0.63671875` を下回った
+- よってこれは **shadow-leaning upgrade / hard-robustness slight regression** という mixed result
+- 現時点では
+  - safest hard-robust candidate はまだ parent / mainline 側
+  - `dropout0` は high-mini / high-shadow alternative
+  という位置付けに留める
