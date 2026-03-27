@@ -759,3 +759,4 @@ row-level 差分:
 - narrow symbol specialist は少なくとも現 recipe では README-faithful gate を押し上げていない
 - `merge weight` だけで改善する兆候も見えなかった
 - したがって current official-first 本線は引き続き broad specialist 由来の `97/3` shallow merge
+- 
