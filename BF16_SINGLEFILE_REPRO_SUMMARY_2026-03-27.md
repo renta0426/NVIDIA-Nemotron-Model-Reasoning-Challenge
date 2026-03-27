@@ -719,3 +719,43 @@ full-data execute repro も起動済みで、`official_mini` により current o
 
 つまり、この帯域の LR / epoch sweep は **train loss が下がっても official-first score を改善しない**。  
 この結果により、current README-faithful 本線は依然として `97/3` shallow merge である。
+
+### 8.10 symbol-ish specialist branch は official_micro で中立止まり
+
+`data/train.csv` に family 列がないため、answer shape から切り出した `symbol-ish` (`symbol_only + mixed symbolic`, `867` rows) を narrow specialist として試した。
+
+まず `official_symbolish` specialist を parent (`official_lowlr`) へ `98/2` で merge し、`official_micro` で確認した。
+
+1. `98/2`
+   - `v5_merge_officiallowlr_symbolishultra_98_02_bf16`
+     - `official_micro = 0.6666666667`
+   - `v5_merge_officiallowlr_symbolishlow_98_02_bf16`
+     - `official_micro = 0.6666666667`
+
+reference:
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+`98/2` で parent と完全横並びだったため、より重い weight も ultra 側だけ再確認した。
+
+2. ultra reweight
+   - `v5_merge_officiallowlr_symbolishultra_97_03_bf16`
+     - `official_micro = 0.6666666667`
+   - `v5_merge_officiallowlr_symbolishultra_95_05_bf16`
+     - `official_micro = 0.6666666667`
+
+row-level 差分:
+
+- `ultra 98/2` は、already-wrong な `symbol_equation` 1 行だけを動かした
+  - `>|%{` -> `>|%{>`
+- `low 98/2` と `ultra 95/5` は、正解のままではあるが numeric row も少し揺らした
+  - 例: `21.35 -> 21.34`
+  - 例: `23.51 -> 23.56`
+- `ultra 97/3` も symbol row を直せず、`gravity_constant` 側に tolerance 内 drift を追加した
+
+解釈:
+
+- narrow symbol specialist は少なくとも現 recipe では README-faithful gate を押し上げていない
+- `merge weight` だけで改善する兆候も見えなかった
+- したがって current official-first 本線は引き続き broad specialist 由来の `97/3` shallow merge
