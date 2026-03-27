@@ -624,4 +624,52 @@ README-faithful local screening の現状 Pareto は次の 2 本。
    - serious: `0.65625 / 0.6328125`
 
 したがって、README-faithful 条件で次に提出寄りへ進めるなら本命は `97/3`。  
-ただし hard 側単独の safest choice は依然として parent なので、両方を保持したまま次の `98/2` 級の浅い merge を詰める価値がある。
+ただし hard 側単独の safest choice は依然として parent なので、両方を保持したままさらに浅い merge も確認した。
+
+- `98/2`
+  - quick: `0.6328125`
+  - `format_fail_rate = 0.0`
+  - `boxed_rate = 1.0`
+
+これは parent (`0.640625`) と `97/3` (`0.6640625`) の両方を下回ったため、浅い merge の best は `97/3` で頭打ちと判断した。
+
+### 8.8 official-first best 専用の minimal single-file
+
+corrected verified best だけでなく、README-faithful official-first best も CUDA / vLLM へ移植しやすいよう、1 ファイルの minimal pipeline に切り出した。
+
+- file:
+  - `versions/v4/code/train_official_first_best_v4_minimal.py`
+
+この file が再現するのは次の current official-first best pipeline:
+
+1. `data/train.csv` から official-long notebook pack を作る
+2. full-data generalist SFT (`lr=1e-4`)
+3. full-data specialist SFT (`lr=5e-5`)
+4. 2 本の LoRA adapter を `97/3` で線形 merge する
+
+README 契約も manifest に明示している。
+
+- `max_lora_rank <= 32`
+- `max_tokens = 7680`
+- `top_p = 1.0`
+- `temperature = 0.0`
+- `max_num_seqs = 64`
+- `max_model_len = 8192`
+- `vLLM`
+- `\boxed{}` 優先抽出
+
+validation:
+
+- `uv run python -m py_compile versions/v4/code/train_official_first_best_v4_minimal.py`
+- render-only smoke:
+  - `uv run python versions/v4/code/train_official_first_best_v4_minimal.py --output-dir versions/v4/outputs/train/_official_first_best_minimal_smoke --candidate-id v5_official_first_best_97_03_minimal_smoke --subsample-size 8`
+- execute smoke:
+  - `uv run python versions/v4/code/train_official_first_best_v4_minimal.py --output-dir versions/v4/outputs/train/_official_first_best_minimal_execute_smoke --candidate-id v5_official_first_best_97_03_minimal_execute_smoke --subsample-size 8 --execute`
+- `uv run pytest -q versions/v4/tests`
+- result:
+  - render-only smoke pass
+  - execute smoke pass
+  - two-stage SFT -> merge completed end-to-end
+  - tests: `5 passed`
+
+full-data execute repro も起動済みで、`official_mini` により current official-first reference と照合する。
