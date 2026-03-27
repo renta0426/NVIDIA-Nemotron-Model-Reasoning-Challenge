@@ -1004,3 +1004,51 @@ reference:
 - `text` を丸ごと抜いても、また `text+symbol` を同時に抜いても broad best の gain は再現しなかった
 - したがって current `official_lowlr + official_ultra 97/3` の improvement は、少なくとも「text を抜いた specialist」「text+symbol を抜いた specialist」という単純な broad family exclusion では説明できない
 - family-slice 路線はここでかなり細くなり、今後の主戦場は full-data specialist の hyperparameter / regularization 側になる
+
+
+### 8.16 `official_ultra` 派生の full-data specialist では `epoch075` が `official_mini` で上振れ
+
+family-slice 路線が一通り neutral だったので、探索空間を full official pack の training dynamics へ戻し、`official_ultra` 派生の full-data specialist を複数本並列に起動した。
+
+最初に完了した有望 branch:
+
+- specialist:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_epoch075_run1`
+  - diff vs original `official_ultra`:
+    - `learning_rate = 5e-5`
+    - `num_epochs = 0.75`
+- merged candidate:
+  - `v5_merge_officiallowlr_officialultra_epoch075_97_03_bf16`
+
+README-faithful gate comparison:
+
+1. `official_mini`
+   - `epoch075_97_03 = 0.7083333333`
+   - current mainline `officialultra_97_03 = 0.6875`
+   - parent `official_lowlr = 0.7083333333`
+
+2. `quick`
+   - `epoch075_97_03 = 0.65625`
+   - current mainline `officialultra_97_03 = 0.6640625`
+
+official_mini row-level diff vs parent:
+
+- total changed rows: `2`
+- improved:
+  - `bit_manipulation`
+    - `bfca784f`: `01011111 -> 11111111`
+- regressed:
+  - `text_decryption`
+    - `ddaa5f84`: `queen creates the secret map -> queen creates the clever map`
+
+解釈:
+
+- `0.75 epoch` は original `official_ultra` よりも shallow merge 向きの可能性がある
+- 少なくとも `official_mini` では mainline `97/3` を上回った
+- ただし `quick` では mainline に `1` row 届かず、現時点では **promising but not yet promotable**
+- この結果を受けて、近傍点として
+  - `epoch090`
+  - `midlr`
+  - `dropout0`
+  - `warmup05`
+  を full-data specialist として継続比較する
