@@ -673,3 +673,49 @@ validation:
   - tests: `5 passed`
 
 full-data execute repro も起動済みで、`official_mini` により current official-first reference と照合する。
+
+### 8.9 official-long full-data SFT sweep v2 は失敗
+
+`97/3` shallow merge の次に、本線として official-long full-data SFT を 3 本並列で追加検証した。
+
+1. `midlr`
+   - candidate:
+     - `v4_baseline_notebook_sft_bf16_full_text_midlr_clip_official_run1`
+   - train:
+     - `lr = 7.5e-5`
+     - `final_train_loss = 0.4564516246`
+   - `official_mini = 0.0208333333`
+   - `format_fail_rate = 0.3125`
+   - `boxed_rate = 0.6875`
+
+2. `highlr`
+   - candidate:
+     - `v4_baseline_notebook_sft_bf16_full_text_highlr_clip_official_run1`
+   - train:
+     - `lr = 1.25e-4`
+     - `final_train_loss = 0.3270089328`
+   - `official_mini = 0.1666666667`
+   - `format_fail_rate = 0.5625`
+   - `boxed_rate = 0.9791666667`
+   - `avg_output_len_chars = 79.8125`
+
+3. `epoch075`
+   - candidate:
+     - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_epoch075_run1`
+   - train:
+     - `lr = 1e-4`
+     - `epochs = 0.75`
+     - `final_train_loss = 0.5615384579`
+   - `official_mini = 0.0`
+   - `format_fail_rate = 0.0`
+   - `boxed_rate = 1.0`
+
+解釈:
+
+- 3 本とも README-faithful local best (`official_lowlr` parent や `97/3`) をまったく超えられなかった
+- `midlr` は `gravity_constant` / `unit_conversion` で extraction fail が多く、短すぎる壊れ方をした
+- `highlr` は boxed 自体は多いが、`roman_numeral`, `symbol_equation`, `gravity_constant` で format fail が激増し、出力長も大きく伸びた
+- `epoch075` は形式は保つが全 family で不正解になり、短縮ではなく reasoning quality 側が落ちた
+
+つまり、この帯域の LR / epoch sweep は **train loss が下がっても official-first score を改善しない**。  
+この結果により、current README-faithful 本線は依然として `97/3` shallow merge である。
