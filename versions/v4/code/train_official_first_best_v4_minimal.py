@@ -921,6 +921,9 @@ def run_pipeline(args: argparse.Namespace) -> None:
             },
         },
         'merge': merge_summary,
+        'execution': {
+            'adapter_dir': str(final_adapter_dir),
+        },
         'readme_eval_contract': README_EVAL_CONTRACT,
     }
     save_json(pipeline_manifest_path, pipeline_manifest)

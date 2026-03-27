@@ -124,6 +124,48 @@ def test_score_candidate_updates_v4_scoreboard(monkeypatch, tmp_path: Path) -> N
     assert registry[0]['submit_value'] == 'True'
 
 
+def test_resolve_candidate_spec_v4_prefers_exact_pipeline_match(monkeypatch, tmp_path: Path) -> None:
+    repo_root = tmp_path
+    train_root = repo_root / 'versions' / 'v4' / 'outputs' / 'train' / 'minimal_repro'
+    pipeline_adapter = train_root / 'adapter_cand'
+    pipeline_adapter.mkdir(parents=True)
+    generalist_adapter = train_root / 'generalist' / 'adapter_cand_generalist'
+    generalist_adapter.mkdir(parents=True)
+
+    pipeline_manifest = train_root / 'cand_pipeline_manifest.json'
+    pipeline_manifest.write_text(
+        json.dumps(
+            {
+                'version': 'v4',
+                'candidate_id': 'cand',
+                'model': {'base_model': 'mock-model'},
+                'merge': {'adapter_dir': str(pipeline_adapter)},
+            }
+        ),
+        encoding='utf-8',
+    )
+    generalist_manifest = train_root / 'generalist' / 'cand_generalist_manifest.json'
+    generalist_manifest.write_text(
+        json.dumps(
+            {
+                'version': 'v4',
+                'candidate_id': 'cand_generalist',
+                'model': {'base_model': 'mock-model'},
+                'execution': {'adapter_dir': str(generalist_adapter)},
+            }
+        ),
+        encoding='utf-8',
+    )
+
+    monkeypatch.setattr(v4_train, 'REPO_ROOT', repo_root)
+
+    candidate = v4_train.resolve_candidate_spec_v4(candidate_id='cand')
+
+    assert candidate.manifest_path == pipeline_manifest
+    assert candidate.adapter_path == pipeline_adapter
+    assert candidate.candidate_id == 'cand'
+
+
 def test_train_merge_and_render_v4_flow(monkeypatch, tmp_path: Path) -> None:
     _set_v4_outputs(monkeypatch, tmp_path)
 

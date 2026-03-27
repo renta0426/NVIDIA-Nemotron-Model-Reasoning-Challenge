@@ -882,3 +882,79 @@ row-level / failure pattern:
 - naive な family upsampling は current official-first route では逆効果
 - 少なくともこの notebook-faithful BF16 SFT recipe では、`text_decryption` をそのまま増やすだけでは official gate の score 改善につながらない
 - 今後は oversampling ではなく、narrow specialist merge か objective 側の修正を優先する
+
+
+### 8.13 bit+gravity exact specialist も README-faithful `official_micro` では neutral
+
+`bit_manipulation` と `gravity_constant` は current broad best (`official_lowlr + official_ultra 97/3`) で伸びが見えていたので、この 2 family だけを exact prompt template で抜いた narrow specialist を追加検証した。
+
+- specialist candidate:
+  - `v4_official_bitgravity_sft_ultralowlr_clip_run1`
+- pack:
+  - `official_bitgravity_sft_pack_run1.parquet`
+  - rows: `3199`
+- merge checks:
+  - `v5_merge_officiallowlr_bitgravity_98_02_bf16`
+    - `official_micro = 0.6666666667`
+    - `avg_output_len_chars = 32.75`
+  - `v5_merge_officiallowlr_bitgravity_97_03_bf16`
+    - `official_micro = 0.6666666667`
+    - `avg_output_len_chars = 27.9167`
+
+reference:
+
+- parent `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+解釈:
+
+- `bit-only` / `gravity-only` と同様に、`bit+gravity` も safe だが neutral
+- したがって current broad `97/3` merge の gain は、この 2 family の isolated specialist だけでは説明できない
+- broad adaptation か、より複合的な interaction を見に行く必要がある
+
+
+### 8.14 official-first minimal repro の `score-candidate` resolver bug を修正
+
+`v5_official_first_best_97_03_minimal_repro_run1` の `official_mini` score を再監査したところ、`score-candidate --candidate-id ...` が pipeline manifest ではなく `..._generalist_manifest.json` を拾っていた。
+
+root cause:
+
+- `versions/v4/code/train.py` の `resolve_candidate_spec_v4()` が
+  - `payload.candidate_id` の exact matchより
+  - manifest stem の `startswith(candidate_id)` fallback
+  を事実上優先していた
+- そのため
+  - target: `v5_official_first_best_97_03_minimal_repro_run1`
+  - actual resolved manifest: `..._generalist_manifest.json`
+  となっていた
+- さらに pipeline manifest 側は merged adapter を `merge.adapter_dir` にだけ持っており、`execution.adapter_dir` には持っていなかった
+
+修正:
+
+- `resolve_candidate_spec_v4()` で:
+  - `payload.candidate_id` の exact match を優先
+  - pipeline manifest の `merge.adapter_dir` も adapter source として解決
+- `versions/v4/code/train_official_first_best_v4_minimal.py` の pipeline manifest に
+  - `execution.adapter_dir = merged adapter dir`
+  を追加
+- regression test 追加:
+  - exact pipeline candidate id が generalist prefix match に負けないことを固定化
+
+再採点結果 (`official_mini`):
+
+- 旧 row (誤解決; generalist manifest)
+  - `overall_acc = 0.6458333333`
+  - `format_fail_rate = 0.0208333333`
+  - `avg_output_len_chars = 16.6875`
+  - `manifest_path = ..._generalist_manifest.json`
+- 新 row (修正後; pipeline manifest + merged adapter)
+  - `overall_acc = 0.6458333333`
+  - `format_fail_rate = 0.0`
+  - `avg_output_len_chars = 16.7083`
+  - `manifest_path = ..._pipeline_manifest.json`
+
+解釈:
+
+- previous score は「大きくは外れていなかった」が、参照 manifest / adapter は誤っていた
+- fix 後は merged pipeline candidate が正しく score される
+- 今後の single-file official-first repro の比較は、この corrected resolver を前提に進める

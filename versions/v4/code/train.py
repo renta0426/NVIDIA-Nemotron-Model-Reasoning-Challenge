@@ -5463,7 +5463,10 @@ def resolve_candidate_spec_v4(
     if manifest_path is not None:
         manifest_path_obj = _require_existing_path(manifest_path, label='candidate manifest json')
         manifest = load_manifest_v4(manifest_path_obj)
-        adapter_dir = normalize_optional_text(manifest.get('execution', {}).get('adapter_dir'))
+        adapter_dir = (
+            normalize_optional_text(manifest.get('execution', {}).get('adapter_dir'))
+            or normalize_optional_text(manifest.get('merge', {}).get('adapter_dir'))
+        )
         base_model = normalize_optional_text(manifest.get('model', {}).get('base_model')) or resolve_active_snapshot_path_v4()
         resolved_candidate_id = (
             candidate_id
@@ -5498,14 +5501,25 @@ def resolve_candidate_spec_v4(
         return resolve_candidate_spec_v4(manifest_path=DEFAULT_V3_STAGE_A_MANIFEST_PATH, candidate_id=candidate_id)
     if candidate_id == 'v3_stage_b_baseline':
         return resolve_candidate_spec_v4(manifest_path=DEFAULT_V3_STAGE_B_MANIFEST_PATH, candidate_id=candidate_id)
+    exact_matches: list[Path] = []
+    prefix_matches: list[Path] = []
     for search_root in (REPO_ROOT / 'versions' / 'v4' / 'outputs' / 'train', REPO_ROOT / 'versions' / 'v3' / 'outputs' / 'train'):
         if not search_root.exists():
             continue
         for candidate_manifest in sorted(search_root.rglob('*_manifest.json')):
             payload = load_manifest_v4(candidate_manifest)
             payload_candidate_id = normalize_optional_text(payload.get('candidate_id'))
-            if payload_candidate_id == candidate_id or candidate_manifest.stem.startswith(candidate_id):
-                return resolve_candidate_spec_v4(manifest_path=candidate_manifest, candidate_id=candidate_id)
+            manifest_candidate_id = candidate_manifest.stem
+            if manifest_candidate_id.endswith('_manifest'):
+                manifest_candidate_id = manifest_candidate_id[: -len('_manifest')]
+            if payload_candidate_id == candidate_id or manifest_candidate_id == candidate_id:
+                exact_matches.append(candidate_manifest)
+            elif manifest_candidate_id.startswith(candidate_id):
+                prefix_matches.append(candidate_manifest)
+    if exact_matches:
+        return resolve_candidate_spec_v4(manifest_path=exact_matches[0], candidate_id=candidate_id)
+    if prefix_matches:
+        return resolve_candidate_spec_v4(manifest_path=prefix_matches[0], candidate_id=candidate_id)
     raise FileNotFoundError(f'Unable to resolve candidate_id={candidate_id}')
 
 
