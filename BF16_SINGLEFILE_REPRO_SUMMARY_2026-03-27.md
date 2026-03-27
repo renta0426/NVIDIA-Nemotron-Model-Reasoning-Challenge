@@ -759,4 +759,70 @@ row-level 差分:
 - narrow symbol specialist は少なくとも現 recipe では README-faithful gate を押し上げていない
 - `merge weight` だけで改善する兆候も見えなかった
 - したがって current official-first 本線は引き続き broad specialist 由来の `97/3` shallow merge
-- 
+
+
+### 8.11 constraint-triad specialist は true `98/2` / `97/3` とも中立、誤 launch の `75/25` だけ崩壊
+
+`symbol-ish` が中立だったため、次は exact prompt templates で family を切り出し、
+
+- `bit_manipulation`
+- `gravity_constant`
+- `symbol_equation`
+
+の 3 family だけを含む `constraint triad` specialist を試した。
+
+- specialist pack:
+  - `official_constraint_triad_sft_pack_run1.parquet`
+  - rows: `4754`
+- specialist candidate:
+  - `v4_official_constraint_triad_sft_ultralowlr_clip_run1`
+
+parent (`official_lowlr`) への merge 結果:
+
+1. automation slip (`75/25`)
+   - `v5_merge_officiallowlr_constrainttriad_98_02_bf16`
+   - candidate id は `98_02` だが、実 manifest 上の merge weight は `0.75 / 0.25`
+   - `official_micro = 0.3333333333`
+   - `format_fail_rate = 0.5`
+   - `avg_output_len_chars = 51.83`
+
+2. `97/3`
+   - `v5_merge_officiallowlr_constrainttriad_97_03_bf16`
+   - `official_micro = 0.6666666667`
+   - `format_fail_rate = 0.0`
+
+3. true `98/2`
+   - `v5_merge_officiallowlr_constrainttriad_true98_02_bf16`
+   - manifest 上の merge weight は `0.98 / 0.02`
+   - `official_micro = 0.6666666667`
+   - `format_fail_rate = 0.0`
+   - `avg_output_len_chars = 30.25`
+
+reference:
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+row-level:
+
+- mislaunch の `75/25` は 6 行で悪化し、典型例では output が
+  - `Please put your final answer inside \boxed{}...`
+  を boxed answer の代わりにそのまま復唱した
+- 具体的には `gravity_constant`, `symbol_equation`, `text_decryption` の行で
+  - extracted answer が `your answer`
+  へ崩れた
+- `97/3` は collapse 自体は防いだが、
+  - wrong symbol row `>|%{` -> `>|%{>`
+  - wrong gravity row `78.01` -> `78.0`
+  という tolerance/near-miss drift だけで、score 改善はゼロだった
+- true `98/2` も score は親と同点で、
+  - wrong symbol row `>|%{` -> `>|%{>`
+  - wrong gravity row `78.01` -> `78.0`
+  - correct gravity row `23.51` -> `23.58`
+  という drift が増えただけだった
+
+解釈:
+
+- constraint-family specialist は specialist weight が重すぎると prompt-instruction echo collapse を起こす
+- ただし true `98/2` と `97/3` はどちらも安全側で、README-faithful gateでは parent と同点止まり
+- したがって、この family slice も current official-first 本線には昇格しない
