@@ -412,3 +412,111 @@ rescored corrected proxy:
   - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
 
 次回再開時の主論点は、`symbol_equation` と `gravity_constant` をどう押し上げるかに絞られる。
+
+## 8. 2026-03-27 official gate 方針への pivot
+
+README の本番条件は `official_lb` (`enable_thinking=true`) なので、corrected no-think proxy だけを最適化しても十分ではない。  
+このため、repo 側へ official-aligned lightweight gate を追加した。
+
+- added:
+  - `versions/v1/conf/eval/official_lb_nothink_shortboxed.yaml`
+  - `versions/v4/conf/eval/candidate_score_quick_nothink_shortboxed.yaml`
+  - `versions/v4/conf/eval/candidate_score_serious_nothink_shortboxed.yaml`
+  - `versions/v4/conf/eval/candidate_score_official_mini.yaml`
+  - `versions/v1/data/eval_packs/shadow_48_balanced.csv`
+
+新しい ladder:
+
+1. corrected no-think proxy で broad sweep
+2. `official_mini` (`shadow_48_balanced`, `official_lb`) で official alignment 確認
+3. full `official quick` (`shadow_128`, `official_lb`) に昇格
+4. さらに良い候補だけ `official serious`
+
+### 8.1 official mini 結果
+
+`official_mini` を主要 full-SFT 候補へ当てた結果、corrected proxy の ranking がそのまま official ranking にはならないと確認できた。
+
+- current corrected verified best
+  - candidate:
+    - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+  - `official_mini = 0.5208333333`
+  - `format_fail_rate = 0.2708333333`
+  - `avg_output_len_chars = 60.9167`
+
+- official-lowLR branch
+  - candidate:
+    - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_mini = 0.7083333333`
+  - `format_fail_rate = 0.0`
+  - `avg_output_len_chars = 30.0417`
+
+family 差も大きく、`official_lowlr` は mini 上で
+
+- `roman_numeral = 1.0`
+- `text_decryption = 1.0`
+- `unit_conversion = 1.0`
+
+まで伸びた。  
+一方 `official_ultra` は `unit_conversion = 0.0`、`text_decryption format_fail_rate = 0.5` で明確に不利だった。
+
+### 8.2 full official quick 結果
+
+`official_mini` 勝者の `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1` を full `official quick` へ昇格。
+
+- `shadow_128 = 0.640625`
+- `format_fail_rate = 0.0078125`
+- `boxed_rate = 1.0`
+- `avg_output_len_chars = 31.125`
+
+主な family:
+
+- `unit_conversion = 1.0`
+- `roman_numeral = 1.0`
+- `text_decryption = 0.8571`
+- `gravity_constant = 0.4091`
+- `bit_manipulation = 0.3636`
+- `symbol_equation = 0.2381`
+
+これは、従来 verified best の `official quick = 0.484375` を大きく上回る。  
+つまり **本番寄せでは current best candidate が入れ替わった**。
+
+### 8.3 full official serious 結果
+
+同 candidate をさらに full `official serious` へ昇格した。
+
+- `shadow_256 = 0.64453125`
+- `hard_shadow_256 = 0.63671875`
+- `format_fail_rate = 0.0078125 / 0.01171875`
+- `boxed_rate = 1.0 / 1.0`
+- `avg_output_len_chars = 30.2383 / 31.0352`
+
+`hard_shadow_256` family snapshot:
+
+- `unit_conversion = 1.0`
+- `roman_numeral = 1.0`
+- `text_decryption = 0.6190`
+- `bit_manipulation = 0.6047`
+- `gravity_constant = 0.3488`
+- `symbol_equation = 0.2558`
+
+解釈:
+
+- corrected proxy の verified best (`official-ultralow`) より、README-faithful local official score はこちらの方がかなり良い
+- したがって現時点の **official-first local best** は
+  - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+- まだ `0.8+` には届かないが、`0.484375 -> 0.640625 -> 0.64453125/0.63671875` まで改善したため、
+  今後の sweep / continuation はこの candidate を親にして進める価値が高い
+
+### 8.4 次の改善方針
+
+parent / parentfix 系は corrected quick でも `0.16-0.23` 台と弱く、本線から外した。  
+代わりに、`official quick = 0.640625` を出した
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+
+を parent にして、gentle な Stage-C continuation を 2 本開始した。
+
+- `v4_rft_stage_c_fullsftparent_gentle_run1`
+- `v4_rft_stage_c_fullsftparent_answerbias_gentle_run1`
+
+狙いは、full-SFT parent の boxed stability を壊さずに `symbol_equation` / `gravity_constant` / `bit_manipulation` を少しずつ押し上げ、official `0.7-0.8` の保持線へ乗せること。
