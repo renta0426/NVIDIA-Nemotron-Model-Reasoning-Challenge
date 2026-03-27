@@ -826,3 +826,59 @@ row-level:
 - constraint-family specialist は specialist weight が重すぎると prompt-instruction echo collapse を起こす
 - ただし true `98/2` と `97/3` はどちらも安全側で、README-faithful gateでは parent と同点止まり
 - したがって、この family slice も current official-first 本線には昇格しない
+
+
+### 8.12 naive text_decryption upsampling は `+25%` でも悪化、`+50%` では全崩壊
+
+`README.md` の Evaluation 契約どおり、`official_lb` 条件をそのまま使う `official_mini` で `text_decryption` の単純 upsampling を検証した。
+
+試した branch:
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_textboost125_run1`
+  - full official pack + exact `text_decryption` rows `+25%`
+  - total rows: `9894`
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_textboost150_run1`
+  - full official pack + exact `text_decryption` rows `+50%`
+  - total rows: `10288`
+
+結果:
+
+1. `textboost125`
+   - `official_mini = 0.5625`
+   - `format_fail_rate = 0.5833333333`
+   - `boxed_rate = 0.6458333333`
+   - `avg_output_len_chars = 56.85`
+   - family:
+     - `bit_manipulation = 0.75`
+     - `gravity_constant = 0.5`
+     - `roman_numeral = 0.5`
+     - `symbol_equation = 0.125`
+     - `text_decryption = 0.625`
+     - `unit_conversion = 0.875`
+
+2. `textboost150`
+   - `official_mini = 0.0`
+   - `format_fail_rate = 1.0`
+   - `boxed_rate = 1.0`
+   - `avg_output_len_chars = 82.0`
+   - family:
+     - 全 6 family が `0.0`
+   - failure bucket:
+     - `boxed_multiple = 48 / 48`
+
+reference:
+
+- parent `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+row-level / failure pattern:
+
+- `textboost125` では `your answer` 抽出、few-shot / instruction 断片の混入、`boxed{...}` literal 化が増えた
+- `textboost150` では全行が `boxed_multiple` に崩れ、README-faithful extraction が一貫して誤作動した
+- つまり `text_decryption` を増やしても当該 family 自体が安定して伸びず、むしろ boxed answer discipline 全体を壊した
+
+解釈:
+
+- naive な family upsampling は current official-first route では逆効果
+- 少なくともこの notebook-faithful BF16 SFT recipe では、`text_decryption` をそのまま増やすだけでは official gate の score 改善につながらない
+- 今後は oversampling ではなく、narrow specialist merge か objective 側の修正を優先する
