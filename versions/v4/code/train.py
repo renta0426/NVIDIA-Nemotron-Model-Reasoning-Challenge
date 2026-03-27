@@ -5124,6 +5124,61 @@ def run_train_sft_v4(args: argparse.Namespace) -> None:
     )
 
 
+def run_train_best_notebook_sft_v4(args: argparse.Namespace) -> None:
+    output_dir = Path(getattr(args, 'output_dir', None) or (VERSION_ROOT / 'outputs' / 'train' / 'best_notebook_sft_singlefile_run1'))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    candidate_id = normalize_optional_text(getattr(args, 'candidate_id', None)) or 'v4_best_notebook_sft_bf16_official_ultralowlr_singlefile_run1'
+    pack_output_path = Path(getattr(args, 'pack_output_path', None) or (output_dir / f'{candidate_id}_train_pack.parquet'))
+    config_output_path = Path(getattr(args, 'config_output_path', None) or (output_dir / f'{candidate_id}_inline_config.yaml'))
+    pack_args = argparse.Namespace(
+        input_path=getattr(args, 'input_path', None) or str(REPO_ROOT / 'data' / 'train.csv'),
+        output_path=str(pack_output_path),
+        subsample_size=int(getattr(args, 'subsample_size', 0)),
+        subsample_seed=int(getattr(args, 'subsample_seed', 42)),
+        base_model=getattr(args, 'base_model', 'model'),
+        prompt_instruction=DEFAULT_BOXED_PROMPT_INSTRUCTION,
+    )
+    run_build_baseline_sft_pack_v4(pack_args)
+    cfg = {
+        'name': 'best_notebook_bf16_official_ultralowlr_singlefile',
+        'base_model': getattr(args, 'base_model', 'model'),
+        'lora_r': 32,
+        'lora_alpha': 16,
+        'lora_dropout': 0.05,
+        'learning_rate': 5.0e-5,
+        'num_epochs': 1.0,
+        'max_seq_len': 1024,
+        'per_device_train_batch_size': 1,
+        'gradient_accumulation_steps': 4,
+        'num_layers': -1,
+        'weighted_loss': False,
+        'mask_prompt': False,
+        'optimizer': 'adamw',
+        'max_grad_norm': 1.0,
+        'lr_schedule_type': 'cosine',
+        'warmup_ratio': 0.1,
+        'prompt_instruction': DEFAULT_BOXED_PROMPT_INSTRUCTION,
+        'seed': 42,
+        'notes': 'Single-file reproduction of the current best verified BF16 notebook SFT recipe aligned to README boxed-answer evaluation.',
+    }
+    config_output_path.write_text(yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True), encoding='utf-8')
+    train_args = argparse.Namespace(
+        config_path=str(config_output_path),
+        train_pack_path=str(pack_output_path),
+        output_dir=str(output_dir),
+        candidate_id=candidate_id,
+        parent_candidate_id=None,
+        init_adapter_path=None,
+        stage='baseline',
+        valid_fold=int(getattr(args, 'valid_fold', -1)),
+        valid_fraction=float(getattr(args, 'valid_fraction', 0.0)),
+        max_train_rows=getattr(args, 'max_train_rows', None),
+        max_valid_rows=getattr(args, 'max_valid_rows', None),
+        execute=bool(getattr(args, 'execute', False)),
+    )
+    run_train_sft_v4(train_args)
+
+
 def _resolve_adapter_weight_path(adapter_dir: Path) -> Path:
     for filename in ('adapter_model.safetensors', 'adapter_model.bin'):
         candidate = adapter_dir / filename
@@ -7482,6 +7537,25 @@ def build_parser() -> argparse.ArgumentParser:
     train_sft_v4_parser.add_argument('--max-valid-rows', type=int, default=None)
     train_sft_v4_parser.add_argument('--execute', action='store_true')
     train_sft_v4_parser.set_defaults(func=run_train_sft_v4)
+
+    train_best_notebook_sft_v4_parser = subparsers.add_parser(
+        'train-best-notebook-sft-v4',
+        help='Build and train the current best verified full-data BF16 notebook SFT recipe in one command.',
+    )
+    train_best_notebook_sft_v4_parser.add_argument('--input-path', default=str(REPO_ROOT / 'data' / 'train.csv'))
+    train_best_notebook_sft_v4_parser.add_argument('--output-dir', default=str(VERSION_ROOT / 'outputs' / 'train' / 'best_notebook_sft_singlefile_run1'))
+    train_best_notebook_sft_v4_parser.add_argument('--candidate-id', default='v4_best_notebook_sft_bf16_official_ultralowlr_singlefile_run1')
+    train_best_notebook_sft_v4_parser.add_argument('--pack-output-path', default=None)
+    train_best_notebook_sft_v4_parser.add_argument('--config-output-path', default=None)
+    train_best_notebook_sft_v4_parser.add_argument('--base-model', default='model')
+    train_best_notebook_sft_v4_parser.add_argument('--subsample-size', type=int, default=0)
+    train_best_notebook_sft_v4_parser.add_argument('--subsample-seed', type=int, default=42)
+    train_best_notebook_sft_v4_parser.add_argument('--valid-fold', type=int, default=-1)
+    train_best_notebook_sft_v4_parser.add_argument('--valid-fraction', type=float, default=0.0)
+    train_best_notebook_sft_v4_parser.add_argument('--max-train-rows', type=int, default=None)
+    train_best_notebook_sft_v4_parser.add_argument('--max-valid-rows', type=int, default=None)
+    train_best_notebook_sft_v4_parser.add_argument('--execute', action='store_true')
+    train_best_notebook_sft_v4_parser.set_defaults(func=run_train_best_notebook_sft_v4)
 
     train_stage_c_rft_parser = subparsers.add_parser('train-stage-c-rft', help='Render or execute the v4 Stage C RFT continuation run.')
     train_stage_c_rft_parser.add_argument('--config-path', default=str(DEFAULT_V4_RFT_TRAIN_CONFIG_PATH))

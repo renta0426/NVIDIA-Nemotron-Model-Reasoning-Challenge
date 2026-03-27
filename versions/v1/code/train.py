@@ -1372,6 +1372,7 @@ def _build_row_level_via_mlx_shards(
         if backend.trust_remote_code:
             command.append('--trust-remote-code')
         worker_env = os.environ.copy()
+        worker_env['COMPETITION_TOKENIZER_PATH'] = backend.model_path
         worker_env['PYTHONUNBUFFERED'] = '1'
         worker_env['MLX_EVAL_NUM_SHARDS'] = '1'
         worker_env['MLX_EVAL_SHARD_INDEX'] = str(shard_index)
@@ -1735,22 +1736,47 @@ def get_tokenizer(
     tokenizer_name: str | None = None,
     tokenizer_revision: str | None = None,
 ) -> tuple[Any, str, str]:
-    if tokenizer_path:
-        tokenizer_path_obj = Path(tokenizer_path)
+    explicit_default_path = os.environ.get('COMPETITION_TOKENIZER_PATH')
+    auto_tokenizer_path: str | None = None
+    if explicit_default_path:
+        auto_tokenizer_path = explicit_default_path
+    else:
+        model_tokenizer_path = Path('model')
+        if model_tokenizer_path.exists() and (model_tokenizer_path / 'tokenizer_config.json').exists():
+            auto_tokenizer_path = str(model_tokenizer_path)
+
+    resolved_tokenizer_path = tokenizer_path or auto_tokenizer_path
+    resolved_automatically = tokenizer_path is None and resolved_tokenizer_path is not None
+
+    if resolved_tokenizer_path:
+        tokenizer_path_obj = Path(resolved_tokenizer_path)
         if not tokenizer_path_obj.exists():
-            raise FileNotFoundError(f'Tokenizer path does not exist: {tokenizer_path}')
+            raise FileNotFoundError(f'Tokenizer path does not exist: {resolved_tokenizer_path}')
         try:
             from transformers import AutoTokenizer  # type: ignore
         except ImportError as exc:  # pragma: no cover - optional runtime path
-            raise RuntimeError('transformers is required when --tokenizer-path is provided.') from exc
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path,
-            revision=tokenizer_revision,
-            trust_remote_code=True,
-        )
-        name = tokenizer_name or getattr(tokenizer, 'name_or_path', tokenizer_path)
-        revision = tokenizer_revision or 'unspecified'
-        return tokenizer, name, revision
+            if not resolved_automatically:
+                raise RuntimeError('transformers is required when --tokenizer-path is provided.') from exc
+        else:
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    resolved_tokenizer_path,
+                    revision=tokenizer_revision,
+                    trust_remote_code=True,
+                )
+            except OSError as exc:
+                if not resolved_automatically:
+                    raise
+                warnings.warn(
+                    f'Automatic tokenizer loading failed for {resolved_tokenizer_path}: {exc}. '
+                    'Falling back to BuiltinCompetitionTokenizer.',
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            else:
+                name = tokenizer_name or getattr(tokenizer, 'name_or_path', resolved_tokenizer_path)
+                revision = tokenizer_revision or ('auto' if resolved_automatically else 'unspecified')
+                return tokenizer, name, revision
 
     tokenizer = BuiltinCompetitionTokenizer()
     return tokenizer, tokenizer_name or tokenizer.name_or_path, tokenizer_revision or tokenizer.revision
