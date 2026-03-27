@@ -1,39 +1,1006 @@
-このファイルは1時的に書き換えられてます。
-あなたに以下の重要な命令を緊急で行う必要があるためです。
-以下を理解したら元に戻して。
+# BF16 single-file repro and experiment summary
 
-- **最重要命令** 今後一切のmlxモデルの利用を禁止します。mlxモデルを使用してる場合は直ちにすべての実験を停止すること。今後は提出要件に適合させるため、Transformers版の公式モデルを直接ベースにしてLoRAを作成してください。
-このルールは今後全ての実験に適用されます。
-- mlxからの移行、Transformers版実験の導入方法は"how-to-get-started-transformers.md"をよく読んで下さい。
-- 過去のmlx実験を遡って変換することは不要で、実験の成果をベースにこれからのTransformers版でも実験ループを重ねて。
-- 現在の計画も全てその前提で書き換えて。
+## 1. README.md を基準にした前提
+
+この整理は `README.md` の Evaluation / Submitting を基準にしている。
+
+- ベースモデルは `NVIDIA Nemotron-3-Nano-30B`
+- 提出物は `adapter_config.json` を含む LoRA adapter
+- `max_lora_rank <= 32`
+- 本番推論は `vLLM`
+- 本番評価パラメータは `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`
+- 回答は `\boxed{}` 抽出が最優先
+
+本リポジトリ内のローカル実験は、最終的にこの契約へ寄せることを目的に進めた。
+
+## 2. 結論サマリ
+
+2026-03-27 時点で、ローカル corrected proxy 上の **verified best** は次の BF16 full-data notebook SFT。
+
+- candidate:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+- recipe:
+  - full `data/train.csv` 9500 rows
+  - notebook-faithful chat text pack
+  - official-long boxed instruction
+  - `lr=5e-5`
+  - `lora_r=32`
+  - `batch=1`
+  - `gradient_accumulation_steps=4`
+  - `optimizer=adamw`
+  - `warmup_ratio=0.1`
+  - `valid_fraction=0.0`
+
+verified local scores:
+
+- `shadow_128 = 0.7265625`
+- `shadow_256 = 0.76171875`
+- `hard_shadow_256 = 0.78515625`
+
+補完狙いの merge (`official-ultra` + `short-ultra`) も試したが、`85/15` merge は quick で上回っても hard serious で負けたため、現時点の corrected verified best は維持。
+
+一方で、README-faithful な `official_lb` (`enable_thinking=true`) を主指標にした **official-first の暫定 best** は別 candidate になった。
+
+- candidate:
+  - `v5_merge_officiallowlr_officialultra_97_03_bf16`
+- recipe:
+  - generalist:
+    - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - specialist:
+    - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+  - linear merge:
+    - `97/3`
+- verified local README-faithful scores:
+  - `official quick shadow_128 = 0.6640625`
+  - `official serious shadow_256 = 0.65625`
+  - `official serious hard_shadow_256 = 0.6328125`
+
+つまり、
+
+- corrected proxy で最も強いのは `official-ultra` 単体 SFT
+- README-faithful official-first で最もバランスが良いのは `official-lowlr` を親にした `97/3` shallow merge
+
+という二層構造になっている。
+
+## 3. ここまでの主要な実験経緯
+
+### 3.1 BF16 のローカル評価が壊れて見えていた時期
+
+初期の BF16 評価では、no-think local eval が極端に悪く、direct generate と shard eval が噛み合っていなかった。
+
+観測された主症状:
+
+- 極短の garbled output
+- `overall_acc=0.0`
+- `format_fail_rate=1.0`
+- direct `mlx_lm.batch_generate` では clean boxed なのに、row-level parquet では壊れている
+
+この時点では prompt wording や `enable_thinking` 側を疑っていたが、後で evaluator の tokenizer drift が主因だと判明した。
+
+### 3.2 root cause: evaluator tokenizer drift
+
+`versions/v1/code/train.py` を調査した結果、`get_tokenizer()` が tokenizer path 未指定時に `BuiltinCompetitionTokenizer()` へ落ちることを確認した。
+
+さらに MLX shard worker 起動時も tokenizer path を渡していなかったため、shard 側でも fake template を踏んでいた。
+
+この修正により:
+
+- local eval の既定 tokenizer を real model tokenizer へ自動解決
+- shard worker にも `COMPETITION_TOKENIZER_PATH` を伝搬
+- stale no-think 評価結果を破棄し、tokfix 後の corrected local eval に切り替え
+
+### 3.3 corrected no-think proxy の再較正
+
+tokenizer drift 修正後、`enable_thinking=false` + short boxed instruction の corrected proxy で BF16 候補を再評価した。
+
+この段階で分かったこと:
+
+- base より良い BF16 candidate は存在する
+- 形式崩れではなく reasoning quality の差で負ける family が多い
+- 特に `text_decryption`, `symbol_equation`, `gravity_constant` がボトルネック
+
+ただし absolute score はユーザー共有の official base `0.5` とはずれており、candidate 間の相対比較用 gate として扱うのが妥当だった。
+
+### 3.4 official thinking-on local gate は cheap gate として不適
+
+README 本番寄せの `official_lb` (`enable_thinking=true`) も real tokenizer 下で試したが、4-row head4 ですら 9 分超かかって終わらなかった。
+
+この結果から:
+
+- tokenizer drift 修正後も official thinking-on は local cheap gate として重すぎる
+- candidate selection は corrected no-think proxy 主体で回す
+- official thinking-on は最終確認向けの高コスト診断に限定
+
+という方針に切り替えた。
+
+ただし、その後に README 寄せ quick gate (`shadow_128` + `official_lb`) 自体は完走できることも確認した。
+
+- candidate:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+- result:
+  - `overall_acc = 0.484375`
+  - `format_fail_rate = 0.2890625`
+  - `boxed_rate = 1.0`
+  - `avg_output_len_chars = 66.34375`
+- observed behavior:
+  - clean boxed answer自体は多い
+  - ただし `text_decryption` や `unit_conversion` で長めの出力や prompt echo が混じる
+  - row-level preview では `<think></think>` を含む boxed output と、instruction の echo による `boxed_multiple` failure の両方が見えた
+
+したがって official thinking-on gate は **実行不能ではない** が、corrected no-think proxy よりかなり重く、かつ format / reasoning の両面でより厳しい診断として使うのが妥当。
+
+### 3.5 full-data notebook SFT 2x2 matrix
+
+次の大きな分岐として、full `data/train.csv` 9500 rows の notebook-style BF16 SFT を 2x2 で比較した。
+
+軸:
+
+- instruction
+  - short: `Put your final answer inside \boxed{}`
+  - official-long: `Please put your final answer inside \boxed{}` の README 寄せ wording
+- learning rate
+  - `1e-4`
+  - `5e-5`
+
+結果:
+
+1. `official-long + 5e-5`
+   - `shadow_128 = 0.7265625`
+   - `shadow_256 = 0.76171875`
+   - `hard_shadow_256 = 0.78515625`
+
+2. `short + 5e-5`
+   - `shadow_128 = 0.6953125`
+   - `shadow_256 = 0.76171875`
+   - `hard_shadow_256 = 0.71875`
+
+3. `official-long + 1e-4`
+   - `shadow_128 = 0.625`
+
+4. `short + 1e-4`
+   - `shadow_128 = 0.0078125`
+
+重要な解釈:
+
+- instruction wording は単なる format 差ではなく、精度差を生む
+- 同じ `5e-5` でも official-long が short を上回る
+- `1e-4` では short branch がほぼ collapse
+
+### 3.6 adapter merge probe
+
+verified best (`official-long + 5e-5`) と、`symbol_equation` が少しだけ強い `short + 5e-5` を線形 merge した。
+
+試した merge:
+
+- `80/20`
+- `85/15`
+
+quick (`shadow_128`) では:
+
+- `85/15 = 0.75`
+- verified best = `0.7265625`
+
+と改善したが、serious では:
+
+- merge `85/15`
+  - `shadow_256 = 0.76171875`
+  - `hard_shadow_256 = 0.75390625`
+- verified best
+  - `shadow_256 = 0.76171875`
+  - `hard_shadow_256 = 0.78515625`
+
+となり、hard 側で悪化した。よって merge は採用しない。
+
+## 4. verified best の弱点
+
+family 別に見ると、verified best の残る弱点は主に次の 2 つ。
+
+- `symbol_equation`
+  - `hard_shadow_256 acc = 0.3488`
+- `gravity_constant`
+  - `hard_shadow_256 acc = 0.7442`
+
+一方で以下はかなり強い。
+
+- `roman_numeral = 1.0`
+- `unit_conversion = 1.0`
+- `text_decryption = 0.9286`
+- `bit_manipulation = 0.6977`
+
+つまり、現時点の BF16 notebook SFT は「長い reasoning を垂れ流さず極短 boxed answer に落とす」点で大きく改善したが、`symbol_equation` と一部 `gravity_constant` の reasoning 精度にはまだ伸び代がある。
+
+## 5. 単一ファイル実装
+
+ユーザー要望に合わせ、best recipe を ad-hoc YAML 群ではなく **1 ファイル** に畳み込んだ。
+
+対象ファイル:
+
+- `versions/v4/code/train.py`
+
+追加した command:
+
+- `train-best-notebook-sft-v4`
+
+この command は 1 コマンドで以下を実行する。
+
+1. `data/train.csv` から full notebook-faithful train pack を作る
+2. README 寄せ official-long boxed instruction を使う
+3. 現 verified best と同じ BF16 SFT recipe で train する
+
+実行例:
+
+```bash
+uv run python versions/v4/code/train.py train-best-notebook-sft-v4 --execute
+```
+
+主要固定値:
+
+- `lora_r=32`
+- `learning_rate=5e-5`
+- `num_epochs=1.0`
+- `per_device_train_batch_size=1`
+- `gradient_accumulation_steps=4`
+- `optimizer=adamw`
+- `mask_prompt=false`
+- `warmup_ratio=0.1`
+- `valid_fraction=0.0`
+
+## 5.1 verified-best 専用 minimal standalone file
+
+その後、CUDA / vLLM への移植時に experimental code が邪魔にならないよう、verified best のみを再現する **最小単体ファイル** も新規に切り出した。
+
+対象ファイル:
+
+- `versions/v4/code/train_best_notebook_sft_v4_minimal.py`
+
+この file に残したのは次だけ:
+
+1. BF16 base model 解決
+2. `data/train.csv` から notebook-faithful pack を作る処理
+3. official boxed instruction を使う verified-best BF16 LoRA training loop
+4. manifest / config / adapter / metrics の出力
+
+逆に、Stage-C / preference / merge / score-candidate などは入れていない。
+
+validation:
+
+- `uv run python -m py_compile versions/v4/code/train_best_notebook_sft_v4_minimal.py versions/v4/code/train.py`
+- render-only smoke:
+  - `uv run python versions/v4/code/train_best_notebook_sft_v4_minimal.py --output-dir versions/v4/outputs/train/_minimal_smoke --candidate-id v4_best_notebook_sft_bf16_official_ultralowlr_minimal_smoke --subsample-size 8`
+- `uv run pytest -q versions/v4/tests`
+- result:
+  - `5 passed`
+
+initial full execute launch は `CacheDataset` 契約違反 (`TextDataset.process()` 未実装) で失敗したが、`__getitem__` が raw datum を返し `process()` が tokenization を担当する形へ修正後、8-row execute probe は成功した。
+
+restarted minimal repro command:
+
+```bash
+uv run python versions/v4/code/train_best_notebook_sft_v4_minimal.py \
+  --output-dir versions/v4/outputs/train/best_notebook_sft_minimal_repro_run1 \
+  --candidate-id v4_best_notebook_sft_bf16_official_ultralowlr_minimal_repro_run1 \
+  --execute
+```
+
+この minimal repro も、完了後に pack / adapter / adapter_config hash を元 verified best と比較する。
+
+minimal repro run は完了した。
+
+- original pack sha256:
+  - `cbc408e902d4adccfd20dc716f8cd9c8338654fdfadf2caac78a54da03df0836`
+- minimal repro pack sha256:
+  - `cbc408e902d4adccfd20dc716f8cd9c8338654fdfadf2caac78a54da03df0836`
+- 判定:
+  - **一致**
+
+したがって minimal standalone file でも、少なくとも `data/train.csv -> notebook-faithful full official pack` までは元 verified best と同じ。
+
+- repro status:
+  - `completed`
+- final_train_loss:
+  - `0.34916338324546814`
+- peak_memory_gb:
+  - `82.635142934`
+
+adapter 側は exact hash では一致しなかった。
+
+- original adapter sha256:
+  - `5ba26f60cbcd14381cdfbfa8c285ea88af8d7aa6c853d357f30567625cb0b558`
+- minimal repro adapter sha256:
+  - `bed1a50a80d4c0565a997440ba4fa36930e8f654d1f2f007c9c0d6e1ea3d3dd7`
+- adapter match:
+  - **不一致**
+- original adapter_config sha256:
+  - `0c7ac6ce03ee7eac917b55cfdb545e19bce068e663cb8541010959cd2f634efb`
+- minimal repro adapter_config sha256:
+  - `46613c6cf3b7dd76ab9fbed05fb6319cd28ec019831c3389ddb6f30dbe85638e`
+- adapter_config match:
+  - **不一致**
+
+そのため corrected proxy で再採点した。
+
+- original verified best
+  - `shadow_128 = 0.7265625`
+  - `shadow_256 = 0.76171875`
+  - `hard_shadow_256 = 0.78515625`
+- minimal repro
+  - `shadow_128 = 0.75`
+  - `shadow_256 = 0.7421875`
+  - `hard_shadow_256 = 0.75390625`
+
+解釈:
+
+- minimal standalone file も **exact deterministic reproduction** には未到達
+- ただし recipe-level では十分近く、quick は元 best を上回った
+- 一方で serious / hard serious は元 best より少し低い
+- よって minimal file は **移植用の最小核として有効** だが、提出用の current verified best そのものと完全同一ではない
+
+## 6. single-file 再現性確認
+
+### 6.1 比較対象
+
+元の verified best:
+
+- candidate:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+- original pack sha256:
+  - `cbc408e902d4adccfd20dc716f8cd9c8338654fdfadf2caac78a54da03df0836`
+- original adapter sha256:
+  - `5ba26f60cbcd14381cdfbfa8c285ea88af8d7aa6c853d357f30567625cb0b558`
+- original adapter_config sha256:
+  - `0c7ac6ce03ee7eac917b55cfdb545e19bce068e663cb8541010959cd2f634efb`
+
+repro command:
+
+```bash
+uv run python versions/v4/code/train.py train-best-notebook-sft-v4 \
+  --output-dir versions/v4/outputs/train/best_notebook_sft_singlefile_repro_run1 \
+  --candidate-id v4_best_notebook_sft_bf16_official_ultralowlr_singlefile_repro_run1 \
+  --execute
+```
+
+### 6.2 再現 run の結果
+
+single-file repro run は完了した。
+
+- original pack sha256:
+  - `cbc408e902d4adccfd20dc716f8cd9c8338654fdfadf2caac78a54da03df0836`
+- repro pack sha256:
+  - `cbc408e902d4adccfd20dc716f8cd9c8338654fdfadf2caac78a54da03df0836`
+- 判定:
+  - **一致**
+
+つまり、single-file command による `data/train.csv -> notebook-faithful full official pack` の生成は、元の verified best run と一致している。
+
+- repro status:
+  - `completed`
+- final_train_loss:
+  - `0.37027615308761597`
+- peak_memory_gb:
+  - `82.634914498`
+
+adapter 側は exact hash では一致しなかった。
+
+- original adapter sha256:
+  - `5ba26f60cbcd14381cdfbfa8c285ea88af8d7aa6c853d357f30567625cb0b558`
+- repro adapter sha256:
+  - `9e42d58b177426081b66a17995380d94955ed61ce10cfe56e0dfa61fc70fa659`
+- adapter match:
+  - **不一致**
+- original adapter_config sha256:
+  - `0c7ac6ce03ee7eac917b55cfdb545e19bce068e663cb8541010959cd2f634efb`
+- repro adapter_config sha256:
+  - `46613c6cf3b7dd76ab9fbed05fb6319cd28ec019831c3389ddb6f30dbe85638e`
+- adapter_config match:
+  - **不一致**
+
+そのため corrected proxy で再採点した。
+
+確認したい項目:
+
+1. 生成された train pack が元 pack と一致するか
+   - **確認済み: 一致**
+2. `adapters.safetensors` hash が一致するか
+   - **不一致**
+3. 一致しない場合でも local corrected score が同等水準か
+   - **確認済み**
+
+rescored corrected proxy:
+
+- original verified best
+  - `shadow_128 = 0.7265625`
+  - `shadow_256 = 0.76171875`
+  - `hard_shadow_256 = 0.78515625`
+- single-file repro
+  - `shadow_128 = 0.6953125`
+  - `shadow_256 = 0.79296875`
+  - `hard_shadow_256 = 0.76171875`
+
+解釈:
+
+- exact deterministic reproduction ではない
+- ただし score profile は近く、`shadow_256` ではむしろ上振れ
+- 一方で `shadow_128` と `hard_shadow_256` は元 verified best より少し低い
+- よって single-file command は **recipe-level reproduction** には成功しているが、**bitwise / hash-level exact reproduction** には未到達
+
+## 7. 2026-03-27 時点の判断
+
+現時点で「更なる改善」ではなく「一旦止める」前提で固定するなら、採用候補は次。
+
+- code path:
+  - `versions/v4/code/train.py`
+- command:
+  - `train-best-notebook-sft-v4`
+- verified best local candidate:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+
+次回再開時の主論点は、`symbol_equation` と `gravity_constant` をどう押し上げるかに絞られる。
+
+## 8. 2026-03-27 official gate 方針への pivot
+
+README の本番条件は `official_lb` (`enable_thinking=true`) なので、corrected no-think proxy だけを最適化しても十分ではない。  
+このため、repo 側へ official-aligned lightweight gate を追加した。
+
+- added:
+  - `versions/v1/conf/eval/official_lb_nothink_shortboxed.yaml`
+  - `versions/v4/conf/eval/candidate_score_quick_nothink_shortboxed.yaml`
+  - `versions/v4/conf/eval/candidate_score_serious_nothink_shortboxed.yaml`
+  - `versions/v4/conf/eval/candidate_score_official_mini.yaml`
+  - `versions/v1/data/eval_packs/shadow_48_balanced.csv`
+
+新しい ladder:
+
+1. corrected no-think proxy で broad sweep
+2. `official_mini` (`shadow_48_balanced`, `official_lb`) で official alignment 確認
+3. full `official quick` (`shadow_128`, `official_lb`) に昇格
+4. さらに良い候補だけ `official serious`
+
+### 8.1 official mini 結果
+
+`official_mini` を主要 full-SFT 候補へ当てた結果、corrected proxy の ranking がそのまま official ranking にはならないと確認できた。
+
+- current corrected verified best
+  - candidate:
+    - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_run1`
+  - `official_mini = 0.5208333333`
+  - `format_fail_rate = 0.2708333333`
+  - `avg_output_len_chars = 60.9167`
+
+- official-lowLR branch
+  - candidate:
+    - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_mini = 0.7083333333`
+  - `format_fail_rate = 0.0`
+  - `avg_output_len_chars = 30.0417`
+
+family 差も大きく、`official_lowlr` は mini 上で
+
+- `roman_numeral = 1.0`
+- `text_decryption = 1.0`
+- `unit_conversion = 1.0`
+
+まで伸びた。  
+一方 `official_ultra` は `unit_conversion = 0.0`、`text_decryption format_fail_rate = 0.5` で明確に不利だった。
+
+### 8.2 full official quick 結果
+
+`official_mini` 勝者の `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1` を full `official quick` へ昇格。
+
+- `shadow_128 = 0.640625`
+- `format_fail_rate = 0.0078125`
+- `boxed_rate = 1.0`
+- `avg_output_len_chars = 31.125`
+
+主な family:
+
+- `unit_conversion = 1.0`
+- `roman_numeral = 1.0`
+- `text_decryption = 0.8571`
+- `gravity_constant = 0.4091`
+- `bit_manipulation = 0.3636`
+- `symbol_equation = 0.2381`
+
+これは、従来 verified best の `official quick = 0.484375` を大きく上回る。  
+つまり **本番寄せでは current best candidate が入れ替わった**。
+
+### 8.3 full official serious 結果
+
+同 candidate をさらに full `official serious` へ昇格した。
+
+- `shadow_256 = 0.64453125`
+- `hard_shadow_256 = 0.63671875`
+- `format_fail_rate = 0.0078125 / 0.01171875`
+- `boxed_rate = 1.0 / 1.0`
+- `avg_output_len_chars = 30.2383 / 31.0352`
+
+`hard_shadow_256` family snapshot:
+
+- `unit_conversion = 1.0`
+- `roman_numeral = 1.0`
+- `text_decryption = 0.6190`
+- `bit_manipulation = 0.6047`
+- `gravity_constant = 0.3488`
+- `symbol_equation = 0.2558`
+
+解釈:
+
+- corrected proxy の verified best (`official-ultralow`) より、README-faithful local official score はこちらの方がかなり良い
+- したがって現時点の **official-first local best** は
+  - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+- まだ `0.8+` には届かないが、`0.484375 -> 0.640625 -> 0.64453125/0.63671875` まで改善したため、
+  今後の sweep / continuation はこの candidate を親にして進める価値が高い
+
+### 8.4 次の改善方針
+
+parent / parentfix 系は corrected quick でも `0.16-0.23` 台と弱く、本線から外した。  
+代わりに、`official quick = 0.640625` を出した
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+
+を parent にして、gentle な Stage-C continuation を 2 本開始した。
+
+- `v4_rft_stage_c_fullsftparent_gentle_run1`
+- `v4_rft_stage_c_fullsftparent_answerbias_gentle_run1`
+
+狙いは、full-SFT parent の boxed stability を壊さずに `symbol_equation` / `gravity_constant` / `bit_manipulation` を少しずつ押し上げ、official `0.7-0.8` の保持線へ乗せること。
+
+### 8.5 gentle Stage-C continuation は official-first では失敗
+
+上記 2 本の continuation は train 自体は完走した。
+
+- `v4_rft_stage_c_fullsftparent_gentle_run1`
+  - `final_train_loss = 0.4285714328`
+  - `final_val_loss = 0.6206146479`
+- `v4_rft_stage_c_fullsftparent_answerbias_gentle_run1`
+  - `final_train_loss = 0.4107142985`
+  - `final_val_loss = 0.5231760144`
+
+しかし `official_micro` (`shadow_12_balanced`, `official_lb`) で診断すると、どちらも実運用には不適だった。
+
+- gentle
+  - `overall_acc = 0.4166666667`
+  - `format_fail_rate = 0.5`
+  - `avg_output_len_chars = 726.25`
+- answerbias
+  - `overall_acc = 0.3333333333`
+  - `format_fail_rate = 0.25`
+  - `avg_output_len_chars = 668.8333`
+
+row-level では `NOT_FOUND`, `your answer`, `boxed{XXIV}`, `<think>:}` などが出ており、training loss が改善しても official thinking-on generation はむしろ壊れた。  
+したがって full-SFT parent からの gentle Stage-C continuation は、本線から外した。
+
+### 8.6 official-first shallow merge sweep
+
+continuation の代わりに、README-faithful local best の
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+
+へ corrected verified best の `official-ultra` を少量混ぜる shallow merge を試した。
+
+試行した比率と結果:
+
+1. `95/5`
+   - quick: `0.6484375`
+   - serious: `0.66796875 / 0.6171875`
+
+2. `90/10`
+   - quick: `0.640625`
+   - serious: `0.63671875 / 0.609375`
+
+3. `97/3`
+   - quick: `0.6640625`
+   - serious: `0.65625 / 0.6328125`
+
+比較基準の parent は:
+
+- quick: `0.640625`
+- serious: `0.64453125 / 0.63671875`
+
+解釈:
+
+- `95/5` は shadow 側の伸びが最も大きいが、hard を落とし過ぎた
+- `90/10` は shadow / hard の両方で parent を超えられなかった
+- `97/3` は quick が現 best で、`shadow_256` も parent 超え、`hard_shadow_256` は parent とほぼ同等まで維持した
+
+3 点平均でも:
+
+- parent mean = `0.640625`
+- `95/5` mean = `0.64453125`
+- `97/3` mean = `0.6510416667`
+
+となり、現時点では `97/3` が最もバランスの良い official-first candidate と判断できる。
+
+### 8.7 2026-03-27 時点の official-first 暫定結論
+
+README-faithful local screening の現状 Pareto は次の 2 本。
+
+1. stable parent
+   - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+   - serious: `0.64453125 / 0.63671875`
+
+2. balanced shallow-merge leader
+   - `v5_merge_officiallowlr_officialultra_97_03_bf16`
+   - quick: `0.6640625`
+   - serious: `0.65625 / 0.6328125`
+
+したがって、README-faithful 条件で次に提出寄りへ進めるなら本命は `97/3`。  
+ただし hard 側単独の safest choice は依然として parent なので、両方を保持したままさらに浅い merge も確認した。
+
+- `98/2`
+  - quick: `0.6328125`
+  - `format_fail_rate = 0.0`
+  - `boxed_rate = 1.0`
+
+これは parent (`0.640625`) と `97/3` (`0.6640625`) の両方を下回ったため、浅い merge の best は `97/3` で頭打ちと判断した。
+
+### 8.8 official-first best 専用の minimal single-file
+
+corrected verified best だけでなく、README-faithful official-first best も CUDA / vLLM へ移植しやすいよう、1 ファイルの minimal pipeline に切り出した。
+
+- file:
+  - `versions/v4/code/train_official_first_best_v4_minimal.py`
+
+この file が再現するのは次の current official-first best pipeline:
+
+1. `data/train.csv` から official-long notebook pack を作る
+2. full-data generalist SFT (`lr=1e-4`)
+3. full-data specialist SFT (`lr=5e-5`)
+4. 2 本の LoRA adapter を `97/3` で線形 merge する
+
+README 契約も manifest に明示している。
+
+- `max_lora_rank <= 32`
+- `max_tokens = 7680`
+- `top_p = 1.0`
+- `temperature = 0.0`
+- `max_num_seqs = 64`
+- `max_model_len = 8192`
+- `vLLM`
+- `\boxed{}` 優先抽出
+
+validation:
+
+- `uv run python -m py_compile versions/v4/code/train_official_first_best_v4_minimal.py`
+- render-only smoke:
+  - `uv run python versions/v4/code/train_official_first_best_v4_minimal.py --output-dir versions/v4/outputs/train/_official_first_best_minimal_smoke --candidate-id v5_official_first_best_97_03_minimal_smoke --subsample-size 8`
+- execute smoke:
+  - `uv run python versions/v4/code/train_official_first_best_v4_minimal.py --output-dir versions/v4/outputs/train/_official_first_best_minimal_execute_smoke --candidate-id v5_official_first_best_97_03_minimal_execute_smoke --subsample-size 8 --execute`
+- `uv run pytest -q versions/v4/tests`
+- result:
+  - render-only smoke pass
+  - execute smoke pass
+  - two-stage SFT -> merge completed end-to-end
+  - tests: `5 passed`
+
+full-data execute repro も起動済みで、`official_mini` により current official-first reference と照合する。
+
+### 8.9 official-long full-data SFT sweep v2 は失敗
+
+`97/3` shallow merge の次に、本線として official-long full-data SFT を 3 本並列で追加検証した。
+
+1. `midlr`
+   - candidate:
+     - `v4_baseline_notebook_sft_bf16_full_text_midlr_clip_official_run1`
+   - train:
+     - `lr = 7.5e-5`
+     - `final_train_loss = 0.4564516246`
+   - `official_mini = 0.0208333333`
+   - `format_fail_rate = 0.3125`
+   - `boxed_rate = 0.6875`
+
+2. `highlr`
+   - candidate:
+     - `v4_baseline_notebook_sft_bf16_full_text_highlr_clip_official_run1`
+   - train:
+     - `lr = 1.25e-4`
+     - `final_train_loss = 0.3270089328`
+   - `official_mini = 0.1666666667`
+   - `format_fail_rate = 0.5625`
+   - `boxed_rate = 0.9791666667`
+   - `avg_output_len_chars = 79.8125`
+
+3. `epoch075`
+   - candidate:
+     - `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_epoch075_run1`
+   - train:
+     - `lr = 1e-4`
+     - `epochs = 0.75`
+     - `final_train_loss = 0.5615384579`
+   - `official_mini = 0.0`
+   - `format_fail_rate = 0.0`
+   - `boxed_rate = 1.0`
+
+解釈:
+
+- 3 本とも README-faithful local best (`official_lowlr` parent や `97/3`) をまったく超えられなかった
+- `midlr` は `gravity_constant` / `unit_conversion` で extraction fail が多く、短すぎる壊れ方をした
+- `highlr` は boxed 自体は多いが、`roman_numeral`, `symbol_equation`, `gravity_constant` で format fail が激増し、出力長も大きく伸びた
+- `epoch075` は形式は保つが全 family で不正解になり、短縮ではなく reasoning quality 側が落ちた
+
+つまり、この帯域の LR / epoch sweep は **train loss が下がっても official-first score を改善しない**。  
+この結果により、current README-faithful 本線は依然として `97/3` shallow merge である。
+
+### 8.10 symbol-ish specialist branch は official_micro で中立止まり
+
+`data/train.csv` に family 列がないため、answer shape から切り出した `symbol-ish` (`symbol_only + mixed symbolic`, `867` rows) を narrow specialist として試した。
+
+まず `official_symbolish` specialist を parent (`official_lowlr`) へ `98/2` で merge し、`official_micro` で確認した。
+
+1. `98/2`
+   - `v5_merge_officiallowlr_symbolishultra_98_02_bf16`
+     - `official_micro = 0.6666666667`
+   - `v5_merge_officiallowlr_symbolishlow_98_02_bf16`
+     - `official_micro = 0.6666666667`
+
+reference:
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+`98/2` で parent と完全横並びだったため、より重い weight も ultra 側だけ再確認した。
+
+2. ultra reweight
+   - `v5_merge_officiallowlr_symbolishultra_97_03_bf16`
+     - `official_micro = 0.6666666667`
+   - `v5_merge_officiallowlr_symbolishultra_95_05_bf16`
+     - `official_micro = 0.6666666667`
+
+row-level 差分:
+
+- `ultra 98/2` は、already-wrong な `symbol_equation` 1 行だけを動かした
+  - `>|%{` -> `>|%{>`
+- `low 98/2` と `ultra 95/5` は、正解のままではあるが numeric row も少し揺らした
+  - 例: `21.35 -> 21.34`
+  - 例: `23.51 -> 23.56`
+- `ultra 97/3` も symbol row を直せず、`gravity_constant` 側に tolerance 内 drift を追加した
+
+解釈:
+
+- narrow symbol specialist は少なくとも現 recipe では README-faithful gate を押し上げていない
+- `merge weight` だけで改善する兆候も見えなかった
+- したがって current official-first 本線は引き続き broad specialist 由来の `97/3` shallow merge
 
 
-- 日本語で回答すること
-- 必ずREADME.mdを元に回答すること
+### 8.11 constraint-triad specialist は true `98/2` / `97/3` とも中立、誤 launch の `75/25` だけ崩壊
 
-- 最終的にはリーダーボードスコア0.9を満たす必要があります。目標ではなく必達。
-- 実装は複数ファイルに分けず、必ず１ファイルとしてまとめること
+`symbol-ish` が中立だったため、次は exact prompt templates で family を切り出し、
 
-- 実験は作業単位で細かく必ずPushすること
-- UV環境を設定しているので追加したい場合はUV ADDで
-- UV環境を設定しているのでpythonはUV RUN PYTHONで
+- `bit_manipulation`
+- `gravity_constant`
+- `symbol_equation`
 
-- 実験の記録は逐一残すこと。
-- 学習には相応の時間がかかるのでそれを短時間で切り上げたり簡易版で結論を出すことはNG.適切に、場合によっては数時間の学習を待つ場面もあるでしょう。それ込みで実行して
+の 3 family だけを含む `constraint triad` specialist を試した。
 
-- 1つの学習には30分から数時間かかる。そのため1個ずつ実行では効率悪いので、何個も並列して実験を回しましょう。
-- 最大5~8並列は余裕で動作します。完了を待たず、多並列で時間効率を高め、多くの実験を回しましょう。
+- specialist pack:
+  - `official_constraint_triad_sft_pack_run1.parquet`
+  - rows: `4754`
+- specialist candidate:
+  - `v4_official_constraint_triad_sft_ultralowlr_clip_run1`
 
-- 完了条件を満たすまでタスクコンプリートせず、ノンストップで実験ループを実行しましょう。
+parent (`official_lowlr`) への merge 結果:
 
-- ローカル検証ベストスコアのパイプラインは新たにフォルダを作って単体の１ファイルとして再実装し、再現性を確認の上、提出要件に合ったsubmission.zipを生成すること。
-なお、このタスクは今後本番スコア相当0.7、0.75、0.8、それ以上を達成するごとに実施して.
+1. automation slip (`75/25`)
+   - `v5_merge_officiallowlr_constrainttriad_98_02_bf16`
+   - candidate id は `98_02` だが、実 manifest 上の merge weight は `0.75 / 0.25`
+   - `official_micro = 0.3333333333`
+   - `format_fail_rate = 0.5`
+   - `avg_output_len_chars = 51.83`
 
-- 現環境はRAM512GBです。OOMには十分気をつけること。
+2. `97/3`
+   - `v5_merge_officiallowlr_constrainttriad_97_03_bf16`
+   - `official_micro = 0.6666666667`
+   - `format_fail_rate = 0.0`
 
-- **最重要命令** 今後一切のmlxモデルの利用を禁止します。mlxモデルを使用してる場合は直ちにすべての実験を停止すること。今後は提出要件に適合させるため、Transformers版の公式モデルを直接ベースにしてLoRAを作成してください。
-このルールは今後全ての実験に適用されます。
-- mlxからの移行、Transformers版実験の導入方法は"how-to-get-started-transformers.md"をよく読んで下さい。
-- 過去のmlx実験を遡って変換することは不要で、実験の成果をベースにこれからのTransformers版でも実験ループを重ねて。
-- 現在の計画も全てその前提で書き換えて。
+3. true `98/2`
+   - `v5_merge_officiallowlr_constrainttriad_true98_02_bf16`
+   - manifest 上の merge weight は `0.98 / 0.02`
+   - `official_micro = 0.6666666667`
+   - `format_fail_rate = 0.0`
+   - `avg_output_len_chars = 30.25`
+
+reference:
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+row-level:
+
+- mislaunch の `75/25` は 6 行で悪化し、典型例では output が
+  - `Please put your final answer inside \boxed{}...`
+  を boxed answer の代わりにそのまま復唱した
+- 具体的には `gravity_constant`, `symbol_equation`, `text_decryption` の行で
+  - extracted answer が `your answer`
+  へ崩れた
+- `97/3` は collapse 自体は防いだが、
+  - wrong symbol row `>|%{` -> `>|%{>`
+  - wrong gravity row `78.01` -> `78.0`
+  という tolerance/near-miss drift だけで、score 改善はゼロだった
+- true `98/2` も score は親と同点で、
+  - wrong symbol row `>|%{` -> `>|%{>`
+  - wrong gravity row `78.01` -> `78.0`
+  - correct gravity row `23.51` -> `23.58`
+  という drift が増えただけだった
+
+解釈:
+
+- constraint-family specialist は specialist weight が重すぎると prompt-instruction echo collapse を起こす
+- ただし true `98/2` と `97/3` はどちらも安全側で、README-faithful gateでは parent と同点止まり
+- したがって、この family slice も current official-first 本線には昇格しない
+
+
+### 8.12 naive text_decryption upsampling は `+25%` でも悪化、`+50%` では全崩壊
+
+`README.md` の Evaluation 契約どおり、`official_lb` 条件をそのまま使う `official_mini` で `text_decryption` の単純 upsampling を検証した。
+
+試した branch:
+
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_textboost125_run1`
+  - full official pack + exact `text_decryption` rows `+25%`
+  - total rows: `9894`
+- `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_textboost150_run1`
+  - full official pack + exact `text_decryption` rows `+50%`
+  - total rows: `10288`
+
+結果:
+
+1. `textboost125`
+   - `official_mini = 0.5625`
+   - `format_fail_rate = 0.5833333333`
+   - `boxed_rate = 0.6458333333`
+   - `avg_output_len_chars = 56.85`
+   - family:
+     - `bit_manipulation = 0.75`
+     - `gravity_constant = 0.5`
+     - `roman_numeral = 0.5`
+     - `symbol_equation = 0.125`
+     - `text_decryption = 0.625`
+     - `unit_conversion = 0.875`
+
+2. `textboost150`
+   - `official_mini = 0.0`
+   - `format_fail_rate = 1.0`
+   - `boxed_rate = 1.0`
+   - `avg_output_len_chars = 82.0`
+   - family:
+     - 全 6 family が `0.0`
+   - failure bucket:
+     - `boxed_multiple = 48 / 48`
+
+reference:
+
+- parent `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+row-level / failure pattern:
+
+- `textboost125` では `your answer` 抽出、few-shot / instruction 断片の混入、`boxed{...}` literal 化が増えた
+- `textboost150` では全行が `boxed_multiple` に崩れ、README-faithful extraction が一貫して誤作動した
+- つまり `text_decryption` を増やしても当該 family 自体が安定して伸びず、むしろ boxed answer discipline 全体を壊した
+
+解釈:
+
+- naive な family upsampling は current official-first route では逆効果
+- 少なくともこの notebook-faithful BF16 SFT recipe では、`text_decryption` をそのまま増やすだけでは official gate の score 改善につながらない
+- 今後は oversampling ではなく、narrow specialist merge か objective 側の修正を優先する
+
+
+### 8.13 bit+gravity exact specialist も README-faithful `official_micro` では neutral
+
+`bit_manipulation` と `gravity_constant` は current broad best (`official_lowlr + official_ultra 97/3`) で伸びが見えていたので、この 2 family だけを exact prompt template で抜いた narrow specialist を追加検証した。
+
+- specialist candidate:
+  - `v4_official_bitgravity_sft_ultralowlr_clip_run1`
+- pack:
+  - `official_bitgravity_sft_pack_run1.parquet`
+  - rows: `3199`
+- merge checks:
+  - `v5_merge_officiallowlr_bitgravity_98_02_bf16`
+    - `official_micro = 0.6666666667`
+    - `avg_output_len_chars = 32.75`
+  - `v5_merge_officiallowlr_bitgravity_97_03_bf16`
+    - `official_micro = 0.6666666667`
+    - `avg_output_len_chars = 27.9167`
+
+reference:
+
+- parent `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+解釈:
+
+- `bit-only` / `gravity-only` と同様に、`bit+gravity` も safe だが neutral
+- したがって current broad `97/3` merge の gain は、この 2 family の isolated specialist だけでは説明できない
+- broad adaptation か、より複合的な interaction を見に行く必要がある
+
+
+### 8.14 official-first minimal repro の `score-candidate` resolver bug を修正
+
+`v5_official_first_best_97_03_minimal_repro_run1` の `official_mini` score を再監査したところ、`score-candidate --candidate-id ...` が pipeline manifest ではなく `..._generalist_manifest.json` を拾っていた。
+
+root cause:
+
+- `versions/v4/code/train.py` の `resolve_candidate_spec_v4()` が
+  - `payload.candidate_id` の exact matchより
+  - manifest stem の `startswith(candidate_id)` fallback
+  を事実上優先していた
+- そのため
+  - target: `v5_official_first_best_97_03_minimal_repro_run1`
+  - actual resolved manifest: `..._generalist_manifest.json`
+  となっていた
+- さらに pipeline manifest 側は merged adapter を `merge.adapter_dir` にだけ持っており、`execution.adapter_dir` には持っていなかった
+
+修正:
+
+- `resolve_candidate_spec_v4()` で:
+  - `payload.candidate_id` の exact match を優先
+  - pipeline manifest の `merge.adapter_dir` も adapter source として解決
+- `versions/v4/code/train_official_first_best_v4_minimal.py` の pipeline manifest に
+  - `execution.adapter_dir = merged adapter dir`
+  を追加
+- regression test 追加:
+  - exact pipeline candidate id が generalist prefix match に負けないことを固定化
+
+再採点結果 (`official_mini`):
+
+- 旧 row (誤解決; generalist manifest)
+  - `overall_acc = 0.6458333333`
+  - `format_fail_rate = 0.0208333333`
+  - `avg_output_len_chars = 16.6875`
+  - `manifest_path = ..._generalist_manifest.json`
+- 新 row (修正後; pipeline manifest + merged adapter)
+  - `overall_acc = 0.6458333333`
+  - `format_fail_rate = 0.0`
+  - `avg_output_len_chars = 16.7083`
+  - `manifest_path = ..._pipeline_manifest.json`
+
+解釈:
+
+- previous score は「大きくは外れていなかった」が、参照 manifest / adapter は誤っていた
+- fix 後は merged pipeline candidate が正しく score される
+- 今後の single-file official-first repro の比較は、この corrected resolver を前提に進める
+
+
+### 8.15 `non-text` / `non-text+nonsymbol` も README-faithful `official_micro` では neutral
+
+`official_lowlr + official_ultra 97/3` の gain が「text 側の悪さを薄めた broad adaptation」なのかを切り分けるため、full official pack から family prefix ベースで除外した broad specialist を追加検証した。
+
+試した branch:
+
+- `v4_official_nontext_sft_ultralowlr_clip_run2`
+  - exact excludes:
+    - `text_decryption`
+  - pack rows: `7924`
+- `v4_official_nontext_nonsymbol_sft_ultralowlr_clip_run1`
+  - exact excludes:
+    - `text_decryption`
+    - `symbol_equation`
+  - pack rows: `6369`
+
+結果:
+
+1. `non-text`
+   - `v5_merge_officiallowlr_nontext_98_02_bf16`
+     - `official_micro = 0.6666666667`
+     - `avg_output_len_chars = 27.8333`
+   - `v5_merge_officiallowlr_nontext_97_03_bf16`
+     - `official_micro = 0.6666666667`
+     - `avg_output_len_chars = 27.8333`
+
+2. `non-text+nonsymbol`
+   - `v5_merge_officiallowlr_nontextnonsymbol_98_02_bf16`
+     - `official_micro = 0.6666666667`
+     - `avg_output_len_chars = 30.3333`
+   - `v5_merge_officiallowlr_nontextnonsymbol_97_03_bf16`
+     - `official_micro = 0.6666666667`
+     - `avg_output_len_chars = 27.8333`
+
+reference:
+
+- parent `v4_baseline_notebook_sft_bf16_full_text_lowlr_clip_official_run1`
+  - `official_micro = 0.6666666667`
+
+解釈:
+
+- `text` を丸ごと抜いても、また `text+symbol` を同時に抜いても broad best の gain は再現しなかった
+- したがって current `official_lowlr + official_ultra 97/3` の improvement は、少なくとも「text を抜いた specialist」「text+symbol を抜いた specialist」という単純な broad family exclusion では説明できない
+- family-slice 路線はここでかなり細くなり、今後の主戦場は full-data specialist の hyperparameter / regularization 側になる
