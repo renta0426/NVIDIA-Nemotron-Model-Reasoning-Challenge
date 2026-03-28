@@ -1109,3 +1109,78 @@ mainline との比較:
   - safest hard-robust candidate はまだ parent / mainline 側
   - `dropout0` は high-mini / high-shadow alternative
   という位置付けに留める
+
+
+### 8.18 `warmup05`, `epoch090`, `dropout0 98/2` はいずれも current mainline 置換には届かず
+
+`official_ultra` 近傍の追加検証として、
+
+1. `warmup05`
+2. `epoch090`
+3. `dropout0 97/3` の cheap weight tweak (`98/2`)
+
+を README-faithful gate で評価した。
+
+#### 8.18.1 `warmup05_run2`
+
+- specialist:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_warmup05_run2`
+- merged candidate:
+  - `v5_merge_officiallowlr_officialultra_warmup05_run2_97_03_bf16`
+- result:
+  - `official_mini = 0.7291666667`
+  - `quick = 0.640625`
+  - `format_fail_rate`
+    - mini `0.0`
+    - quick `0.015625`
+
+解釈:
+
+- `official_mini` では current mainline / `epoch075` を上回る
+- しかし `quick` が current bar `0.6640625` を下回ったため、serious には昇格しない
+- row-level では `gravity_constant` を一部戻す一方、`text_decryption` / `bit_manipulation` が崩れる
+
+#### 8.18.2 `epoch090`
+
+- specialist:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_epoch090_run1`
+- merged candidate:
+  - `v5_merge_officiallowlr_officialultra_epoch090_97_03_bf16`
+- result:
+  - `official_mini = 0.7083333333`
+  - `quick = 0.65625`
+  - `format_fail_rate`
+    - mini `0.0`
+    - quick `0.0078125`
+
+解釈:
+
+- `official_mini` は `epoch075` と同水準
+- `quick` も `epoch075` と同じ `0.65625` に留まり、current mainline / `dropout0` に届かない
+- row-level では `text_decryption` と `gravity_constant` を一部回復するが、`bit_manipulation` の取りこぼしが残る
+
+#### 8.18.3 `dropout0 98/2`
+
+- merged candidate:
+  - `v5_merge_officiallowlr_officialultra_dropout0_98_02_bf16`
+- result:
+  - `official_mini = 0.7291666667`
+  - `quick = 0.6484375`
+  - `format_fail_rate = 0.0`
+
+解釈:
+
+- `dropout0` specialist の weight を `97/3 -> 98/2` に軽くしても、README-faithful `quick` は回復しなかった
+- `97/3` の
+  - `official_mini = 0.75`
+  - `quick = 0.6640625`
+  に対し、両方で悪化した
+- したがって `dropout0` 系の current best merge weight は依然として `97/3`
+
+総括:
+
+- `warmup05`, `epoch090`, `dropout0 98/2` はいずれも interesting だが、current mainline または `dropout0 97/3` を明確に置き換えるほどではなかった
+- 次の主戦場は
+  - `midlr_run2`
+  - `dropout0 + epoch090` の combined branch
+  の 2 本になった
