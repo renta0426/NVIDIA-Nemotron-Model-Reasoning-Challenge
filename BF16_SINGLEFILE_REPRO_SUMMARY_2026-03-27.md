@@ -1245,3 +1245,52 @@ mainline との比較:
 - `dropout0 + epoch075`
 
 の combined full-data specialist 2 本とした。
+
+### 8.18.6 `dropout0 + epoch090`
+
+- specialist:
+  - `v4_baseline_notebook_sft_bf16_full_text_ultralowlr_clip_official_dropout0_epoch090_run1`
+- merged candidate:
+  - `v5_merge_officiallowlr_officialultra_dropout0epoch090_97_03_bf16`
+- result:
+  - `official_mini = 0.7291666667`
+  - `quick = 0.65625`
+  - `format_fail_rate`
+    - mini `0.0`
+    - quick `0.015625`
+  - `boxed_rate = 1.0`
+  - `avg_output_len_chars`
+    - mini `27.7083333333`
+    - quick `29.7578125`
+
+解釈:
+
+- `official_mini` は strong で、`warmup05` と同水準まで上がった
+- しかし README-faithful `quick` は `0.65625` に留まり、current bar `0.6640625` を超えられない
+- row-level では current mainline に対して
+  - gains:
+    - `text_decryption x2`
+  - losses:
+    - `gravity_constant x2`
+    - `bit_manipulation x1`
+  - net `-1`
+- これは `midlr_run2` や `epoch090` の近傍で見えていた
+  - text を少し戻す
+  - gravity / bit を少し落とす
+ というパターンの延長に留まった
+- よって `dropout0 + epoch090` は **mini は strong だが mainline 置換には届かない**
+
+この結果を踏まえ、live frontier は引き続き
+
+- balanced mainline:
+  - `v5_merge_officiallowlr_officialultra_97_03_bf16`
+- shadow-leaning alternative:
+  - `v5_merge_officiallowlr_officialultra_dropout0_97_03_bf16`
+
+の 2 本を維持しつつ、未完了の `dropout0 + epoch075` を継続した。
+
+空いた 1 枠では、`epoch090` とは failure profile が違う `warmup05` 側の補完を狙って
+
+- `dropout0 + warmup05`
+
+を新規投入した。
