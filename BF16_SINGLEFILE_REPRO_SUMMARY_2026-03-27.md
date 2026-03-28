@@ -1184,3 +1184,64 @@ mainline との比較:
   - `midlr_run2`
   - `dropout0 + epoch090` の combined branch
   の 2 本になった
+
+
+### 8.18.4 `midlr_run2`
+
+- specialist:
+  - `v4_baseline_notebook_sft_bf16_full_text_midlr_clip_official_run2`
+- merged candidate:
+  - `v5_merge_officiallowlr_officialmidlr_97_03_run2_bf16`
+- result:
+  - `official_mini = 0.7083333333`
+  - `quick = 0.65625`
+  - `format_fail_rate = 0.015625`
+  - `boxed_rate = 1.0`
+  - `avg_output_len_chars = 29.7578125`
+
+解釈:
+
+- `midlr_run2` は `epoch075` / `epoch090` と同じ `0.65625` tier に入った
+- `official_mini` は competitive だが、README-faithful `quick` では current mainline (`0.6640625`) を超えられない
+- row-level では `text_decryption` を 2 行戻す一方、`gravity_constant x2` と `bit_manipulation x1` を落として net `-1`
+- よって `midlr_run2` も **promising だが serious 昇格には届かない近傍候補** と整理した
+
+### 8.18.5 `mainline × dropout0` の cheap meta-merge は失敗
+
+`v5_merge_officiallowlr_officialultra_97_03_bf16` と `v5_merge_officiallowlr_officialultra_dropout0_97_03_bf16` は、
+
+- quick がどちらも `0.6640625`
+- mainline は hard が少し良い
+- `dropout0` は shadow が少し良い
+
+という補完的な形に見えたため、cheap な 2 次 merge を試した。
+
+- merged candidate:
+  - `v5_merge_mainline_dropout0_50_50_bf16`
+- result:
+  - `official_mini = 0.7083333333`
+  - `quick = 0.6328125`
+  - `format_fail_rate = 0.015625`
+  - `boxed_rate = 1.0`
+
+解釈:
+
+- 平均化すると補完ではなく劣化になった
+- row-level では
+  - `text_decryption` を 1 行だけ回復
+  - その代わり `gravity_constant x3` と `bit_manipulation x2` を落として net `-4`
+- したがって **mainline / dropout0 の相補は simple adapter averaging では回収できない**
+
+この時点の official-first frontier は引き続き次の 2 本。
+
+- balanced mainline:
+  - `v5_merge_officiallowlr_officialultra_97_03_bf16`
+- shadow-leaning alternative:
+  - `v5_merge_officiallowlr_officialultra_dropout0_97_03_bf16`
+
+次の live branch は
+
+- `dropout0 + epoch090`
+- `dropout0 + epoch075`
+
+の combined full-data specialist 2 本とした。
