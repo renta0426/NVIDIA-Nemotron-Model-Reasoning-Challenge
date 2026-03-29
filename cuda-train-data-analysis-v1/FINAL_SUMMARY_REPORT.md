@@ -33,6 +33,25 @@
 - 未解決 / 要注意: `2,236 + 27 = 2,263` 行（`23.8%`）
 - 結論: **かなり良いが、完璧ではない**
 
+### selection tier の実務的な意味
+
+この 4 tier は、train.csv に最初から推論文が入っていることを意味しません。`README.md` にある通り、このコンペの train は `prompt` と `answer` を持つだけで、評価も最終答えの Accuracy です。したがって今回の tier は、**どの行をどの強さの教師信号へ変換してよいか** を決めるための operational label です。
+
+- `verified_trace_ready`
+  - 例と query answer の整合を programmatic に確認でき、現在の solver / rule family の範囲では十分に強い根拠がある行
+  - ただし「高品質な自然言語 CoT が元データに既に含まれている」ことは意味しない
+  - 意味するのは、後段で `<think> ... </think> \boxed{}` 形式の trace 教師へ変換する候補として安全性が高いこと
+- `answer_only_keep`
+  - 最終答えレベルの supervision は安全だが、prompt-local な導出が一意ではない、または trace 教師としては根拠が薄い行
+  - Accuracy 重視の補助教師としては使えるが、完全な reasoning trace 教師とはみなさない
+- `manual_audit_priority`
+  - `verified_trace_ready` に上げるだけの一意な規則根拠がなく、`answer_only_keep` に落とすほど答えレベルの確信も足りず、`exclude_suspect` にするほどの明確な衝突も無い保留行
+  - つまり「未解決」だけでなく、「今は安全に reusable な教師へ変換しない方がよい」という意味を含む hold queue
+- `exclude_suspect`
+  - 規則と gold の衝突、またはラベル誤り / parser 想定外の可能性があるため、現時点では学習へ混ぜない行
+
+要するに、`verified_trace_ready` は「元から CoT 付き」、`manual_audit_priority` は「そのまま CoT 化してよい」という意味ではありません。今回の台帳は、**row-level に教師化の安全性を振り分けた ledger** です。
+
 ## 3. family ごとの最終結果
 
 | family | total | verified | answer_only | manual | exclude | 概要 |
@@ -49,6 +68,72 @@
 - `roman` / `gravity` / `unit` は、curation の観点ではほぼ完成です。
 - `text` は accuracy 向けの教師としてかなり良い状態ですが、`971` 行は **answer-only** であり、完全な reasoning trace 教師ではありません。
 - 残る主要ボトルネックは `bit_manipulation` と `symbol_equation` です。
+
+### Kaggle 側 family 名との対応
+
+Kaggle 参加者の write-up や discussion では、次の名称がよく使われます。
+
+| Kaggle 側ラベル | この repo の family / subtype | 補足 |
+| --- | --- | --- |
+| `Bit Manipulation` | `bit_manipulation` | そのまま対応 |
+| `Gravity` | `gravity_constant` | 隠れた重力定数 `g` を使う落下距離問題 |
+| `Unit Conversion` | `unit_conversion` | 固定比率の単位変換 |
+| `Cipher` | `text_decryption` | monoalphabetic な文字置換復号 |
+| `Numeral` | `roman_numeral` | Roman numeral 変換 |
+| `Equation (Numeric)` | `symbol_equation` のうち `numeric_2x2` | `ddOdd` 形式の numeric operator 問題 |
+| `Equation (Symbolic)` | `symbol_equation` のうち `glyph_len5` | 記号列 transformation 問題 |
+
+注意点として、この repo の top-level family は 6 個ですが、Kaggle 文脈の 7 分類に合わせる場合は `symbol_equation` を内部で
+
+- `numeric_2x2`
+- `glyph_len5`
+
+へ分けて読む必要があります。
+
+したがって、外部の議論と付き合わせるときは、
+
+- `symbol_equation + numeric_2x2` = `Equation (Numeric)`
+- `symbol_equation + glyph_len5` = `Equation (Symbolic)`
+
+として読むのが正確です。
+
+### 学習ハンドオフの最短ルール
+
+今後の fine-tuning / data mix 設計では、まず次の運用を基準にするのが安全です。
+
+| 目的 | 使う artifact | 基本方針 |
+| --- | --- | --- |
+| trace 付き core SFT | `artifacts/train_verified_trace_ready_v1.csv` | solver で整合確認済みの行だけを使い、短い `<think> ... </think> \boxed{}` へ変換 |
+| answer-only 補助 SFT | `artifacts/train_answer_only_keep_v1.csv` | final answer supervision 専用。verified trace より混合比率を低くする |
+| curated 全体を一括参照 | `artifacts/train_recommended_learning_target_v1.csv` | `verified + answer_only` を一括で使いたいときの入口 |
+| 次の回収候補 | `artifacts/manual_pass1_priority_pack_v1.csv` | 新規 family 発見や manual 昇格の起点 |
+| 保留全件台帳 | `artifacts/train_manual_audit_priority_v1.csv` | そのまま学習へ入れず、cluster 単位で再審査 |
+| 完全除外 | `artifacts/train_exclude_suspect_v1.csv` | 学習へ入れない |
+
+推奨する最小ルールは次です。
+
+1. `verified_trace_ready` を trace 教師の主集合にする
+2. `answer_only_keep` は boxed answer の安定化用に少量混ぜる
+3. `manual_audit_priority` は raw のまま CoT 化しない
+4. `exclude_suspect` は学習対象から外す
+
+特に `manual_audit_priority` は「未解決だが後で何とかなるかもしれない」だけでなく、**現時点では safe reusable rule が立っていないため、そのまま教師化しない方がよい行**を含みます。従って、manual 全体へ一括で synthetic CoT を付けるのは非推奨です。
+
+学習側で最低限見る列は次です。
+
+- `family`
+- `template_subtype`
+- `selection_tier`
+- `teacher_solver_candidate`
+- `analysis_notes`
+- `audit_reasons`
+- `symbol_query_operator`
+- `symbol_same_operator_example_count`
+- `symbol_numeric_formula_name`
+- `bit_structured_formula_name`
+- `bit_structured_formula_abstract_family`
+
+このうち `family + template_subtype` を使うと、Kaggle 側の `Equation (Numeric)` / `Equation (Symbolic)` を含む 7 分類へ素直に寄せられます。
 
 ## 4. 今回の主な改善点
 

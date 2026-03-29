@@ -19,152 +19,18 @@
 - `verified_trace_ready = 6086`
 - `answer_only_keep = 1151`
 - `manual_audit_priority = 2236`
-- `exclude_suspect = 27`
+## 6. family / tier の詳細はどこを見るべきか
 
-になっています。
+family ごとの solved / unsolved の意味、selection tier の解釈、Kaggle 側 family 名との対応、学習へどう流し込むかは、重複を避けるため **FINAL_SUMMARY_REPORT.md を正本** とします。
 
-## 2. なぜこの台帳が必要だったか
+とくに次の内容は provenance 本文で再説明せず、最終サマリを参照してください。
 
-`README.md` の評価仕様では、このコンペは **Accuracy（最終解答の正答率）** で評価され、生成文から `\boxed{}` を優先して最終答を抽出します。  
-つまり、誤 teacher や曖昧な teacher を学習に混ぜると、そのままスコア悪化に直結します。
+- `verified_trace_ready` / `answer_only_keep` / `manual_audit_priority` / `exclude_suspect` の実務的な意味
+- `roman_numeral` / `gravity_constant` / `unit_conversion` / `text_decryption` / `bit_manipulation` / `symbol_equation` の最終解釈
+- `symbol_equation` 内部の `numeric_2x2` / `glyph_len5` と Kaggle 側 `Equation (Numeric)` / `Equation (Symbolic)` の対応
+- 今後の学習ハンドオフでどの artifact をどう使うか
 
-そのため今回の分析は、単に family を当てることが目的ではなく、
-
-1. **安全な教師行を最大化する**
-2. **危険な行を昇格させない**
-3. **manual review を最短で回せる順に並べる**
-
-ことを目的に作られました。
-
-## 3. 直接の起点になったファイル
-
-`train_row_analysis_v1.csv` の生成に直接関わるソースは、次の通りです。
-
-| ファイル | 役割 |
-| --- | --- |
-| `README.md` | Accuracy 最優先、`\\boxed{}` 抽出、LoRA 提出という制約の根拠 |
-| `try-cuda-train-result.md` | 既存 teacher coverage が低いこと、どの family が取りこぼされているかの出発点 |
-| `try-cuda-train-data-analyst-plan.md` | 元タスク定義。現在は repo から削除済みだが Git 履歴から復元可能 |
-| `data/train.csv` | 主入力。9,500 行すべてを分析 |
-| `data/test.csv` | public test overlap 等の metadata 付与に使用 |
-| `versions/v1/code/train.py` | `parse_prompt`、`build_metadata_frame`、`build_manual_audit_frame` など既存 parser / metadata を再利用 |
-| `cuda-train-data-analysis-v1/code/train_data_analysis_v1.py` | 実際に `train_row_analysis_v1.csv` を生成した本体 |
-| `cuda-train-data-analysis-v1/reports/*.md` | 各 promotion / hold / exclude 判断の逐次記録 |
-| `cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md` | 全体の最終要約、artifact / report 索引 |
-| `cuda-train-data-analysis-v1/artifacts/analysis_manifest_v1.json` | 最終生成ファイル一覧と件数の manifest |
-
-補足:
-
-- `try-cuda-train.md` は主に「分析結果をどう学習へ反映するか」を考える側のファイルで、`train_row_analysis_v1.csv` 自体の生成元ではありません。
-- ただし分析時の文脈ファイルとして overview / mid-results では参照されています。
-
-## 4. 削除済みの元計画ファイルから復元できる要求
-
-`try-cuda-train-data-analyst-plan.md` は後から削除されていますが、Git 履歴から復元すると、要求は次の通りでした。
-
-- `data/train.csv` の全 `9500` 件を徹底分析する
-- 6 template を正確に分け、当てはまらないものは無理に押し込まない
-- parser / solver は使ってよいが、**低信頼判定は目視確認する**
-- 正しい規則復元付き教師として使えるか、answer-only までに留めるべきか、除外すべきかを切る
-- 最終的に学習対象抽出 CSV を別途作る
-- 学習は実行しない
-
-この要求は、そのまま `train_row_analysis_v1.csv` と派生 CSV 群に反映されています。
-
-## 5. 実際の生成パイプライン
-
-`train_row_analysis_v1.csv` は、概ね次の順序で作られました。
-
-### 5.1 metadata 再構築
-
-最初に `run_analysis(...)` が
-
-1. `versions/v1/code/train.py` を動的ロード
-2. `data/train.csv` と `data/test.csv` を読む
-3. `v1.build_metadata_frame(train_df, public_test_df)` で metadata を再構築
-4. `v1.build_manual_audit_frame(metadata_df)` で初期 manual seed を作る
-
-という流れを取ります。
-
-ここで出る `metadata_df` が、そのまま `artifacts/train_metadata_rebuilt_v1.csv` になり、`train_row_analysis_v1.csv` の **先頭 41 列**の元になります。
-
-### 5.2 行ごとの family 分析
-
-次に `analysis_records = [analyze_row(...)]` で全 9,500 行を 1 行ずつ解析します。
-
-`analyze_row(...)` は row の `family` に応じて以下へ分岐します。
-
-- `analyze_roman_row(...)`
-- `analyze_gravity_row(...)`
-- `analyze_unit_row(...)`
-- `analyze_bit_row(...)`
-- `analyze_text_row(...)`
-- `analyze_symbol_row(...)`
-
-ここで各 row に
-
-- `template_subtype`
-- `teacher_solver_candidate`
-- `auto_solver_predicted_answer`
-- `verified_trace_ready`
-- `answer_only_ready`
-- `audit_reasons`
-- `analysis_notes`
-- `suspect_label`
-
-などが付きます。
-
-### 5.3 初期 selection tier 決定
-
-`analyze_row(...)` の基本 tier 判定は次です。
-
-1. `verified_trace_ready == True` → `verified_trace_ready`
-2. `answer_only_ready == True` → `answer_only_keep`
-3. `suspect_label == True` → `exclude_suspect`
-4. それ以外で `symbol/text/bit` → `manual_audit_priority`
-5. それ以外の parse-ok family は原則 exact 側へ
-
-要するに、**最初の `train_row_analysis_v1.csv` は base solver + conservative tiering の結果**です。
-
-### 5.4 後段の promotion / exclusion pass
-
-ここが非常に重要です。最終版の `train_row_analysis_v1.csv` は、base 解析のままではありません。
-
-`run_analysis(...)` の中で、base 解析のあとに次の後段 pass が順に適用され、DataFrame が上書き更新されます。
-
-| コード上の pass | 役割 | 主に対応する reports |
-| --- | --- | --- |
-| `apply_bit_structured_formula_promotions(...)` | binary structured-byte の exact / abstract / multi-consensus を適用 | `43`, `45`, `47` |
-| `apply_bit_structured_low_support_answer_only_promotions(...)` | thin zero-error abstract family を `answer_only_keep` 化 | `51` |
-| `apply_bit_structured_support3_answer_only_promotions(...)` | `support=3 / distinct=3 / error=0` narrow family を `answer_only_keep` 化 | `54` |
-| `apply_bit_structured_manual_prompt_curation(...)` | structured-byte residual を direct reread で `verified` / `exclude` に確定 | `56` |
-| `apply_symbol_operator_consensus_promotions(...)` | operator-local repeated evidence による symbol answer-only 昇格 | `49` |
-| `apply_symbol_minus_prefix_subfamily_promotions(...)` | `-` prefixed abs-diff の zero-error subfamily 昇格 | `50` |
-| `apply_symbol_minus_direct_plain_promotions(...)` | prompt-exact な direct `-` family 昇格 | `53` |
-| `apply_symbol_thin_support2_promotions(...)` | `!` / `"` の thin support-2 subfamily 昇格 | `55` |
-| `apply_symbol_manual_prompt_exact_answer_only_curation(...)` | `:` と prefix-always-abs tail の direct reread 昇格 | `57`, `58` |
-| `apply_symbol_star_prefix_if_negative_promotions(...)` | `*` の prefix-if-negative subgroup 昇格 | `52` |
-
-最終版の `train_row_analysis_v1.csv` は、**これらすべて適用後**の状態です。
-
-## 6. family ごとの base 解析ロジック
-
-### 6.1 `roman_numeral`
-
-- query 数値を Roman へ変換
-- prompt examples も同規則で一致するか確認
-- 一致すれば `verified_trace_ready`
-
-これは最終的に `1576 / 1576` verified です。
-
-### 6.2 `gravity_constant`
-
-- `versions/v1` parser が持つ gravity metadata を使い、例と query の整合を確認
-- 最終的に `1597 / 1597` verified
-
-overview では template bucket は `gravity_half_g_t2` です。
-
-### 6.3 `unit_conversion`
+この provenance 文書では以降、**どのコードと pass によって台帳が生成されたか** に焦点を当てます。
 
 - 例から ratio を推定し、query に適用
 - format / decimal places も確認
@@ -472,16 +338,16 @@ glyph_multiset_possible, glyph_order_acyclic
 
 ## 11. これが「学習データそのもの」ではない理由
 
-`train_row_analysis_v1.csv` は学習用の完成データではなく、**学習データを作るための台帳**です。
+`train_row_analysis_v1.csv` は completion 済みの学習 JSONL や SFT corpus ではなく、**学習データを作るための row-level ledger** です。
 
-具体的には、
+どの tier を trace 化し、どの tier を answer-only に留め、どの tier を保留 / 除外するかの意味付けは、学習者向けの正本である `FINAL_SUMMARY_REPORT.md` に集約しています。ここでは provenance の観点から、`train_row_analysis_v1.csv` が
 
-- `verified_trace_ready` は trace 蒸留向けコア
-- `answer_only_keep` は answer-only 補助
-- `manual_audit_priority` はまだ保留
-- `exclude_suspect` は学習除外
+- metadata 再構築
+- row 解析
+- promotion / exclusion pass
+- artifact 切り出し
 
-という意味を持つので、実際に学習へ入れる候補は `train_recommended_learning_target_v1.csv` 側です。
+を経て生成された **中間管理台帳** であることだけ押さえれば十分です。
 
 ## 12. 再生成コマンド
 
@@ -506,27 +372,21 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 まで一括で出ます。
 
-## 13. 読み方のおすすめ
+## 13. 最短の参照順
 
-`train_row_analysis_v1.csv` を理解したいだけなら、次の順で見るのが最短です。
+重複を避けるため、用途ごとに参照先を分けます。
 
-1. `cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md`
-2. `cuda-train-data-analysis-v1/reports/11_latest_snapshot.md`
-3. `cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv`
-4. `cuda-train-data-analysis-v1/artifacts/train_recommended_learning_target_v1.csv`
-5. `cuda-train-data-analysis-v1/artifacts/manual_pass1_priority_pack_v1.csv`
-6. `cuda-train-data-analysis-v1/code/train_data_analysis_v1.py`
+1. 学習へどう流すか知りたいとき
+  - `cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md`
+2. 行台帳がどう生成されたか知りたいとき
+  - この provenance 文書
+3. 実データを見たいとき
+  - `cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv`
+4. 実装を確認したいとき
+  - `cuda-train-data-analysis-v1/code/train_data_analysis_v1.py`
 
 ## 14. 一言で言うと
 
-`train_row_analysis_v1.csv` は、
+`train_row_analysis_v1.csv` は、`README.md` の accuracy-first 制約と、`reports/00` から `reports/59` までの安全側判断を、単一スクリプトで再現可能な形に束ねた **row-level audit ledger** です。
 
-- `README.md` の accuracy-first 制約
-- `try-cuda-train-result.md` が示した baseline coverage の不足
-- 削除済み元計画ファイルの「9,500 件全件を泥臭く監査する」という要求
-- `versions/v1` の parser / metadata 基盤
-- `reports/00` から `reports/59` までの安全側判断
-
-を全部束ねて作られた **最終 row-level audit ledger** です。
-
-このファイルの本質は「family 推定 CSV」ではなく、**何を安全に学習へ回せるかを判定した証拠台帳** にあります。
+本質は family 名の説明そのものではなく、**どの pass が、どの row を、どの tier へ移したかを追跡可能にしていること** にあります。
