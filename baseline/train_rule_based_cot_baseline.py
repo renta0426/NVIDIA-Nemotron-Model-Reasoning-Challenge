@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_training_frame(path: Path) -> pd.DataFrame:
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path, dtype=str, keep_default_na=False)
     required = {"id", "prompt", "answer", "generated_cot", "label"}
     missing = required.difference(frame.columns)
     if missing:
