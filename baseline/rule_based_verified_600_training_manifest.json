@@ -1,0 +1,54 @@
+{
+  "source_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/artifacts/train_verified_trace_ready_v1.csv",
+  "output_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/rule_based_verified_600_training_data.csv",
+  "subsample_size": 600,
+  "seed": 42,
+  "selection_tier": "verified_trace_ready",
+  "family_quotas": {
+    "gravity_constant": 100,
+    "unit_conversion": 100,
+    "roman_numeral": 100,
+    "text_decryption": 100,
+    "bit_manipulation": 100,
+    "symbol_equation": 100
+  },
+  "family_counts": {
+    "bit_manipulation": 100,
+    "gravity_constant": 100,
+    "roman_numeral": 100,
+    "symbol_equation": 100,
+    "text_decryption": 100,
+    "unit_conversion": 100
+  },
+  "template_subtype_counts": {
+    "bit_other": 33,
+    "bit_permutation_inversion": 33,
+    "bit_structured_byte_formula": 34,
+    "gravity_half_g_t2": 100,
+    "numeric_2x2": 100,
+    "roman_standard": 100,
+    "text_monoalphabetic": 100,
+    "unit_fixed_ratio": 100
+  },
+  "teacher_solver_counts": {
+    "binary_affine_xor": 24,
+    "binary_bit_permutation_bijection": 31,
+    "binary_byte_transform": 11,
+    "binary_structured_byte_formula": 29,
+    "binary_structured_byte_formula_manual": 5,
+    "gravity_numeric_rule": 100,
+    "roman_standard": 100,
+    "symbol_numeric_operator_formula": 100,
+    "text_char_substitution": 100,
+    "unit_numeric_rule": 100
+  },
+  "notes": [
+    "Built from solver-verified rows only.",
+    "Training CSV is baseline-compatible: id,prompt,answer,generated_cot,label.",
+    "generated_cot is rule-based short trace, not external LLM-generated CoT."
+  ],
+  "token_length_check": {
+    "status": "skipped",
+    "reason": "model_path_not_provided"
+  }
+}
