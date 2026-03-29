@@ -305,3 +305,210 @@ rule-based 600 の良い部分を維持したまま、binary family を重点補
 - 次にやるべきことは、binary 専用の output contract 強化と監査ログ追加
 
 結論として、このモデルの現状課題は「全体性能」ではなく「binary family の最終出力品質」である。
+
+## Update: Comparison Against Rule-Based 800
+
+このセクションでは、上記の rule-based 600 分析を踏まえたうえで、binary だけを強化する目的で作成した `rule_based_verified_600_training_data_v2.csv` から学習した 800 行版アダプタの結果を追記する。
+
+比較対象は以下。
+
+- 600 版: `baseline/cot/output-csv/rule_based_adapter_readme_inference_samples_rule_base-600.csv`
+- 800 版: `baseline/cot/output-csv/rule_based_adapter_readme_inference_samples_rule_base-800.csv`
+
+800 版の学習データ構成は次の通り。
+
+- non-binary 500 行は rule-based 600 から維持
+- binary 100 行は置換し、baseline 側 binary CoT 300 行を採用
+- 合計 800 行
+
+目的は、non-binary には手を加えず、binary のみ baseline 側の教師信号で補強することだった。
+
+## Aggregate Comparison: 600 vs 800
+
+同じ 30 サンプルで比較すると、結果は次の通りだった。
+
+| Version | Match | Total | Notes |
+|---|---:|---:|---|
+| rule-based 600 | 24 | 30 | 既存ベースライン |
+| rule-based 800 | 22 | 30 | binary 強化版だが悪化 |
+
+family ごとの比較は以下。
+
+| Family | 600 | 800 | Delta |
+|---|---:|---:|---:|
+| binary | 5 / 10 | 5 / 10 | 0 |
+| gravity | 4 / 4 | 3 / 4 | -1 |
+| roman | 4 / 4 | 4 / 4 | 0 |
+| symbol | 4 / 4 | 4 / 4 | 0 |
+| text | 4 / 4 | 3 / 4 | -1 |
+| unit | 3 / 4 | 3 / 4 | 0 |
+
+要するに、800 版は狙っていた binary 強化に成功しておらず、しかも non-binary に副作用を出している。
+
+## Net Effect Of The 800 Variant
+
+### 1. Binary accuracy did not improve
+
+最重要ポイントは、binary の命中率が `5 / 10` のままで改善していないことだ。
+
+つまり、今回の 800 版は
+
+- binary 教師信号の量は増えた
+- しかし binary の正答率は上がらなかった
+
+という結果になっている。
+
+これは「binary を baseline 側で厚くすればそのまま精度が上がる」という単純な仮説を支持しない。
+
+### 2. Binary failure mode changed
+
+600 版では binary の失敗は、短い断片抽出や boxed 崩れが支配的だった。
+
+代表例:
+
+- `0031df9c`: `00110100` -> `1`
+- `008b52fd`: `01100101` -> `001`
+- `030479a6`: `01000110` -> `-0`
+- `069dbaab`: `00010000` -> `10`
+- `08615ada`: `11101111` -> `10`
+
+一方で 800 版では、同じような失敗サンプルが短い断片ではなく、もっともらしい 8-bit 形式の誤答へ変化した。
+
+代表例:
+
+- `008b52fd`: `01100101` -> `00011101`
+- `030479a6`: `01000110` -> `11000010`
+- `069dbaab`: `00010000` -> `00011100`
+- `08615ada`: `11101111` -> `01011110`
+
+これは重要な変化である。800 版では、binary に対して
+
+- final answer の boxed / 8-bit 形式はやや安定した
+- しかし規則推定そのものは改善していない
+
+と解釈するのが妥当である。
+
+言い換えると、600 版は「崩れた誤答」、800 版は「整った誤答」に寄った。
+
+### 3. There was one binary recovery, but also one binary regression
+
+800 版では `0031df9c` が改善した。
+
+- 600 版: `00110100` -> `1`
+- 800 版: `00110100` -> `00110100`
+
+これは baseline 側 binary CoT を入れた効果が全くゼロではないことを示す。
+
+しかし同時に、600 版で正解だった `0a195a74` が 800 版では退行した。
+
+- 600 版: `01010010` -> `01010010`
+- 800 版: `01010010` -> `00110011`
+
+したがって binary 全体では改善と退行が相殺され、命中率は据え置きになった。
+
+## New Regressions Outside Binary
+
+今回もっとも痛いのは、binary 以外に副作用が出た点である。
+
+### Gravity regression
+
+`0073bcbb` は
+
+- 600 版: `20.33`
+- 800 版: `20.32`
+
+となった。
+
+これは丸め差であり、README の数値許容によっては本番評価で吸収される可能性がある。したがって gravity の退行は深刻度が最も高いわけではない。
+
+### Text regression
+
+`001c63cb` は
+
+- 600 版: `wizard creates secret`
+- 800 版: `7`
+
+となった。
+
+これは gravity より重い。text family は exact string match が必要であり、`7` は完全な失点である。
+
+raw_output を見ると、モデルは文字置換の解析自体を途中まで進めているが、最終的に文字列 answer を boxed で閉じる制御に失敗している可能性が高い。
+
+つまり 800 版では
+
+- binary の 8-bit boxed answer を出す癖を少し強めた
+- その代わり、text の安定した final answer closure を一部壊した
+
+可能性がある。
+
+## Interpretation Of The 800 Experiment
+
+この実験の読み方はかなり重要である。
+
+### What the experiment disproved
+
+今回の結果は、次の単純仮説を支持しない。
+
+- binary 教師を 100 から 300 に置換すれば、そのまま binary accuracy が改善する
+
+実際には binary accuracy は上がらず、全体の qualitative sample 成績は悪化した。
+
+### What the experiment did show
+
+一方で、次のことは示している。
+
+1. baseline 側 binary 教師は final answer style に影響を与える
+2. その影響は、正しい規則発見よりも「整った binary 出力」に先に出る
+3. binary 300 行置換は強すぎて、non-binary の安定性を損なう可能性がある
+
+## Practical Conclusion After The 800 Trial
+
+現時点では、800 版構成は mainline 採用候補ではない。
+
+理由は以下。
+
+1. 全体一致率が `24 / 30` から `22 / 30` に悪化した
+2. binary 命中率が改善していない
+3. text と gravity に副作用が出た
+
+したがって、今回の 800 版から得るべき教訓は「binary 置換強化は効く」ではなく、より限定的に次の通りである。
+
+- baseline binary 混合は、binary の answer formatting/style に効く
+- しかし 300 行の置換は強すぎる
+- binary reasoning accuracy を上げるには別の混合設計が必要
+
+## Updated Recommendation: Prefer Add-On Over Replacement
+
+800 版の結果を踏まえると、次の方針がより妥当である。
+
+### Avoid full replacement of rule-based binary rows
+
+今回の v2 は、既存 rule-based binary 100 行を捨てて baseline binary 300 行に置換した。これは強すぎた可能性が高い。
+
+### Prefer additive binary reinforcement
+
+次に試すなら、次のような add-on 型のほうが自然である。
+
+- rule-based 600 をそのまま土台にする
+- binary 100 行は残す
+- baseline binary を追加で `100` から `150` 行だけ足す
+- 合計 `700` から `750` 行程度にする
+
+この構成なら
+
+- 既存 rule-based 側の安定性を維持しやすい
+- binary の output style だけ追加で補強できる
+- non-binary の副作用を抑えやすい
+
+## Updated Final Assessment
+
+600 版と 800 版を並べて見たときの最終評価は以下の通り。
+
+- rule-based 600 は binary で大きく落とすが、non-binary はかなり安定している
+- rule-based 800 は binary の出力形式をやや整えたが、binary accuracy 自体は改善できていない
+- そのうえで text と gravity に退行が出たため、現在の 800 構成は採用しない方がよい
+- 次に進むなら、binary の「置換」ではなく「少量加算」で再設計すべきである
+
+したがって、この比較から得るべき判断は次の一文に尽きる。
+
+**baseline binary の混合は無効ではないが、300 行置換は強すぎる。次は binary add-on 型の v3 が妥当である。**
