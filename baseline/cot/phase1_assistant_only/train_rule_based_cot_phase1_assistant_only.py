@@ -683,21 +683,46 @@ def render_training_pair(tokenizer: Any, row: dict[str, str]) -> tuple[str, str,
 
 
 def tokenize_training_row(tokenizer: Any, row: dict[str, str]) -> dict[str, Any]:
-    _, _, prompt_prefix, full_text = render_training_pair(tokenizer, row)
-    prompt_ids = tokenizer(prompt_prefix, add_special_tokens=False)["input_ids"]
-    full_encoded = tokenizer(
-        full_text,
-        add_special_tokens=False,
-        truncation=True,
-        max_length=MAX_SEQ_LEN,
-    )
+    _, assistant_message, _, full_text = render_training_pair(tokenizer, row)
+    assistant_char_start = full_text.find(assistant_message)
+    if assistant_char_start < 0:
+        raise ValueError(f"Assistant span not found in rendered chat for row {row['id']}")
+    try:
+        full_encoded = tokenizer(
+            full_text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+            return_offsets_mapping=True,
+        )
+    except (NotImplementedError, TypeError):
+        full_encoded = tokenizer(
+            full_text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+        )
     input_ids = list(full_encoded["input_ids"])
     attention_mask = list(full_encoded["attention_mask"])
-    if len(prompt_ids) > len(input_ids):
-        raise ValueError(f"Prompt prefix exceeds truncated full sequence for row {row['id']}")
-    if input_ids[: len(prompt_ids)] != prompt_ids:
-        raise ValueError(f"Prompt prefix tokenization mismatch for row {row['id']}")
-    labels = [-100] * len(prompt_ids) + input_ids[len(prompt_ids) :]
+    offset_mapping = full_encoded.get("offset_mapping")
+    assistant_token_start: int | None = None
+    if offset_mapping:
+        for index, (start, _end) in enumerate(offset_mapping):
+            if start >= assistant_char_start:
+                assistant_token_start = index
+                break
+    if assistant_token_start is None:
+        prefix_text = full_text[:assistant_char_start]
+        prefix_ids = tokenizer(
+            prefix_text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+        )["input_ids"]
+        assistant_token_start = len(prefix_ids)
+    if assistant_token_start >= len(input_ids):
+        raise ValueError(f"Assistant tokens were truncated out for row {row['id']}")
+    labels = [-100] * assistant_token_start + input_ids[assistant_token_start:]
     if len(labels) != len(input_ids):
         raise ValueError(f"Label/input length mismatch for row {row['id']}")
     return {
