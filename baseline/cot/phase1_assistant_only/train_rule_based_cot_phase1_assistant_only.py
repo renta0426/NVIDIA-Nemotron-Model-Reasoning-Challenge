@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import inspect
 import json
 import os
 import random
@@ -813,13 +814,18 @@ def train(args: argparse.Namespace, rows: list[dict[str, str]]) -> None:
         gradient_checkpointing=True,
         remove_unused_columns=False,
     )
-    trainer = stack["Trainer"](
-        model=model,
-        args=training_args,
-        train_dataset=dataset,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-    )
+    trainer_kwargs = {
+        "model": model,
+        "args": training_args,
+        "train_dataset": dataset,
+        "data_collator": data_collator,
+    }
+    trainer_signature = inspect.signature(stack["Trainer"].__init__).parameters
+    if "processing_class" in trainer_signature:
+        trainer_kwargs["processing_class"] = tokenizer
+    elif "tokenizer" in trainer_signature:
+        trainer_kwargs["tokenizer"] = tokenizer
+    trainer = stack["Trainer"](**trainer_kwargs)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print("Starting Phase 1 training with assistant-only loss...")
     trainer.train()
