@@ -1,0 +1,79 @@
+{
+  "source_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/cot/phase0_offline_eval/artifacts/phase1_assistant_only_training_data.csv",
+  "manifest_json": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/cot/phase0_offline_eval/artifacts/phase1_assistant_only_manifest.json",
+  "subsample_size": 900,
+  "seed": 42,
+  "verified_quotas": {
+    "gravity_constant": 120,
+    "unit_conversion": 120,
+    "roman_numeral": 120,
+    "text_decryption": 100,
+    "bit_manipulation": 160,
+    "symbol_equation": 60
+  },
+  "answer_only_quotas": {
+    "text_decryption": 20,
+    "bit_manipulation": 120,
+    "symbol_equation": 80
+  },
+  "family_counts": {
+    "bit_manipulation": 280,
+    "gravity_constant": 120,
+    "roman_numeral": 120,
+    "symbol_equation": 140,
+    "text_decryption": 120,
+    "unit_conversion": 120
+  },
+  "source_selection_tier_counts": {
+    "answer_only_keep": 220,
+    "verified_trace_ready": 680
+  },
+  "assistant_style_counts": {
+    "boxed_only": 220,
+    "trace_boxed": 680
+  },
+  "template_subtype_counts": {
+    "bit_other": 106,
+    "bit_permutation_inversion": 53,
+    "bit_structured_byte_formula": 121,
+    "gravity_half_g_t2": 120,
+    "numeric_2x2": 140,
+    "roman_standard": 120,
+    "text_monoalphabetic": 120,
+    "unit_fixed_ratio": 120
+  },
+  "teacher_solver_counts": {
+    "": 160,
+    "binary_affine_xor": 53,
+    "binary_bit_permutation_bijection": 51,
+    "binary_byte_transform": 2,
+    "binary_structured_byte_formula": 54,
+    "gravity_numeric_rule": 120,
+    "roman_standard": 120,
+    "symbol_numeric_operator_formula": 120,
+    "text_char_substitution": 100,
+    "unit_numeric_rule": 120
+  },
+  "training_plumbing": {
+    "assistant_only_loss": true,
+    "template_alignment_goal": "user prompt uses README-compatible boxed instruction and assistant-only labels mask user tokens",
+    "boxed_instruction": "Please put your final answer inside `\\boxed{}`. For example: `\\boxed{your answer}`",
+    "max_seq_len": 2048,
+    "epochs": 2,
+    "learning_rate": 0.0001,
+    "lora_rank": 32,
+    "target_modules_default": "all-linear"
+  },
+  "binary_phase1_design": {
+    "verified_binary_trace_rows": 160,
+    "answer_only_binary_boxed_rows": 120,
+    "binary_answer_only_is_boxed_only": true,
+    "binary_trace_avoids_repeating_final_answer_inside_think": true
+  },
+  "notes": [
+    "This Phase 1 dataset keeps the baseline structure but moves beyond the old 600-row verified-only mix.",
+    "verified_trace_ready rows remain short trace teachers, while answer_only_keep rows are boxed-only to strengthen final answer closure without inventing reasoning.",
+    "The companion training path uses assistant-only labels so user prompt tokens do not contribute to the loss."
+  ]
+}
