@@ -1,0 +1,71 @@
+{
+  "source_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "output_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/cot/output-csv/rule_based_binary_guarded_800_training_data.csv",
+  "sample_template_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/cot/output-csv/rule_based_adapter_readme_inference_samples_binary_guarded_template.csv",
+  "subsample_size": 800,
+  "seed": 42,
+  "base_family_quotas": {
+    "gravity_constant": 100,
+    "unit_conversion": 100,
+    "roman_numeral": 100,
+    "text_decryption": 100,
+    "bit_manipulation": 100,
+    "symbol_equation": 100
+  },
+  "bonus_family_quotas": {
+    "bit_manipulation": 100,
+    "gravity_constant": 25,
+    "unit_conversion": 25,
+    "roman_numeral": 25,
+    "text_decryption": 25
+  },
+  "family_counts": {
+    "bit_manipulation": 200,
+    "gravity_constant": 125,
+    "roman_numeral": 125,
+    "symbol_equation": 100,
+    "text_decryption": 125,
+    "unit_conversion": 125
+  },
+  "template_subtype_counts": {
+    "bit_other": 84,
+    "bit_permutation_inversion": 54,
+    "bit_structured_byte_formula": 62,
+    "gravity_half_g_t2": 125,
+    "numeric_2x2": 100,
+    "roman_standard": 125,
+    "text_monoalphabetic": 125,
+    "unit_fixed_ratio": 125
+  },
+  "teacher_solver_counts": {
+    "binary_affine_xor": 47,
+    "binary_bit_permutation_bijection": 45,
+    "binary_bit_permutation_independent": 7,
+    "binary_byte_transform": 11,
+    "binary_structured_byte_formula": 48,
+    "binary_structured_byte_formula_abstract": 14,
+    "binary_three_bit_boolean": 14,
+    "binary_two_bit_boolean": 14,
+    "gravity_numeric_rule": 125,
+    "roman_standard": 125,
+    "symbol_numeric_operator_formula": 100,
+    "text_char_substitution": 125,
+    "unit_numeric_rule": 125
+  },
+  "binary_guardrails": {
+    "uses_only_verified_trace_ready_rows": true,
+    "binary_bonus_requires_strong_verified_rule": true,
+    "binary_trace_does_not_repeat_final_answer_inside_think": true,
+    "selected_binary_rows": 200,
+    "selected_binary_min_support_signal": 0
+  },
+  "notes": [
+    "README evaluation prioritizes boxed extraction, so binary traces avoid restating the final 8-bit answer outside the box.",
+    "This 800-row mix replaces the old binary-heavy 300-row expansion with verified-only binary bonus rows plus non-binary anchors.",
+    "Sample template CSV is a scaffold for future README-compatible adapter inference; extracted_answer and raw_output are intentionally blank."
+  ],
+  "token_length_check": {
+    "status": "skipped",
+    "reason": "model_path_not_provided"
+  }
+}
