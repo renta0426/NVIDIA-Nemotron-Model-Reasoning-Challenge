@@ -7,6 +7,7 @@ import importlib.machinery
 import json
 import math
 import random
+import re
 import sys
 import types
 from dataclasses import asdict, dataclass
@@ -44,6 +45,7 @@ DEFAULT_CACHE_DIR = REPO_ROOT / 'hf_cache'
 DEFAULT_TRAIN_CSV = REPO_ROOT / 'data' / 'train.csv'
 DEFAULT_OUTPUT_ROOT = VERSION_ROOT / 'outputs' / 'transformers_submission_v5'
 DEFAULT_PROMPT = 'If x + 3 = 10, what is x?'
+DEFAULT_SMOKE_MAX_NEW_TOKENS = 256
 DEFAULT_PROMPT_INSTRUCTION = (
     '\nPlease put your final answer inside `\\boxed{}`. '
     'For example: `\\boxed{your answer}`'
@@ -431,6 +433,14 @@ def render_answer_completion(answer: str) -> str:
     if not answer_text:
         raise ValueError('answer text must not be empty')
     return rf'\boxed{{{answer_text}}}'
+
+
+def extract_boxed_answer(text: str) -> str | None:
+    matches = re.findall(r'\\boxed\s*\{([^}]*)\}', text)
+    if not matches:
+        return None
+    answer = matches[-1].strip()
+    return answer or None
 
 
 def load_tokenizer(model_path: Path) -> Any:
@@ -909,6 +919,9 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
             generate_kwargs['attention_mask'] = attention_mask
         generated = model.generate(**generate_kwargs)
     decoded = tokenizer.decode(generated[0], skip_special_tokens=False)
+    generated_tokens = generated[0][input_tensor.shape[-1] :]
+    generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=False)
+    boxed_answer = extract_boxed_answer(generated_text) or extract_boxed_answer(decoded)
 
     summary = {
         'adapter_dir': str(adapter_dir),
@@ -918,6 +931,11 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
         'max_new_tokens': args.max_new_tokens,
         'prompt': args.prompt,
         'decoded_text': decoded,
+        'generated_text': generated_text,
+        'boxed_answer': boxed_answer,
+        'has_boxed_answer': boxed_answer is not None,
+        'prompt_token_count': int(input_tensor.shape[-1]),
+        'generated_token_count': int(generated_tokens.shape[-1]),
         'created_at': utc_now(),
     }
     save_json(Path(adapter_dir) / 'smoke_test_summary.json', summary)
@@ -928,7 +946,12 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
     if device == 'mps':
         torch.mps.empty_cache()
 
-    print(decoded)
+    print(generated_text)
+    if boxed_answer is None and not getattr(args, 'allow_missing_boxed', False):
+        raise ValueError(
+            'Smoke test completed but no \\boxed{} answer was found in the generated text. '
+            'Increase --max-new-tokens or inspect smoke_test_summary.json.'
+        )
     return summary
 
 
@@ -964,6 +987,7 @@ def run_all(args: argparse.Namespace) -> dict[str, Any]:
         download_snapshot=args.download_snapshot,
         device=args.device,
         seed=args.seed,
+        allow_missing_boxed=args.allow_missing_boxed,
     )
     smoke_summary = smoke_test_adapter(smoke_args)
 
@@ -1028,9 +1052,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_shared_model_args(smoke_parser)
     smoke_parser.add_argument('--adapter-dir', type=str, required=True)
     smoke_parser.add_argument('--prompt', type=str, default=DEFAULT_PROMPT)
-    smoke_parser.add_argument('--max-new-tokens', type=int, default=128)
+    smoke_parser.add_argument('--max-new-tokens', type=int, default=DEFAULT_SMOKE_MAX_NEW_TOKENS)
     smoke_parser.add_argument('--seed', type=int, default=42)
     smoke_parser.add_argument('--prompt-instruction', type=str, default=DEFAULT_PROMPT_INSTRUCTION)
+    smoke_parser.add_argument('--allow-missing-boxed', action='store_true')
 
     validate_parser = subparsers.add_parser(
         'validate-submission',
@@ -1049,8 +1074,9 @@ def build_parser() -> argparse.ArgumentParser:
     add_shared_model_args(run_all_parser)
     add_train_args(run_all_parser)
     run_all_parser.add_argument('--smoke-prompt', type=str, default=DEFAULT_PROMPT)
-    run_all_parser.add_argument('--max-new-tokens', type=int, default=128)
+    run_all_parser.add_argument('--max-new-tokens', type=int, default=DEFAULT_SMOKE_MAX_NEW_TOKENS)
     run_all_parser.add_argument('--zip-path', type=str, default='submission.zip')
+    run_all_parser.add_argument('--allow-missing-boxed', action='store_true')
 
     return parser
 
