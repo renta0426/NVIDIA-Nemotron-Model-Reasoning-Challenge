@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import gc
+import importlib.machinery
 import json
 import math
 import random
+import sys
+import types
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version as package_version
@@ -273,6 +277,123 @@ def resolve_torch_dtype(device: str) -> torch.dtype:
     return torch.float32
 
 
+_NON_CUDA_STREAM_PATCHED = False
+_MAMBA_RMSNORM_FALLBACK_PATCHED = False
+
+
+class _NullCudaStream:
+    pass
+
+
+def _device_type(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, torch.device):
+        return value.type
+    text = str(value)
+    if text.startswith('cuda'):
+        return 'cuda'
+    if text.startswith('mps'):
+        return 'mps'
+    if text.startswith('cpu'):
+        return 'cpu'
+    return text
+
+
+def install_non_cuda_stream_fallback() -> None:
+    global _NON_CUDA_STREAM_PATCHED
+    if _NON_CUDA_STREAM_PATCHED:
+        return
+
+    original_default_stream = torch.cuda.default_stream
+    original_stream = torch.cuda.stream
+
+    def safe_default_stream(device: Any = None) -> Any:
+        if _device_type(device) not in {None, 'cuda'}:
+            return _NullCudaStream()
+        return original_default_stream(device)
+
+    def safe_stream(stream: Any) -> Any:
+        if isinstance(stream, _NullCudaStream):
+            return nullcontext()
+        return original_stream(stream)
+
+    torch.cuda.default_stream = safe_default_stream
+    torch.cuda.stream = safe_stream
+    _NON_CUDA_STREAM_PATCHED = True
+
+
+def fallback_mamba_rmsnorm_fn(
+    *,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor | None = None,
+    z: torch.Tensor | None = None,
+    eps: float = 1e-6,
+    group_size: int | None = None,
+    norm_before_gate: bool = False,
+    **_: Any,
+) -> torch.Tensor:
+    if bias is not None:
+        raise NotImplementedError('fallback_mamba_rmsnorm_fn does not support bias')
+
+    input_dtype = x.dtype
+    hidden_states = x.to(torch.float32)
+    gate = z.to(torch.float32) if isinstance(z, torch.Tensor) else None
+    if gate is not None and not norm_before_gate:
+        hidden_states = hidden_states * torch.nn.functional.silu(gate)
+
+    hidden_size = hidden_states.shape[-1]
+    if group_size is not None and group_size > 0 and hidden_size % group_size == 0:
+        grouped = hidden_states.reshape(*hidden_states.shape[:-1], hidden_size // group_size, group_size)
+        variance = grouped.pow(2).mean(dim=-1, keepdim=True)
+        hidden_states = (grouped * torch.rsqrt(variance + eps)).reshape_as(hidden_states)
+    else:
+        variance = hidden_states.pow(2).mean(dim=-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + eps)
+
+    hidden_states = hidden_states * weight.to(device=hidden_states.device, dtype=torch.float32)
+    if gate is not None and norm_before_gate:
+        hidden_states = hidden_states * torch.nn.functional.silu(gate)
+    return hidden_states.to(input_dtype)
+
+
+def install_mamba_rmsnorm_fallback() -> None:
+    global _MAMBA_RMSNORM_FALLBACK_PATCHED
+    if _MAMBA_RMSNORM_FALLBACK_PATCHED:
+        return
+    if 'mamba_ssm.ops.triton.layernorm_gated' in sys.modules:
+        _MAMBA_RMSNORM_FALLBACK_PATCHED = True
+        return
+
+    mamba_ssm_module = sys.modules.setdefault('mamba_ssm', types.ModuleType('mamba_ssm'))
+    ops_module = sys.modules.setdefault('mamba_ssm.ops', types.ModuleType('mamba_ssm.ops'))
+    triton_module = sys.modules.setdefault('mamba_ssm.ops.triton', types.ModuleType('mamba_ssm.ops.triton'))
+    layernorm_module = types.ModuleType('mamba_ssm.ops.triton.layernorm_gated')
+    layernorm_module.rmsnorm_fn = fallback_mamba_rmsnorm_fn
+    mamba_ssm_module.__spec__ = importlib.machinery.ModuleSpec('mamba_ssm', loader=None, is_package=True)
+    ops_module.__spec__ = importlib.machinery.ModuleSpec('mamba_ssm.ops', loader=None, is_package=True)
+    triton_module.__spec__ = importlib.machinery.ModuleSpec('mamba_ssm.ops.triton', loader=None, is_package=True)
+    layernorm_module.__spec__ = importlib.machinery.ModuleSpec(
+        'mamba_ssm.ops.triton.layernorm_gated',
+        loader=None,
+        is_package=False,
+    )
+
+    mamba_ssm_module.ops = ops_module
+    ops_module.triton = triton_module
+    triton_module.layernorm_gated = layernorm_module
+    sys.modules['mamba_ssm.ops.triton.layernorm_gated'] = layernorm_module
+    _MAMBA_RMSNORM_FALLBACK_PATCHED = True
+
+
+def install_nemotron_non_cuda_fallbacks(device: str) -> None:
+    if device == 'cuda':
+        return
+    install_non_cuda_stream_fallback()
+    install_mamba_rmsnorm_fallback()
+
+
 def seed_everything(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
@@ -326,6 +447,7 @@ def load_model(
     dtype: torch.dtype,
     for_training: bool,
 ) -> Any:
+    install_nemotron_non_cuda_fallbacks(device)
     model = AutoModelForCausalLM.from_pretrained(
         str(model_path),
         trust_remote_code=True,
@@ -523,9 +645,10 @@ def validate_adapter_dir(adapter_dir: Path) -> dict[str, Any]:
 def make_submission_zip(adapter_dir: Path, zip_path: Path) -> dict[str, Any]:
     validate_adapter_dir(adapter_dir)
     zip_path.parent.mkdir(parents=True, exist_ok=True)
+    zip_path_resolved = zip_path.resolve()
     with ZipFile(zip_path, 'w', compression=ZIP_DEFLATED) as archive:
         for file_path in sorted(adapter_dir.rglob('*')):
-            if file_path.is_file():
+            if file_path.is_file() and file_path.resolve() != zip_path_resolved:
                 archive.write(file_path, arcname=file_path.relative_to(adapter_dir))
     return {
         'zip_path': str(zip_path),
@@ -759,20 +882,32 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
         add_generation_prompt=True,
         return_tensors='pt',
     )
-    if isinstance(input_ids, dict):
-        input_tensor = input_ids['input_ids']
-    else:
+    attention_mask = None
+    if isinstance(input_ids, torch.Tensor):
         input_tensor = input_ids
+    elif hasattr(input_ids, 'input_ids'):
+        input_tensor = input_ids['input_ids']
+        attention_mask = input_ids.get('attention_mask')
+    elif isinstance(input_ids, dict):
+        input_tensor = input_ids['input_ids']
+        attention_mask = input_ids.get('attention_mask')
+    else:
+        raise TypeError(f'Unsupported chat-template return type: {type(input_ids)!r}')
     input_tensor = input_tensor.to(device)
+    if attention_mask is not None:
+        attention_mask = attention_mask.to(device)
 
     with torch.no_grad():
-        generated = model.generate(
-            input_tensor,
-            max_new_tokens=args.max_new_tokens,
-            do_sample=False,
-            eos_token_id=tokenizer.eos_token_id,
-            pad_token_id=tokenizer.eos_token_id,
-        )
+        generate_kwargs: dict[str, Any] = {
+            'input_ids': input_tensor,
+            'max_new_tokens': args.max_new_tokens,
+            'do_sample': False,
+            'eos_token_id': tokenizer.eos_token_id,
+            'pad_token_id': tokenizer.eos_token_id,
+        }
+        if attention_mask is not None:
+            generate_kwargs['attention_mask'] = attention_mask
+        generated = model.generate(**generate_kwargs)
     decoded = tokenizer.decode(generated[0], skip_special_tokens=False)
 
     summary = {
