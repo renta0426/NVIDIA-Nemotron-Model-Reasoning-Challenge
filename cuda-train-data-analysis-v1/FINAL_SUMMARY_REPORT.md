@@ -22,15 +22,15 @@
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
-| `verified_trace_ready` | 6,086 | 64.1% |
-| `answer_only_keep` | 1,151 | 12.1% |
-| `manual_audit_priority` | 2,236 | 23.5% |
-| `exclude_suspect` | 27 | 0.3% |
+| `verified_trace_ready` | 6,486 | 68.3% |
+| `answer_only_keep` | 1,397 | 14.7% |
+| `manual_audit_priority` | 1,591 | 16.7% |
+| `exclude_suspect` | 26 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,086 + 1,151 = 7,237` 行（`76.2%`）
-- 未解決 / 要注意: `2,236 + 27 = 2,263` 行（`23.8%`）
+- 安全側の学習コア: `6,486 + 1,397 = 7,883` 行（`83.0%`）
+- 未解決 / 要注意: `1,591 + 26 = 1,617` 行（`17.0%`）
 - 結論: **かなり良いが、完璧ではない**
 
 ### selection tier の実務的な意味
@@ -60,7 +60,7 @@
 | `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
-| `bit_manipulation` | 1,602 | 604 | 35 | 947 | 16 | 主要な残課題 |
+| `bit_manipulation` | 1,602 | 1,004 | 281 | 302 | 15 | trace-safe 再監査後も主要な残課題 |
 | `symbol_equation` | 1,555 | 110 | 145 | 1,289 | 11 | 主要な残課題 |
 
 ### 解釈
@@ -152,8 +152,9 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 結果:
 
 - 以前の solved 参照値: `306`
-- 最終 verified binary: `599`
-- 改善幅: `+293`
+- ルール拡張後の binary 回収総量: `1,285` (`verified 1,004 + answer_only 281`)
+- trace-safe 再監査後の verified binary: `1,004`
+- 改善幅: `+698` verified / `+979` curated total
 - semantic-dedup 後の structured byte formula library から、`71` 個の repeated zero-error family を確定した
 - その conservative support rule により、manual binary `189` 行を新規 `verified_trace_ready` に昇格した
 - さらに abstract family pass（`support>=12`, `distinct exact>=6`, `0 error`）で singleton structured rows `29` 行を追加 `verified_trace_ready` に昇格した
@@ -161,8 +162,10 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 - さらに conservative hybrid consensus で `20` 行を `answer_only_keep` に昇格した
 - さらに thin zero-error abstract family を `answer_only_keep` として `11` 行追加回収した
 - さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family を `answer_only_keep` として `2` 行追加回収した
-- さらに direct prompt reread により structured-byte residual `5` 行を `verified_trace_ready`、`1` 行を `exclude_suspect` に手動確定した
-- current binary は `604 verified / 35 answer_only / 947 manual / 16 exclude`
+- さらに second-pass not-structured formula と prompt-exact manual reread で binary の残差を大きく圧縮した
+- ただし学習用途では、self-including support や ID 固定 prompt-exact singleton に依存する row を `verified_trace_ready` に残すべきではない
+- そのため leave-one-out 再監査を追加し、薄い structured / not-structured singleton と manual prompt exact `145` 行を `answer_only_keep` に戻した
+- current binary は `1,004 verified / 281 answer_only / 302 manual / 15 exclude`
 
 ### 4.2 text の改善
 
@@ -401,9 +404,10 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.1 binary がまだ重い
 
-- `bit_manipulation` はまだ `947 manual + 16 exclude`
+- `bit_manipulation` はまだ `302 manual + 15 exclude`
 - 2-bit / 3-bit / affine XOR / byte transform まで当てても、なお多数が未解決
-- structured byte formula により `189 verified`、さらに abstract structured-byte family により `29 verified`、さらに multi-consensus で `2 answer_only` を追加回収できた
+- structured byte / not-structured / second-pass promotion により binary curated total は `1,285` まで増えた
+- ただし training-safe 監査で `145` 行を verified から answer-only に戻しており、trace 教師コアは `1,004` に保守化した
 - 未解決群の中心は「少なくとも一部 bit position で単純候補が立たない」ケース
 - low-gap で一意 affine と gold が衝突する `11` 行は今回除外できたが、それ以外の affine mismatch は gap が大きく、まだ安全に切れない
 - single-missing-bit / shared-varset hybrid consensus により `20 answer_only` を追加回収できたが、これは unique trace ではなく conservative answer-only recovery である

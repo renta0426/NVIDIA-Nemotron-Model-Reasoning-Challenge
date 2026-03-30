@@ -76,6 +76,19 @@ BIT_BOOLEAN3_OPERATIONS = {
     "choice": lambda a, b, c: (a & b) | ((1 - a) & c),
     "parity3": lambda a, b, c: a ^ b ^ c,
 }
+BIT_BOOLEAN4_OPERATIONS = {
+    "parity4": lambda a, b, c, d: a ^ b ^ c ^ d,
+    "or4": lambda a, b, c, d: 1 if (a | b | c | d) else 0,
+    "and4": lambda a, b, c, d: 1 if (a & b & c & d) else 0,
+    "majority4": lambda a, b, c, d: 1 if (a + b + c + d) >= 3 else 0,
+}
+BIT_BOOLEAN4_INDEX_TUPLES = tuple(
+    (first_index, second_index, third_index, fourth_index)
+    for first_index in range(8)
+    for second_index in range(8)
+    for third_index in range(8)
+    for fourth_index in range(8)
+)
 BIT_BYTE_TRANSFORMS = {
     "not": lambda value, _: (~value) & 0xFF,
     "xor_mask": lambda value, param: value ^ int(param),
@@ -108,6 +121,11 @@ BIT_STRUCTURED_BYTE_BINARY_OPERATIONS = {
     "and": lambda a, b: a & b,
     "or": lambda a, b: a | b,
 }
+BIT_STRUCTURED_BYTE_TERNARY_OPERATIONS = {
+    "choose": lambda selector, when_true, when_false: (selector & when_true) | (((~selector) & 0xFF) & when_false),
+    "majority": lambda a, b, c: (a & b) | (a & c) | (b & c),
+}
+BIT_STRUCTURED_BYTE_COMMUTATIVE_OPERATIONS = {"xor", "and", "or", "majority"}
 BIT_STRUCTURED_ABSTRACT_MIN_SUPPORT = 12
 BIT_STRUCTURED_ABSTRACT_MIN_DISTINCT = 6
 
@@ -1020,6 +1038,43 @@ def infer_bit_three_bit_boolean_answer(examples: list[tuple[str, str]], query_bi
     return "".join(predicted_bits), value_counts, support_counts
 
 
+def infer_bit_four_bit_boolean_answer(examples: list[tuple[str, str]], query_bits: str) -> tuple[str | None, list[int], list[int]]:
+    if len(query_bits) != 8 or not examples:
+        return None, [], []
+    value_counts: list[int] = []
+    support_counts: list[int] = []
+    predicted_bits: list[str] = []
+    for output_index in range(8):
+        values: set[str] = set()
+        supports = 0
+        for first_index, second_index, third_index, fourth_index in BIT_BOOLEAN4_INDEX_TUPLES:
+            for operation in BIT_BOOLEAN4_OPERATIONS.values():
+                valid = True
+                for input_bits, output_bits in examples:
+                    first_bit = int(input_bits[first_index])
+                    second_bit = int(input_bits[second_index])
+                    third_bit = int(input_bits[third_index])
+                    fourth_bit = int(input_bits[fourth_index])
+                    target_bit = int(output_bits[output_index])
+                    if operation(first_bit, second_bit, third_bit, fourth_bit) != target_bit:
+                        valid = False
+                        break
+                if not valid:
+                    continue
+                query_first = int(query_bits[first_index])
+                query_second = int(query_bits[second_index])
+                query_third = int(query_bits[third_index])
+                query_fourth = int(query_bits[fourth_index])
+                values.add(str(operation(query_first, query_second, query_third, query_fourth)))
+                supports += 1
+        value_counts.append(len(values))
+        support_counts.append(supports)
+        if len(values) != 1:
+            return None, value_counts, support_counts
+        predicted_bits.append(next(iter(values)))
+    return "".join(predicted_bits), value_counts, support_counts
+
+
 def rref_gf2(rows: list[list[int]], nvars: int) -> tuple[list[list[int]], list[int]]:
     matrix = [row[:] for row in rows]
     pivot_columns: list[int] = []
@@ -1130,7 +1185,7 @@ def build_bit_structured_byte_formulas() -> tuple[tuple[str, tuple[int, ...]], .
     for shift in range(1, 8):
         raw_sources.append((f"rol{shift}", lambda value, shift=shift: rotate_left_byte(value, shift)))
         raw_sources.append((f"ror{shift}", lambda value, shift=shift: rotate_right_byte(value, shift)))
-    for shift in range(1, 4):
+    for shift in range(1, 8):
         raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
         raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
 
@@ -1147,6 +1202,30 @@ def build_bit_structured_byte_formulas() -> tuple[tuple[str, tuple[int, ...]], .
         for op_name, operation in BIT_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
             signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
             formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    for selector_name, selector_signature in sources:
+        for true_name, true_signature in sources:
+            for false_name, false_signature in sources:
+                signature = tuple(
+                    BIT_STRUCTURED_BYTE_TERNARY_OPERATIONS["choose"](
+                        selector_signature[value],
+                        true_signature[value],
+                        false_signature[value],
+                    )
+                    & 0xFF
+                    for value in range(256)
+                )
+                formulas.setdefault(signature, f"choose({selector_name},{true_name},{false_name})")
+    for (name_a, signature_a), (name_b, signature_b), (name_c, signature_c) in combinations_with_replacement(sources, 3):
+        signature = tuple(
+            BIT_STRUCTURED_BYTE_TERNARY_OPERATIONS["majority"](
+                signature_a[value],
+                signature_b[value],
+                signature_c[value],
+            )
+            & 0xFF
+            for value in range(256)
+        )
+        formulas.setdefault(signature, f"majority({name_a},{name_b},{name_c})")
     return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
 
 
@@ -1157,6 +1236,75 @@ def infer_bit_structured_byte_formula_matches(examples: list[tuple[str, str]], q
     query_value = int(query_bits, 2)
     matches: list[tuple[str, str]] = []
     for formula_name, signature in build_bit_structured_byte_formulas():
+        if all(signature[input_value] == output_value for input_value, output_value in pairs):
+            matches.append((formula_name, format(signature[query_value] & 0xFF, "08b")))
+    return matches
+
+
+@lru_cache(maxsize=1)
+def build_bit_structured_byte_not_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    raw_sources = [
+        ("x", lambda value: value & 0xFF),
+        ("reverse", reverse_byte_bits),
+        ("nibble_swap", nibble_swap_byte),
+    ]
+    for shift in range(1, 8):
+        raw_sources.append((f"rol{shift}", lambda value, shift=shift: rotate_left_byte(value, shift)))
+        raw_sources.append((f"ror{shift}", lambda value, shift=shift: rotate_right_byte(value, shift)))
+    for shift in range(1, 8):
+        raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
+        raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
+    extended_sources = list(raw_sources)
+    for name, function in raw_sources:
+        extended_sources.append((f"not({name})", lambda value, function=function: (~function(value)) & 0xFF))
+
+    canonical_sources: dict[tuple[int, ...], str] = {}
+    for name, function in extended_sources:
+        signature = tuple(function(value) & 0xFF for value in range(256))
+        canonical_sources.setdefault(signature, name)
+    sources = [(name, signature) for signature, name in sorted(canonical_sources.items(), key=lambda item: item[1])]
+
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in sources:
+        formulas.setdefault(signature, name)
+    for (name_a, signature_a), (name_b, signature_b) in combinations_with_replacement(sources, 2):
+        for op_name, operation in BIT_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+            signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
+            formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    for selector_name, selector_signature in sources:
+        for true_name, true_signature in sources:
+            for false_name, false_signature in sources:
+                signature = tuple(
+                    BIT_STRUCTURED_BYTE_TERNARY_OPERATIONS["choose"](
+                        selector_signature[value],
+                        true_signature[value],
+                        false_signature[value],
+                    )
+                    & 0xFF
+                    for value in range(256)
+                )
+                formulas.setdefault(signature, f"choose({selector_name},{true_name},{false_name})")
+    for (name_a, signature_a), (name_b, signature_b), (name_c, signature_c) in combinations_with_replacement(sources, 3):
+        signature = tuple(
+            BIT_STRUCTURED_BYTE_TERNARY_OPERATIONS["majority"](
+                signature_a[value],
+                signature_b[value],
+                signature_c[value],
+            )
+            & 0xFF
+            for value in range(256)
+        )
+        formulas.setdefault(signature, f"majority({name_a},{name_b},{name_c})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+def infer_bit_structured_byte_not_formula_matches(examples: list[tuple[str, str]], query_bits: str) -> list[tuple[str, str]]:
+    if len(query_bits) != 8 or not examples:
+        return []
+    pairs = [(int(input_bits, 2), int(output_bits, 2)) for input_bits, output_bits in examples]
+    query_value = int(query_bits, 2)
+    matches: list[tuple[str, str]] = []
+    for formula_name, signature in build_bit_structured_byte_not_formulas():
         if all(signature[input_value] == output_value for input_value, output_value in pairs):
             matches.append((formula_name, format(signature[query_value] & 0xFF, "08b")))
     return matches
@@ -1182,7 +1330,9 @@ def abstract_bit_structured_formula_name(name: str) -> str:
         return abstract_bit_structured_source_name(formula_name)
     operation, remainder = formula_name.split("(", 1)
     arguments = [abstract_bit_structured_source_name(part) for part in remainder[:-1].split(",")]
-    return f"{operation}({','.join(sorted(arguments))})"
+    if operation in BIT_STRUCTURED_BYTE_COMMUTATIVE_OPERATIONS:
+        arguments = sorted(arguments)
+    return f"{operation}({','.join(arguments)})"
 
 
 def split_pipe_text(value: Any) -> list[str]:
@@ -1310,7 +1460,7 @@ def infer_bit_hybrid_consensus_answer(
     if len(varsets) == 1:
         info["varset"] = ",".join(f"i{index}" for index in next(iter(varsets)))
 
-    if len(predicted_outputs) != 1 or len(varsets) != 1 or len(next(iter(varsets))) != 2:
+    if len(predicted_outputs) != 1 or len(varsets) != 1 or len(next(iter(varsets))) not in {2, 3}:
         return None, info
 
     info["ready"] = True
@@ -1533,6 +1683,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
             "bit_bijection_solution_count": 0,
             "bit_boolean2_unique": False,
             "bit_boolean3_unique": False,
+            "bit_boolean4_unique": False,
             "bit_affine_unique": False,
             "bit_byte_transform_unique": False,
             "bit_byte_transform_names": "",
@@ -1550,6 +1701,15 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
             "bit_structured_formula_prediction_count": 0,
             "bit_structured_formula_safe_support": 0,
             "bit_structured_formula_safe": False,
+            "bit_not_structured_formula_name": "",
+            "bit_not_structured_formula_prediction": "",
+            "bit_not_structured_formula_names": "",
+            "bit_not_structured_formula_predictions": "",
+            "bit_not_structured_formula_matches_gold": False,
+            "bit_not_structured_formula_match_count": 0,
+            "bit_not_structured_formula_prediction_count": 0,
+            "bit_not_structured_formula_safe_support": 0,
+            "bit_not_structured_formula_safe": False,
         }
     candidate_sets = build_bit_candidate_sets(examples)
     independent_answer, independent_choice_counts = infer_bit_independent_answer(candidate_sets, query_bits)
@@ -1557,6 +1717,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     bijection_answer = next(iter(bijection_answers)) if len(bijection_answers) == 1 else ""
     boolean2_answer, boolean2_value_counts, boolean2_support_counts = infer_bit_two_bit_boolean_answer(examples, query_bits)
     boolean3_answer, boolean3_value_counts, boolean3_support_counts = infer_bit_three_bit_boolean_answer(examples, query_bits)
+    boolean4_answer, boolean4_value_counts, boolean4_support_counts = None, [], []
     affine_answer, affine_free_var_counts = infer_bit_affine_xor_answer(examples, query_bits)
     byte_transform_answer, byte_transform_names = infer_bit_byte_transform_answer(examples, query_bits)
     structured_formula_matches = infer_bit_structured_byte_formula_matches(examples, query_bits)
@@ -1565,6 +1726,14 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     structured_formula_prediction = structured_formula_predictions[0] if len(structured_formula_predictions) == 1 else ""
     structured_formula_names_text = "|".join(name for name, _ in structured_formula_matches)
     structured_formula_predictions_text = "|".join(structured_formula_predictions)
+    not_structured_formula_matches = infer_bit_structured_byte_not_formula_matches(examples, query_bits)
+    not_structured_formula_predictions = sorted({prediction for _, prediction in not_structured_formula_matches})
+    not_structured_formula_name = not_structured_formula_matches[0][0] if len(not_structured_formula_matches) == 1 else ""
+    not_structured_formula_prediction = (
+        not_structured_formula_predictions[0] if len(not_structured_formula_predictions) == 1 else ""
+    )
+    not_structured_formula_names_text = "|".join(name for name, _ in not_structured_formula_matches)
+    not_structured_formula_predictions_text = "|".join(not_structured_formula_predictions)
     hybrid_answer, hybrid_info = infer_bit_hybrid_consensus_answer(examples, candidate_sets, query_bits)
     strict_prediction = bijection_answer or (independent_answer or "")
     fallback_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (hybrid_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
@@ -1674,6 +1843,8 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
                 "boolean2_support_counts": boolean2_support_counts,
                 "boolean3_value_counts": boolean3_value_counts,
                 "boolean3_support_counts": boolean3_support_counts,
+                "boolean4_value_counts": boolean4_value_counts,
+                "boolean4_support_counts": boolean4_support_counts,
                 "affine_free_var_counts": affine_free_var_counts,
                 "byte_transform_names": byte_transform_names,
                 "no_candidate_positions": no_candidate_positions,
@@ -1688,6 +1859,11 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
                 "structured_formula_prediction_count": len(structured_formula_predictions),
                 "structured_formula_prediction": structured_formula_prediction,
                 "structured_formula_sample_matches": [name for name, _ in structured_formula_matches[:8]],
+                "not_structured_formula_name": not_structured_formula_name,
+                "not_structured_formula_match_count": len(not_structured_formula_matches),
+                "not_structured_formula_prediction_count": len(not_structured_formula_predictions),
+                "not_structured_formula_prediction": not_structured_formula_prediction,
+                "not_structured_formula_sample_matches": [name for name, _ in not_structured_formula_matches[:8]],
                 "affine_low_gap_mismatch": affine_low_gap_mismatch,
             }
         ),
@@ -1701,6 +1877,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "bit_bijection_solution_count": int(len(bijection_answers)),
         "bit_boolean2_unique": bool(boolean2_answer is not None),
         "bit_boolean3_unique": bool(boolean3_answer is not None),
+        "bit_boolean4_unique": False,
         "bit_affine_unique": bool(affine_answer is not None),
         "bit_byte_transform_unique": bool(byte_transform_answer is not None),
         "bit_no_candidate_positions": int(no_candidate_positions),
@@ -1717,6 +1894,17 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "bit_structured_formula_matches_gold": bool(structured_formula_prediction and structured_formula_prediction == str(answer)),
         "bit_structured_formula_match_count": int(len(structured_formula_matches)),
         "bit_structured_formula_prediction_count": int(len(structured_formula_predictions)),
+        "bit_not_structured_formula_name": not_structured_formula_name,
+        "bit_not_structured_formula_prediction": not_structured_formula_prediction,
+        "bit_not_structured_formula_names": not_structured_formula_names_text,
+        "bit_not_structured_formula_predictions": not_structured_formula_predictions_text,
+        "bit_not_structured_formula_matches_gold": bool(
+            not_structured_formula_prediction and not_structured_formula_prediction == str(answer)
+        ),
+        "bit_not_structured_formula_match_count": int(len(not_structured_formula_matches)),
+        "bit_not_structured_formula_prediction_count": int(len(not_structured_formula_predictions)),
+        "bit_not_structured_formula_safe_support": 0,
+        "bit_not_structured_formula_safe": False,
         "bit_structured_formula_safe_support": 0,
         "bit_structured_formula_safe": False,
     }
@@ -1998,6 +2186,7 @@ def analyze_row(v1: Any, metadata_record: dict[str, Any]) -> dict[str, Any]:
         "bit_bijection_solution_count": int(family_result.get("bit_bijection_solution_count", 0)),
         "bit_boolean2_unique": bool(family_result.get("bit_boolean2_unique", False)),
         "bit_boolean3_unique": bool(family_result.get("bit_boolean3_unique", False)),
+        "bit_boolean4_unique": bool(family_result.get("bit_boolean4_unique", False)),
         "bit_affine_unique": bool(family_result.get("bit_affine_unique", False)),
         "bit_byte_transform_unique": bool(family_result.get("bit_byte_transform_unique", False)),
         "bit_no_candidate_positions": int(family_result.get("bit_no_candidate_positions", 0)),
@@ -2016,6 +2205,17 @@ def analyze_row(v1: Any, metadata_record: dict[str, Any]) -> dict[str, Any]:
         "bit_structured_formula_prediction_count": int(family_result.get("bit_structured_formula_prediction_count", 0)),
         "bit_structured_formula_safe_support": int(family_result.get("bit_structured_formula_safe_support", 0)),
         "bit_structured_formula_safe": bool(family_result.get("bit_structured_formula_safe", False)),
+        "bit_not_structured_formula_name": family_result.get("bit_not_structured_formula_name", ""),
+        "bit_not_structured_formula_prediction": family_result.get("bit_not_structured_formula_prediction", ""),
+        "bit_not_structured_formula_names": family_result.get("bit_not_structured_formula_names", ""),
+        "bit_not_structured_formula_predictions": family_result.get("bit_not_structured_formula_predictions", ""),
+        "bit_not_structured_formula_matches_gold": bool(family_result.get("bit_not_structured_formula_matches_gold", False)),
+        "bit_not_structured_formula_match_count": int(family_result.get("bit_not_structured_formula_match_count", 0)),
+        "bit_not_structured_formula_prediction_count": int(
+            family_result.get("bit_not_structured_formula_prediction_count", 0)
+        ),
+        "bit_not_structured_formula_safe_support": int(family_result.get("bit_not_structured_formula_safe_support", 0)),
+        "bit_not_structured_formula_safe": bool(family_result.get("bit_not_structured_formula_safe", False)),
         "text_wordmap_predicted_answer": family_result.get("text_wordmap_predicted_answer", ""),
         "text_unknown_char_count": int(family_result.get("text_unknown_char_count", 0)),
         "text_unknown_chars": family_result.get("text_unknown_chars", ""),
@@ -2653,6 +2853,370 @@ def apply_bit_structured_manual_prompt_curation(
         exclude_df = exclude_df.sort_values(["bit_structured_formula_name", "id"], ascending=[True, True]).reset_index(drop=True)
 
     return analysis_df, promote_df, exclude_df
+
+
+def apply_bit_not_structured_formula_promotions(analysis_df: pd.DataFrame) -> pd.DataFrame:
+    analysis_df = analysis_df.copy()
+    bit_mask = analysis_df["family"] == "bit_manipulation"
+    unique_formula_mask = (
+        bit_mask
+        & (analysis_df["bit_not_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_not_structured_formula_name"].astype(str) != "")
+    )
+    unique_formula_df = analysis_df.loc[unique_formula_mask].copy()
+    if unique_formula_df.empty:
+        analysis_df["bit_not_structured_formula_abstract_family"] = ""
+        analysis_df["bit_not_structured_formula_abstract_support"] = 0
+        analysis_df["bit_not_structured_formula_abstract_error_rows"] = 0
+        analysis_df["bit_not_structured_formula_abstract_distinct_exact"] = 0
+        analysis_df["bit_not_structured_formula_abstract_safe"] = False
+        return analysis_df
+
+    support_df = (
+        unique_formula_df.groupby("bit_not_structured_formula_name", dropna=False)
+        .agg(
+            support_rows=("id", "size"),
+            gold_match_rows=("bit_not_structured_formula_matches_gold", "sum"),
+        )
+        .reset_index()
+    )
+    support_df["support_rows"] = support_df["support_rows"].astype(int)
+    support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+    support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+    support_df["safe_formula"] = (support_df["support_rows"] >= 2) & (support_df["error_rows"] == 0)
+    safe_formula_names = set(support_df.loc[support_df["safe_formula"], "bit_not_structured_formula_name"].astype(str))
+
+    unique_formula_df["bit_not_structured_formula_abstract_family"] = unique_formula_df["bit_not_structured_formula_name"].map(
+        abstract_bit_structured_formula_name
+    )
+    abstract_support_df = (
+        unique_formula_df.groupby("bit_not_structured_formula_abstract_family", dropna=False)
+        .agg(
+            support_rows=("id", "size"),
+            gold_match_rows=("bit_not_structured_formula_matches_gold", "sum"),
+            distinct_exact_formula_count=("bit_not_structured_formula_name", "nunique"),
+        )
+        .reset_index()
+    )
+    abstract_support_df["support_rows"] = abstract_support_df["support_rows"].astype(int)
+    abstract_support_df["gold_match_rows"] = abstract_support_df["gold_match_rows"].astype(int)
+    abstract_support_df["distinct_exact_formula_count"] = abstract_support_df["distinct_exact_formula_count"].astype(int)
+    abstract_support_df["error_rows"] = abstract_support_df["support_rows"] - abstract_support_df["gold_match_rows"]
+    abstract_support_df["safe_abstract_family"] = (
+        (abstract_support_df["support_rows"] >= BIT_STRUCTURED_ABSTRACT_MIN_SUPPORT)
+        & (abstract_support_df["error_rows"] == 0)
+        & (abstract_support_df["distinct_exact_formula_count"] >= BIT_STRUCTURED_ABSTRACT_MIN_DISTINCT)
+    )
+    safe_abstract_family_names = set(
+        abstract_support_df.loc[abstract_support_df["safe_abstract_family"], "bit_not_structured_formula_abstract_family"].astype(str)
+    )
+
+    safe_support_map = {
+        str(row["bit_not_structured_formula_name"]): int(row["support_rows"])
+        for row in support_df.to_dict(orient="records")
+    }
+    analysis_df["bit_not_structured_formula_safe_support"] = (
+        analysis_df["bit_not_structured_formula_name"].map(safe_support_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_not_structured_formula_safe"] = analysis_df["bit_not_structured_formula_name"].astype(str).isin(
+        safe_formula_names
+    )
+    analysis_df["bit_not_structured_formula_abstract_family"] = analysis_df["bit_not_structured_formula_name"].map(
+        abstract_bit_structured_formula_name
+    )
+    abstract_support_map = {
+        str(row["bit_not_structured_formula_abstract_family"]): int(row["support_rows"])
+        for row in abstract_support_df.to_dict(orient="records")
+    }
+    abstract_error_map = {
+        str(row["bit_not_structured_formula_abstract_family"]): int(row["error_rows"])
+        for row in abstract_support_df.to_dict(orient="records")
+    }
+    abstract_distinct_map = {
+        str(row["bit_not_structured_formula_abstract_family"]): int(row["distinct_exact_formula_count"])
+        for row in abstract_support_df.to_dict(orient="records")
+    }
+    analysis_df["bit_not_structured_formula_abstract_support"] = (
+        analysis_df["bit_not_structured_formula_abstract_family"].map(abstract_support_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_not_structured_formula_abstract_error_rows"] = (
+        analysis_df["bit_not_structured_formula_abstract_family"].map(abstract_error_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_not_structured_formula_abstract_distinct_exact"] = (
+        analysis_df["bit_not_structured_formula_abstract_family"].map(abstract_distinct_map).fillna(0).astype(int)
+    )
+    analysis_df["bit_not_structured_formula_abstract_safe"] = analysis_df["bit_not_structured_formula_abstract_family"].astype(
+        str
+    ).isin(safe_abstract_family_names)
+
+    promote_mask = (
+        bit_mask
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & analysis_df["bit_not_structured_formula_safe"]
+        & analysis_df["bit_not_structured_formula_matches_gold"]
+        & (analysis_df["bit_not_structured_formula_match_count"] == 1)
+    )
+    analysis_df.loc[promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+    analysis_df.loc[promote_mask, "teacher_solver_candidate"] = "binary_structured_byte_not_formula"
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[
+        promote_mask, "bit_not_structured_formula_prediction"
+    ]
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[promote_mask, "answer_only_ready"] = False
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = "bit_not_structured_byte_exact"
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    abstract_promote_mask = (
+        bit_mask
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["bit_not_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_not_structured_formula_safe_support"] == 1)
+        & analysis_df["bit_not_structured_formula_matches_gold"]
+        & analysis_df["bit_not_structured_formula_abstract_safe"]
+    )
+    analysis_df.loc[abstract_promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+    analysis_df.loc[abstract_promote_mask, "teacher_solver_candidate"] = "binary_structured_byte_not_formula_abstract"
+    analysis_df.loc[abstract_promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[
+        abstract_promote_mask, "bit_not_structured_formula_prediction"
+    ]
+    analysis_df.loc[abstract_promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[abstract_promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[abstract_promote_mask, "answer_only_ready"] = False
+    analysis_df.loc[abstract_promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[abstract_promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[abstract_promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[abstract_promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[abstract_promote_mask, "analysis_notes"] = "bit_not_structured_byte_abstract_exact"
+    analysis_df.loc[abstract_promote_mask, "suspect_label"] = False
+    return analysis_df
+
+
+def apply_bit_not_structured_low_support_answer_only_promotions(analysis_df: pd.DataFrame) -> pd.DataFrame:
+    analysis_df = analysis_df.copy()
+    candidate_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["bit_not_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_not_structured_formula_prediction_count"] == 1)
+        & (analysis_df["bit_not_structured_formula_prediction"] == analysis_df["answer"])
+        & (analysis_df["bit_not_structured_formula_abstract_error_rows"] == 0)
+        & (analysis_df["bit_not_structured_formula_abstract_support"] >= 4)
+        & (analysis_df["bit_not_structured_formula_abstract_distinct_exact"] >= 2)
+    )
+    if not candidate_mask.any():
+        return analysis_df
+    analysis_df.loc[candidate_mask, "auto_solver_predicted_answer"] = analysis_df.loc[
+        candidate_mask, "bit_not_structured_formula_prediction"
+    ]
+    analysis_df.loc[candidate_mask, "auto_solver_match"] = True
+    analysis_df.loc[candidate_mask, "verified_trace_ready"] = False
+    analysis_df.loc[candidate_mask, "answer_only_ready"] = True
+    analysis_df.loc[candidate_mask, "example_consistency_ok"] = True
+    analysis_df.loc[candidate_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[candidate_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[candidate_mask, "audit_reasons"] = ""
+    analysis_df.loc[candidate_mask, "analysis_notes"] = "bit_not_structured_low_support_answer_only"
+    analysis_df.loc[candidate_mask, "suspect_label"] = False
+    return analysis_df
+
+
+BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS: dict[str, dict[str, str]] = {
+    "5f29ae58": {"formula_name": "and(nibble_swap,rol1)", "decision_note": "manual_prompt_exact_verified"},
+    "88fff090": {"formula_name": "and(nibble_swap,rol2)", "decision_note": "manual_prompt_exact_verified"},
+    "e34cc6dd": {"formula_name": "and(rol2,rol3)", "decision_note": "manual_prompt_exact_verified"},
+    "45378f59": {"formula_name": "choose(nibble_swap,rol2,shl2)", "decision_note": "manual_prompt_exact_verified"},
+    "57256dec": {"formula_name": "choose(nibble_swap,rol3,not(shl3))", "decision_note": "manual_prompt_exact_verified"},
+    "47720c17": {"formula_name": "choose(nibble_swap,ror2,not(shl6))", "decision_note": "manual_prompt_exact_verified"},
+    "c4a6d52b": {"formula_name": "choose(nibble_swap,shr3,ror3)", "decision_note": "manual_prompt_exact_verified"},
+    "22e28f23": {"formula_name": "choose(not(rol1),nibble_swap,shr4)", "decision_note": "manual_prompt_exact_verified"},
+    "b06650c1": {"formula_name": "choose(not(rol1),not(shl3),rol3)", "decision_note": "manual_prompt_exact_verified"},
+    "05ca617c": {"formula_name": "choose(not(rol1),not(shl7),ror1)", "decision_note": "manual_prompt_exact_verified"},
+    "adeac6af": {"formula_name": "choose(not(rol1),rol2,shr6)", "decision_note": "manual_prompt_exact_verified"},
+    "c628dd06": {"formula_name": "choose(not(rol1),shr4,nibble_swap)", "decision_note": "manual_prompt_exact_verified"},
+    "91c9c95f": {"formula_name": "choose(not(rol1),shr6,rol2)", "decision_note": "manual_prompt_exact_verified"},
+    "abda193b": {"formula_name": "choose(not(rol2),not(shl4),nibble_swap)", "decision_note": "manual_prompt_exact_verified"},
+    "2630aaf8": {"formula_name": "choose(not(rol2),not(shl6),ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "e6d3a97b": {"formula_name": "choose(not(rol3),not(shl1),rol1)", "decision_note": "manual_prompt_exact_verified"},
+    "eb252a80": {"formula_name": "choose(not(rol3),not(shl5),ror3)", "decision_note": "manual_prompt_exact_verified"},
+    "5b68563d": {"formula_name": "choose(not(rol3),shl2,rol2)", "decision_note": "manual_prompt_exact_verified"},
+    "b4549ab9": {"formula_name": "choose(not(ror1),not(shl5),ror3)", "decision_note": "manual_prompt_exact_verified"},
+    "3a67aa26": {"formula_name": "choose(not(ror1),not(shl6),ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "97b03b75": {"formula_name": "choose(not(ror1),shl4,nibble_swap)", "decision_note": "manual_prompt_exact_verified"},
+    "93955d17": {"formula_name": "choose(not(ror1),shl6,ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "a37158d6": {"formula_name": "choose(not(ror2),not(shl1),rol1)", "decision_note": "manual_prompt_exact_verified"},
+    "dd900b68": {"formula_name": "choose(not(ror2),not(shl2),rol2)", "decision_note": "manual_prompt_exact_verified"},
+    "ea5def07": {"formula_name": "choose(not(ror2),not(shl4),nibble_swap)", "decision_note": "manual_prompt_exact_verified"},
+    "5dfea8b0": {"formula_name": "choose(not(ror2),not(shl5),ror3)", "decision_note": "manual_prompt_exact_verified"},
+    "4f80d363": {"formula_name": "choose(not(ror2),not(shl7),ror1)", "decision_note": "manual_prompt_exact_verified"},
+    "46dd0f22": {"formula_name": "choose(not(ror2),shl1,rol1)", "decision_note": "manual_prompt_exact_verified"},
+    "e98106b7": {"formula_name": "choose(not(ror3),not(shl2),rol2)", "decision_note": "manual_prompt_exact_verified"},
+    "722b605b": {"formula_name": "choose(not(ror3),not(shl7),ror1)", "decision_note": "manual_prompt_exact_verified"},
+    "2e5e7fe7": {"formula_name": "choose(not(ror3),not(shl7),shr2)", "decision_note": "manual_prompt_exact_verified"},
+    "59c78e51": {"formula_name": "choose(not(ror3),shl4,nibble_swap)", "decision_note": "manual_prompt_exact_verified"},
+    "855b5480": {"formula_name": "choose(not(ror3),shr2,ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "7b107eec": {"formula_name": "choose(not(shl1),not(shl3),rol3)", "decision_note": "manual_prompt_exact_verified"},
+    "3e953bd6": {"formula_name": "choose(not(shl1),not(shl6),ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "947c23f0": {"formula_name": "choose(not(shl2),not(shl6),ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "fd13b7fd": {"formula_name": "choose(not(shl5),ror3,shl6)", "decision_note": "manual_prompt_exact_verified"},
+    "37cbea46": {"formula_name": "choose(not(shr1),not(shr2),not(shl6))", "decision_note": "manual_prompt_exact_verified"},
+    "5fead1a1": {"formula_name": "choose(not(shr1),not(shr5),not(shl3))", "decision_note": "manual_prompt_exact_verified"},
+    "b4229b4a": {"formula_name": "choose(not(shr1),not(shr6),not(shl2))", "decision_note": "manual_prompt_exact_verified"},
+    "dd9ee40c": {"formula_name": "choose(not(shr2),not(shr5),not(shl3))", "decision_note": "manual_prompt_exact_verified"},
+    "b8e5057a": {"formula_name": "choose(not(shr3),not(shr6),not(shl2))", "decision_note": "manual_prompt_exact_verified"},
+    "7f2e1469": {"formula_name": "choose(not(shr3),not(shr7),not(shl1))", "decision_note": "manual_prompt_exact_verified"},
+    "021ed764": {"formula_name": "choose(not(shr4),not(shr6),not(shl2))", "decision_note": "manual_prompt_exact_verified"},
+    "e1f3ffbb": {"formula_name": "choose(not(shr4),not(shr7),not(shl1))", "decision_note": "manual_prompt_exact_verified"},
+    "1c3f2ff9": {"formula_name": "or(nibble_swap,not(shr5))", "decision_note": "manual_prompt_exact_verified"},
+    "fd7920d3": {"formula_name": "or(not(shr2),ror1)", "decision_note": "manual_prompt_exact_verified"},
+    "bd214050": {"formula_name": "or(not(shr3),shr4)", "decision_note": "manual_prompt_exact_verified"},
+    "ac7ed6cf": {"formula_name": "or(not(shr3),shr6)", "decision_note": "manual_prompt_exact_verified"},
+    "e124d12a": {"formula_name": "or(not(shr4),ror1)", "decision_note": "manual_prompt_exact_verified"},
+    "35364e9a": {"formula_name": "or(not(shr5),ror2)", "decision_note": "manual_prompt_exact_verified"},
+    "8b85ff03": {"formula_name": "or(not(shr5),shr7)", "decision_note": "manual_prompt_exact_verified"},
+    "d1c3ed77": {"formula_name": "or(not(shr6),ror3)", "decision_note": "manual_prompt_exact_verified"},
+    "4510a429": {"formula_name": "or(not(shr7),ror1)", "decision_note": "manual_prompt_exact_verified"},
+    "161667cd": {"formula_name": "xor(nibble_swap,not(shl3))", "decision_note": "manual_prompt_exact_verified"},
+    "ee4f1423": {"formula_name": "xor(not(rol3),shl4)", "decision_note": "manual_prompt_exact_verified"},
+    "562cfc29": {"formula_name": "xor(not(ror1),shl2)", "decision_note": "manual_prompt_exact_verified"},
+    "be01af6b": {"formula_name": "xor(not(shl5),shl6)", "decision_note": "manual_prompt_exact_verified"},
+}
+
+
+def apply_bit_not_structured_manual_prompt_curation(analysis_df: pd.DataFrame) -> pd.DataFrame:
+    analysis_df = analysis_df.copy()
+    if not BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS:
+        return analysis_df
+
+    promote_ids = set(BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS)
+    promote_formula_map = {
+        row_id: spec["formula_name"] for row_id, spec in BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS.items()
+    }
+    promote_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["bit_not_structured_formula_match_count"] == 1)
+        & (analysis_df["bit_not_structured_formula_prediction_count"] == 1)
+        & analysis_df["id"].astype(str).isin(promote_ids)
+        & (
+            analysis_df["id"].astype(str).map(promote_formula_map).fillna("")
+            == analysis_df["bit_not_structured_formula_name"].astype(str)
+        )
+        & (analysis_df["bit_not_structured_formula_prediction"] == analysis_df["answer"])
+    )
+    if not promote_mask.any():
+        return analysis_df
+
+    analysis_df.loc[promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+    analysis_df.loc[promote_mask, "teacher_solver_candidate"] = "binary_structured_byte_not_formula_manual"
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[
+        promote_mask, "bit_not_structured_formula_prediction"
+    ]
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[promote_mask, "answer_only_ready"] = False
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = "bit_not_structured_manual_prompt_exact"
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+    return analysis_df
+
+
+def int_cell(value: Any) -> int:
+    try:
+        if pd.isna(value):
+            return 0
+    except TypeError:
+        pass
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def bit_formula_trace_leave_one_out_safe(row: pd.Series, prefix: str) -> bool:
+    exact_support = int_cell(row.get(f"{prefix}_safe_support", 0))
+    abstract_support = int_cell(row.get(f"{prefix}_abstract_support", 0))
+    abstract_distinct = int_cell(row.get(f"{prefix}_abstract_distinct_exact", 0))
+    exact_leave_one_out_support = max(exact_support - 1, 0)
+    abstract_leave_one_out_support = max(abstract_support - 1, 0)
+    abstract_leave_one_out_distinct = max(abstract_distinct - (1 if exact_support == 1 else 0), 0)
+    return bool(
+        exact_leave_one_out_support >= 2
+        or (
+            abstract_leave_one_out_support >= BIT_STRUCTURED_ABSTRACT_MIN_SUPPORT
+            and abstract_leave_one_out_distinct >= BIT_STRUCTURED_ABSTRACT_MIN_DISTINCT
+        )
+    )
+
+
+def apply_bit_trace_training_safety_reaudit(analysis_df: pd.DataFrame) -> pd.DataFrame:
+    analysis_df = analysis_df.copy()
+    bit_verified_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & (analysis_df["selection_tier"] == "verified_trace_ready")
+    )
+    if not bit_verified_mask.any():
+        return analysis_df
+
+    structured_reaudit_mask = (
+        bit_verified_mask
+        & analysis_df["analysis_notes"].isin(["bit_structured_byte_exact", "bit_structured_byte_abstract_exact"])
+    )
+    if structured_reaudit_mask.any():
+        structured_trace_safe = analysis_df.loc[structured_reaudit_mask].apply(
+            lambda row: bit_formula_trace_leave_one_out_safe(row, "bit_structured_formula"),
+            axis=1,
+        )
+        structured_demote_ids = set(
+            analysis_df.loc[structured_reaudit_mask].loc[~structured_trace_safe, "id"].astype(str)
+        )
+        if structured_demote_ids:
+            demote_mask = analysis_df["id"].astype(str).isin(structured_demote_ids)
+            analysis_df.loc[demote_mask, "teacher_solver_candidate"] = ""
+            analysis_df.loc[demote_mask, "verified_trace_ready"] = False
+            analysis_df.loc[demote_mask, "answer_only_ready"] = True
+            analysis_df.loc[demote_mask, "selection_tier"] = "answer_only_keep"
+            analysis_df.loc[demote_mask, "analysis_notes"] = "bit_structured_byte_reaudited_answer_only"
+
+    not_structured_reaudit_mask = (
+        bit_verified_mask
+        & analysis_df["analysis_notes"].isin(["bit_not_structured_byte_exact", "bit_not_structured_byte_abstract_exact"])
+    )
+    if not_structured_reaudit_mask.any():
+        not_structured_trace_safe = analysis_df.loc[not_structured_reaudit_mask].apply(
+            lambda row: bit_formula_trace_leave_one_out_safe(row, "bit_not_structured_formula"),
+            axis=1,
+        )
+        not_structured_demote_ids = set(
+            analysis_df.loc[not_structured_reaudit_mask].loc[~not_structured_trace_safe, "id"].astype(str)
+        )
+        if not_structured_demote_ids:
+            demote_mask = analysis_df["id"].astype(str).isin(not_structured_demote_ids)
+            analysis_df.loc[demote_mask, "teacher_solver_candidate"] = ""
+            analysis_df.loc[demote_mask, "verified_trace_ready"] = False
+            analysis_df.loc[demote_mask, "answer_only_ready"] = True
+            analysis_df.loc[demote_mask, "selection_tier"] = "answer_only_keep"
+            analysis_df.loc[demote_mask, "analysis_notes"] = "bit_not_structured_reaudited_answer_only"
+
+    manual_prompt_mask = (
+        bit_verified_mask
+        & analysis_df["analysis_notes"].isin(["bit_structured_manual_prompt_exact", "bit_not_structured_manual_prompt_exact"])
+    )
+    if manual_prompt_mask.any():
+        analysis_df.loc[manual_prompt_mask, "teacher_solver_candidate"] = ""
+        analysis_df.loc[manual_prompt_mask, "verified_trace_ready"] = False
+        analysis_df.loc[manual_prompt_mask, "answer_only_ready"] = True
+        analysis_df.loc[manual_prompt_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[manual_prompt_mask, "analysis_notes"] = "bit_manual_prompt_answer_only"
+
+    return analysis_df
 
 
 def collect_symbol_minus_prefix_subfamily_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
@@ -4167,6 +4731,7 @@ def build_reports(
         "",
         "- `verified_trace_ready` は `<think> ... </think> \\boxed{}` の蒸留用コア学習データにする。",
         "- `answer_only_keep` は answer-only / terse-boxed 補助学習データに限定し、verified trace と混ぜる比率を抑える。",
+        "- `bit_manipulation` の structured-byte 系は leave-one-out 再監査を通した行だけを `verified_trace_ready` に残し、自己支持に依存する singleton / prompt-exact 行は `answer_only_keep` に落とす。",
         "- `manual_audit_priority` は family ごとに目視監査し、通過分だけ `verified_trace_ready` か `answer_only_keep` に昇格させる。",
         "- `exclude_suspect` は現時点では学習から外す。規則と答えが衝突しており、ラベル誤りや parser 想定外の可能性がある。",
         "",
@@ -4207,7 +4772,7 @@ def build_reports(
             limit=25,
         ),
         "",
-        "Observation: simple byte transforms (shift/rotate/mask) recover a small extra slice, but the dominant unresolved cluster still has no single-bit candidate on at least one output position, so the remaining rules likely need broader boolean/circuit families or richer non-local byte transforms.",
+        "Observation: the structured-byte library now stays on the conservative repeated binary family (`xor`/`and`/`or` plus selected `choose`/`majority` over `x`, `rol/ror`, `shl/shr`, `reverse`, `nibble_swap`) and the shift span reaches `1..7`, which recovers a much larger exact slice. For training use, a leave-one-out re-audit keeps only self-independent structured families in `verified_trace_ready`; thinner singleton or prompt-exact rows now fall back to `answer_only_keep`.",
     ]
     (reports_dir / "07_binary_cluster_notes.md").write_text("\n".join(binary_lines) + "\n", encoding="utf-8")
 
@@ -4297,7 +4862,9 @@ def build_reports(
         "## Key changes in this snapshot",
         "",
         "- `text_decryption`: all 971 previously manual rows are now `answer_only_keep` via clean gold-answer completion of missing monoalphabetic mappings.",
-        "- `bit_manipulation`: added simple byte-transform recovery (`shift`, `rotate`, `mask`) and recovered 11 extra verified rows; current pass1 also excludes 11 low-gap affine mismatches whose unique rule conflicts with the gold label.",
+        "- `bit_manipulation`: the structured-byte library now keeps the conservative repeated formula family while spanning `shl/shr` through shifts `1..7`; selected `choose`/`majority` families and second-pass not-structured formulas recover a larger exact slice.",
+        "- `bit_manipulation`: for training safety, structured binary promotions are re-audited under leave-one-out support. Rows whose evidence depends on the row itself or on prompt-exact singleton curation are retained only as `answer_only_keep`, not as trace-ready teachers.",
+        "- `bit_manipulation`: ternary-varset hybrid consensus was rechecked under the same unique-output gate and stays zero-gain on current train; inverted ternary hybrid candidates remain disabled because they destabilized existing answer-only consensus rows during validation.",
         "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact prompt-backed rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`), further shrinking the unresolved symbol-numeric queue.",
         f"- `symbol_equation/numeric_2x2`: `{len(symbol_query_only_rejection_df)}` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities).",
         f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset), so glyph rows stay manual.",
@@ -4660,6 +5227,10 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df, structured_low_support_candidate_df = apply_bit_structured_low_support_answer_only_promotions(analysis_df)
     analysis_df, structured_support3_candidate_df = apply_bit_structured_support3_answer_only_promotions(analysis_df)
     analysis_df, structured_manual_exact_promote_df, structured_manual_exact_exclude_df = apply_bit_structured_manual_prompt_curation(analysis_df)
+    analysis_df = apply_bit_not_structured_formula_promotions(analysis_df)
+    analysis_df = apply_bit_not_structured_low_support_answer_only_promotions(analysis_df)
+    analysis_df = apply_bit_not_structured_manual_prompt_curation(analysis_df)
+    analysis_df = apply_bit_trace_training_safety_reaudit(analysis_df)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
     analysis_df, symbol_minus_direct_support_df, symbol_minus_direct_candidate_df = apply_symbol_minus_direct_plain_promotions(analysis_df)
@@ -4681,6 +5252,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
             "bit_bijection_unique",
             "bit_boolean2_unique",
             "bit_boolean3_unique",
+            "bit_boolean4_unique",
             "bit_affine_unique",
             "bit_byte_transform_unique",
             "bit_hybrid_consensus_ready",
@@ -4781,7 +5353,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         analysis_df.loc[
             (analysis_df["family"] == "bit_manipulation") & (analysis_df["selection_tier"] == "manual_audit_priority")
         ],
-        ["num_examples", "bit_simple_family", "bit_no_candidate_positions", "bit_multi_candidate_positions", "bit_boolean2_unique", "bit_boolean3_unique", "bit_affine_unique", "bit_byte_transform_unique"],
+        ["num_examples", "bit_simple_family", "bit_no_candidate_positions", "bit_multi_candidate_positions", "bit_boolean2_unique", "bit_boolean3_unique", "bit_boolean4_unique", "bit_affine_unique", "bit_byte_transform_unique"],
         name="rows",
     )
     text_manual_queue_df = (
