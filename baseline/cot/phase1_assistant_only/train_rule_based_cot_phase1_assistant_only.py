@@ -814,6 +814,8 @@ def train(args: argparse.Namespace, rows: list[dict[str, str]]) -> None:
         gradient_checkpointing=True,
         remove_unused_columns=False,
     )
+    import inspect
+
     trainer_kwargs = {
         "model": model,
         "args": training_args,
