@@ -46,9 +46,9 @@ DEFAULT_TRAIN_CSV = REPO_ROOT / 'data' / 'train.csv'
 DEFAULT_OUTPUT_ROOT = VERSION_ROOT / 'outputs' / 'transformers_submission_v5'
 DEFAULT_PROMPT = 'If x + 3 = 10, what is x?'
 DEFAULT_SMOKE_MAX_NEW_TOKENS = 256
+OFFICIAL_BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 DEFAULT_PROMPT_INSTRUCTION = (
-    '\nPlease put your final answer inside `\\boxed{}`. '
-    'For example: `\\boxed{your answer}`'
+    '\n' + OFFICIAL_BOXED_INSTRUCTION
 )
 
 ALLOWED_TARGET_SUFFIXES = (
@@ -82,6 +82,13 @@ README_EVAL_CONTRACT: dict[str, Any] = {
     'answer_extraction': 'prioritize \\boxed{} content',
     'inference_engine': 'vLLM',
 }
+
+BOXED_PATTERN = re.compile(r"\\boxed\{([^}]*)(?:\}|$)")
+NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
+FINAL_ANSWER_IS_PATTERN = re.compile(r"(?:The\s+)?Final answer is:\s*([^\n]+)", re.IGNORECASE)
+FINAL_ANSWER_COLON_PATTERN = re.compile(r"Final answer\s*[:：]\s*([^\n]+)", re.IGNORECASE)
+CLEAN_FORMAT_BUCKETS = {'clean_boxed', 'clean_final_answer'}
+RISKY_TEXT_MARKERS = ('}', '{', '\\', '`', '\n', '\r')
 
 
 @dataclass
@@ -409,17 +416,20 @@ def maybe_apply_chat_template(
     *,
     tokenize: bool,
     add_generation_prompt: bool,
+    enable_thinking: bool = True,
     return_tensors: str | None = None,
 ) -> Any:
     kwargs: dict[str, Any] = {
         'tokenize': tokenize,
         'add_generation_prompt': add_generation_prompt,
+        'enable_thinking': enable_thinking,
     }
     if return_tensors is not None:
         kwargs['return_tensors'] = return_tensors
     try:
-        return tokenizer.apply_chat_template(messages, enable_thinking=True, **kwargs)
+        return tokenizer.apply_chat_template(messages, **kwargs)
     except TypeError:
+        kwargs.pop('enable_thinking', None)
         return tokenizer.apply_chat_template(messages, **kwargs)
 
 
@@ -436,11 +446,154 @@ def render_answer_completion(answer: str) -> str:
 
 
 def extract_boxed_answer(text: str) -> str | None:
-    matches = re.findall(r'\\boxed\s*\{([^}]*)\}', text)
+    matches = BOXED_PATTERN.findall(text)
     if not matches:
         return None
     answer = matches[-1].strip()
     return answer or None
+
+
+def extract_final_answer_with_source(text: str | None) -> tuple[str, str]:
+    if text is None:
+        return ('NOT_FOUND', 'not_found')
+
+    boxed_matches = BOXED_PATTERN.findall(text)
+    if boxed_matches:
+        non_empty = [match.strip() for match in boxed_matches if match.strip()]
+        if non_empty:
+            return (non_empty[-1], 'boxed')
+        return (boxed_matches[-1].strip(), 'boxed')
+
+    final_answer_is_matches = FINAL_ANSWER_IS_PATTERN.findall(text)
+    if final_answer_is_matches:
+        return (final_answer_is_matches[-1].strip(), 'final_answer_is')
+
+    final_answer_colon_matches = FINAL_ANSWER_COLON_PATTERN.findall(text)
+    if final_answer_colon_matches:
+        return (final_answer_colon_matches[-1].strip(), 'final_answer_colon')
+
+    number_matches = NUMBER_PATTERN.findall(text)
+    if number_matches:
+        return (number_matches[-1], 'last_number')
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if lines:
+        return (lines[-1], 'last_line')
+    return ('NOT_FOUND', 'not_found')
+
+
+def verify_answer(stored_answer: str, predicted: str) -> bool:
+    stored_answer = stored_answer.strip()
+    predicted = predicted.strip()
+    try:
+        stored_num = float(stored_answer)
+        predicted_num = float(predicted)
+    except (TypeError, ValueError):
+        return predicted.lower() == stored_answer.lower()
+    return math.isclose(stored_num, predicted_num, rel_tol=1e-2, abs_tol=1e-5)
+
+
+def estimate_output_token_count(text: str | None) -> int:
+    if not text:
+        return 0
+    return len(re.findall(r'\S+', text))
+
+
+def raw_output_num_lines(text: str | None) -> int:
+    if not text:
+        return 0
+    return len(text.splitlines()) or 1
+
+
+def count_boxed_occurrences(text: str | None) -> int:
+    if not text:
+        return 0
+    return len(BOXED_PATTERN.findall(text))
+
+
+def detect_extra_trailing_numbers(raw_output: str | None, extracted_answer: str) -> bool:
+    if not raw_output or not extracted_answer or extracted_answer == 'NOT_FOUND':
+        return False
+    last_position = raw_output.rfind(extracted_answer)
+    if last_position == -1:
+        return False
+    suffix = raw_output[last_position + len(extracted_answer) :]
+    return bool(NUMBER_PATTERN.search(suffix))
+
+
+def detect_boxed_unclosed(raw_output: str | None) -> bool:
+    if not raw_output:
+        return False
+    last_box_start = raw_output.rfind(r'\boxed{')
+    if last_box_start == -1:
+        return False
+    return raw_output.find('}', last_box_start) == -1
+
+
+def detect_boxed_truncated_right_brace(raw_output: str | None) -> bool:
+    if not raw_output:
+        return False
+    last_box_start = raw_output.rfind(r'\boxed{')
+    if last_box_start == -1:
+        return False
+    closing_index = raw_output.find('}', last_box_start)
+    if closing_index == -1:
+        return False
+    trailing_segment = raw_output[closing_index + 1 :].splitlines()[0] if raw_output[closing_index + 1 :] else ''
+    return '}' in trailing_segment
+
+
+def classify_format_bucket(raw_output: str | None, extracted_answer: str, extraction_source: str) -> str:
+    if raw_output is None or not str(raw_output).strip():
+        return 'not_found'
+
+    boxed_matches = BOXED_PATTERN.findall(raw_output)
+    has_only_empty_boxed = bool(boxed_matches) and all(not match.strip() for match in boxed_matches)
+    if extraction_source == 'boxed':
+        if has_only_empty_boxed or extracted_answer == '':
+            return 'boxed_empty'
+        if detect_boxed_unclosed(raw_output):
+            return 'boxed_unclosed'
+        if len(boxed_matches) > 1:
+            return 'boxed_multiple'
+        if detect_boxed_truncated_right_brace(raw_output):
+            return 'boxed_truncated_right_brace'
+        if detect_extra_trailing_numbers(raw_output, extracted_answer):
+            return 'extra_trailing_numbers'
+        return 'clean_boxed'
+
+    if extraction_source in {'final_answer_is', 'final_answer_colon'}:
+        if detect_extra_trailing_numbers(raw_output, extracted_answer):
+            return 'extra_trailing_numbers'
+        return 'clean_final_answer'
+
+    if extraction_source == 'last_number':
+        return 'last_number_fallback'
+    if extraction_source == 'last_line':
+        return 'last_line_fallback'
+    return 'not_found'
+
+
+def row_contains_risky_chars(gold_answer: str, extracted_answer: str) -> bool:
+    values = (gold_answer or '', extracted_answer or '')
+    return any(marker in value for value in values for marker in RISKY_TEXT_MARKERS)
+
+
+def normalize_eval_answer(value: Any) -> str:
+    if value is None:
+        return ''
+    if value != value:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def build_eval_user_content(raw_prompt: str, boxed_instruction: str) -> str:
+    instruction = boxed_instruction.strip()
+    if not instruction:
+        return raw_prompt
+    return f'{raw_prompt.rstrip()}\n{instruction}'
 
 
 def load_tokenizer(model_path: Path) -> Any:
@@ -955,6 +1108,226 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
+def evaluate_pack(args: argparse.Namespace) -> dict[str, Any]:
+    seed_everything(args.seed)
+    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
+    input_path = require_existing_path(args.input_path, label='eval pack')
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cache_dir = Path(args.cache_dir)
+    base_model_path = resolve_base_model_path(
+        base_model_path=args.base_model_path,
+        cache_dir=cache_dir,
+        revision=args.revision,
+        allow_download=args.download_snapshot,
+    )
+    device = resolve_device(args.device)
+    dtype = resolve_torch_dtype(device)
+
+    frame = pd.read_csv(input_path)
+    if not {'id', 'prompt', 'answer'}.issubset(frame.columns):
+        raise ValueError("Eval pack must contain at least 'id', 'prompt', and 'answer' columns.")
+    if args.max_rows > 0:
+        frame = frame.head(args.max_rows).copy()
+    frame = frame.reset_index(drop=True)
+
+    tokenizer = load_tokenizer(base_model_path)
+    base_model = load_model(model_path=base_model_path, device=device, dtype=dtype, for_training=False)
+    model = PeftModel.from_pretrained(base_model, str(adapter_dir), is_trainable=False)
+    model.eval()
+
+    row_level_path = output_dir / 'row_level.jsonl'
+    if row_level_path.exists():
+        row_level_path.unlink()
+
+    manifest = {
+        'adapter_dir': str(adapter_dir),
+        'input_path': str(input_path),
+        'output_dir': str(output_dir),
+        'base_model_path': str(base_model_path),
+        'revision': args.revision,
+        'device': device,
+        'dtype': str(dtype),
+        'max_rows': int(len(frame)),
+        'max_new_tokens': args.max_new_tokens,
+        'temperature': args.temperature,
+        'top_p': args.top_p,
+        'enable_thinking': args.enable_thinking,
+        'add_generation_prompt': args.add_generation_prompt,
+        'boxed_instruction': args.boxed_instruction,
+        'readme_eval_contract': README_EVAL_CONTRACT,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'eval_manifest.json', manifest)
+
+    rows: list[dict[str, Any]] = []
+    for row_index, row in frame.iterrows():
+        prompt_id = normalize_eval_answer(row.get('id'))
+        gold_answer = normalize_eval_answer(row.get('answer'))
+        user_content = build_eval_user_content(str(row['prompt']), args.boxed_instruction)
+        encoded = maybe_apply_chat_template(
+            tokenizer,
+            [{'role': 'user', 'content': user_content}],
+            tokenize=True,
+            add_generation_prompt=args.add_generation_prompt,
+            enable_thinking=args.enable_thinking,
+            return_tensors='pt',
+        )
+        attention_mask = None
+        if isinstance(encoded, torch.Tensor):
+            input_tensor = encoded
+        elif hasattr(encoded, 'input_ids'):
+            input_tensor = encoded['input_ids']
+            attention_mask = encoded.get('attention_mask')
+        elif isinstance(encoded, dict):
+            input_tensor = encoded['input_ids']
+            attention_mask = encoded.get('attention_mask')
+        else:
+            raise TypeError(f'Unsupported chat-template return type: {type(encoded)!r}')
+
+        input_tensor = input_tensor.to(device)
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(device)
+
+        do_sample = args.temperature > 0.0
+        print(
+            json.dumps(
+                {
+                    'event': 'row_start',
+                    'row_index': int(row_index) + 1,
+                    'rows_total': int(len(frame)),
+                    'id': prompt_id,
+                    'prompt_len_tokens': int(input_tensor.shape[-1]),
+                    'max_new_tokens': int(args.max_new_tokens),
+                    'enable_thinking': bool(args.enable_thinking),
+                    'do_sample': bool(do_sample),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        generate_kwargs: dict[str, Any] = {
+            'input_ids': input_tensor,
+            'max_new_tokens': args.max_new_tokens,
+            'do_sample': do_sample,
+            'eos_token_id': tokenizer.eos_token_id,
+            'pad_token_id': tokenizer.eos_token_id,
+        }
+        if do_sample:
+            generate_kwargs['temperature'] = args.temperature
+            generate_kwargs['top_p'] = args.top_p
+        if attention_mask is not None:
+            generate_kwargs['attention_mask'] = attention_mask
+
+        with torch.no_grad():
+            generated = model.generate(**generate_kwargs)
+
+        generated_tokens = generated[0][input_tensor.shape[-1] :]
+        raw_output = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+        extracted_answer, extraction_source = extract_final_answer_with_source(raw_output)
+        format_bucket = classify_format_bucket(raw_output, extracted_answer, extraction_source)
+
+        row_payload = {
+            'id': prompt_id,
+            'row_index': int(row_index),
+            'family': normalize_optional_text(row.get('family')) or 'unknown',
+            'answer_type': normalize_optional_text(row.get('answer_type')) or 'unknown',
+            'gold_answer': gold_answer,
+            'raw_output': raw_output,
+            'extracted_answer': extracted_answer,
+            'extraction_source': extraction_source,
+            'format_bucket': format_bucket,
+            'has_boxed': count_boxed_occurrences(raw_output) > 0,
+            'boxed_count': count_boxed_occurrences(raw_output),
+            'contains_extra_numbers': detect_extra_trailing_numbers(raw_output, extracted_answer),
+            'contains_risky_chars': row_contains_risky_chars(gold_answer, extracted_answer),
+            'is_correct': verify_answer(gold_answer, extracted_answer),
+            'raw_output_len_chars': len(raw_output),
+            'raw_output_num_lines': raw_output_num_lines(raw_output),
+            'raw_output_est_tokens': estimate_output_token_count(raw_output),
+            'prompt_len_tokens': int(input_tensor.shape[-1]),
+            'generated_len_tokens': int(generated_tokens.shape[-1]),
+        }
+        rows.append(row_payload)
+        append_jsonl(row_level_path, row_payload)
+        print(
+            json.dumps(
+                {
+                    'event': 'row_done',
+                    'row_index': int(row_index) + 1,
+                    'rows_total': int(len(frame)),
+                    'id': prompt_id,
+                    'is_correct': row_payload['is_correct'],
+                    'extracted_answer': extracted_answer,
+                    'format_bucket': format_bucket,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+
+    row_level = pd.DataFrame(rows)
+    row_level.to_csv(output_dir / 'row_level.csv', index=False)
+
+    summary = {
+        'adapter_dir': str(adapter_dir),
+        'input_path': str(input_path),
+        'output_dir': str(output_dir),
+        'base_model_path': str(base_model_path),
+        'device': device,
+        'dtype': str(dtype),
+        'n_rows': int(len(row_level)),
+        'overall_acc': float(row_level['is_correct'].mean()) if len(row_level) else float('nan'),
+        'extraction_fail_rate': float((row_level['extraction_source'] == 'not_found').mean()) if len(row_level) else float('nan'),
+        'format_fail_rate': float((~row_level['format_bucket'].isin(CLEAN_FORMAT_BUCKETS)).mean()) if len(row_level) else float('nan'),
+        'boxed_rate': float(row_level['has_boxed'].mean()) if len(row_level) else float('nan'),
+        'avg_output_len_chars': float(row_level['raw_output_len_chars'].mean()) if len(row_level) else float('nan'),
+        'max_new_tokens': args.max_new_tokens,
+        'temperature': args.temperature,
+        'top_p': args.top_p,
+        'enable_thinking': args.enable_thinking,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'summary.json', summary)
+
+    family_metrics = (
+        row_level.groupby('family', dropna=False)
+        .agg(
+            n=('id', 'size'),
+            acc=('is_correct', 'mean'),
+            extraction_fail_rate=('extraction_source', lambda s: float((s == 'not_found').mean())),
+            format_fail_rate=('format_bucket', lambda s: float((~s.isin(CLEAN_FORMAT_BUCKETS)).mean())),
+            boxed_rate=('has_boxed', 'mean'),
+            avg_output_len_chars=('raw_output_len_chars', 'mean'),
+        )
+        .reset_index()
+        .sort_values(['n', 'family'], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    family_metrics.to_csv(output_dir / 'family_metrics.csv', index=False)
+
+    failure_metrics = (
+        row_level.groupby('format_bucket', dropna=False)
+        .size()
+        .rename('n')
+        .reset_index()
+        .sort_values(['n', 'format_bucket'], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    failure_metrics['ratio'] = failure_metrics['n'] / len(row_level) if len(row_level) else float('nan')
+    failure_metrics.to_csv(output_dir / 'failure_metrics.csv', index=False)
+
+    del model
+    del base_model
+    gc.collect()
+    if device == 'mps':
+        torch.mps.empty_cache()
+
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
+
+
 def run_validation_command(args: argparse.Namespace) -> dict[str, Any]:
     summary = validate_adapter_dir(require_existing_path(args.adapter_dir, label='adapter dir'))
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -1035,6 +1408,20 @@ def add_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--prompt-instruction', type=str, default=DEFAULT_PROMPT_INSTRUCTION)
 
 
+def add_eval_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--adapter-dir', type=str, required=True)
+    parser.add_argument('--input-path', type=str, required=True)
+    parser.add_argument('--output-dir', type=str, required=True)
+    parser.add_argument('--max-rows', type=int, default=0)
+    parser.add_argument('--max-new-tokens', type=int, default=int(README_EVAL_CONTRACT['max_tokens']))
+    parser.add_argument('--temperature', type=float, default=float(README_EVAL_CONTRACT['temperature']))
+    parser.add_argument('--top-p', type=float, default=float(README_EVAL_CONTRACT['top_p']))
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--boxed-instruction', type=str, default=OFFICIAL_BOXED_INSTRUCTION)
+    parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--add-generation-prompt', action=argparse.BooleanOptionalAction, default=True)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -1062,6 +1449,13 @@ def build_parser() -> argparse.ArgumentParser:
         help='Validate adapter_config.json against README/vLLM submission constraints',
     )
     validate_parser.add_argument('--adapter-dir', type=str, required=True)
+
+    eval_parser = subparsers.add_parser(
+        'evaluate-pack',
+        help='Run README-faithful local evaluation on an eval pack with a saved adapter',
+    )
+    add_shared_model_args(eval_parser)
+    add_eval_args(eval_parser)
 
     zip_parser = subparsers.add_parser('make-submission', help='Create submission.zip from a validated adapter dir')
     zip_parser.add_argument('--adapter-dir', type=str, required=True)
@@ -1092,6 +1486,9 @@ def main() -> None:
         return
     if args.command == 'validate-submission':
         run_validation_command(args)
+        return
+    if args.command == 'evaluate-pack':
+        evaluate_pack(args)
         return
     if args.command == 'make-submission':
         run_make_submission_command(args)
