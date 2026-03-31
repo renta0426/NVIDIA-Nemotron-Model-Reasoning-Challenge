@@ -250,7 +250,7 @@ binary では **exclude 以外ほぼ全部使う** 発想に切り替える。
 推奨:
 - `verified_trace_ready`: 高重み
 - `answer_only_keep`: 中重み
-- `manual_audit_priority`: 低〜中重み
+- `manual_audit_priority`: **early positive SFT には直接入れず**, rollout で strict verifier を通過した成功軌跡か late-stage RL prompt として使う
 - `exclude_suspect`: 使わない
 
 ### なぜ可能か
@@ -290,6 +290,7 @@ binary では **exclude 以外ほぼ全部使う** 発想に切り替える。
 - majority を `boxed only` にする
 - 必要なら少量だけ ultra-short scratchpad を混ぜる
 - でも長い `<think>` は避ける
+- **初期の positive teacher は `verified_trace_ready + answer_only_keep` を中心にし、`manual_audit_priority` は strict verifier を通った rollout 成功だけ採用する**
 
 ### なぜ
 あなたの結果では、
@@ -312,6 +313,7 @@ GRPO前の warm start として非常に相性がいいです。
 ### chosen
 - `\boxed{01010101}` のような exact gold
 - できれば短い completion
+- `manual_audit_priority` は raw gold をそのまま chosen にせず、**rollout で strict exact を通した短い成功例**を優先する
 
 ### rejected
 - current model の長い wrong output
@@ -437,6 +439,47 @@ easy only ではダメです。
   → reasoning 強化が必要。GRPOへ進む。
 - verified / structured も少し動く  
   → outcome-centric 方針は正しい。GRPOの前段として有望。
+
+---
+
+# 昇格ゲートと中止条件
+
+## 共通原則
+- binary は **Kaggle mimic** と **strict exact 8-bit** を両方記録する
+- candidate 昇格は **strict exact 8-bit 主体**で判断する
+- `General Stable Set` と `Symbol Watch Set` を落として binary だけを上げた candidate は昇格させない
+
+## ORPO probe の昇格ゲート
+ORPO probe は、少なくとも次のどれかを満たした時だけ次段へ進める。
+
+1. `Binary Hard Set` の **strict exact 8-bit** が `12/60` 以上  
+2. `verified_trace_ready` strict exact が `8/20` 以上  
+3. `bit_structured_byte_formula` strict exact が `1/14` 以上
+
+加えて、次は必須条件とする。
+
+- `General Stable Set >= 188/200`
+- `Symbol Watch Set >= 24/60`
+- `last_number` 失敗数が直近 anchor より悪化しない
+
+## GRPO candidate の昇格ゲート
+GRPO candidate は、少なくとも次を満たさない限り merge 候補にしない。
+
+- `Binary Hard Set` strict exact が **現行 best exact** を上回る
+- `verified_trace_ready` strict exact が **7/20 を上回る**
+- `bit_structured_byte_formula` strict exact が **0/14 のままではない**
+- `General Stable Set >= 188/200`
+- `text >= 43/50`
+- `gravity >= 47/50`
+- `Symbol Watch Set >= 24/60`
+
+## 明示的な中止条件
+次が起きた run は、その方向を一旦止める。
+
+- binary strict exact が動かないまま output length だけ伸びる
+- `last_number` 失敗が再増加する
+- hybrid narrative のように non-binary family まで巻き添え退行する
+- strict exact は不変で Kaggle mimic だけが伸びる
 
 ---
 
