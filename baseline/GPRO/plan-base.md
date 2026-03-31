@@ -336,6 +336,54 @@ ORPO だけで structured-byte を解くのは難しい。
 
 ---
 
+# Step 1 / Step 2 は GRPO の必須前提か
+
+## 結論
+**理論上は必須ではないが、この repo の binary では実務上かなり重要**です。
+
+いきなり GRPO を始めること自体はできます。  
+しかし現状の失敗は、
+
+- `README.md` の実評価が `\boxed{}` 優先 + fallback 抽出で動く
+- binary では `last_number` / long-output collapse が大きい
+- `result/2-1` の hybrid のように、自然言語推論を増やすと binary も non-binary も崩れやすい
+- `bit_structured_byte_formula` がまだ `0/14` で、real binary にそのまま sparse reward を当てても探索が立ち上がりにくい
+
+という条件なので、**GRPO が「解き方」を学ぶ前に「壊れた答え方」に引っ張られる危険が高い**。
+
+したがって Step 1 / Step 2 は、
+
+- Step 1 で action space を `\boxed{[01]{8}}` 近傍に寄せる
+- Step 2 で collapse / leading-zero drop / extra digits を先に減らす
+- Step 3 で初めて reasoning/search policy を押す
+
+という **readiness filter** として使うのがよい。
+
+## どういう意味で「前提」なのか
+
+### Step 1 がやること
+- binary specialist の default completion を短い exact boxed byte に寄せる
+- `manual_audit_priority` の unsafe trace を early positive teacher へ混ぜない
+- rollout 成功例を positive teacher に再利用できる状態を作る
+
+つまり Step 1 は、**GRPO の前に「正しい終端形」を固定する工程**です。
+
+### Step 2 がやること
+- `1`, `10`, `001`, `-0` のような collapse を chosen/rejected で直接叩く
+- leading zero の保持を policy に埋め込む
+- `last_number` fallback に落ちやすい長文 completion を不利にする
+
+つまり Step 2 は、**GRPO の reward に入れる前から明らかな bad policy を先に削る工程**です。
+
+### Step 3 が本来やること
+- format 修正ではなく、答えそのものを見つける policy を押し上げる
+- synthetic curriculum と verifier で structured-byte まで探索させる
+
+したがって、この 3 つは役割が違う。  
+**Step 3 単独で Step 1 / Step 2 の仕事まで兼務させると、失敗確率が高い**。
+
+---
+
 ## Step 3: GRPO を binary specialist にだけ適用
 ここが本命です。
 
@@ -390,6 +438,92 @@ easy only ではダメです。
 ### なぜ Hamming を初期だけ使うか
 完全 sparse だと hard binary で何も学べないからです。  
 ただし最終的には exact-only に寄せないと、1-bit near-miss に最適化される危険がある。
+
+---
+
+# GPRO が binary に有効かを最短で確かめる進め方
+
+## 結論
+最短で知りたいのは、
+
+1. **outcome-centric 学習で collapse を減らせるか**
+2. **format 改善だけでなく strict exact 8-bit が少しでも動くか**
+3. **その signal を持ったまま GRPO に入れるか**
+
+です。
+
+したがって、確認順は次がよい。
+
+### Probe A: binary-only answer-only SFT / RFT
+目的は「短い exact boxed output に閉じるか」を見ること。
+
+見る指標:
+- `Binary Hard Set` strict exact 8-bit
+- `verified_trace_ready` exact
+- `bit_structured_byte_formula` exact
+- `last_number` 失敗数
+- 平均出力長
+
+ここで少なくとも、
+- output length が縮む
+- `last_number` が減る
+- general / symbol を壊さない
+
+の 3 つは確認したい。
+
+### Probe B: binary-only ORPO
+目的は「collapse を直接叩いたときに、この model が outcome learning で動くか」を見ること。
+
+見る指標:
+- strict exact 8-bit
+- boxed regex rate
+- leading-zero 保持
+- `last_number` 失敗数
+- 平均出力長
+
+#### Probe B の読み方
+- format/length は改善、exact は不変  
+  → outcome 方針自体は妥当。reasoning 改善はまだ足りないので GRPO へ進む
+- exact も少し動く  
+  → binary で outcome-centric learning が効いている。GRPO に上げる価値が高い
+- format も exact も動かない  
+  → そのまま GRPO へ行かず、chosen/rejected か warm start を作り直す
+
+### Probe C: small synthetic GRPO
+ここで初めて GRPO を始める。
+
+ただし最初は、
+- real binary 直打ちではなく synthetic easy-medium
+- reward は exact + format + length の early shaping
+- strict exact が立ち上がったら late reward へ寄せる
+
+とし、**small synthetic で signal が出るか**を先に見る。
+
+### Probe D: synthetic hard + real verified GRPO
+Probe C で signal が出たら、
+- structured byte
+- choose/majority
+- ambiguity-rich
+- leading-zero heavy
+
+を増やし、そこへ real verified を混ぜる。
+
+### Probe E: real all-non-exclude GRPO
+最後に `manual_audit_priority` も late-stage prompt / rollout success 由来の positive として入れる。
+
+## 実務上の判断
+要するに、
+
+- **「GRPO が有効か」だけを早く知りたいなら ORPO probe まででよい**
+- **「binary を本当に押し上げられるか」まで見たいなら small synthetic GRPO まで入る**
+
+この順なら、いきなり長い real-binary GRPO を回して
+
+- exact は動かない
+- output だけ長くなる
+- non-binary を巻き添えで壊す
+
+という失敗をかなり避けられる。
 
 ---
 
