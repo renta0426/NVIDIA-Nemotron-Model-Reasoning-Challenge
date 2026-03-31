@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_SOURCE_CSV = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts" / "train_row_analysis_v1.csv"
 DEFAULT_DATASET_CSV = Path(__file__).resolve().parent / "artifacts" / "step1_binary_answer_only_training_data.csv"
 DEFAULT_MANIFEST_JSON = Path(__file__).resolve().parent / "artifacts" / "step1_binary_answer_only_manifest.json"
