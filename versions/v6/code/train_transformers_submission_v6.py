@@ -1841,12 +1841,13 @@ def summarize_family_micro_smoke(
     output_dir: Path,
     pack_path: Path,
     eval_summary: dict[str, Any],
+    max_new_tokens: int,
 ) -> dict[str, Any]:
     row_level = pd.read_csv(output_dir / 'row_level.csv').fillna('')
     row_payloads: list[dict[str, Any]] = []
     family_pass_map: dict[str, bool] = {}
     for row in row_level.to_dict(orient='records'):
-        reasons = build_micro_smoke_gate(row, max_new_tokens=args.max_new_tokens)
+        reasons = build_micro_smoke_gate(row, max_new_tokens=max_new_tokens)
         family = normalize_optional_text(row.get('family')) or 'unknown'
         qualitative_pass = not reasons
         family_pass_map[family] = family_pass_map.get(family, False) or qualitative_pass
@@ -2122,6 +2123,7 @@ def family_micro_smoke(args: argparse.Namespace) -> dict[str, Any]:
         output_dir=output_dir,
         pack_path=pack_path,
         eval_summary=eval_summary,
+        max_new_tokens=args.max_new_tokens,
     )
 
 
