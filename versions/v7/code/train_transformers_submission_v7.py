@@ -1,0 +1,2450 @@
+from __future__ import annotations
+
+import argparse
+from collections import Counter
+from contextlib import nullcontext
+import gc
+import importlib.machinery
+import json
+import math
+import os
+import random
+import re
+import subprocess
+import sys
+import time
+import types
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version as package_version
+from pathlib import Path
+from typing import Any, Iterable
+from zipfile import ZIP_DEFLATED, ZipFile
+
+import pandas as pd
+import torch
+from huggingface_hub import snapshot_download
+from peft import LoraConfig, PeftModel, TaskType, get_peft_model
+from torch.nn.utils.rnn import pad_sequence
+from torch.optim import AdamW
+from torch.utils.data import DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer, get_cosine_schedule_with_warmup
+
+
+def find_repo_root(start: Path) -> Path:
+    current = start.resolve()
+    while current != current.parent:
+        if (current / 'README.md').exists() and (current / 'pyproject.toml').exists():
+            return current
+        current = current.parent
+    raise RuntimeError(f'Could not locate repository root from {start}')
+
+
+REPO_ROOT = find_repo_root(Path(__file__).resolve())
+VERSION_ROOT = Path(__file__).resolve().parents[1]
+
+MODEL_ID = 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16'
+DEFAULT_MODEL_DIR = REPO_ROOT / 'models' / 'nemotron-3-nano-30b-a3b-bf16'
+DEFAULT_CACHE_DIR = REPO_ROOT / 'hf_cache'
+DEFAULT_TRACK_B_DSL_TRAIN_CSV = (
+    REPO_ROOT / 'baseline' / 'cot' / 'phase2_binary_dsl' / 'artifacts' / 'phase2_binary_dsl_training_data.csv'
+)
+DEFAULT_TRACK_B_HYBRID_TRAIN_CSV = (
+    REPO_ROOT / 'baseline' / 'cot' / 'phase2_binary_dsl' / 'artifacts' / 'phase2_binary_hybrid_training_data.csv'
+)
+TRACK_B_DATASET_PATHS: dict[str, Path] = {
+    'dsl': DEFAULT_TRACK_B_DSL_TRAIN_CSV,
+    'hybrid': DEFAULT_TRACK_B_HYBRID_TRAIN_CSV,
+}
+TRACK_B_DATASET_HYPOTHESES: dict[str, str] = {
+    'dsl': (
+        'Executable-style binary DSL scratchpads should improve exact 8-bit closure and '
+        'structured-formula transfer while keeping the strong anchor families stable.'
+    ),
+    'hybrid': (
+        'Compact hybrid binary traces should improve exact 8-bit closure with lower reasoning drift '
+        'than the plain generalist recipe while keeping the strong anchor families stable.'
+    ),
+}
+DEFAULT_TRAIN_CSV = DEFAULT_TRACK_B_DSL_TRAIN_CSV
+DEFAULT_OUTPUT_ROOT = VERSION_ROOT / 'outputs' / 'transformers_submission_v6'
+DEFAULT_PROMPT = 'If x + 3 = 10, what is x?'
+DEFAULT_SMOKE_MAX_NEW_TOKENS = 256
+OFFICIAL_BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
+DEFAULT_PROMPT_INSTRUCTION = (
+    '\n' + OFFICIAL_BOXED_INSTRUCTION
+)
+DEFAULT_MICRO_SMOKE_PARALLEL_JOBS = 4
+DEFAULT_PHASE0_EVAL_DIR = REPO_ROOT / 'baseline' / 'cot' / 'phase0_offline_eval' / 'artifacts'
+DEFAULT_MICRO_SMOKE_SOURCE_PATHS: dict[str, Path] = {
+    'general_stable_set': DEFAULT_PHASE0_EVAL_DIR / 'general_stable_set.csv',
+    'binary_hard_set': DEFAULT_PHASE0_EVAL_DIR / 'binary_hard_set.csv',
+    'symbol_watch_set': DEFAULT_PHASE0_EVAL_DIR / 'symbol_watch_set.csv',
+}
+DEFAULT_MICRO_SMOKE_CASES: tuple[dict[str, str], ...] = (
+    {
+        'source_name': 'general_stable_set',
+        'id': '1bde7dfb',
+        'family': 'gravity',
+        'note': 'anchor_gravity',
+    },
+    {
+        'source_name': 'general_stable_set',
+        'id': '0fdc689e',
+        'family': 'unit',
+        'note': 'anchor_unit',
+    },
+    {
+        'source_name': 'general_stable_set',
+        'id': '2e5b0b54',
+        'family': 'roman',
+        'note': 'anchor_roman',
+    },
+    {
+        'source_name': 'general_stable_set',
+        'id': '50f2caf4',
+        'family': 'text',
+        'note': 'anchor_text',
+    },
+    {
+        'source_name': 'binary_hard_set',
+        'id': 'c625ba91',
+        'family': 'binary',
+        'note': 'binary_verified_trace',
+    },
+    {
+        'source_name': 'binary_hard_set',
+        'id': '2630aaf8',
+        'family': 'binary',
+        'note': 'binary_structured_formula',
+    },
+    {
+        'source_name': 'symbol_watch_set',
+        'id': '5b06502f',
+        'family': 'symbol',
+        'note': 'symbol_numeric_anchor',
+    },
+    {
+        'source_name': 'symbol_watch_set',
+        'id': 'b13d511a',
+        'family': 'symbol',
+        'note': 'symbol_glyph_len5_watch',
+    },
+)
+MPS_ENV_KEYS = (
+    'PYTORCH_MPS_FAST_MATH',
+    'PYTORCH_MPS_PREFER_METAL',
+    'PYTORCH_ENABLE_MPS_FALLBACK',
+    'PYTORCH_MPS_HIGH_WATERMARK_RATIO',
+    'PYTORCH_MPS_LOW_WATERMARK_RATIO',
+)
+
+ALLOWED_TARGET_SUFFIXES = (
+    'q_proj',
+    'k_proj',
+    'v_proj',
+    'o_proj',
+    'up_proj',
+    'down_proj',
+    'in_proj',
+    'out_proj',
+)
+REQUIRED_CORE_TARGET_SUFFIXES = {
+    'q_proj',
+    'k_proj',
+    'v_proj',
+    'o_proj',
+    'up_proj',
+    'down_proj',
+}
+
+README_EVAL_CONTRACT: dict[str, Any] = {
+    'base_model': 'NVIDIA Nemotron-3-Nano-30B',
+    'max_lora_rank': 32,
+    'max_tokens': 7680,
+    'top_p': 1.0,
+    'temperature': 0.0,
+    'max_num_seqs': 64,
+    'gpu_memory_utilization': 0.85,
+    'max_model_len': 8192,
+    'answer_extraction': 'prioritize \\boxed{} content',
+    'inference_engine': 'vLLM',
+}
+
+BOXED_PATTERN = re.compile(r"\\boxed\{([^}]*)(?:\}|$)")
+NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
+FINAL_ANSWER_IS_PATTERN = re.compile(r"(?:The\s+)?Final answer is:\s*([^\n]+)", re.IGNORECASE)
+FINAL_ANSWER_COLON_PATTERN = re.compile(r"Final answer\s*[:：]\s*([^\n]+)", re.IGNORECASE)
+CLEAN_FORMAT_BUCKETS = {'clean_boxed', 'clean_final_answer'}
+RISKY_TEXT_MARKERS = ('}', '{', '\\', '`', '\n', '\r')
+
+
+@dataclass
+class TrainSummary:
+    adapter_dir: str
+    base_model_id: str
+    base_model_path: str
+    revision: str
+    device: str
+    dtype: str
+    train_rows: int
+    optimizer_steps: int
+    target_modules: list[str]
+    started_at: str
+    completed_at: str
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def normalize_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if value != value:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    normalized = text.strip()
+    if not normalized or normalized.lower() == 'nan':
+        return None
+    return normalized
+
+
+def collect_mps_env_settings() -> dict[str, str | None]:
+    return {key: os.environ.get(key) for key in MPS_ENV_KEYS}
+
+
+class TensorStateList(list):
+    @property
+    def device(self) -> torch.device:
+        for value in self:
+            if isinstance(value, torch.Tensor):
+                return value.device
+        return torch.device('cpu')
+
+    def zero_(self) -> TensorStateList:
+        for value in self:
+            if isinstance(value, torch.Tensor) and value.numel() > 0:
+                value.zero_()
+        return self
+
+
+def prime_nemotron_cache_object(cache_value: Any, *, config: Any | None = None) -> Any:
+    if cache_value is None:
+        return None
+    if config is not None:
+        if not hasattr(cache_value, 'conv_kernel_size') and hasattr(config, 'conv_kernel'):
+            cache_value.conv_kernel_size = int(config.conv_kernel)
+        if not hasattr(cache_value, 'ssm_state_size') and hasattr(config, 'ssm_state_size'):
+            cache_value.ssm_state_size = int(config.ssm_state_size)
+        if not hasattr(cache_value, 'intermediate_size') and hasattr(config, 'mamba_num_heads') and hasattr(config, 'mamba_head_dim'):
+            cache_value.intermediate_size = int(config.mamba_num_heads) * int(config.mamba_head_dim)
+    if not hasattr(cache_value, 'seqlen_offset'):
+        cache_value.seqlen_offset = 0
+    for attr_name in ('conv_states', 'ssm_states', 'key_cache', 'value_cache'):
+        values = getattr(cache_value, attr_name, None)
+        if values is not None and not isinstance(values, TensorStateList):
+            setattr(cache_value, attr_name, TensorStateList(values))
+    return cache_value
+
+
+def locate_nemotron_generation_model(model: Any) -> Any:
+    queue = [model]
+    seen: set[int] = set()
+    while queue:
+        current = queue.pop(0)
+        if current is None:
+            continue
+        current_id = id(current)
+        if current_id in seen:
+            continue
+        seen.add(current_id)
+        if current.__class__.__name__ == 'NemotronHForCausalLM':
+            return current
+        if hasattr(current, 'prepare_inputs_for_generation') and hasattr(current, 'backbone'):
+            return current
+        for attr in ('base_model', 'model'):
+            child = getattr(current, attr, None)
+            if child is not None:
+                queue.append(child)
+    raise RuntimeError('Could not locate the Nemotron generation model for cache patching.')
+
+
+def install_nemotron_cache_bridge_patch(model: Any) -> dict[str, Any]:
+    target = locate_nemotron_generation_model(model)
+    model_cls = target.__class__
+    target_name = f'{model_cls.__module__}.{model_cls.__name__}'
+    if getattr(model_cls, '_copilot_cache_bridge_patch_applied', False):
+        return {
+            'applied': False,
+            'already_patched': True,
+            'target_class': target_name,
+        }
+
+    original_prepare = getattr(model_cls, 'prepare_inputs_for_generation', None)
+    original_forward = getattr(model_cls, 'forward', None)
+    if original_prepare is None or original_forward is None:
+        raise RuntimeError(f'Nemotron cache bridge target is missing generation hooks: {target_name}')
+
+    def patched_prepare_inputs_for_generation(
+        self,
+        input_ids,
+        past_key_values=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        cache_position=None,
+        position_ids=None,
+        use_cache=True,
+        **kwargs,
+    ):
+        model_inputs = original_prepare(
+            self,
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            cache_position=cache_position,
+            position_ids=position_ids,
+            use_cache=use_cache,
+            **kwargs,
+        )
+        if isinstance(model_inputs, dict):
+            cache_value = past_key_values
+            if cache_value is None:
+                cache_value = model_inputs.get('past_key_values')
+            cache_value = prime_nemotron_cache_object(cache_value, config=getattr(self, 'config', None))
+            model_inputs['cache_params'] = cache_value
+            model_inputs['past_key_values'] = cache_value
+        return model_inputs
+
+    def patched_forward(
+        self,
+        input_ids=None,
+        inputs_embeds=None,
+        position_ids=None,
+        cache_params=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        use_cache=None,
+        cache_position=None,
+        attention_mask=None,
+        **kwargs,
+    ):
+        cache_candidate = kwargs.pop('past_key_values', None)
+        if cache_params is None and cache_candidate is not None:
+            cache_params = cache_candidate
+        cache_params = prime_nemotron_cache_object(cache_params, config=getattr(self, 'config', None))
+        return original_forward(
+            self,
+            input_ids=input_ids,
+            inputs_embeds=inputs_embeds,
+            position_ids=position_ids,
+            cache_params=cache_params,
+            labels=labels,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            use_cache=use_cache,
+            cache_position=cache_position,
+            attention_mask=attention_mask,
+            **kwargs,
+        )
+
+    model_cls.prepare_inputs_for_generation = patched_prepare_inputs_for_generation
+    model_cls.forward = patched_forward
+    model_cls._copilot_cache_bridge_patch_applied = True
+    model_cls._copilot_cache_bridge_target = target_name
+    return {
+        'applied': True,
+        'already_patched': False,
+        'target_class': target_name,
+    }
+
+
+def package_versions() -> dict[str, str]:
+    names = {
+        'transformers': 'transformers',
+        'accelerate': 'accelerate',
+        'peft': 'peft',
+        'torch': 'torch',
+        'huggingface_hub': 'huggingface-hub',
+        'pandas': 'pandas',
+        'sentencepiece': 'sentencepiece',
+        'safetensors': 'safetensors',
+    }
+    resolved: dict[str, str] = {}
+    for logical_name, dist_name in names.items():
+        try:
+            resolved[logical_name] = package_version(dist_name)
+        except PackageNotFoundError:
+            resolved[logical_name] = 'missing'
+    return resolved
+
+
+def save_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+
+def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a', encoding='utf-8') as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False) + '\n')
+
+
+def require_existing_path(path_value: str | Path, *, label: str) -> Path:
+    path = Path(path_value)
+    if path.exists():
+        return path
+    raise FileNotFoundError(f'{label} not found: {path}')
+
+
+def has_complete_transformers_snapshot(model_dir: Path) -> bool:
+    if not model_dir.exists() or not model_dir.is_dir():
+        return False
+    required = (
+        'config.json',
+        'configuration_nemotron_h.py',
+        'modeling_nemotron_h.py',
+        'tokenizer.json',
+        'tokenizer_config.json',
+        'model.safetensors.index.json',
+    )
+    return all((model_dir / name).exists() for name in required)
+
+
+def validate_transformers_model_dir(model_dir: Path) -> None:
+    if not model_dir.exists() or not model_dir.is_dir():
+        raise FileNotFoundError(f'Base model path not found: {model_dir}')
+
+    required = (
+        'config.json',
+        'tokenizer.json',
+        'tokenizer_config.json',
+        'model.safetensors.index.json',
+    )
+    missing = [name for name in required if not (model_dir / name).exists()]
+    if missing:
+        raise RuntimeError(
+            f'Base model path is missing required Transformers files: {model_dir} '
+            f'(missing: {missing})'
+        )
+
+    config_path = model_dir / 'config.json'
+    payload = json.loads(config_path.read_text(encoding='utf-8'))
+    quantization = payload.get('quantization') or payload.get('quantization_config')
+    if isinstance(quantization, dict) and quantization:
+        raise RuntimeError(
+            f'Base model path points to a quantized snapshot, which is not allowed for this workflow: '
+            f'{model_dir} (quantization={quantization})'
+        )
+
+    remote_code_files = (
+        'configuration_nemotron_h.py',
+        'modeling_nemotron_h.py',
+    )
+    missing_remote_code = [name for name in remote_code_files if not (model_dir / name).exists()]
+    if missing_remote_code:
+        raise RuntimeError(
+            f'Base model path is missing required Nemotron remote-code files: {model_dir} '
+            f'(missing: {missing_remote_code})'
+        )
+
+
+def download_official_snapshot(cache_dir: Path, revision: str) -> Path:
+    allow_patterns = [
+        '*.json',
+        '*.py',
+        '*.jinja',
+        '*.txt',
+        '*.model',
+        '*.safetensors',
+        'tokenizer*',
+        'special_tokens_map.json',
+        'chat_template.jinja',
+    ]
+    local_path = snapshot_download(
+        repo_id=MODEL_ID,
+        revision=revision,
+        cache_dir=str(cache_dir),
+        allow_patterns=allow_patterns,
+    )
+    return Path(local_path)
+
+
+def resolve_base_model_path(
+    *,
+    base_model_path: str | None,
+    cache_dir: Path,
+    revision: str,
+    allow_download: bool,
+) -> Path:
+    requested = normalize_optional_text(base_model_path)
+    if requested is not None:
+        explicit_path = Path(requested)
+        if explicit_path.exists():
+            validate_transformers_model_dir(explicit_path)
+            return explicit_path.resolve()
+        if requested != MODEL_ID:
+            raise FileNotFoundError(f'Base model path does not exist: {explicit_path}')
+    if has_complete_transformers_snapshot(DEFAULT_MODEL_DIR):
+        validate_transformers_model_dir(DEFAULT_MODEL_DIR)
+        return DEFAULT_MODEL_DIR.resolve()
+    if allow_download or requested == MODEL_ID:
+        return download_official_snapshot(cache_dir, revision).resolve()
+    raise RuntimeError(
+        'Official Transformers BF16 model was not found locally. '
+        'Provide --base-model-path or use --download-snapshot.'
+    )
+
+
+def resolve_device(preferred: str) -> str:
+    candidate = preferred.strip().lower()
+    if candidate == 'auto':
+        if torch.backends.mps.is_available():
+            return 'mps'
+        if torch.cuda.is_available():
+            return 'cuda'
+        return 'cpu'
+    if candidate == 'mps':
+        if not torch.backends.mps.is_available():
+            raise RuntimeError('MPS is not available on this machine.')
+        return 'mps'
+    if candidate == 'cuda':
+        if not torch.cuda.is_available():
+            raise RuntimeError('CUDA is not available on this machine.')
+        return 'cuda'
+    if candidate == 'cpu':
+        return 'cpu'
+    raise ValueError(f'Unsupported device: {preferred}')
+
+
+def resolve_torch_dtype(device: str) -> torch.dtype:
+    if device in {'mps', 'cuda'}:
+        return torch.float16
+    return torch.float32
+
+
+_NON_CUDA_STREAM_PATCHED = False
+_MAMBA_RMSNORM_FALLBACK_PATCHED = False
+
+
+class _NullCudaStream:
+    pass
+
+
+def _device_type(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, torch.device):
+        return value.type
+    text = str(value)
+    if text.startswith('cuda'):
+        return 'cuda'
+    if text.startswith('mps'):
+        return 'mps'
+    if text.startswith('cpu'):
+        return 'cpu'
+    return text
+
+
+def install_non_cuda_stream_fallback() -> None:
+    global _NON_CUDA_STREAM_PATCHED
+    if _NON_CUDA_STREAM_PATCHED:
+        return
+
+    original_default_stream = torch.cuda.default_stream
+    original_stream = torch.cuda.stream
+
+    def safe_default_stream(device: Any = None) -> Any:
+        if _device_type(device) not in {None, 'cuda'}:
+            return _NullCudaStream()
+        return original_default_stream(device)
+
+    def safe_stream(stream: Any) -> Any:
+        if isinstance(stream, _NullCudaStream):
+            return nullcontext()
+        return original_stream(stream)
+
+    torch.cuda.default_stream = safe_default_stream
+    torch.cuda.stream = safe_stream
+    _NON_CUDA_STREAM_PATCHED = True
+
+
+def fallback_mamba_rmsnorm_fn(
+    *,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor | None = None,
+    z: torch.Tensor | None = None,
+    eps: float = 1e-6,
+    group_size: int | None = None,
+    norm_before_gate: bool = False,
+    **_: Any,
+) -> torch.Tensor:
+    if bias is not None:
+        raise NotImplementedError('fallback_mamba_rmsnorm_fn does not support bias')
+
+    input_dtype = x.dtype
+    hidden_states = x.to(torch.float32)
+    gate = z.to(torch.float32) if isinstance(z, torch.Tensor) else None
+    if gate is not None and not norm_before_gate:
+        hidden_states = hidden_states * torch.nn.functional.silu(gate)
+
+    hidden_size = hidden_states.shape[-1]
+    if group_size is not None and group_size > 0 and hidden_size % group_size == 0:
+        grouped = hidden_states.reshape(*hidden_states.shape[:-1], hidden_size // group_size, group_size)
+        variance = grouped.pow(2).mean(dim=-1, keepdim=True)
+        hidden_states = (grouped * torch.rsqrt(variance + eps)).reshape_as(hidden_states)
+    else:
+        variance = hidden_states.pow(2).mean(dim=-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + eps)
+
+    hidden_states = hidden_states * weight.to(device=hidden_states.device, dtype=torch.float32)
+    if gate is not None and norm_before_gate:
+        hidden_states = hidden_states * torch.nn.functional.silu(gate)
+    return hidden_states.to(input_dtype)
+
+
+def install_mamba_rmsnorm_fallback() -> None:
+    global _MAMBA_RMSNORM_FALLBACK_PATCHED
+    if _MAMBA_RMSNORM_FALLBACK_PATCHED:
+        return
+    if 'mamba_ssm.ops.triton.layernorm_gated' in sys.modules:
+        _MAMBA_RMSNORM_FALLBACK_PATCHED = True
+        return
+
+    mamba_ssm_module = sys.modules.setdefault('mamba_ssm', types.ModuleType('mamba_ssm'))
+    ops_module = sys.modules.setdefault('mamba_ssm.ops', types.ModuleType('mamba_ssm.ops'))
+    triton_module = sys.modules.setdefault('mamba_ssm.ops.triton', types.ModuleType('mamba_ssm.ops.triton'))
+    layernorm_module = types.ModuleType('mamba_ssm.ops.triton.layernorm_gated')
+    layernorm_module.rmsnorm_fn = fallback_mamba_rmsnorm_fn
+    mamba_ssm_module.__spec__ = importlib.machinery.ModuleSpec('mamba_ssm', loader=None, is_package=True)
+    ops_module.__spec__ = importlib.machinery.ModuleSpec('mamba_ssm.ops', loader=None, is_package=True)
+    triton_module.__spec__ = importlib.machinery.ModuleSpec('mamba_ssm.ops.triton', loader=None, is_package=True)
+    layernorm_module.__spec__ = importlib.machinery.ModuleSpec(
+        'mamba_ssm.ops.triton.layernorm_gated',
+        loader=None,
+        is_package=False,
+    )
+
+    mamba_ssm_module.ops = ops_module
+    ops_module.triton = triton_module
+    triton_module.layernorm_gated = layernorm_module
+    sys.modules['mamba_ssm.ops.triton.layernorm_gated'] = layernorm_module
+    _MAMBA_RMSNORM_FALLBACK_PATCHED = True
+
+
+def install_nemotron_non_cuda_fallbacks(device: str) -> None:
+    if device == 'cuda':
+        return
+    install_non_cuda_stream_fallback()
+    install_mamba_rmsnorm_fallback()
+
+
+def seed_everything(seed: int) -> None:
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def maybe_apply_chat_template(
+    tokenizer: Any,
+    messages: list[dict[str, str]],
+    *,
+    tokenize: bool,
+    add_generation_prompt: bool,
+    enable_thinking: bool = True,
+    return_tensors: str | None = None,
+) -> Any:
+    kwargs: dict[str, Any] = {
+        'tokenize': tokenize,
+        'add_generation_prompt': add_generation_prompt,
+        'enable_thinking': enable_thinking,
+    }
+    if return_tensors is not None:
+        kwargs['return_tensors'] = return_tensors
+    try:
+        return tokenizer.apply_chat_template(messages, **kwargs)
+    except TypeError:
+        kwargs.pop('enable_thinking', None)
+        return tokenizer.apply_chat_template(messages, **kwargs)
+
+
+def build_training_prompt(raw_prompt: str, prompt_instruction: str) -> str:
+    instruction = prompt_instruction.strip()
+    return raw_prompt if not instruction else f'{raw_prompt}{instruction}'
+
+
+def render_answer_completion(answer: str) -> str:
+    answer_text = answer.strip()
+    if not answer_text:
+        raise ValueError('answer text must not be empty')
+    return rf'\boxed{{{answer_text}}}'
+
+
+def extract_boxed_answer(text: str) -> str | None:
+    matches = BOXED_PATTERN.findall(text)
+    if not matches:
+        return None
+    answer = matches[-1].strip()
+    return answer or None
+
+
+def extract_final_answer_with_source(text: str | None) -> tuple[str, str]:
+    if text is None:
+        return ('NOT_FOUND', 'not_found')
+
+    boxed_matches = BOXED_PATTERN.findall(text)
+    if boxed_matches:
+        non_empty = [match.strip() for match in boxed_matches if match.strip()]
+        if non_empty:
+            return (non_empty[-1], 'boxed')
+        return (boxed_matches[-1].strip(), 'boxed')
+
+    final_answer_is_matches = FINAL_ANSWER_IS_PATTERN.findall(text)
+    if final_answer_is_matches:
+        return (final_answer_is_matches[-1].strip(), 'final_answer_is')
+
+    final_answer_colon_matches = FINAL_ANSWER_COLON_PATTERN.findall(text)
+    if final_answer_colon_matches:
+        return (final_answer_colon_matches[-1].strip(), 'final_answer_colon')
+
+    number_matches = NUMBER_PATTERN.findall(text)
+    if number_matches:
+        return (number_matches[-1], 'last_number')
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if lines:
+        return (lines[-1], 'last_line')
+    return ('NOT_FOUND', 'not_found')
+
+
+def verify_answer(stored_answer: str, predicted: str) -> bool:
+    stored_answer = stored_answer.strip()
+    predicted = predicted.strip()
+    try:
+        stored_num = float(stored_answer)
+        predicted_num = float(predicted)
+    except (TypeError, ValueError):
+        return predicted.lower() == stored_answer.lower()
+    return math.isclose(stored_num, predicted_num, rel_tol=1e-2, abs_tol=1e-5)
+
+
+def estimate_output_token_count(text: str | None) -> int:
+    if not text:
+        return 0
+    return len(re.findall(r'\S+', text))
+
+
+def raw_output_num_lines(text: str | None) -> int:
+    if not text:
+        return 0
+    return len(text.splitlines()) or 1
+
+
+def count_boxed_occurrences(text: str | None) -> int:
+    if not text:
+        return 0
+    return len(BOXED_PATTERN.findall(text))
+
+
+def detect_extra_trailing_numbers(raw_output: str | None, extracted_answer: str) -> bool:
+    if not raw_output or not extracted_answer or extracted_answer == 'NOT_FOUND':
+        return False
+    last_position = raw_output.rfind(extracted_answer)
+    if last_position == -1:
+        return False
+    suffix = raw_output[last_position + len(extracted_answer) :]
+    return bool(NUMBER_PATTERN.search(suffix))
+
+
+def detect_boxed_unclosed(raw_output: str | None) -> bool:
+    if not raw_output:
+        return False
+    last_box_start = raw_output.rfind(r'\boxed{')
+    if last_box_start == -1:
+        return False
+    return raw_output.find('}', last_box_start) == -1
+
+
+def detect_boxed_truncated_right_brace(raw_output: str | None) -> bool:
+    if not raw_output:
+        return False
+    last_box_start = raw_output.rfind(r'\boxed{')
+    if last_box_start == -1:
+        return False
+    closing_index = raw_output.find('}', last_box_start)
+    if closing_index == -1:
+        return False
+    trailing_segment = raw_output[closing_index + 1 :].splitlines()[0] if raw_output[closing_index + 1 :] else ''
+    return '}' in trailing_segment
+
+
+def classify_format_bucket(raw_output: str | None, extracted_answer: str, extraction_source: str) -> str:
+    if raw_output is None or not str(raw_output).strip():
+        return 'not_found'
+
+    boxed_matches = BOXED_PATTERN.findall(raw_output)
+    has_only_empty_boxed = bool(boxed_matches) and all(not match.strip() for match in boxed_matches)
+    if extraction_source == 'boxed':
+        if has_only_empty_boxed or extracted_answer == '':
+            return 'boxed_empty'
+        if detect_boxed_unclosed(raw_output):
+            return 'boxed_unclosed'
+        if len(boxed_matches) > 1:
+            return 'boxed_multiple'
+        if detect_boxed_truncated_right_brace(raw_output):
+            return 'boxed_truncated_right_brace'
+        if detect_extra_trailing_numbers(raw_output, extracted_answer):
+            return 'extra_trailing_numbers'
+        return 'clean_boxed'
+
+    if extraction_source in {'final_answer_is', 'final_answer_colon'}:
+        if detect_extra_trailing_numbers(raw_output, extracted_answer):
+            return 'extra_trailing_numbers'
+        return 'clean_final_answer'
+
+    if extraction_source == 'last_number':
+        return 'last_number_fallback'
+    if extraction_source == 'last_line':
+        return 'last_line_fallback'
+    return 'not_found'
+
+
+def row_contains_risky_chars(gold_answer: str, extracted_answer: str) -> bool:
+    values = (gold_answer or '', extracted_answer or '')
+    return any(marker in value for value in values for marker in RISKY_TEXT_MARKERS)
+
+
+def normalize_eval_answer(value: Any) -> str:
+    if value is None:
+        return ''
+    if value != value:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def build_eval_user_content(raw_prompt: str, boxed_instruction: str) -> str:
+    instruction = boxed_instruction.strip()
+    if not instruction:
+        return raw_prompt
+    return f'{raw_prompt.rstrip()}\n{instruction}'
+
+
+def load_tokenizer(model_path: Path) -> Any:
+    tokenizer = AutoTokenizer.from_pretrained(str(model_path), trust_remote_code=True)
+    if tokenizer.pad_token is None and tokenizer.eos_token is not None:
+        tokenizer.pad_token = tokenizer.eos_token
+    return tokenizer
+
+
+def load_model(
+    *,
+    model_path: Path,
+    device: str,
+    dtype: torch.dtype,
+    for_training: bool,
+    attn_implementation: str = 'eager',
+) -> Any:
+    install_nemotron_non_cuda_fallbacks(device)
+    model = AutoModelForCausalLM.from_pretrained(
+        str(model_path),
+        trust_remote_code=True,
+        torch_dtype=dtype,
+        low_cpu_mem_usage=True,
+        attn_implementation=attn_implementation,
+    )
+    model.to(device)
+    if for_training:
+        model.config.use_cache = False
+        model.gradient_checkpointing_enable()
+    else:
+        model.eval()
+    return model
+
+
+def load_inference_model(
+    *,
+    base_model_path: Path,
+    adapter_dir: Path | None,
+    device: str,
+    dtype: torch.dtype,
+    attn_implementation: str,
+    patch_cache_bridge: bool,
+    merge_adapter_for_inference: bool,
+) -> tuple[Any, Any, Any, dict[str, Any] | None]:
+    tokenizer = load_tokenizer(base_model_path)
+    base_model = load_model(
+        model_path=base_model_path,
+        device=device,
+        dtype=dtype,
+        for_training=False,
+        attn_implementation=attn_implementation,
+    )
+    cache_bridge_info: dict[str, Any] | None = None
+    if patch_cache_bridge:
+        cache_bridge_info = install_nemotron_cache_bridge_patch(base_model)
+
+    model = base_model
+    if adapter_dir is not None:
+        model = PeftModel.from_pretrained(base_model, str(adapter_dir), is_trainable=False)
+        if merge_adapter_for_inference:
+            model = model.merge_and_unload()
+            model.to(device)
+            if patch_cache_bridge:
+                cache_bridge_info = install_nemotron_cache_bridge_patch(model)
+
+    if hasattr(base_model, 'config'):
+        base_model.config.use_cache = True
+    if hasattr(model, 'config'):
+        model.config.use_cache = True
+    model.eval()
+    return tokenizer, base_model, model, cache_bridge_info
+
+
+def discover_target_modules(model: Any) -> list[str]:
+    discovered: set[str] = set()
+    for name, module in model.named_modules():
+        suffix = name.split('.')[-1]
+        if suffix in ALLOWED_TARGET_SUFFIXES and hasattr(module, 'weight'):
+            discovered.add(suffix)
+    missing = sorted(REQUIRED_CORE_TARGET_SUFFIXES - discovered)
+    if missing:
+        raise RuntimeError(f'Missing expected Nemotron target modules: {missing}')
+    return sorted(discovered)
+
+
+def normalize_training_family(row: dict[str, Any]) -> str:
+    return normalize_optional_text(row.get('family')) or normalize_optional_text(row.get('label')) or 'unknown'
+
+
+def normalize_training_selection_tier(row: dict[str, Any]) -> str | None:
+    return normalize_optional_text(row.get('source_selection_tier')) or normalize_optional_text(row.get('selection_tier'))
+
+
+def normalize_training_assistant_style(row: dict[str, Any]) -> str:
+    explicit_style = normalize_optional_text(row.get('assistant_style'))
+    if explicit_style is not None:
+        return explicit_style
+    if normalize_optional_text(row.get('generated_cot')) is not None:
+        return 'trace_boxed'
+    return 'boxed_only'
+
+
+def render_assistant_training_message(row: dict[str, Any], answer: str) -> str:
+    assistant_style = normalize_training_assistant_style(row)
+    generated_cot = normalize_optional_text(row.get('generated_cot'))
+    if assistant_style == 'trace_boxed':
+        if generated_cot is None:
+            raise ValueError(f"trace_boxed rows must provide generated_cot: {row.get('id', '')}")
+        if normalize_training_family(row) == 'binary' and answer in generated_cot:
+            raise ValueError(f"Binary trace should not repeat the final answer outside the box: {row.get('id', '')}")
+        return f'{generated_cot}\n\n{render_answer_completion(answer)}'
+    if assistant_style == 'boxed_only':
+        explicit_style = normalize_optional_text(row.get('assistant_style'))
+        if explicit_style == 'boxed_only' and generated_cot is not None:
+            raise ValueError(f"boxed_only rows must not carry generated_cot: {row.get('id', '')}")
+        return render_answer_completion(answer)
+    raise ValueError(f'Unsupported assistant_style: {assistant_style}')
+
+
+def render_training_pair(
+    tokenizer: Any,
+    row: dict[str, Any],
+    prompt_instruction: str,
+) -> tuple[str, str, str]:
+    prompt = normalize_optional_text(row.get('prompt'))
+    answer = normalize_optional_text(row.get('answer'))
+    if prompt is None or answer is None:
+        raise ValueError(f"Training row must contain prompt and answer: {row.get('id', '')}")
+    user_message = build_training_prompt(prompt, prompt_instruction)
+    assistant_message = render_assistant_training_message(row, answer)
+    messages = [
+        {'role': 'user', 'content': user_message},
+        {'role': 'assistant', 'content': assistant_message},
+    ]
+    full_text = str(
+        maybe_apply_chat_template(
+            tokenizer,
+            messages,
+            tokenize=False,
+            add_generation_prompt=False,
+        )
+    )
+    return user_message, assistant_message, full_text
+
+
+def encode_training_example(
+    *,
+    tokenizer: Any,
+    row: dict[str, Any],
+    prompt_instruction: str,
+    max_length: int,
+    assistant_only_loss: bool,
+) -> dict[str, Any]:
+    _user_message, assistant_message, full_text = render_training_pair(tokenizer, row, prompt_instruction)
+    assistant_char_start = full_text.find(assistant_message)
+    if assistant_char_start < 0:
+        raise ValueError(f"Assistant span not found in rendered chat for row {row.get('id', '')}")
+    try:
+        full_encoded = tokenizer(
+            full_text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=max_length,
+            return_offsets_mapping=True,
+        )
+    except (NotImplementedError, TypeError):
+        full_encoded = tokenizer(
+            full_text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=max_length,
+        )
+    input_ids = list(full_encoded['input_ids'])
+    attention_mask = list(full_encoded['attention_mask'])
+    offset_mapping = full_encoded.get('offset_mapping')
+
+    assistant_token_start: int | None = None
+    if offset_mapping:
+        for index, (start, _end) in enumerate(offset_mapping):
+            if start >= assistant_char_start:
+                assistant_token_start = index
+                break
+    if assistant_token_start is None:
+        prefix_text = full_text[:assistant_char_start]
+        prefix_ids = tokenizer(
+            prefix_text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=max_length,
+        )['input_ids']
+        assistant_token_start = len(prefix_ids)
+    if assistant_token_start >= len(input_ids):
+        raise ValueError(f"Assistant tokens were truncated out for row {row.get('id', '')}")
+
+    labels = [-100] * assistant_token_start + input_ids[assistant_token_start:] if assistant_only_loss else list(input_ids)
+    return {
+        'input_ids': torch.tensor(input_ids, dtype=torch.long),
+        'attention_mask': torch.tensor(attention_mask, dtype=torch.long),
+        'labels': torch.tensor(labels, dtype=torch.long),
+        'assistant_token_start': assistant_token_start,
+        'assistant_style': normalize_training_assistant_style(row),
+    }
+
+
+def tokenize_training_examples(
+    *,
+    tokenizer: Any,
+    train_csv_path: Path,
+    prompt_instruction: str,
+    max_length: int,
+    max_rows: int,
+    assistant_only_loss: bool,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    frame = pd.read_csv(train_csv_path)
+    if not {'prompt', 'answer'}.issubset(frame.columns):
+        raise ValueError("train.csv must contain at least 'prompt' and 'answer' columns.")
+    original_rows = len(frame)
+    if max_rows > 0:
+        frame = frame.head(max_rows).copy()
+    frame = frame.reset_index(drop=True)
+
+    records: list[dict[str, Any]] = []
+    family_counts: Counter[str] = Counter()
+    assistant_style_counts: Counter[str] = Counter()
+    selection_tier_counts: Counter[str] = Counter()
+    for row in frame.to_dict(orient='records'):
+        prompt = normalize_optional_text(row.get('prompt'))
+        answer = normalize_optional_text(row.get('answer'))
+        if prompt is None or answer is None:
+            continue
+        encoded = encode_training_example(
+            tokenizer=tokenizer,
+            row=row,
+            prompt_instruction=prompt_instruction,
+            max_length=max_length,
+            assistant_only_loss=assistant_only_loss,
+        )
+        family = normalize_training_family(row)
+        assistant_style = encoded['assistant_style']
+        selection_tier = normalize_training_selection_tier(row)
+        family_counts[family] += 1
+        assistant_style_counts[assistant_style] += 1
+        if selection_tier is not None:
+            selection_tier_counts[selection_tier] += 1
+        records.append(
+            {
+                'input_ids': encoded['input_ids'],
+                'attention_mask': encoded['attention_mask'],
+                'labels': encoded['labels'],
+                'metadata': {
+                    'id': normalize_optional_text(row.get('id')),
+                    'family': family,
+                    'assistant_style': assistant_style,
+                    'selection_tier': selection_tier,
+                    'template_subtype': normalize_optional_text(row.get('template_subtype')),
+                    'assistant_token_start': int(encoded['assistant_token_start']),
+                },
+            }
+        )
+
+    if not records:
+        raise RuntimeError('No valid training records were built from train.csv')
+
+    manifest = {
+        'input_path': str(train_csv_path),
+        'original_rows': original_rows,
+        'used_rows': len(records),
+        'prompt_instruction': prompt_instruction,
+        'max_length': max_length,
+        'max_rows': max_rows,
+        'assistant_only_loss': assistant_only_loss,
+        'source_columns': list(frame.columns),
+        'family_counts': dict(sorted(family_counts.items())),
+        'assistant_style_counts': dict(sorted(assistant_style_counts.items())),
+        'selection_tier_counts': dict(sorted(selection_tier_counts.items())),
+    }
+    return records, manifest
+
+
+def collate_training_batch(examples: list[dict[str, Any]], pad_token_id: int) -> dict[str, torch.Tensor]:
+    input_ids = pad_sequence(
+        [example['input_ids'] for example in examples],
+        batch_first=True,
+        padding_value=pad_token_id,
+    )
+    attention_mask = pad_sequence(
+        [example['attention_mask'] for example in examples],
+        batch_first=True,
+        padding_value=0,
+    )
+    labels = pad_sequence(
+        [example['labels'] for example in examples],
+        batch_first=True,
+        padding_value=-100,
+    )
+    return {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask,
+        'labels': labels,
+    }
+
+
+def move_batch_to_device(batch: dict[str, torch.Tensor], device: str) -> dict[str, torch.Tensor]:
+    return {key: value.to(device) for key, value in batch.items()}
+
+
+def normalize_adapter_config(
+    *,
+    adapter_dir: Path,
+    revision: str,
+    target_modules: list[str],
+) -> None:
+    config_path = adapter_dir / 'adapter_config.json'
+    payload = json.loads(config_path.read_text(encoding='utf-8'))
+    payload['base_model_name_or_path'] = MODEL_ID
+    payload['revision'] = revision
+    payload['bias'] = 'none'
+    payload['use_dora'] = False
+    payload['modules_to_save'] = None
+    payload['target_modules'] = target_modules
+    config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+
+def validate_adapter_dir(adapter_dir: Path) -> dict[str, Any]:
+    config_path = adapter_dir / 'adapter_config.json'
+    weights_path = adapter_dir / 'adapter_model.safetensors'
+    if not config_path.exists():
+        raise RuntimeError(f'adapter_config.json not found: {config_path}')
+    if not weights_path.exists():
+        raise RuntimeError(f'adapter_model.safetensors not found: {weights_path}')
+    if weights_path.stat().st_size <= 0:
+        raise RuntimeError(f'adapter_model.safetensors is empty: {weights_path}')
+
+    payload = json.loads(config_path.read_text(encoding='utf-8'))
+    errors: list[str] = []
+
+    if payload.get('base_model_name_or_path') != MODEL_ID:
+        errors.append(
+            f"base_model_name_or_path must be '{MODEL_ID}', got {payload.get('base_model_name_or_path')!r}"
+        )
+    rank = payload.get('r')
+    if rank is None or int(rank) > README_EVAL_CONTRACT['max_lora_rank']:
+        errors.append(f"r must be <= 32, got {rank!r}")
+    if payload.get('bias') != 'none':
+        errors.append(f"bias must be 'none', got {payload.get('bias')!r}")
+    if payload.get('use_dora', False):
+        errors.append('use_dora must be false')
+    if payload.get('modules_to_save') is not None:
+        errors.append(f"modules_to_save must be null/None, got {payload.get('modules_to_save')!r}")
+
+    target_modules = payload.get('target_modules')
+    if not isinstance(target_modules, list) or not target_modules:
+        errors.append('target_modules must be a non-empty list')
+    else:
+        unknown = sorted(set(target_modules) - set(ALLOWED_TARGET_SUFFIXES))
+        if unknown:
+            errors.append(f'unknown target_modules for this Nemotron recipe: {unknown}')
+
+    if errors:
+        raise RuntimeError('INVALID ADAPTER:\n- ' + '\n- '.join(errors))
+
+    return {
+        'adapter_dir': str(adapter_dir),
+        'r': int(rank),
+        'target_modules': list(target_modules),
+        'base_model_name_or_path': payload.get('base_model_name_or_path'),
+        'revision': payload.get('revision'),
+        'weights_bytes': weights_path.stat().st_size,
+    }
+
+
+def make_submission_zip(adapter_dir: Path, zip_path: Path) -> dict[str, Any]:
+    validate_adapter_dir(adapter_dir)
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    zip_path_resolved = zip_path.resolve()
+    with ZipFile(zip_path, 'w', compression=ZIP_DEFLATED) as archive:
+        for file_path in sorted(adapter_dir.rglob('*')):
+            if file_path.is_file() and file_path.resolve() != zip_path_resolved:
+                archive.write(file_path, arcname=file_path.relative_to(adapter_dir))
+    return {
+        'zip_path': str(zip_path),
+        'zip_size_bytes': zip_path.stat().st_size,
+    }
+
+
+def train_lora(args: argparse.Namespace) -> TrainSummary:
+    started_at = utc_now()
+    seed_everything(args.seed)
+
+    cache_dir = Path(args.cache_dir)
+    base_model_path = resolve_base_model_path(
+        base_model_path=args.base_model_path,
+        cache_dir=cache_dir,
+        revision=args.revision,
+        allow_download=args.download_snapshot,
+    )
+    train_csv_path = require_existing_path(args.train_csv, label='train csv')
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    device = resolve_device(args.device)
+    dtype = resolve_torch_dtype(device)
+    tokenizer = load_tokenizer(base_model_path)
+    model = load_model(model_path=base_model_path, device=device, dtype=dtype, for_training=True)
+    if tokenizer.pad_token_id is not None:
+        model.config.pad_token_id = tokenizer.pad_token_id
+
+    target_modules = discover_target_modules(model)
+
+    if args.lora_r > README_EVAL_CONTRACT['max_lora_rank']:
+        raise ValueError('This competition requires LoRA rank <= 32.')
+
+    peft_config = LoraConfig(
+        task_type=TaskType.CAUSAL_LM,
+        r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        target_modules=target_modules,
+        bias='none',
+        use_dora=False,
+        modules_to_save=None,
+    )
+    model = get_peft_model(model, peft_config)
+    if hasattr(model, 'enable_input_require_grads'):
+        model.enable_input_require_grads()
+    model.print_trainable_parameters()
+
+    records, data_manifest = tokenize_training_examples(
+        tokenizer=tokenizer,
+        train_csv_path=train_csv_path,
+        prompt_instruction=args.prompt_instruction,
+        max_length=args.max_length,
+        max_rows=args.max_rows,
+        assistant_only_loss=bool(args.assistant_only_loss),
+    )
+
+    train_loader = DataLoader(
+        records,
+        batch_size=args.train_batch_size,
+        shuffle=True,
+        collate_fn=lambda batch: collate_training_batch(batch, tokenizer.pad_token_id),
+    )
+    micro_steps_per_epoch = len(train_loader)
+    target_micro_steps = max(1, math.ceil(micro_steps_per_epoch * args.epochs))
+    optimizer_steps_target = max(1, math.ceil(target_micro_steps / args.grad_accum))
+    warmup_steps = max(0, int(round(optimizer_steps_target * args.warmup_ratio)))
+
+    optimizer = AdamW(
+        [parameter for parameter in model.parameters() if parameter.requires_grad],
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
+    if args.lr_schedule_type == 'cosine':
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=optimizer_steps_target,
+        )
+    else:
+        scheduler = None
+
+    manifest_path = output_dir / 'training_manifest.json'
+    metrics_path = output_dir / 'training_metrics.jsonl'
+    save_json(
+        manifest_path,
+        {
+            'started_at': started_at,
+            'base_model_id': MODEL_ID,
+            'base_model_path': str(base_model_path),
+            'revision': args.revision,
+            'device': device,
+            'dtype': str(dtype),
+            'package_versions': package_versions(),
+            'readme_eval_contract': README_EVAL_CONTRACT,
+            'train_args': {
+                'train_csv': str(train_csv_path),
+                'output_dir': str(output_dir),
+                'cache_dir': str(cache_dir),
+                'max_rows': args.max_rows,
+                'max_length': args.max_length,
+                'epochs': args.epochs,
+                'train_batch_size': args.train_batch_size,
+                'grad_accum': args.grad_accum,
+                'learning_rate': args.learning_rate,
+                'weight_decay': args.weight_decay,
+                'max_grad_norm': args.max_grad_norm,
+                'warmup_ratio': args.warmup_ratio,
+                'lr_schedule_type': args.lr_schedule_type,
+                'lora_r': args.lora_r,
+                'lora_alpha': args.lora_alpha,
+                'lora_dropout': args.lora_dropout,
+                'seed': args.seed,
+                'prompt_instruction': args.prompt_instruction,
+                'assistant_only_loss': bool(args.assistant_only_loss),
+            },
+            'target_modules': target_modules,
+            'data_manifest': data_manifest,
+            'target_micro_steps': target_micro_steps,
+            'optimizer_steps_target': optimizer_steps_target,
+        },
+    )
+
+    model.train()
+    optimizer.zero_grad(set_to_none=True)
+    micro_step = 0
+    optimizer_step = 0
+    epoch_index = 0
+
+    while micro_step < target_micro_steps:
+        epoch_index += 1
+        for batch in train_loader:
+            micro_step += 1
+            moved = move_batch_to_device(batch, device)
+            outputs = model(**moved)
+            raw_loss = outputs.loss
+            loss = raw_loss / args.grad_accum
+            loss.backward()
+
+            should_step = micro_step % args.grad_accum == 0 or micro_step == target_micro_steps
+            if should_step:
+                if args.max_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
+                optimizer.zero_grad(set_to_none=True)
+                optimizer_step += 1
+
+                metric = {
+                    'kind': 'train',
+                    'created_at': utc_now(),
+                    'epoch_index': epoch_index,
+                    'micro_step': micro_step,
+                    'optimizer_step': optimizer_step,
+                    'train_loss': float(raw_loss.detach().cpu().item()),
+                    'learning_rate': float(optimizer.param_groups[0]['lr']),
+                }
+                append_jsonl(metrics_path, metric)
+                print(
+                    f"optimizer_step={optimizer_step}/{optimizer_steps_target} "
+                    f"micro_step={micro_step}/{target_micro_steps} "
+                    f"loss={metric['train_loss']:.6f} lr={metric['learning_rate']:.8f}"
+                )
+                if device == 'mps':
+                    torch.mps.empty_cache()
+
+            if micro_step >= target_micro_steps:
+                break
+
+    model.save_pretrained(
+        str(output_dir),
+        safe_serialization=True,
+        save_embedding_layers=False,
+    )
+    normalize_adapter_config(
+        adapter_dir=output_dir,
+        revision=args.revision,
+        target_modules=target_modules,
+    )
+    validation_summary = validate_adapter_dir(output_dir)
+    save_json(output_dir / 'validation_summary.json', validation_summary)
+
+    completed_at = utc_now()
+    final_summary = TrainSummary(
+        adapter_dir=str(output_dir),
+        base_model_id=MODEL_ID,
+        base_model_path=str(base_model_path),
+        revision=args.revision,
+        device=device,
+        dtype=str(dtype),
+        train_rows=data_manifest['used_rows'],
+        optimizer_steps=optimizer_step,
+        target_modules=target_modules,
+        started_at=started_at,
+        completed_at=completed_at,
+    )
+    save_json(output_dir / 'training_summary.json', asdict(final_summary))
+
+    del model
+    gc.collect()
+    if device == 'mps':
+        torch.mps.empty_cache()
+
+    print(json.dumps(asdict(final_summary), ensure_ascii=False, indent=2))
+    return final_summary
+
+
+def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
+    seed_everything(args.seed)
+    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
+    cache_dir = Path(args.cache_dir)
+    base_model_path = resolve_base_model_path(
+        base_model_path=args.base_model_path,
+        cache_dir=cache_dir,
+        revision=args.revision,
+        allow_download=args.download_snapshot,
+    )
+
+    device = resolve_device(args.device)
+    dtype = resolve_torch_dtype(device)
+    tokenizer, base_model, model, cache_bridge_info = load_inference_model(
+        base_model_path=base_model_path,
+        adapter_dir=adapter_dir,
+        device=device,
+        dtype=dtype,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=bool(args.patch_cache_bridge),
+        merge_adapter_for_inference=bool(args.merge_adapter_for_inference),
+    )
+
+    prompt = build_training_prompt(args.prompt, args.prompt_instruction)
+    input_ids = maybe_apply_chat_template(
+        tokenizer,
+        [{'role': 'user', 'content': prompt}],
+        tokenize=True,
+        add_generation_prompt=True,
+        enable_thinking=args.enable_thinking,
+        return_tensors='pt',
+    )
+    attention_mask = None
+    if isinstance(input_ids, torch.Tensor):
+        input_tensor = input_ids
+    elif hasattr(input_ids, 'input_ids'):
+        input_tensor = input_ids['input_ids']
+        attention_mask = input_ids.get('attention_mask')
+    elif isinstance(input_ids, dict):
+        input_tensor = input_ids['input_ids']
+        attention_mask = input_ids.get('attention_mask')
+    else:
+        raise TypeError(f'Unsupported chat-template return type: {type(input_ids)!r}')
+    input_tensor = input_tensor.to(device)
+    if attention_mask is not None:
+        attention_mask = attention_mask.to(device)
+
+    with torch.inference_mode():
+        generate_kwargs: dict[str, Any] = {
+            'input_ids': input_tensor,
+            'max_new_tokens': args.max_new_tokens,
+            'do_sample': False,
+            'num_beams': 1,
+            'use_cache': True,
+            'eos_token_id': tokenizer.eos_token_id,
+            'pad_token_id': tokenizer.eos_token_id,
+        }
+        if attention_mask is not None:
+            generate_kwargs['attention_mask'] = attention_mask
+        generated = model.generate(**generate_kwargs)
+    decoded = tokenizer.decode(generated[0], skip_special_tokens=False)
+    generated_tokens = generated[0][input_tensor.shape[-1] :]
+    generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=False)
+    boxed_answer = extract_boxed_answer(generated_text) or extract_boxed_answer(decoded)
+
+    summary = {
+        'adapter_dir': str(adapter_dir),
+        'base_model_path': str(base_model_path),
+        'revision': args.revision,
+        'device': device,
+        'dtype': str(dtype),
+        'attn_implementation': args.attn_implementation,
+        'patch_cache_bridge': bool(args.patch_cache_bridge),
+        'cache_bridge_info': cache_bridge_info,
+        'merge_adapter_for_inference': bool(args.merge_adapter_for_inference),
+        'enable_thinking': bool(args.enable_thinking),
+        'mps_env': collect_mps_env_settings(),
+        'max_new_tokens': args.max_new_tokens,
+        'prompt': args.prompt,
+        'decoded_text': decoded,
+        'generated_text': generated_text,
+        'boxed_answer': boxed_answer,
+        'has_boxed_answer': boxed_answer is not None,
+        'prompt_token_count': int(input_tensor.shape[-1]),
+        'generated_token_count': int(generated_tokens.shape[-1]),
+        'created_at': utc_now(),
+    }
+    save_json(Path(adapter_dir) / 'smoke_test_summary.json', summary)
+
+    del model
+    del base_model
+    gc.collect()
+    if device == 'mps':
+        torch.mps.empty_cache()
+
+    print(generated_text)
+    if boxed_answer is None and not getattr(args, 'allow_missing_boxed', False):
+        raise ValueError(
+            'Smoke test completed but no \\boxed{} answer was found in the generated text. '
+            'Increase --max-new-tokens or inspect smoke_test_summary.json.'
+        )
+    return summary
+
+
+def evaluate_pack(args: argparse.Namespace) -> dict[str, Any]:
+    seed_everything(args.seed)
+    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
+    input_path = require_existing_path(args.input_path, label='eval pack')
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cache_dir = Path(args.cache_dir)
+    base_model_path = resolve_base_model_path(
+        base_model_path=args.base_model_path,
+        cache_dir=cache_dir,
+        revision=args.revision,
+        allow_download=args.download_snapshot,
+    )
+    device = resolve_device(args.device)
+    dtype = resolve_torch_dtype(device)
+
+    frame = pd.read_csv(input_path)
+    if not {'id', 'prompt', 'answer'}.issubset(frame.columns):
+        raise ValueError("Eval pack must contain at least 'id', 'prompt', and 'answer' columns.")
+    if args.max_rows > 0:
+        frame = frame.head(args.max_rows).copy()
+    frame = frame.reset_index(drop=True)
+
+    tokenizer, base_model, model, cache_bridge_info = load_inference_model(
+        base_model_path=base_model_path,
+        adapter_dir=adapter_dir,
+        device=device,
+        dtype=dtype,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=bool(args.patch_cache_bridge),
+        merge_adapter_for_inference=bool(args.merge_adapter_for_inference),
+    )
+
+    row_level_path = output_dir / 'row_level.jsonl'
+    if row_level_path.exists():
+        row_level_path.unlink()
+
+    manifest = {
+        'adapter_dir': str(adapter_dir),
+        'input_path': str(input_path),
+        'output_dir': str(output_dir),
+        'base_model_path': str(base_model_path),
+        'revision': args.revision,
+        'device': device,
+        'dtype': str(dtype),
+        'attn_implementation': args.attn_implementation,
+        'patch_cache_bridge': bool(args.patch_cache_bridge),
+        'cache_bridge_info': cache_bridge_info,
+        'merge_adapter_for_inference': bool(args.merge_adapter_for_inference),
+        'mps_env': collect_mps_env_settings(),
+        'max_rows': int(len(frame)),
+        'max_new_tokens': args.max_new_tokens,
+        'temperature': args.temperature,
+        'top_p': args.top_p,
+        'enable_thinking': args.enable_thinking,
+        'add_generation_prompt': args.add_generation_prompt,
+        'boxed_instruction': args.boxed_instruction,
+        'readme_eval_contract': README_EVAL_CONTRACT,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'eval_manifest.json', manifest)
+
+    rows: list[dict[str, Any]] = []
+    for row_index, row in frame.iterrows():
+        prompt_id = normalize_eval_answer(row.get('id'))
+        gold_answer = normalize_eval_answer(row.get('answer'))
+        user_content = build_eval_user_content(str(row['prompt']), args.boxed_instruction)
+        encoded = maybe_apply_chat_template(
+            tokenizer,
+            [{'role': 'user', 'content': user_content}],
+            tokenize=True,
+            add_generation_prompt=args.add_generation_prompt,
+            enable_thinking=args.enable_thinking,
+            return_tensors='pt',
+        )
+        attention_mask = None
+        if isinstance(encoded, torch.Tensor):
+            input_tensor = encoded
+        elif hasattr(encoded, 'input_ids'):
+            input_tensor = encoded['input_ids']
+            attention_mask = encoded.get('attention_mask')
+        elif isinstance(encoded, dict):
+            input_tensor = encoded['input_ids']
+            attention_mask = encoded.get('attention_mask')
+        else:
+            raise TypeError(f'Unsupported chat-template return type: {type(encoded)!r}')
+
+        input_tensor = input_tensor.to(device)
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(device)
+
+        do_sample = args.temperature > 0.0
+        print(
+            json.dumps(
+                {
+                    'event': 'row_start',
+                    'row_index': int(row_index) + 1,
+                    'rows_total': int(len(frame)),
+                    'id': prompt_id,
+                    'prompt_len_tokens': int(input_tensor.shape[-1]),
+                    'max_new_tokens': int(args.max_new_tokens),
+                    'enable_thinking': bool(args.enable_thinking),
+                    'do_sample': bool(do_sample),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        generate_kwargs: dict[str, Any] = {
+            'input_ids': input_tensor,
+            'max_new_tokens': args.max_new_tokens,
+            'do_sample': do_sample,
+            'num_beams': 1,
+            'use_cache': True,
+            'eos_token_id': tokenizer.eos_token_id,
+            'pad_token_id': tokenizer.eos_token_id,
+        }
+        if do_sample:
+            generate_kwargs['temperature'] = args.temperature
+            generate_kwargs['top_p'] = args.top_p
+        if attention_mask is not None:
+            generate_kwargs['attention_mask'] = attention_mask
+
+        with torch.inference_mode():
+            generated = model.generate(**generate_kwargs)
+
+        generated_tokens = generated[0][input_tensor.shape[-1] :]
+        raw_output = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+        extracted_answer, extraction_source = extract_final_answer_with_source(raw_output)
+        format_bucket = classify_format_bucket(raw_output, extracted_answer, extraction_source)
+
+        row_payload = {
+            'id': prompt_id,
+            'row_index': int(row_index),
+            'family': normalize_optional_text(row.get('family')) or normalize_optional_text(row.get('family_short')) or 'unknown',
+            'family_long': normalize_optional_text(row.get('family_long')) or normalize_optional_text(row.get('family')),
+            'template_subtype': normalize_optional_text(row.get('template_subtype')),
+            'selection_tier': normalize_optional_text(row.get('selection_tier')),
+            'teacher_solver_candidate': normalize_optional_text(row.get('teacher_solver_candidate')),
+            'benchmark_name': normalize_optional_text(row.get('benchmark_name')),
+            'benchmark_role': normalize_optional_text(row.get('benchmark_role')),
+            'micro_smoke_note': normalize_optional_text(row.get('micro_smoke_note')),
+            'answer_type': normalize_optional_text(row.get('answer_type')) or 'unknown',
+            'gold_answer': gold_answer,
+            'raw_output': raw_output,
+            'extracted_answer': extracted_answer,
+            'extraction_source': extraction_source,
+            'format_bucket': format_bucket,
+            'has_boxed': count_boxed_occurrences(raw_output) > 0,
+            'boxed_count': count_boxed_occurrences(raw_output),
+            'contains_extra_numbers': detect_extra_trailing_numbers(raw_output, extracted_answer),
+            'contains_risky_chars': row_contains_risky_chars(gold_answer, extracted_answer),
+            'is_correct': verify_answer(gold_answer, extracted_answer),
+            'raw_output_len_chars': len(raw_output),
+            'raw_output_num_lines': raw_output_num_lines(raw_output),
+            'raw_output_est_tokens': estimate_output_token_count(raw_output),
+            'prompt_len_tokens': int(input_tensor.shape[-1]),
+            'generated_len_tokens': int(generated_tokens.shape[-1]),
+        }
+        rows.append(row_payload)
+        append_jsonl(row_level_path, row_payload)
+        print(
+            json.dumps(
+                {
+                    'event': 'row_done',
+                    'row_index': int(row_index) + 1,
+                    'rows_total': int(len(frame)),
+                    'id': prompt_id,
+                    'is_correct': row_payload['is_correct'],
+                    'extracted_answer': extracted_answer,
+                    'format_bucket': format_bucket,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+
+    row_level = pd.DataFrame(rows)
+    row_level.to_csv(output_dir / 'row_level.csv', index=False)
+
+    summary = {
+        'adapter_dir': str(adapter_dir),
+        'input_path': str(input_path),
+        'output_dir': str(output_dir),
+        'base_model_path': str(base_model_path),
+        'device': device,
+        'dtype': str(dtype),
+        'n_rows': int(len(row_level)),
+        'overall_acc': float(row_level['is_correct'].mean()) if len(row_level) else float('nan'),
+        'extraction_fail_rate': float((row_level['extraction_source'] == 'not_found').mean()) if len(row_level) else float('nan'),
+        'format_fail_rate': float((~row_level['format_bucket'].isin(CLEAN_FORMAT_BUCKETS)).mean()) if len(row_level) else float('nan'),
+        'boxed_rate': float(row_level['has_boxed'].mean()) if len(row_level) else float('nan'),
+        'avg_output_len_chars': float(row_level['raw_output_len_chars'].mean()) if len(row_level) else float('nan'),
+        'max_new_tokens': args.max_new_tokens,
+        'temperature': args.temperature,
+        'top_p': args.top_p,
+        'enable_thinking': args.enable_thinking,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'summary.json', summary)
+
+    family_metrics = (
+        row_level.groupby('family', dropna=False)
+        .agg(
+            n=('id', 'size'),
+            acc=('is_correct', 'mean'),
+            extraction_fail_rate=('extraction_source', lambda s: float((s == 'not_found').mean())),
+            format_fail_rate=('format_bucket', lambda s: float((~s.isin(CLEAN_FORMAT_BUCKETS)).mean())),
+            boxed_rate=('has_boxed', 'mean'),
+            avg_output_len_chars=('raw_output_len_chars', 'mean'),
+        )
+        .reset_index()
+        .sort_values(['n', 'family'], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    family_metrics.to_csv(output_dir / 'family_metrics.csv', index=False)
+
+    failure_metrics = (
+        row_level.groupby('format_bucket', dropna=False)
+        .size()
+        .rename('n')
+        .reset_index()
+        .sort_values(['n', 'format_bucket'], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    failure_metrics['ratio'] = failure_metrics['n'] / len(row_level) if len(row_level) else float('nan')
+    failure_metrics.to_csv(output_dir / 'failure_metrics.csv', index=False)
+
+    del model
+    del base_model
+    gc.collect()
+    if device == 'mps':
+        torch.mps.empty_cache()
+
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
+
+
+def build_default_micro_smoke_pack() -> pd.DataFrame:
+    source_frames: dict[str, pd.DataFrame] = {}
+    rows: list[dict[str, Any]] = []
+    for case in DEFAULT_MICRO_SMOKE_CASES:
+        source_name = case['source_name']
+        source_path = DEFAULT_MICRO_SMOKE_SOURCE_PATHS[source_name]
+        if source_name not in source_frames:
+            source_frames[source_name] = pd.read_csv(source_path, dtype=str).fillna('')
+        frame = source_frames[source_name]
+        match = frame.loc[frame['id'] == case['id']]
+        if len(match) != 1:
+            raise RuntimeError(f'Micro smoke case {case["id"]} was not found exactly once in {source_path}')
+        row = dict(match.iloc[0].to_dict())
+        family_short = normalize_optional_text(row.get('family_short')) or case['family']
+        family_long = normalize_optional_text(row.get('family')) or family_short
+        row['family'] = family_short
+        row['family_long'] = family_long
+        row['micro_smoke_note'] = case['note']
+        row['micro_smoke_source_name'] = source_name
+        rows.append(row)
+    pack = pd.DataFrame(rows)
+    if not {'id', 'prompt', 'answer', 'family'}.issubset(pack.columns):
+        raise RuntimeError('Micro smoke pack is missing required evaluation columns.')
+    return pack
+
+
+def detect_runaway_repetition(raw_output: str | None) -> bool:
+    text = normalize_optional_text(raw_output)
+    if text is None:
+        return False
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) >= 4 and max(Counter(lines).values(), default=0) >= 3:
+        return True
+    words = re.findall(r'\S+', text)
+    if len(words) >= 24 and words[-24:-12] == words[-12:]:
+        return True
+    return False
+
+
+def build_micro_smoke_gate(row: dict[str, Any], *, max_new_tokens: int) -> list[str]:
+    reasons: list[str] = []
+    extracted_answer = normalize_optional_text(row.get('extracted_answer'))
+    if not bool(row.get('has_boxed', False)):
+        reasons.append('missing_boxed')
+    if extracted_answer is None or extracted_answer == 'NOT_FOUND':
+        reasons.append('missing_extracted_answer')
+    if detect_runaway_repetition(normalize_optional_text(row.get('raw_output'))):
+        reasons.append('runaway_repetition')
+    generated_len_tokens = int(row.get('generated_len_tokens', 0) or 0)
+    if generated_len_tokens >= max_new_tokens and not bool(row.get('has_boxed', False)):
+        reasons.append('token_ceiling_without_boxed')
+    return reasons
+
+
+def resolve_track_b_train_csv(track_b_dataset: str) -> Path:
+    try:
+        return TRACK_B_DATASET_PATHS[track_b_dataset]
+    except KeyError as exc:
+        raise ValueError(f'Unsupported Track B dataset: {track_b_dataset}') from exc
+
+
+def append_boolean_optional_flag(command: list[str], flag_name: str, enabled: bool) -> None:
+    command.append(f'--{flag_name}' if enabled else f'--no-{flag_name}')
+
+
+def build_micro_smoke_eval_summary(
+    *,
+    adapter_dir: Path,
+    pack_path: Path,
+    output_dir: Path,
+    row_level: pd.DataFrame,
+    base_summary: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        'adapter_dir': str(adapter_dir),
+        'input_path': str(pack_path),
+        'output_dir': str(output_dir),
+        'base_model_path': base_summary.get('base_model_path'),
+        'device': base_summary.get('device'),
+        'dtype': base_summary.get('dtype'),
+        'n_rows': int(len(row_level)),
+        'overall_acc': float(row_level['is_correct'].mean()) if len(row_level) else float('nan'),
+        'extraction_fail_rate': float((row_level['extraction_source'] == 'not_found').mean()) if len(row_level) else float('nan'),
+        'format_fail_rate': float((~row_level['format_bucket'].isin(CLEAN_FORMAT_BUCKETS)).mean()) if len(row_level) else float('nan'),
+        'boxed_rate': float(row_level['has_boxed'].mean()) if len(row_level) else float('nan'),
+        'avg_output_len_chars': float(row_level['raw_output_len_chars'].mean()) if len(row_level) else float('nan'),
+        'max_new_tokens': base_summary.get('max_new_tokens'),
+        'temperature': base_summary.get('temperature'),
+        'top_p': base_summary.get('top_p'),
+        'enable_thinking': base_summary.get('enable_thinking'),
+        'created_at': utc_now(),
+    }
+
+
+def summarize_family_micro_smoke(
+    *,
+    adapter_dir: Path,
+    output_dir: Path,
+    pack_path: Path,
+    eval_summary: dict[str, Any],
+    max_new_tokens: int,
+) -> dict[str, Any]:
+    row_level = pd.read_csv(output_dir / 'row_level.csv').fillna('')
+    row_payloads: list[dict[str, Any]] = []
+    family_pass_map: dict[str, bool] = {}
+    for row in row_level.to_dict(orient='records'):
+        reasons = build_micro_smoke_gate(row, max_new_tokens=max_new_tokens)
+        family = normalize_optional_text(row.get('family')) or 'unknown'
+        qualitative_pass = not reasons
+        family_pass_map[family] = family_pass_map.get(family, False) or qualitative_pass
+        row_payloads.append(
+            {
+                'id': str(row.get('id', '')),
+                'family': family,
+                'template_subtype': normalize_optional_text(row.get('template_subtype')),
+                'selection_tier': normalize_optional_text(row.get('selection_tier')),
+                'teacher_solver_candidate': normalize_optional_text(row.get('teacher_solver_candidate')),
+                'micro_smoke_note': normalize_optional_text(row.get('micro_smoke_note')),
+                'is_correct': bool(row.get('is_correct', False)),
+                'has_boxed': bool(row.get('has_boxed', False)),
+                'extracted_answer': normalize_optional_text(row.get('extracted_answer')),
+                'format_bucket': normalize_optional_text(row.get('format_bucket')),
+                'raw_output_est_tokens': int(row.get('raw_output_est_tokens', 0) or 0),
+                'generated_len_tokens': int(row.get('generated_len_tokens', 0) or 0),
+                'qualitative_pass': qualitative_pass,
+                'qualitative_fail_reasons': reasons,
+            }
+        )
+
+    family_gate = (
+        pd.DataFrame(row_payloads)
+        .groupby('family', dropna=False)
+        .agg(
+            n=('id', 'size'),
+            pass_count=('qualitative_pass', 'sum'),
+            any_pass=('qualitative_pass', 'max'),
+            boxed_rate=('has_boxed', 'mean'),
+            acc=('is_correct', 'mean'),
+        )
+        .reset_index()
+        .sort_values(['family'], ascending=[True])
+        .reset_index(drop=True)
+    )
+    family_gate.to_csv(output_dir / 'family_micro_smoke_family_gate.csv', index=False)
+    pd.DataFrame(row_payloads).to_csv(output_dir / 'family_micro_smoke_row_level.csv', index=False)
+
+    required_families = {'gravity', 'roman', 'text', 'unit', 'binary', 'symbol'}
+    kaggle_promotion_recommended = all(bool(family_pass_map.get(family, False)) for family in required_families)
+    summary = {
+        'track': 'Track B. Binary Program-Induction Redesign',
+        'adapter_dir': str(adapter_dir),
+        'output_dir': str(output_dir),
+        'micro_smoke_pack_path': str(pack_path),
+        'base_model_path': eval_summary['base_model_path'],
+        'n_rows': len(row_payloads),
+        'families': sorted(required_families),
+        'qualitative_pass_count': sum(1 for row in row_payloads if row['qualitative_pass']),
+        'qualitative_fail_count': sum(1 for row in row_payloads if not row['qualitative_pass']),
+        'boxed_count': sum(1 for row in row_payloads if row['has_boxed']),
+        'accuracy_count': sum(1 for row in row_payloads if row['is_correct']),
+        'kaggle_promotion_recommended': kaggle_promotion_recommended,
+        'eval_summary': eval_summary,
+        'family_gate': family_gate.to_dict(orient='records'),
+        'rows': row_payloads,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'family_micro_smoke_summary.json', summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
+
+
+def run_serial_family_micro_smoke(
+    *,
+    args: argparse.Namespace,
+    adapter_dir: Path,
+    output_dir: Path,
+    pack_path: Path,
+) -> dict[str, Any]:
+    eval_args = argparse.Namespace(
+        adapter_dir=str(adapter_dir),
+        input_path=str(pack_path),
+        output_dir=str(output_dir),
+        max_rows=0,
+        max_new_tokens=args.max_new_tokens,
+        temperature=0.0,
+        top_p=1.0,
+        seed=args.seed,
+        boxed_instruction=args.boxed_instruction,
+        enable_thinking=args.enable_thinking,
+        add_generation_prompt=args.add_generation_prompt,
+        base_model_path=args.base_model_path,
+        cache_dir=args.cache_dir,
+        revision=args.revision,
+        download_snapshot=args.download_snapshot,
+        device=args.device,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=args.patch_cache_bridge,
+        merge_adapter_for_inference=args.merge_adapter_for_inference,
+    )
+    return evaluate_pack(eval_args)
+
+
+def run_parallel_family_micro_smoke(
+    *,
+    args: argparse.Namespace,
+    adapter_dir: Path,
+    output_dir: Path,
+    pack_frame: pd.DataFrame,
+    pack_path: Path,
+) -> dict[str, Any]:
+    parallel_jobs = max(1, int(args.parallel_jobs))
+    jobs_root = output_dir / 'parallel_jobs'
+    jobs_root.mkdir(parents=True, exist_ok=True)
+
+    pending: list[dict[str, Any]] = []
+    script_path = Path(__file__).resolve()
+    grouped = pack_frame.groupby('family', sort=True)
+    for family, family_frame in grouped:
+        family_dir = jobs_root / str(family)
+        family_dir.mkdir(parents=True, exist_ok=True)
+        input_path = family_dir / f'{family}_micro_smoke.csv'
+        family_frame.to_csv(input_path, index=False)
+        log_path = family_dir / 'evaluate_pack.log'
+        command = [
+            sys.executable,
+            str(script_path),
+            'evaluate-pack',
+            '--adapter-dir',
+            str(adapter_dir),
+            '--input-path',
+            str(input_path),
+            '--output-dir',
+            str(family_dir),
+            '--max-new-tokens',
+            str(args.max_new_tokens),
+            '--temperature',
+            '0.0',
+            '--top-p',
+            '1.0',
+            '--seed',
+            str(args.seed),
+            '--boxed-instruction',
+            args.boxed_instruction,
+            '--base-model-path',
+            str(args.base_model_path),
+            '--cache-dir',
+            str(args.cache_dir),
+            '--revision',
+            str(args.revision),
+            '--device',
+            str(args.device),
+            '--attn-implementation',
+            str(args.attn_implementation),
+        ]
+        append_boolean_optional_flag(command, 'enable-thinking', bool(args.enable_thinking))
+        append_boolean_optional_flag(command, 'add-generation-prompt', bool(args.add_generation_prompt))
+        append_boolean_optional_flag(command, 'patch-cache-bridge', bool(args.patch_cache_bridge))
+        append_boolean_optional_flag(command, 'merge-adapter-for-inference', bool(args.merge_adapter_for_inference))
+        if bool(args.download_snapshot):
+            command.append('--download-snapshot')
+        pending.append(
+            {
+                'family': str(family),
+                'input_path': str(input_path),
+                'output_dir': str(family_dir),
+                'log_path': str(log_path),
+                'command': command,
+            }
+        )
+
+    running: list[dict[str, Any]] = []
+    completed: list[dict[str, Any]] = []
+    while pending or running:
+        while pending and len(running) < parallel_jobs:
+            job = pending.pop(0)
+            log_handle = Path(job['log_path']).open('w', encoding='utf-8')
+            process = subprocess.Popen(
+                job['command'],
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            job['started_at'] = utc_now()
+            job['_log_handle'] = log_handle
+            job['_process'] = process
+            running.append(job)
+
+        if not running:
+            continue
+
+        time.sleep(5)
+        next_running: list[dict[str, Any]] = []
+        for job in running:
+            process = job['_process']
+            returncode = process.poll()
+            if returncode is None:
+                next_running.append(job)
+                continue
+            job['_log_handle'].close()
+            job['returncode'] = int(returncode)
+            job['completed_at'] = utc_now()
+            del job['_log_handle']
+            del job['_process']
+            completed.append(job)
+        running = next_running
+
+    manifest = {
+        'parallel_jobs_requested': parallel_jobs,
+        'jobs': completed,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'parallel_micro_smoke_jobs.json', manifest)
+
+    failures = [job for job in completed if job.get('returncode') != 0]
+    if failures:
+        failed_families = [job['family'] for job in failures]
+        raise RuntimeError(
+            'Parallel family micro smoke failed for families: '
+            + ', '.join(sorted(failed_families))
+        )
+
+    row_frames: list[pd.DataFrame] = []
+    job_summaries: list[dict[str, Any]] = []
+    for job in completed:
+        family_dir = Path(job['output_dir'])
+        row_frames.append(pd.read_csv(family_dir / 'row_level.csv').fillna(''))
+        job_summaries.append(json.loads((family_dir / 'summary.json').read_text(encoding='utf-8')))
+
+    row_level = pd.concat(row_frames, ignore_index=True) if row_frames else pd.DataFrame()
+    row_level.to_csv(output_dir / 'row_level.csv', index=False)
+    row_level_jsonl = output_dir / 'row_level.jsonl'
+    if row_level_jsonl.exists():
+        row_level_jsonl.unlink()
+    for row in row_level.to_dict(orient='records'):
+        append_jsonl(row_level_jsonl, row)
+
+    base_summary = job_summaries[0] if job_summaries else {}
+    eval_summary = build_micro_smoke_eval_summary(
+        adapter_dir=adapter_dir,
+        pack_path=pack_path,
+        output_dir=output_dir,
+        row_level=row_level,
+        base_summary=base_summary,
+    )
+    eval_summary['mode'] = 'parallel_family_jobs'
+    eval_summary['parallel_jobs_requested'] = parallel_jobs
+    eval_summary['job_summaries'] = job_summaries
+    save_json(output_dir / 'summary.json', eval_summary)
+    return eval_summary
+
+
+def family_micro_smoke(args: argparse.Namespace) -> dict[str, Any]:
+    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
+    output_value = normalize_optional_text(getattr(args, 'output_dir', None))
+    output_dir = Path(output_value) if output_value is not None else (adapter_dir / 'family_micro_smoke')
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    pack_frame = build_default_micro_smoke_pack()
+    pack_path = output_dir / 'family_micro_smoke_pack.csv'
+    pack_frame.to_csv(pack_path, index=False)
+
+    if max(1, int(args.parallel_jobs)) == 1:
+        eval_summary = run_serial_family_micro_smoke(
+            args=args,
+            adapter_dir=adapter_dir,
+            output_dir=output_dir,
+            pack_path=pack_path,
+        )
+    else:
+        eval_summary = run_parallel_family_micro_smoke(
+            args=args,
+            adapter_dir=adapter_dir,
+            output_dir=output_dir,
+            pack_frame=pack_frame,
+            pack_path=pack_path,
+        )
+
+    return summarize_family_micro_smoke(
+        adapter_dir=adapter_dir,
+        output_dir=output_dir,
+        pack_path=pack_path,
+        eval_summary=eval_summary,
+        max_new_tokens=args.max_new_tokens,
+    )
+
+
+def run_validation_command(args: argparse.Namespace) -> dict[str, Any]:
+    summary = validate_adapter_dir(require_existing_path(args.adapter_dir, label='adapter dir'))
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
+
+
+def run_make_submission_command(args: argparse.Namespace) -> dict[str, Any]:
+    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
+    zip_path = Path(args.zip_path)
+    if zip_path.name != 'submission.zip':
+        raise ValueError(f'zip filename must be submission.zip, got {zip_path.name}')
+    summary = make_submission_zip(adapter_dir, zip_path)
+    save_json(adapter_dir / 'submission_zip_summary.json', summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
+
+
+def run_all(args: argparse.Namespace) -> dict[str, Any]:
+    train_args = argparse.Namespace(**vars(args))
+    train_summary = train_lora(train_args)
+
+    smoke_args = argparse.Namespace(
+        adapter_dir=train_summary.adapter_dir,
+        cache_dir=args.cache_dir,
+        revision=args.revision,
+        prompt=args.smoke_prompt,
+        max_new_tokens=args.max_new_tokens,
+        prompt_instruction=args.prompt_instruction,
+        base_model_path=args.base_model_path,
+        download_snapshot=args.download_snapshot,
+        device=args.device,
+        seed=args.seed,
+        allow_missing_boxed=args.allow_missing_boxed,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=args.patch_cache_bridge,
+        merge_adapter_for_inference=args.merge_adapter_for_inference,
+        enable_thinking=args.enable_thinking,
+    )
+    smoke_summary = smoke_test_adapter(smoke_args)
+
+    validation_summary = validate_adapter_dir(Path(train_summary.adapter_dir))
+
+    zip_path = Path(args.zip_path)
+    zip_summary = make_submission_zip(Path(train_summary.adapter_dir), zip_path)
+
+    combined = {
+        'train_summary': asdict(train_summary),
+        'smoke_summary': smoke_summary,
+        'validation_summary': validation_summary,
+        'zip_summary': zip_summary,
+    }
+    save_json(Path(train_summary.adapter_dir) / 'run_all_summary.json', combined)
+    print(json.dumps(combined, ensure_ascii=False, indent=2))
+    return combined
+
+
+def run_track_b(args: argparse.Namespace) -> dict[str, Any]:
+    train_args = argparse.Namespace(**vars(args))
+    train_args.train_csv = str(resolve_track_b_train_csv(args.track_b_dataset))
+    train_summary = train_lora(train_args)
+    adapter_dir = Path(train_summary.adapter_dir)
+
+    micro_smoke_args = argparse.Namespace(
+        adapter_dir=str(adapter_dir),
+        output_dir=str(adapter_dir / 'family_micro_smoke'),
+        cache_dir=args.cache_dir,
+        revision=args.revision,
+        base_model_path=args.base_model_path,
+        download_snapshot=args.download_snapshot,
+        device=args.device,
+        seed=args.seed,
+        max_new_tokens=args.micro_smoke_max_new_tokens,
+        parallel_jobs=args.micro_smoke_parallel_jobs,
+        boxed_instruction=args.boxed_instruction,
+        enable_thinking=args.enable_thinking,
+        add_generation_prompt=args.add_generation_prompt,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=args.patch_cache_bridge,
+        merge_adapter_for_inference=args.merge_adapter_for_inference,
+    )
+    micro_smoke_summary = family_micro_smoke(micro_smoke_args)
+
+    validation_summary = validate_adapter_dir(adapter_dir)
+    zip_path_value = normalize_optional_text(args.zip_path)
+    zip_path = Path(zip_path_value) if zip_path_value is not None else (adapter_dir / 'submission.zip')
+    zip_summary = make_submission_zip(adapter_dir, zip_path)
+
+    hypothesis = normalize_optional_text(args.hypothesis) or TRACK_B_DATASET_HYPOTHESES[args.track_b_dataset]
+    combined = {
+        'track': 'Track B. Binary Program-Induction Redesign',
+        'track_b_dataset': args.track_b_dataset,
+        'train_csv': train_args.train_csv,
+        'hypothesis': hypothesis,
+        'readme_eval_contract': README_EVAL_CONTRACT,
+        'train_summary': asdict(train_summary),
+        'micro_smoke_summary': micro_smoke_summary,
+        'validation_summary': validation_summary,
+        'zip_summary': zip_summary,
+        'created_at': utc_now(),
+    }
+    save_json(adapter_dir / 'track_b_run_summary.json', combined)
+    save_json(adapter_dir / 'kaggle_handoff_summary.json', combined)
+    print(json.dumps(combined, ensure_ascii=False, indent=2))
+    return combined
+
+
+def add_shared_model_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--base-model-path', type=str, default=str(DEFAULT_MODEL_DIR))
+    parser.add_argument('--cache-dir', type=str, default=str(DEFAULT_CACHE_DIR))
+    parser.add_argument('--revision', type=str, default='main')
+    parser.add_argument('--download-snapshot', action='store_true')
+    parser.add_argument('--device', type=str, default='auto', choices=('auto', 'mps', 'cuda', 'cpu'))
+    parser.add_argument(
+        '--attn-implementation',
+        type=str,
+        default='eager',
+        choices=('eager', 'sdpa', 'flash_attention_2'),
+    )
+
+
+def add_inference_tuning_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        '--patch-cache-bridge',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        '--merge-adapter-for-inference',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+
+
+def add_train_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--train-csv', type=str, default=str(DEFAULT_TRAIN_CSV))
+    parser.add_argument('--output-dir', type=str, required=True)
+    parser.add_argument('--max-rows', type=int, default=0)
+    parser.add_argument('--max-length', type=int, default=2048)
+    parser.add_argument('--epochs', type=float, default=2.0)
+    parser.add_argument('--train-batch-size', type=int, default=4)
+    parser.add_argument('--grad-accum', type=int, default=1)
+    parser.add_argument('--learning-rate', type=float, default=1e-4)
+    parser.add_argument('--weight-decay', type=float, default=0.0)
+    parser.add_argument('--max-grad-norm', type=float, default=1.0)
+    parser.add_argument('--warmup-ratio', type=float, default=0.1)
+    parser.add_argument('--lr-schedule-type', type=str, default='cosine', choices=('cosine', 'constant'))
+    parser.add_argument('--lora-r', type=int, default=32)
+    parser.add_argument('--lora-alpha', type=int, default=32)
+    parser.add_argument('--lora-dropout', type=float, default=0.0)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--prompt-instruction', type=str, default=DEFAULT_PROMPT_INSTRUCTION)
+    parser.add_argument('--assistant-only-loss', action=argparse.BooleanOptionalAction, default=True)
+
+
+def add_eval_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--adapter-dir', type=str, required=True)
+    parser.add_argument('--input-path', type=str, required=True)
+    parser.add_argument('--output-dir', type=str, required=True)
+    parser.add_argument('--max-rows', type=int, default=0)
+    parser.add_argument('--max-new-tokens', type=int, default=int(README_EVAL_CONTRACT['max_tokens']))
+    parser.add_argument('--temperature', type=float, default=float(README_EVAL_CONTRACT['temperature']))
+    parser.add_argument('--top-p', type=float, default=float(README_EVAL_CONTRACT['top_p']))
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--boxed-instruction', type=str, default=OFFICIAL_BOXED_INSTRUCTION)
+    parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--add-generation-prompt', action=argparse.BooleanOptionalAction, default=True)
+
+
+def add_family_micro_smoke_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--adapter-dir', type=str, required=True)
+    parser.add_argument('--output-dir', type=str)
+    parser.add_argument('--max-new-tokens', type=int, default=128)
+    parser.add_argument('--parallel-jobs', type=int, default=DEFAULT_MICRO_SMOKE_PARALLEL_JOBS)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--boxed-instruction', type=str, default=OFFICIAL_BOXED_INSTRUCTION)
+    parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('--add-generation-prompt', action=argparse.BooleanOptionalAction, default=True)
+
+
+def add_track_b_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--track-b-dataset', type=str, default='dsl', choices=tuple(sorted(TRACK_B_DATASET_PATHS)))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            'Single-file Transformers + PEFT LoRA pipeline for README-compatible '
+            'NVIDIA Nemotron Track B submission work.'
+        )
+    )
+    subparsers = parser.add_subparsers(dest='command', required=True)
+
+    train_parser = subparsers.add_parser('train-lora', help='Train a LoRA adapter with assistant-only loss by default')
+    add_shared_model_args(train_parser)
+    add_train_args(train_parser)
+
+    smoke_parser = subparsers.add_parser('smoke-test', help='Run a local generation smoke test with a saved adapter')
+    add_shared_model_args(smoke_parser)
+    smoke_parser.add_argument('--adapter-dir', type=str, required=True)
+    smoke_parser.add_argument('--prompt', type=str, default=DEFAULT_PROMPT)
+    smoke_parser.add_argument('--max-new-tokens', type=int, default=DEFAULT_SMOKE_MAX_NEW_TOKENS)
+    smoke_parser.add_argument('--seed', type=int, default=42)
+    smoke_parser.add_argument('--prompt-instruction', type=str, default=DEFAULT_PROMPT_INSTRUCTION)
+    smoke_parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=True)
+    smoke_parser.add_argument('--allow-missing-boxed', action='store_true')
+    add_inference_tuning_args(smoke_parser)
+
+    validate_parser = subparsers.add_parser(
+        'validate-submission',
+        help='Validate adapter_config.json against README/vLLM submission constraints',
+    )
+    validate_parser.add_argument('--adapter-dir', type=str, required=True)
+
+    eval_parser = subparsers.add_parser(
+        'evaluate-pack',
+        help='Run README-faithful local evaluation on an eval pack with a saved adapter',
+    )
+    add_shared_model_args(eval_parser)
+    add_eval_args(eval_parser)
+    add_inference_tuning_args(eval_parser)
+
+    family_micro_smoke_parser = subparsers.add_parser(
+        'family-micro-smoke',
+        help='Run the curated Track B local family micro smoke set',
+    )
+    add_shared_model_args(family_micro_smoke_parser)
+    add_family_micro_smoke_args(family_micro_smoke_parser)
+    add_inference_tuning_args(family_micro_smoke_parser)
+
+    zip_parser = subparsers.add_parser('make-submission', help='Create submission.zip from a validated adapter dir')
+    zip_parser.add_argument('--adapter-dir', type=str, required=True)
+    zip_parser.add_argument('--zip-path', type=str, default='submission.zip')
+
+    run_all_parser = subparsers.add_parser(
+        'run-all',
+        help='Train, smoke-test, validate, and produce submission.zip in one command',
+    )
+    add_shared_model_args(run_all_parser)
+    add_train_args(run_all_parser)
+    run_all_parser.add_argument('--smoke-prompt', type=str, default=DEFAULT_PROMPT)
+    run_all_parser.add_argument('--max-new-tokens', type=int, default=DEFAULT_SMOKE_MAX_NEW_TOKENS)
+    run_all_parser.add_argument('--zip-path', type=str, default='submission.zip')
+    run_all_parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=True)
+    run_all_parser.add_argument('--allow-missing-boxed', action='store_true')
+    add_inference_tuning_args(run_all_parser)
+
+    run_track_b_parser = subparsers.add_parser(
+        'run-track-b',
+        help='Train the Track B binary redesign recipe, run parallel local family micro smoke, and build submission.zip',
+    )
+    add_shared_model_args(run_track_b_parser)
+    add_train_args(run_track_b_parser)
+    add_track_b_args(run_track_b_parser)
+    run_track_b_parser.add_argument('--micro-smoke-max-new-tokens', type=int, default=128)
+    run_track_b_parser.add_argument('--micro-smoke-parallel-jobs', type=int, default=DEFAULT_MICRO_SMOKE_PARALLEL_JOBS)
+    run_track_b_parser.add_argument('--boxed-instruction', type=str, default=OFFICIAL_BOXED_INSTRUCTION)
+    run_track_b_parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=False)
+    run_track_b_parser.add_argument('--add-generation-prompt', action=argparse.BooleanOptionalAction, default=True)
+    run_track_b_parser.add_argument('--zip-path', type=str, default=None)
+    run_track_b_parser.add_argument('--hypothesis', type=str, default=None)
+    add_inference_tuning_args(run_track_b_parser)
+
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.command == 'train-lora':
+        train_lora(args)
+        return
+    if args.command == 'smoke-test':
+        smoke_test_adapter(args)
+        return
+    if args.command == 'validate-submission':
+        run_validation_command(args)
+        return
+    if args.command == 'evaluate-pack':
+        evaluate_pack(args)
+        return
+    if args.command == 'family-micro-smoke':
+        family_micro_smoke(args)
+        return
+    if args.command == 'make-submission':
+        run_make_submission_command(args)
+        return
+    if args.command == 'run-all':
+        run_all(args)
+        return
+    if args.command == 'run-track-b':
+        run_track_b(args)
+        return
+    raise ValueError(f'Unsupported command: {args.command}')
+
+
+if __name__ == '__main__':
+    main()
