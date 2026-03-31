@@ -6,6 +6,7 @@ import gc
 import importlib.machinery
 import json
 import math
+import os
 import random
 import re
 import sys
@@ -49,6 +50,13 @@ DEFAULT_SMOKE_MAX_NEW_TOKENS = 256
 OFFICIAL_BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 DEFAULT_PROMPT_INSTRUCTION = (
     '\n' + OFFICIAL_BOXED_INSTRUCTION
+)
+MPS_ENV_KEYS = (
+    'PYTORCH_MPS_FAST_MATH',
+    'PYTORCH_MPS_PREFER_METAL',
+    'PYTORCH_ENABLE_MPS_FALLBACK',
+    'PYTORCH_MPS_HIGH_WATERMARK_RATIO',
+    'PYTORCH_MPS_LOW_WATERMARK_RATIO',
 )
 
 ALLOWED_TARGET_SUFFIXES = (
@@ -120,6 +128,159 @@ def normalize_optional_text(value: Any) -> str | None:
     if not normalized or normalized.lower() == 'nan':
         return None
     return normalized
+
+
+def collect_mps_env_settings() -> dict[str, str | None]:
+    return {key: os.environ.get(key) for key in MPS_ENV_KEYS}
+
+
+class TensorStateList(list):
+    @property
+    def device(self) -> torch.device:
+        for value in self:
+            if isinstance(value, torch.Tensor):
+                return value.device
+        return torch.device('cpu')
+
+    def zero_(self) -> TensorStateList:
+        for value in self:
+            if isinstance(value, torch.Tensor) and value.numel() > 0:
+                value.zero_()
+        return self
+
+
+def prime_nemotron_cache_object(cache_value: Any, *, config: Any | None = None) -> Any:
+    if cache_value is None:
+        return None
+    if config is not None:
+        if not hasattr(cache_value, 'conv_kernel_size') and hasattr(config, 'conv_kernel'):
+            cache_value.conv_kernel_size = int(config.conv_kernel)
+        if not hasattr(cache_value, 'ssm_state_size') and hasattr(config, 'ssm_state_size'):
+            cache_value.ssm_state_size = int(config.ssm_state_size)
+        if not hasattr(cache_value, 'intermediate_size') and hasattr(config, 'mamba_num_heads') and hasattr(config, 'mamba_head_dim'):
+            cache_value.intermediate_size = int(config.mamba_num_heads) * int(config.mamba_head_dim)
+    if not hasattr(cache_value, 'seqlen_offset'):
+        cache_value.seqlen_offset = 0
+    for attr_name in ('conv_states', 'ssm_states', 'key_cache', 'value_cache'):
+        values = getattr(cache_value, attr_name, None)
+        if values is not None and not isinstance(values, TensorStateList):
+            setattr(cache_value, attr_name, TensorStateList(values))
+    return cache_value
+
+
+def locate_nemotron_generation_model(model: Any) -> Any:
+    queue = [model]
+    seen: set[int] = set()
+    while queue:
+        current = queue.pop(0)
+        if current is None:
+            continue
+        current_id = id(current)
+        if current_id in seen:
+            continue
+        seen.add(current_id)
+        if current.__class__.__name__ == 'NemotronHForCausalLM':
+            return current
+        if hasattr(current, 'prepare_inputs_for_generation') and hasattr(current, 'backbone'):
+            return current
+        for attr in ('base_model', 'model'):
+            child = getattr(current, attr, None)
+            if child is not None:
+                queue.append(child)
+    raise RuntimeError('Could not locate the Nemotron generation model for cache patching.')
+
+
+def install_nemotron_cache_bridge_patch(model: Any) -> dict[str, Any]:
+    target = locate_nemotron_generation_model(model)
+    model_cls = target.__class__
+    target_name = f'{model_cls.__module__}.{model_cls.__name__}'
+    if getattr(model_cls, '_copilot_cache_bridge_patch_applied', False):
+        return {
+            'applied': False,
+            'already_patched': True,
+            'target_class': target_name,
+        }
+
+    original_prepare = getattr(model_cls, 'prepare_inputs_for_generation', None)
+    original_forward = getattr(model_cls, 'forward', None)
+    if original_prepare is None or original_forward is None:
+        raise RuntimeError(f'Nemotron cache bridge target is missing generation hooks: {target_name}')
+
+    def patched_prepare_inputs_for_generation(
+        self,
+        input_ids,
+        past_key_values=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        cache_position=None,
+        position_ids=None,
+        use_cache=True,
+        **kwargs,
+    ):
+        model_inputs = original_prepare(
+            self,
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            cache_position=cache_position,
+            position_ids=position_ids,
+            use_cache=use_cache,
+            **kwargs,
+        )
+        if isinstance(model_inputs, dict):
+            cache_value = past_key_values
+            if cache_value is None:
+                cache_value = model_inputs.get('past_key_values')
+            cache_value = prime_nemotron_cache_object(cache_value, config=getattr(self, 'config', None))
+            model_inputs['cache_params'] = cache_value
+            model_inputs['past_key_values'] = cache_value
+        return model_inputs
+
+    def patched_forward(
+        self,
+        input_ids=None,
+        inputs_embeds=None,
+        position_ids=None,
+        cache_params=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        use_cache=None,
+        cache_position=None,
+        attention_mask=None,
+        **kwargs,
+    ):
+        cache_candidate = kwargs.pop('past_key_values', None)
+        if cache_params is None and cache_candidate is not None:
+            cache_params = cache_candidate
+        cache_params = prime_nemotron_cache_object(cache_params, config=getattr(self, 'config', None))
+        return original_forward(
+            self,
+            input_ids=input_ids,
+            inputs_embeds=inputs_embeds,
+            position_ids=position_ids,
+            cache_params=cache_params,
+            labels=labels,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            use_cache=use_cache,
+            cache_position=cache_position,
+            attention_mask=attention_mask,
+            **kwargs,
+        )
+
+    model_cls.prepare_inputs_for_generation = patched_prepare_inputs_for_generation
+    model_cls.forward = patched_forward
+    model_cls._copilot_cache_bridge_patch_applied = True
+    model_cls._copilot_cache_bridge_target = target_name
+    return {
+        'applied': True,
+        'already_patched': False,
+        'target_class': target_name,
+    }
 
 
 def package_versions() -> dict[str, str]:
@@ -609,6 +770,7 @@ def load_model(
     device: str,
     dtype: torch.dtype,
     for_training: bool,
+    attn_implementation: str = 'eager',
 ) -> Any:
     install_nemotron_non_cuda_fallbacks(device)
     model = AutoModelForCausalLM.from_pretrained(
@@ -616,7 +778,7 @@ def load_model(
         trust_remote_code=True,
         torch_dtype=dtype,
         low_cpu_mem_usage=True,
-        attn_implementation='eager',
+        attn_implementation=attn_implementation,
     )
     model.to(device)
     if for_training:
@@ -625,6 +787,45 @@ def load_model(
     else:
         model.eval()
     return model
+
+
+def load_inference_model(
+    *,
+    base_model_path: Path,
+    adapter_dir: Path | None,
+    device: str,
+    dtype: torch.dtype,
+    attn_implementation: str,
+    patch_cache_bridge: bool,
+    merge_adapter_for_inference: bool,
+) -> tuple[Any, Any, Any, dict[str, Any] | None]:
+    tokenizer = load_tokenizer(base_model_path)
+    base_model = load_model(
+        model_path=base_model_path,
+        device=device,
+        dtype=dtype,
+        for_training=False,
+        attn_implementation=attn_implementation,
+    )
+    cache_bridge_info: dict[str, Any] | None = None
+    if patch_cache_bridge:
+        cache_bridge_info = install_nemotron_cache_bridge_patch(base_model)
+
+    model = base_model
+    if adapter_dir is not None:
+        model = PeftModel.from_pretrained(base_model, str(adapter_dir), is_trainable=False)
+        if merge_adapter_for_inference:
+            model = model.merge_and_unload()
+            model.to(device)
+            if patch_cache_bridge:
+                cache_bridge_info = install_nemotron_cache_bridge_patch(model)
+
+    if hasattr(base_model, 'config'):
+        base_model.config.use_cache = True
+    if hasattr(model, 'config'):
+        model.config.use_cache = True
+    model.eval()
+    return tokenizer, base_model, model, cache_bridge_info
 
 
 def discover_target_modules(model: Any) -> list[str]:
@@ -1032,10 +1233,15 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
 
     device = resolve_device(args.device)
     dtype = resolve_torch_dtype(device)
-    tokenizer = load_tokenizer(base_model_path)
-    base_model = load_model(model_path=base_model_path, device=device, dtype=dtype, for_training=False)
-    model = PeftModel.from_pretrained(base_model, str(adapter_dir), is_trainable=False)
-    model.eval()
+    tokenizer, base_model, model, cache_bridge_info = load_inference_model(
+        base_model_path=base_model_path,
+        adapter_dir=adapter_dir,
+        device=device,
+        dtype=dtype,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=bool(args.patch_cache_bridge),
+        merge_adapter_for_inference=bool(args.merge_adapter_for_inference),
+    )
 
     prompt = build_training_prompt(args.prompt, args.prompt_instruction)
     input_ids = maybe_apply_chat_template(
@@ -1043,6 +1249,7 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
         [{'role': 'user', 'content': prompt}],
         tokenize=True,
         add_generation_prompt=True,
+        enable_thinking=args.enable_thinking,
         return_tensors='pt',
     )
     attention_mask = None
@@ -1060,11 +1267,13 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
     if attention_mask is not None:
         attention_mask = attention_mask.to(device)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         generate_kwargs: dict[str, Any] = {
             'input_ids': input_tensor,
             'max_new_tokens': args.max_new_tokens,
             'do_sample': False,
+            'num_beams': 1,
+            'use_cache': True,
             'eos_token_id': tokenizer.eos_token_id,
             'pad_token_id': tokenizer.eos_token_id,
         }
@@ -1081,6 +1290,13 @@ def smoke_test_adapter(args: argparse.Namespace) -> dict[str, Any]:
         'base_model_path': str(base_model_path),
         'revision': args.revision,
         'device': device,
+        'dtype': str(dtype),
+        'attn_implementation': args.attn_implementation,
+        'patch_cache_bridge': bool(args.patch_cache_bridge),
+        'cache_bridge_info': cache_bridge_info,
+        'merge_adapter_for_inference': bool(args.merge_adapter_for_inference),
+        'enable_thinking': bool(args.enable_thinking),
+        'mps_env': collect_mps_env_settings(),
         'max_new_tokens': args.max_new_tokens,
         'prompt': args.prompt,
         'decoded_text': decoded,
@@ -1132,10 +1348,15 @@ def evaluate_pack(args: argparse.Namespace) -> dict[str, Any]:
         frame = frame.head(args.max_rows).copy()
     frame = frame.reset_index(drop=True)
 
-    tokenizer = load_tokenizer(base_model_path)
-    base_model = load_model(model_path=base_model_path, device=device, dtype=dtype, for_training=False)
-    model = PeftModel.from_pretrained(base_model, str(adapter_dir), is_trainable=False)
-    model.eval()
+    tokenizer, base_model, model, cache_bridge_info = load_inference_model(
+        base_model_path=base_model_path,
+        adapter_dir=adapter_dir,
+        device=device,
+        dtype=dtype,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=bool(args.patch_cache_bridge),
+        merge_adapter_for_inference=bool(args.merge_adapter_for_inference),
+    )
 
     row_level_path = output_dir / 'row_level.jsonl'
     if row_level_path.exists():
@@ -1149,6 +1370,11 @@ def evaluate_pack(args: argparse.Namespace) -> dict[str, Any]:
         'revision': args.revision,
         'device': device,
         'dtype': str(dtype),
+        'attn_implementation': args.attn_implementation,
+        'patch_cache_bridge': bool(args.patch_cache_bridge),
+        'cache_bridge_info': cache_bridge_info,
+        'merge_adapter_for_inference': bool(args.merge_adapter_for_inference),
+        'mps_env': collect_mps_env_settings(),
         'max_rows': int(len(frame)),
         'max_new_tokens': args.max_new_tokens,
         'temperature': args.temperature,
@@ -1211,6 +1437,8 @@ def evaluate_pack(args: argparse.Namespace) -> dict[str, Any]:
             'input_ids': input_tensor,
             'max_new_tokens': args.max_new_tokens,
             'do_sample': do_sample,
+            'num_beams': 1,
+            'use_cache': True,
             'eos_token_id': tokenizer.eos_token_id,
             'pad_token_id': tokenizer.eos_token_id,
         }
@@ -1220,7 +1448,7 @@ def evaluate_pack(args: argparse.Namespace) -> dict[str, Any]:
         if attention_mask is not None:
             generate_kwargs['attention_mask'] = attention_mask
 
-        with torch.no_grad():
+        with torch.inference_mode():
             generated = model.generate(**generate_kwargs)
 
         generated_tokens = generated[0][input_tensor.shape[-1] :]
@@ -1361,6 +1589,10 @@ def run_all(args: argparse.Namespace) -> dict[str, Any]:
         device=args.device,
         seed=args.seed,
         allow_missing_boxed=args.allow_missing_boxed,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=args.patch_cache_bridge,
+        merge_adapter_for_inference=args.merge_adapter_for_inference,
+        enable_thinking=args.enable_thinking,
     )
     smoke_summary = smoke_test_adapter(smoke_args)
 
@@ -1386,6 +1618,25 @@ def add_shared_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--revision', type=str, default='main')
     parser.add_argument('--download-snapshot', action='store_true')
     parser.add_argument('--device', type=str, default='auto', choices=('auto', 'mps', 'cuda', 'cpu'))
+    parser.add_argument(
+        '--attn-implementation',
+        type=str,
+        default='eager',
+        choices=('eager', 'sdpa', 'flash_attention_2'),
+    )
+
+
+def add_inference_tuning_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        '--patch-cache-bridge',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    parser.add_argument(
+        '--merge-adapter-for-inference',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
 
 
 def add_train_args(parser: argparse.ArgumentParser) -> None:
@@ -1442,7 +1693,9 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser.add_argument('--max-new-tokens', type=int, default=DEFAULT_SMOKE_MAX_NEW_TOKENS)
     smoke_parser.add_argument('--seed', type=int, default=42)
     smoke_parser.add_argument('--prompt-instruction', type=str, default=DEFAULT_PROMPT_INSTRUCTION)
+    smoke_parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=True)
     smoke_parser.add_argument('--allow-missing-boxed', action='store_true')
+    add_inference_tuning_args(smoke_parser)
 
     validate_parser = subparsers.add_parser(
         'validate-submission',
@@ -1456,6 +1709,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_shared_model_args(eval_parser)
     add_eval_args(eval_parser)
+    add_inference_tuning_args(eval_parser)
 
     zip_parser = subparsers.add_parser('make-submission', help='Create submission.zip from a validated adapter dir')
     zip_parser.add_argument('--adapter-dir', type=str, required=True)
@@ -1470,7 +1724,9 @@ def build_parser() -> argparse.ArgumentParser:
     run_all_parser.add_argument('--smoke-prompt', type=str, default=DEFAULT_PROMPT)
     run_all_parser.add_argument('--max-new-tokens', type=int, default=DEFAULT_SMOKE_MAX_NEW_TOKENS)
     run_all_parser.add_argument('--zip-path', type=str, default='submission.zip')
+    run_all_parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=True)
     run_all_parser.add_argument('--allow-missing-boxed', action='store_true')
+    add_inference_tuning_args(run_all_parser)
 
     return parser
 
