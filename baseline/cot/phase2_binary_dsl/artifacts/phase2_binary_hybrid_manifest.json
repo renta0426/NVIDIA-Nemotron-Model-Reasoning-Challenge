@@ -1,0 +1,76 @@
+{
+  "source_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_binary_dsl/artifacts/phase2_binary_hybrid_training_data.csv",
+  "manifest_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_binary_dsl/artifacts/phase2_binary_hybrid_manifest.json",
+  "subsample_size": 900,
+  "seed": 42,
+  "verified_quotas": {
+    "gravity_constant": 120,
+    "unit_conversion": 120,
+    "roman_numeral": 120,
+    "text_decryption": 100,
+    "bit_manipulation": 160,
+    "symbol_equation": 60
+  },
+  "answer_only_quotas": {
+    "text_decryption": 20,
+    "bit_manipulation": 120,
+    "symbol_equation": 80
+  },
+  "family_counts": {
+    "bit_manipulation": 280,
+    "gravity_constant": 120,
+    "roman_numeral": 120,
+    "symbol_equation": 140,
+    "text_decryption": 120,
+    "unit_conversion": 120
+  },
+  "source_selection_tier_counts": {
+    "answer_only_keep": 220,
+    "verified_trace_ready": 680
+  },
+  "assistant_style_counts": {
+    "boxed_only": 220,
+    "trace_boxed": 680
+  },
+  "template_subtype_counts": {
+    "bit_other": 106,
+    "bit_permutation_inversion": 53,
+    "bit_structured_byte_formula": 121,
+    "gravity_half_g_t2": 120,
+    "numeric_2x2": 140,
+    "roman_standard": 120,
+    "text_monoalphabetic": 120,
+    "unit_fixed_ratio": 120
+  },
+  "teacher_solver_counts": {
+    "": 160,
+    "binary_affine_xor": 53,
+    "binary_bit_permutation_bijection": 51,
+    "binary_byte_transform": 2,
+    "binary_structured_byte_formula": 54,
+    "gravity_numeric_rule": 120,
+    "roman_standard": 120,
+    "symbol_numeric_operator_formula": 120,
+    "text_char_substitution": 100,
+    "unit_numeric_rule": 120
+  },
+  "binary_phase2_design": {
+    "verified_binary_trace_rows": 160,
+    "answer_only_binary_boxed_rows": 120,
+    "binary_answer_only_is_boxed_only": true,
+    "binary_trace_avoids_repeating_final_answer_inside_think": true,
+    "binary_trace_style": "hybrid_narrative",
+    "binary_trace_category_counts": {
+      "generic_solver_family": 13,
+      "hybrid_byte_transform": 14,
+      "hybrid_exact_formula": 133
+    }
+  },
+  "notes": [
+    "Phase 2 keeps the Phase 1 mixture fixed so binary teacher format is the main changed variable.",
+    "Verified binary rows use a compact hybrid trace that verbalizes the verified rule and query application, while answer_only_keep binary rows stay boxed-only.",
+    "Binary traces never restate the final 8-bit answer inside <think> because README scoring is boxed-first and long numeric drift is harmful.",
+    "The output schema matches phase1_assistant_only/train_rule_based_cot_phase1_assistant_only.py so the existing trainer can consume this CSV via --dataset-csv."
+  ]
+}

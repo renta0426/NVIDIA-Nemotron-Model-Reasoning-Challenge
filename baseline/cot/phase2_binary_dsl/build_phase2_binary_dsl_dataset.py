@@ -13,8 +13,8 @@ from typing import Any, Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_SOURCE_CSV = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts" / "train_row_analysis_v1.csv"
-DEFAULT_DATASET_CSV = Path(__file__).resolve().parent / "artifacts" / "phase2_binary_dsl_training_data.csv"
-DEFAULT_MANIFEST_JSON = Path(__file__).resolve().parent / "artifacts" / "phase2_binary_dsl_manifest.json"
+DEFAULT_DATASET_CSV = Path(__file__).resolve().parent / "artifacts" / "phase2_binary_hybrid_training_data.csv"
+DEFAULT_MANIFEST_JSON = Path(__file__).resolve().parent / "artifacts" / "phase2_binary_hybrid_manifest.json"
 BOXED_INSTRUCTION = "Please put your final answer inside `\\boxed{}`. For example: `\\boxed{your answer}`"
 DEFAULT_SEED = 42
 
@@ -87,7 +87,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Build the Phase 2 README-aligned dataset that keeps the Phase 1 mixture "
-            "but rewrites verified binary teachers into a structured DSL scratchpad."
+            "but rewrites verified binary teachers into a compact hybrid trace."
         )
     )
     parser.add_argument(
@@ -528,7 +528,12 @@ def is_simple_transform(node: ExprNode) -> bool:
     return not node.args and node.name not in {"x", "query"}
 
 
-def build_binary_dsl_trace(rule_text: str, query_text: str, final_answer_text: str) -> str:
+def simplify_step_text(step_line: str) -> str:
+    _label, _sep, remainder = step_line.partition("=")
+    return remainder or step_line
+
+
+def build_binary_hybrid_trace(rule_text: str, query_text: str, final_answer_text: str) -> str:
     query_value = int(query_text, 2)
     root = parse_expr(rule_text)
     steps: list[str] = []
@@ -575,30 +580,33 @@ def build_binary_dsl_trace(rule_text: str, query_text: str, final_answer_text: s
         return label
 
     root_apply = emit(root, is_root=True)
-    lines = [
-        "family=binary",
-        f"rule={rule_text}",
-        f"query={query_text}",
+    sentences = [
+        f"The examples support the verified binary rule {rule_text}.",
+        f"I apply the same byte transformation to the query {query_text}.",
     ]
-    lines.extend(steps[:4])
-    lines.append(f"apply={root_apply}")
-    lines.append("constraints=exact_8bit,leading_zeros,box_only_final")
-    return "<think>" + "\n".join(lines) + "</think>"
+    if steps:
+        preview_steps = [simplify_step_text(step) for step in steps[:2]]
+        sentences.append(f"Useful intermediate byte operations are {'; '.join(preview_steps)}.")
+    if root_apply:
+        if steps:
+            sentences.append(f"I then complete the query application as {root_apply}.")
+        else:
+            sentences.append(f"The key query application is {root_apply}.")
+    sentences.append(
+        "I keep the result as one exact 8-bit binary string with leading zeros and will place only that final byte in the box."
+    )
+    return "<think>" + " ".join(sentences) + "</think>"
 
 
 def build_binary_generic_trace(row: dict[str, str], payload: dict[str, Any]) -> str:
     solver = row.get("teacher_solver_candidate", "").strip() or "verified_binary_rule"
     rule_label = generic_binary_rule_label(row, payload)
     query_text = row.get("query_raw", "").strip()
-    lines = [
-        "family=binary",
-        f"solver={solver}",
-        f"rule_family={rule_label}",
-        f"query={query_text}",
-        "apply=verified_binary_program(query)",
-        "constraints=exact_8bit,leading_zeros,box_only_final",
-    ]
-    return "<think>" + "\n".join(lines) + "</think>"
+    return (
+        f"<think>The examples support the verified binary solver family {solver} with rule family {rule_label}. "
+        f"I apply the same byte transformation to the query {query_text}. "
+        "I keep the result as one exact 8-bit binary string with leading zeros and will place only that final byte in the box.</think>"
+    )
 
 
 def build_roman_trace(row: dict[str, str], payload: dict[str, Any]) -> str:
@@ -667,7 +675,7 @@ def build_binary_trace(row: dict[str, str], payload: dict[str, Any]) -> str:
     if resolved is not None:
         rule_text, rule_source = resolved
         try:
-            return build_binary_dsl_trace(
+            return build_binary_hybrid_trace(
                 rule_text=rule_text,
                 query_text=query_text,
                 final_answer_text=row["answer"].strip(),
@@ -703,7 +711,7 @@ def binary_trace_category(row: dict[str, str]) -> str:
     rule_text, rule_source = resolved
     try:
         parse_expr(rule_text)
-        return f"dsl_{rule_source}"
+        return f"hybrid_{rule_source}"
     except Exception:
         return f"generic_{rule_source}"
 
@@ -802,11 +810,12 @@ def build_manifest(*, source_rows: list[dict[str, str]], output_rows: list[dict[
             "answer_only_binary_boxed_rows": len(binary_boxed_only_rows),
             "binary_answer_only_is_boxed_only": True,
             "binary_trace_avoids_repeating_final_answer_inside_think": True,
+            "binary_trace_style": "hybrid_narrative",
             "binary_trace_category_counts": dict(sorted(binary_trace_categories.items())),
         },
         "notes": [
             "Phase 2 keeps the Phase 1 mixture fixed so binary teacher format is the main changed variable.",
-            "Verified binary rows use a structured DSL-style scratchpad where possible, while answer_only_keep binary rows stay boxed-only.",
+            "Verified binary rows use a compact hybrid trace that verbalizes the verified rule and query application, while answer_only_keep binary rows stay boxed-only.",
             "Binary traces never restate the final 8-bit answer inside <think> because README scoring is boxed-first and long numeric drift is harmful.",
             "The output schema matches phase1_assistant_only/train_rule_based_cot_phase1_assistant_only.py so the existing trainer can consume this CSV via --dataset-csv.",
         ],
