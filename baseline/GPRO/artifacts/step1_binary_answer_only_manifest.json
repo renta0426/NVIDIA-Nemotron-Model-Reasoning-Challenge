@@ -1,0 +1,63 @@
+{
+  "source_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/GPRO/artifacts/step1_binary_answer_only_training_data.csv",
+  "manifest_json": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/GPRO/artifacts/step1_binary_answer_only_manifest.json",
+  "seed": 42,
+  "dataset_size": 1285,
+  "source_binary_non_exclude_count": 1587,
+  "source_verified_trace_ready_count": 1004,
+  "source_answer_only_keep_count": 281,
+  "short_trace_quota_requested": 160,
+  "assistant_style_counts": {
+    "boxed_only": 1125,
+    "trace_boxed": 160
+  },
+  "source_selection_tier_counts": {
+    "answer_only_keep": 281,
+    "verified_trace_ready": 1004
+  },
+  "teacher_solver_counts": {
+    "": 281,
+    "binary_affine_xor": 133,
+    "binary_bit_permutation_bijection": 78,
+    "binary_bit_permutation_independent": 7,
+    "binary_byte_transform": 11,
+    "binary_structured_byte_formula": 446,
+    "binary_structured_byte_formula_abstract": 152,
+    "binary_structured_byte_not_formula": 25,
+    "binary_three_bit_boolean": 17,
+    "binary_two_bit_boolean": 135
+  },
+  "template_subtype_counts": {
+    "bit_other": 347,
+    "bit_permutation_inversion": 87,
+    "bit_structured_byte_formula": 851
+  },
+  "training_plumbing": {
+    "assistant_only_loss": true,
+    "boxed_instruction": "Please put your final answer inside `\\boxed{}`. For example: `\\boxed{your answer}`",
+    "max_seq_len": 2048,
+    "epochs": 2,
+    "learning_rate": 0.0001,
+    "lora_rank": 32,
+    "target_modules_default": "all-linear"
+  },
+  "step1_binary_design": {
+    "goal": "stabilize short exact boxed 8-bit outputs before ORPO/GRPO",
+    "uses_binary_only_rows": true,
+    "excludes_selection_tier": "exclude_suspect",
+    "verified_rows_boxed_only_majority": true,
+    "verified_short_trace_rows": 160,
+    "verified_boxed_only_rows": 844,
+    "answer_only_boxed_rows": 281,
+    "rollout_strict_success_rows": 0,
+    "boxed_only_ratio": 0.8755,
+    "rollout_success_source_rule": "manual_audit_priority only",
+    "binary_trace_avoids_repeating_final_answer_inside_think": true
+  },
+  "notes": [
+    "README evaluation prioritizes boxed extraction and otherwise falls back to heuristic extraction, so Step 1 biases the policy toward short exact boxed answers.",
+    "Most verified binary rows are converted to boxed-only supervision; only a small diverse subset keeps an ultra-short, answer-free <think> one-liner.",
+    "manual_audit_priority rows are excluded from the base positive set and may only re-enter via strict rollout successes."
+  ]
+}
