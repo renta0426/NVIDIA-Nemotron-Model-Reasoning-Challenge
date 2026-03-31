@@ -10,7 +10,9 @@ import math
 import os
 import random
 import re
+import subprocess
 import sys
+import time
 import types
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -55,6 +57,7 @@ OFFICIAL_BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. F
 DEFAULT_PROMPT_INSTRUCTION = (
     '\n' + OFFICIAL_BOXED_INSTRUCTION
 )
+DEFAULT_MICRO_SMOKE_PARALLEL_JOBS = 4
 DEFAULT_PHASE0_EVAL_DIR = REPO_ROOT / 'baseline' / 'cot' / 'phase0_offline_eval' / 'artifacts'
 DEFAULT_MICRO_SMOKE_SOURCE_PATHS: dict[str, Path] = {
     'general_stable_set': DEFAULT_PHASE0_EVAL_DIR / 'general_stable_set.csv',
@@ -1799,39 +1802,46 @@ def build_micro_smoke_gate(row: dict[str, Any], *, max_new_tokens: int) -> list[
     return reasons
 
 
-def family_micro_smoke(args: argparse.Namespace) -> dict[str, Any]:
-    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
-    output_value = normalize_optional_text(getattr(args, 'output_dir', None))
-    output_dir = Path(output_value) if output_value is not None else (adapter_dir / 'family_micro_smoke')
-    output_dir.mkdir(parents=True, exist_ok=True)
+def append_boolean_optional_flag(command: list[str], flag_name: str, enabled: bool) -> None:
+    command.append(f'--{flag_name}' if enabled else f'--no-{flag_name}')
 
-    pack_frame = build_default_micro_smoke_pack()
-    pack_path = output_dir / 'family_micro_smoke_pack.csv'
-    pack_frame.to_csv(pack_path, index=False)
 
-    eval_args = argparse.Namespace(
-        adapter_dir=str(adapter_dir),
-        input_path=str(pack_path),
-        output_dir=str(output_dir),
-        max_rows=0,
-        max_new_tokens=args.max_new_tokens,
-        temperature=0.0,
-        top_p=1.0,
-        seed=args.seed,
-        boxed_instruction=args.boxed_instruction,
-        enable_thinking=args.enable_thinking,
-        add_generation_prompt=args.add_generation_prompt,
-        base_model_path=args.base_model_path,
-        cache_dir=args.cache_dir,
-        revision=args.revision,
-        download_snapshot=args.download_snapshot,
-        device=args.device,
-        attn_implementation=args.attn_implementation,
-        patch_cache_bridge=args.patch_cache_bridge,
-        merge_adapter_for_inference=args.merge_adapter_for_inference,
-    )
-    eval_summary = evaluate_pack(eval_args)
+def build_micro_smoke_eval_summary(
+    *,
+    adapter_dir: Path,
+    pack_path: Path,
+    output_dir: Path,
+    row_level: pd.DataFrame,
+    base_summary: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        'adapter_dir': str(adapter_dir),
+        'input_path': str(pack_path),
+        'output_dir': str(output_dir),
+        'base_model_path': base_summary.get('base_model_path'),
+        'device': base_summary.get('device'),
+        'dtype': base_summary.get('dtype'),
+        'n_rows': int(len(row_level)),
+        'overall_acc': float(row_level['is_correct'].mean()) if len(row_level) else float('nan'),
+        'extraction_fail_rate': float((row_level['extraction_source'] == 'not_found').mean()) if len(row_level) else float('nan'),
+        'format_fail_rate': float((~row_level['format_bucket'].isin(CLEAN_FORMAT_BUCKETS)).mean()) if len(row_level) else float('nan'),
+        'boxed_rate': float(row_level['has_boxed'].mean()) if len(row_level) else float('nan'),
+        'avg_output_len_chars': float(row_level['raw_output_len_chars'].mean()) if len(row_level) else float('nan'),
+        'max_new_tokens': base_summary.get('max_new_tokens'),
+        'temperature': base_summary.get('temperature'),
+        'top_p': base_summary.get('top_p'),
+        'enable_thinking': base_summary.get('enable_thinking'),
+        'created_at': utc_now(),
+    }
 
+
+def summarize_family_micro_smoke(
+    *,
+    adapter_dir: Path,
+    output_dir: Path,
+    pack_path: Path,
+    eval_summary: dict[str, Any],
+) -> dict[str, Any]:
     row_level = pd.read_csv(output_dir / 'row_level.csv').fillna('')
     row_payloads: list[dict[str, Any]] = []
     family_pass_map: dict[str, bool] = {}
@@ -1899,6 +1909,220 @@ def family_micro_smoke(args: argparse.Namespace) -> dict[str, Any]:
     save_json(output_dir / 'family_micro_smoke_summary.json', summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return summary
+
+
+def run_serial_family_micro_smoke(
+    *,
+    args: argparse.Namespace,
+    adapter_dir: Path,
+    output_dir: Path,
+    pack_path: Path,
+) -> dict[str, Any]:
+    eval_args = argparse.Namespace(
+        adapter_dir=str(adapter_dir),
+        input_path=str(pack_path),
+        output_dir=str(output_dir),
+        max_rows=0,
+        max_new_tokens=args.max_new_tokens,
+        temperature=0.0,
+        top_p=1.0,
+        seed=args.seed,
+        boxed_instruction=args.boxed_instruction,
+        enable_thinking=args.enable_thinking,
+        add_generation_prompt=args.add_generation_prompt,
+        base_model_path=args.base_model_path,
+        cache_dir=args.cache_dir,
+        revision=args.revision,
+        download_snapshot=args.download_snapshot,
+        device=args.device,
+        attn_implementation=args.attn_implementation,
+        patch_cache_bridge=args.patch_cache_bridge,
+        merge_adapter_for_inference=args.merge_adapter_for_inference,
+    )
+    return evaluate_pack(eval_args)
+
+
+def run_parallel_family_micro_smoke(
+    *,
+    args: argparse.Namespace,
+    adapter_dir: Path,
+    output_dir: Path,
+    pack_frame: pd.DataFrame,
+    pack_path: Path,
+) -> dict[str, Any]:
+    parallel_jobs = max(1, int(args.parallel_jobs))
+    jobs_root = output_dir / 'parallel_jobs'
+    jobs_root.mkdir(parents=True, exist_ok=True)
+
+    pending: list[dict[str, Any]] = []
+    script_path = Path(__file__).resolve()
+    grouped = pack_frame.groupby('family', sort=True)
+    for family, family_frame in grouped:
+        family_dir = jobs_root / str(family)
+        family_dir.mkdir(parents=True, exist_ok=True)
+        input_path = family_dir / f'{family}_micro_smoke.csv'
+        family_frame.to_csv(input_path, index=False)
+        log_path = family_dir / 'evaluate_pack.log'
+        command = [
+            sys.executable,
+            str(script_path),
+            'evaluate-pack',
+            '--adapter-dir',
+            str(adapter_dir),
+            '--input-path',
+            str(input_path),
+            '--output-dir',
+            str(family_dir),
+            '--max-new-tokens',
+            str(args.max_new_tokens),
+            '--temperature',
+            '0.0',
+            '--top-p',
+            '1.0',
+            '--seed',
+            str(args.seed),
+            '--boxed-instruction',
+            args.boxed_instruction,
+            '--base-model-path',
+            str(args.base_model_path),
+            '--cache-dir',
+            str(args.cache_dir),
+            '--revision',
+            str(args.revision),
+            '--device',
+            str(args.device),
+            '--attn-implementation',
+            str(args.attn_implementation),
+        ]
+        append_boolean_optional_flag(command, 'enable-thinking', bool(args.enable_thinking))
+        append_boolean_optional_flag(command, 'add-generation-prompt', bool(args.add_generation_prompt))
+        append_boolean_optional_flag(command, 'patch-cache-bridge', bool(args.patch_cache_bridge))
+        append_boolean_optional_flag(command, 'merge-adapter-for-inference', bool(args.merge_adapter_for_inference))
+        if bool(args.download_snapshot):
+            command.append('--download-snapshot')
+        pending.append(
+            {
+                'family': str(family),
+                'input_path': str(input_path),
+                'output_dir': str(family_dir),
+                'log_path': str(log_path),
+                'command': command,
+            }
+        )
+
+    running: list[dict[str, Any]] = []
+    completed: list[dict[str, Any]] = []
+    while pending or running:
+        while pending and len(running) < parallel_jobs:
+            job = pending.pop(0)
+            log_handle = Path(job['log_path']).open('w', encoding='utf-8')
+            process = subprocess.Popen(
+                job['command'],
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            job['started_at'] = utc_now()
+            job['_log_handle'] = log_handle
+            job['_process'] = process
+            running.append(job)
+
+        if not running:
+            continue
+
+        time.sleep(5)
+        next_running: list[dict[str, Any]] = []
+        for job in running:
+            process = job['_process']
+            returncode = process.poll()
+            if returncode is None:
+                next_running.append(job)
+                continue
+            job['_log_handle'].close()
+            job['returncode'] = int(returncode)
+            job['completed_at'] = utc_now()
+            del job['_log_handle']
+            del job['_process']
+            completed.append(job)
+        running = next_running
+
+    manifest = {
+        'parallel_jobs_requested': parallel_jobs,
+        'jobs': completed,
+        'created_at': utc_now(),
+    }
+    save_json(output_dir / 'parallel_micro_smoke_jobs.json', manifest)
+
+    failures = [job for job in completed if job.get('returncode') != 0]
+    if failures:
+        failed_families = [job['family'] for job in failures]
+        raise RuntimeError(
+            'Parallel family micro smoke failed for families: '
+            + ', '.join(sorted(failed_families))
+        )
+
+    row_frames: list[pd.DataFrame] = []
+    job_summaries: list[dict[str, Any]] = []
+    for job in completed:
+        family_dir = Path(job['output_dir'])
+        row_frames.append(pd.read_csv(family_dir / 'row_level.csv').fillna(''))
+        job_summaries.append(json.loads((family_dir / 'summary.json').read_text(encoding='utf-8')))
+
+    row_level = pd.concat(row_frames, ignore_index=True) if row_frames else pd.DataFrame()
+    row_level.to_csv(output_dir / 'row_level.csv', index=False)
+    row_level_jsonl = output_dir / 'row_level.jsonl'
+    if row_level_jsonl.exists():
+        row_level_jsonl.unlink()
+    for row in row_level.to_dict(orient='records'):
+        append_jsonl(row_level_jsonl, row)
+
+    base_summary = job_summaries[0] if job_summaries else {}
+    eval_summary = build_micro_smoke_eval_summary(
+        adapter_dir=adapter_dir,
+        pack_path=pack_path,
+        output_dir=output_dir,
+        row_level=row_level,
+        base_summary=base_summary,
+    )
+    eval_summary['mode'] = 'parallel_family_jobs'
+    eval_summary['parallel_jobs_requested'] = parallel_jobs
+    eval_summary['job_summaries'] = job_summaries
+    save_json(output_dir / 'summary.json', eval_summary)
+    return eval_summary
+
+
+def family_micro_smoke(args: argparse.Namespace) -> dict[str, Any]:
+    adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
+    output_value = normalize_optional_text(getattr(args, 'output_dir', None))
+    output_dir = Path(output_value) if output_value is not None else (adapter_dir / 'family_micro_smoke')
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    pack_frame = build_default_micro_smoke_pack()
+    pack_path = output_dir / 'family_micro_smoke_pack.csv'
+    pack_frame.to_csv(pack_path, index=False)
+
+    if max(1, int(args.parallel_jobs)) == 1:
+        eval_summary = run_serial_family_micro_smoke(
+            args=args,
+            adapter_dir=adapter_dir,
+            output_dir=output_dir,
+            pack_path=pack_path,
+        )
+    else:
+        eval_summary = run_parallel_family_micro_smoke(
+            args=args,
+            adapter_dir=adapter_dir,
+            output_dir=output_dir,
+            pack_frame=pack_frame,
+            pack_path=pack_path,
+        )
+
+    return summarize_family_micro_smoke(
+        adapter_dir=adapter_dir,
+        output_dir=output_dir,
+        pack_path=pack_path,
+        eval_summary=eval_summary,
+    )
 
 
 def run_validation_command(args: argparse.Namespace) -> dict[str, Any]:
@@ -1972,6 +2196,7 @@ def run_track_a(args: argparse.Namespace) -> dict[str, Any]:
         device=args.device,
         seed=args.seed,
         max_new_tokens=args.micro_smoke_max_new_tokens,
+        parallel_jobs=args.micro_smoke_parallel_jobs,
         boxed_instruction=args.boxed_instruction,
         enable_thinking=args.enable_thinking,
         add_generation_prompt=args.add_generation_prompt,
@@ -2072,6 +2297,7 @@ def add_family_micro_smoke_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--adapter-dir', type=str, required=True)
     parser.add_argument('--output-dir', type=str)
     parser.add_argument('--max-new-tokens', type=int, default=128)
+    parser.add_argument('--parallel-jobs', type=int, default=DEFAULT_MICRO_SMOKE_PARALLEL_JOBS)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--boxed-instruction', type=str, default=OFFICIAL_BOXED_INSTRUCTION)
     parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=False)
@@ -2143,11 +2369,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_track_a_parser = subparsers.add_parser(
         'run-track-a',
-        help='Train the Track A generalist, run local family micro smoke, and build submission.zip',
+        help='Train the Track A generalist, run parallel local family micro smoke, and build submission.zip',
     )
     add_shared_model_args(run_track_a_parser)
     add_train_args(run_track_a_parser)
     run_track_a_parser.add_argument('--micro-smoke-max-new-tokens', type=int, default=128)
+    run_track_a_parser.add_argument('--micro-smoke-parallel-jobs', type=int, default=DEFAULT_MICRO_SMOKE_PARALLEL_JOBS)
     run_track_a_parser.add_argument('--boxed-instruction', type=str, default=OFFICIAL_BOXED_INSTRUCTION)
     run_track_a_parser.add_argument('--enable-thinking', action=argparse.BooleanOptionalAction, default=False)
     run_track_a_parser.add_argument('--add-generation-prompt', action=argparse.BooleanOptionalAction, default=True)
