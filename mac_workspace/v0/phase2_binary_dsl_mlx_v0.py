@@ -1667,6 +1667,24 @@ def encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
     return list(encoded)
 
 
+def maybe_fix_tokenizer_eos_ids(tokenizer: Any) -> None:
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    eos_token = getattr(tokenizer, "eos_token", None)
+    eos_token_ids = getattr(tokenizer, "eos_token_ids", None)
+    if eos_token_id is None or eos_token != "<|im_end|>":
+        return
+    normalized_ids: set[int] = set()
+    if eos_token_ids is not None:
+        try:
+            normalized_ids = {int(token_id) for token_id in eos_token_ids}
+        except TypeError:
+            normalized_ids = {int(eos_token_ids)}
+    expected_id = int(eos_token_id)
+    if normalized_ids == {expected_id}:
+        return
+    tokenizer.eos_token_ids = {expected_id}
+
+
 def generate_phase0_records_batched(
     *,
     benchmark_rows: Sequence[dict[str, Any]],
@@ -1693,6 +1711,7 @@ def generate_phase0_records_batched(
     if adapter_dir is not None:
         load_kwargs["adapter_path"] = str(adapter_dir)
     model, tokenizer = load(str(model_path), **load_kwargs)
+    maybe_fix_tokenizer_eos_ids(tokenizer)
     prompts = build_prompts(tokenizer, [str(row["prompt"]) for row in benchmark_rows])
     prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
     sampler = make_sampler(
