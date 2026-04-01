@@ -1572,7 +1572,7 @@ def generate_phase0_records_batched(
     *,
     benchmark_rows: Sequence[dict[str, Any]],
     model_path: Path,
-    adapter_dir: Path,
+    adapter_dir: Path | None,
     max_tokens: int,
     top_p: float,
     temperature: float,
@@ -1590,7 +1590,10 @@ def generate_phase0_records_batched(
 
     maybe_patch_batch_generator_stats(mx)
     maybe_patch_mamba_cache_extract()
-    model, tokenizer = load(str(model_path), adapter_path=str(adapter_dir), lazy=lazy_load)
+    load_kwargs: dict[str, Any] = {"lazy": lazy_load}
+    if adapter_dir is not None:
+        load_kwargs["adapter_path"] = str(adapter_dir)
+    model, tokenizer = load(str(model_path), **load_kwargs)
     prompts = build_prompts(tokenizer, [str(row["prompt"]) for row in benchmark_rows])
     prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
     sampler = make_sampler(
@@ -1877,7 +1880,7 @@ def run_phase0_eval_parallel(
     *,
     benchmark_rows: Sequence[dict[str, Any]],
     model_path: Path,
-    adapter_dir: Path,
+    adapter_dir: Path | None,
     eval_root: Path,
     args: argparse.Namespace,
 ) -> list[dict[str, Any]]:
@@ -1931,8 +1934,6 @@ def run_phase0_eval_parallel(
                 "eval-phase0-worker",
                 "--model-path",
                 str(model_path),
-                "--adapter-path",
-                str(adapter_dir),
                 "--input-jsonl",
                 str(shard_input_path),
                 "--output-jsonl",
@@ -1956,6 +1957,8 @@ def run_phase0_eval_parallel(
                 "--worker-label",
                 f"shard{shard_index + 1}of{num_shards}",
             ]
+            if adapter_dir is not None:
+                command.extend(["--adapter-path", str(adapter_dir)])
             if args.lazy_load:
                 command.append("--lazy-load")
             log_handle = shard_log_path.open("w", encoding="utf-8")
@@ -2055,12 +2058,18 @@ def run_train_mlx_config(args: argparse.Namespace) -> None:
 
 
 def run_phase0_eval(args: argparse.Namespace) -> None:
-    adapter_dir = Path(args.adapter_path).resolve()
-    if not adapter_dir.exists():
-        raise FileNotFoundError(f"Adapter directory does not exist: {adapter_dir}")
-    verify_training_outputs(adapter_dir)
+    adapter_dir = None
+    if args.adapter_path is not None:
+        adapter_dir = Path(args.adapter_path).resolve()
+        if not adapter_dir.exists():
+            raise FileNotFoundError(f"Adapter directory does not exist: {adapter_dir}")
+        verify_training_outputs(adapter_dir)
 
-    run_root = adapter_dir.parent
+    if adapter_dir is not None:
+        run_root = adapter_dir.parent
+    else:
+        run_root = Path(args.output_root).resolve() / str(args.eval_name)
+        ensure_dir(run_root)
     shadow_model_dir = build_shadow_model_dir(
         Path(args.model_root),
         run_root / "shadow_model",
@@ -2102,8 +2111,10 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
 
 
 def run_phase0_eval_worker(args: argparse.Namespace) -> None:
-    adapter_dir = Path(args.adapter_path).resolve()
-    verify_training_outputs(adapter_dir)
+    adapter_dir = None
+    if args.adapter_path is not None:
+        adapter_dir = Path(args.adapter_path).resolve()
+        verify_training_outputs(adapter_dir)
     benchmark_rows = load_jsonl_records(Path(args.input_jsonl))
     records = generate_phase0_records_batched(
         benchmark_rows=benchmark_rows,
@@ -2183,7 +2194,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     phase0_eval = subparsers.add_parser("eval-phase0", help="Run phase0-style offline evaluation with MLX generation.")
     phase0_eval.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
-    phase0_eval.add_argument("--adapter-path", type=Path, required=True)
+    phase0_eval.add_argument("--adapter-path", type=Path, default=None)
+    phase0_eval.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    phase0_eval.add_argument("--eval-name", type=str, default="phase0_base_model_mlx_eval")
     phase0_eval.add_argument("--phase0-prebuilt-root", type=Path, default=DEFAULT_PHASE0_PREBUILT_ROOT)
     phase0_eval.add_argument("--phase0-analysis-csv", type=Path, default=DEFAULT_PHASE0_ANALYSIS_CSV)
     phase0_eval.add_argument("--rebuild-phase0", action="store_true")
@@ -2208,7 +2221,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Internal worker for sharded phase0 MLX evaluation.",
     )
     phase0_eval_worker.add_argument("--model-path", type=Path, required=True)
-    phase0_eval_worker.add_argument("--adapter-path", type=Path, required=True)
+    phase0_eval_worker.add_argument("--adapter-path", type=Path, default=None)
     phase0_eval_worker.add_argument("--input-jsonl", type=Path, required=True)
     phase0_eval_worker.add_argument("--output-jsonl", type=Path, required=True)
     phase0_eval_worker.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
