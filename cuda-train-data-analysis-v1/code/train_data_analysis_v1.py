@@ -3389,7 +3389,7 @@ def apply_bit_prompt_local_consensus_promotions(
 
     bit_candidate_mask = (
         (analysis_df["family"] == "bit_manipulation")
-        & (analysis_df["selection_tier"] != "verified_trace_ready")
+        & (analysis_df["selection_tier"].isin(["answer_only_keep", "manual_audit_priority"]))
     )
     if not bit_candidate_mask.any():
         return (
@@ -3421,24 +3421,23 @@ def apply_bit_prompt_local_consensus_promotions(
             "query_bits": query_bits,
         }
 
-    def promote_rows(row_ids: set[str], prediction_map: dict[str, str], teacher_solver: str, note: str) -> None:
+    def curate_answer_only_rows(row_ids: set[str], prediction_map: dict[str, str], note: str) -> None:
         if not row_ids:
             return
-        promote_mask = analysis_df["id"].astype(str).isin(row_ids)
-        analysis_df.loc[promote_mask, "template_subtype"] = "bit_structured_byte_formula"
-        analysis_df.loc[promote_mask, "teacher_solver_candidate"] = teacher_solver
-        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
-            analysis_df.loc[promote_mask, "id"].astype(str).map(prediction_map)
+        curate_mask = analysis_df["id"].astype(str).isin(row_ids)
+        analysis_df.loc[curate_mask, "teacher_solver_candidate"] = ""
+        analysis_df.loc[curate_mask, "auto_solver_predicted_answer"] = (
+            analysis_df.loc[curate_mask, "id"].astype(str).map(prediction_map)
         )
-        analysis_df.loc[promote_mask, "auto_solver_match"] = True
-        analysis_df.loc[promote_mask, "verified_trace_ready"] = True
-        analysis_df.loc[promote_mask, "answer_only_ready"] = False
-        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
-        analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
-        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
-        analysis_df.loc[promote_mask, "audit_reasons"] = ""
-        analysis_df.loc[promote_mask, "analysis_notes"] = note
-        analysis_df.loc[promote_mask, "suspect_label"] = False
+        analysis_df.loc[curate_mask, "auto_solver_match"] = True
+        analysis_df.loc[curate_mask, "verified_trace_ready"] = False
+        analysis_df.loc[curate_mask, "answer_only_ready"] = True
+        analysis_df.loc[curate_mask, "example_consistency_ok"] = True
+        analysis_df.loc[curate_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[curate_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[curate_mask, "audit_reasons"] = ""
+        analysis_df.loc[curate_mask, "analysis_notes"] = note
+        analysis_df.loc[curate_mask, "suspect_label"] = False
 
     current_candidate_rows: list[dict[str, Any]] = []
     current_promote_predictions: dict[str, str] = {}
@@ -3467,11 +3466,10 @@ def apply_bit_prompt_local_consensus_promotions(
 
     current_candidate_df = pd.DataFrame(current_candidate_rows, columns=current_candidate_columns)
     current_promote_ids = set(current_promote_predictions)
-    promote_rows(
+    curate_answer_only_rows(
         current_promote_ids,
         current_promote_predictions,
-        "binary_structured_prompt_local_consensus",
-        "bit_prompt_local_current_consensus_exact",
+        "bit_prompt_local_current_consensus_answer_only",
     )
 
     remaining_after_current = {
@@ -3617,11 +3615,10 @@ def apply_bit_prompt_local_consensus_promotions(
         BIT_PROMPT_LOCAL_STAGE1_MIN_SUPPORT,
     )
     stage1_promote_ids = set(stage1_promote_predictions)
-    promote_rows(
+    curate_answer_only_rows(
         stage1_promote_ids,
         stage1_promote_predictions,
-        "binary_prompt_local_extended_formula",
-        "bit_prompt_local_extended_support3_exact",
+        "bit_prompt_local_extended_support3_answer_only",
     )
 
     remaining_after_stage1 = {
@@ -3642,11 +3639,10 @@ def apply_bit_prompt_local_consensus_promotions(
         BIT_PROMPT_LOCAL_STAGE2_ABSTRACT_MIN_SUPPORT,
         BIT_PROMPT_LOCAL_STAGE2_ABSTRACT_MIN_DISTINCT,
     )
-    promote_rows(
+    curate_answer_only_rows(
         set(stage2_promote_predictions),
         stage2_promote_predictions,
-        "binary_prompt_local_nested_formula",
-        "bit_prompt_local_nested_support3_or_abstract_exact",
+        "bit_prompt_local_nested_support3_or_abstract_answer_only",
     )
 
     return (

@@ -60,14 +60,14 @@
 | `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
-| `bit_manipulation` | 1,602 | 1,457 | 3 | 138 | 4 | prompt-local consensus で残差を大幅圧縮 |
+| `bit_manipulation` | 1,602 | 1,004 | 445 | 138 | 15 | prompt-local consensus は answer-only として回収 |
 | `symbol_equation` | 1,555 | 110 | 145 | 1,289 | 11 | 主要な残課題 |
 
 ### 解釈
 
 - `roman` / `gravity` / `unit` は、curation の観点ではほぼ完成です。
 - `text` は accuracy 向けの教師としてかなり良い状態ですが、`971` 行は **answer-only** であり、完全な reasoning trace 教師ではありません。
-- 最大の残課題は `symbol_equation` です。`bit_manipulation` は prompt-local consensus 追加により、manual を `138` 行まで圧縮できました。
+- 最大の残課題は `symbol_equation` です。`bit_manipulation` は trace-safe core を `1,004 verified` に保ちつつ、prompt-local consensus を `answer_only` として追加回収し、manual を `138` 行まで圧縮できました。
 
 ### Kaggle 側 family 名との対応
 
@@ -152,9 +152,9 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 結果:
 
 - 以前の solved 参照値: `306`
-- ルール拡張後の binary 回収総量: `1,460` (`verified 1,457 + answer_only 3`)
-- trace-safe 再監査と prompt-local consensus 追加後の verified binary: `1,457`
-- 改善幅: `+1,151` verified / `+1,154` curated total
+- ルール拡張後の binary 回収総量: `1,449` (`verified 1,004 + answer_only 445`)
+- trace-safe 再監査後も維持した verified binary core: `1,004`
+- 改善幅: `+698` verified / `+1,143` curated total
 - semantic-dedup 後の structured byte formula library から、`71` 個の repeated zero-error family を確定した
 - その conservative support rule により、manual binary `189` 行を新規 `verified_trace_ready` に昇格した
 - さらに abstract family pass（`support>=12`, `distinct exact>=6`, `0 error`）で singleton structured rows `29` 行を追加 `verified_trace_ready` に昇格した
@@ -164,11 +164,11 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 - さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family を `answer_only_keep` として `2` 行追加回収した
 - さらに second-pass not-structured formula と prompt-exact manual reread で binary の残差を大きく圧縮した
 - ただし学習用途では、self-including support や ID 固定 prompt-exact singleton に依存する row を `verified_trace_ready` に残し続けるべきではない
-- そのため leave-one-out 再監査を残したうえで、再監査後の残差だけに prompt-local exact consensus を段階適用した
-- current structured/not-structured same-pred exact で `313` 行を `verified_trace_ready` に再昇格した
-- extended binary family（leave-one-out 互換の `support>=3`, `error=0`）で `10` 行を追加 `verified_trace_ready` に昇格した
-- nested binary family（exact `support>=3` または abstract family `support>=4`, `distinct>=2`, `error=0`）で `130` 行を追加 `verified_trace_ready` に昇格した
-- current binary は `1,457 verified / 3 answer_only / 138 manual / 4 exclude`
+- そのため leave-one-out 再監査を残したうえで、再監査後の残差だけに prompt-local exact consensus を段階適用したが、trace 教師へは上げず `answer_only_keep` に留めた
+- current structured/not-structured same-pred exact で `305` 行を `answer_only_keep` として追加回収した
+- extended binary family（`support>=3`, `error=0`）で `10` 行を `answer_only_keep` として追加回収した
+- nested binary family（exact `support>=3` または abstract family `support>=4`, `distinct>=2`, `error=0`）で `127` 行を `answer_only_keep` として追加回収した
+- current binary は `1,004 verified / 445 answer_only / 138 manual / 15 exclude`
 
 ### 4.2 text の改善
 
@@ -407,13 +407,13 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.1 binary がまだ重い
 
-- `bit_manipulation` は `138 manual + 4 exclude` まで圧縮できた
+- `bit_manipulation` は `138 manual + 15 exclude` まで圧縮できた
 - 2-bit / 3-bit / affine XOR / byte transform に加えて、current structured/not-structured same-pred exact、extended binary family、nested binary family を段階適用した
-- binary curated total は `1,460`、そのうち trace 教師コアは `1,457` まで到達した
-- leave-one-out 再監査は維持したまま、その後段で `313 + 10 + 130` 行を prompt-local consensus から `verified_trace_ready` に再昇格した
+- binary curated total は `1,449`、そのうち trace 教師コアは `1,004` に保ったまま answer-only を厚くできた
+- leave-one-out 再監査は維持したまま、その後段で `305 + 10 + 127` 行を prompt-local consensus から `answer_only_keep` として追加回収した
 - 残差の中心は、なお high no-candidate で prompt-local exact family が立たないケースである
 - affine mismatch の疑わしい低ギャップ行は引き続き除外側へ寄せ、unsafe な verified 水増しは避けた
-- answer-only は `3` 行まで減っており、binary はほぼ trace-ready 中心の curated family になった
+- answer-only は `445` 行まで増え、binary は trace-safe core と answer supervision を分離した curated family になった
 - さらに thin zero-error abstract family から `11 answer_only` を追加回収できた
 - さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family から `2 answer_only` を追加回収できた
 - さらに direct prompt reread により structured-byte residual `5` 行を `verified`、`1` 行を `exclude_suspect` に確定できた
