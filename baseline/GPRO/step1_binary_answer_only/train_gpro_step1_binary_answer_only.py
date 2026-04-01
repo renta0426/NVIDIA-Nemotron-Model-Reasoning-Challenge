@@ -28,7 +28,7 @@ NUM_EPOCHS = 2
 BATCH_SIZE = 1
 GRAD_ACCUM = 4
 LR = 1e-4
-OUTPUT_COLUMNS = [
+REQUIRED_DATASET_COLUMNS = [
     "id",
     "prompt",
     "answer",
@@ -37,6 +37,11 @@ OUTPUT_COLUMNS = [
     "assistant_style",
     "source_selection_tier",
 ]
+PRECOMPUTED_TEXT_COLUMNS = [
+    "user_message",
+    "assistant_message",
+]
+OUTPUT_COLUMNS = REQUIRED_DATASET_COLUMNS + PRECOMPUTED_TEXT_COLUMNS
 REQUIRED_SOURCE_COLUMNS = {
     "id",
     "prompt",
@@ -140,7 +145,7 @@ def load_dataset_rows(path: Path) -> list[dict[str, str]]:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None:
             raise ValueError(f"CSV header is missing: {path}")
-        missing = set(OUTPUT_COLUMNS).difference(reader.fieldnames)
+        missing = set(REQUIRED_DATASET_COLUMNS).difference(reader.fieldnames)
         if missing:
             raise ValueError(f"Missing required columns in {path}: {sorted(missing)}")
         rows = [dict(row) for row in reader]
@@ -275,6 +280,29 @@ def build_short_binary_trace(row: dict[str, str]) -> str:
     return f"<think>{sentence}</think>"
 
 
+def build_user_message(prompt: str) -> str:
+    return prompt + "\n" + BOXED_INSTRUCTION
+
+
+def render_assistant_message_from_fields(*, answer: str, generated_cot: str, assistant_style: str) -> str:
+    if assistant_style == "trace_boxed":
+        return f"{generated_cot}\n\n\\boxed{{{answer}}}"
+    if assistant_style == "boxed_only":
+        return f"\\boxed{{{answer}}}"
+    raise ValueError(f"Unsupported assistant_style: {assistant_style}")
+
+
+def enrich_output_row(row: dict[str, str]) -> dict[str, str]:
+    enriched = dict(row)
+    enriched["user_message"] = build_user_message(enriched["prompt"])
+    enriched["assistant_message"] = render_assistant_message_from_fields(
+        answer=enriched["answer"],
+        generated_cot=enriched["generated_cot"],
+        assistant_style=enriched["assistant_style"],
+    )
+    return enriched
+
+
 def detect_rollout_completion_field(fieldnames: list[str]) -> str:
     for candidate in ("completion", "assistant_message", "response", "raw_output"):
         if candidate in fieldnames:
@@ -388,7 +416,7 @@ def build_output_rows(
         )
     output_rows.extend(rollout_rows)
     output_rows.sort(key=lambda row: row["id"])
-    return output_rows
+    return [enrich_output_row(row) for row in output_rows]
 
 
 def validate_output(rows: list[dict[str, str]]) -> None:
@@ -408,6 +436,16 @@ def validate_output(rows: list[dict[str, str]]) -> None:
             raise ValueError(f"Step 1 dataset must be binary-only: {row_id}")
         if not re.fullmatch(r"[01]{8}", row["answer"]):
             raise ValueError(f"Binary answers must stay exact 8-bit strings: {row_id}")
+        expected_user_message = build_user_message(row["prompt"])
+        if row["user_message"] != expected_user_message:
+            raise ValueError(f"user_message mismatch for row {row_id}")
+        expected_assistant_message = render_assistant_message_from_fields(
+            answer=row["answer"],
+            generated_cot=row["generated_cot"],
+            assistant_style=row["assistant_style"],
+        )
+        if row["assistant_message"] != expected_assistant_message:
+            raise ValueError(f"assistant_message mismatch for row {row_id}")
         if row["assistant_style"] == "trace_boxed":
             if not row["generated_cot"].startswith("<think>") or not row["generated_cot"].endswith("</think>"):
                 raise ValueError(f"trace_boxed rows must use a <think> wrapper: {row_id}")
@@ -463,6 +501,7 @@ def build_manifest(
         "template_subtype_counts": dict(sorted(template_counts.items())),
         "training_plumbing": {
             "assistant_only_loss": True,
+            "precomputed_messages_in_dataset": True,
             "boxed_instruction": BOXED_INSTRUCTION,
             "max_seq_len": MAX_SEQ_LEN,
             "epochs": NUM_EPOCHS,
@@ -487,6 +526,7 @@ def build_manifest(
             "README evaluation prioritizes boxed extraction and otherwise falls back to heuristic extraction, so Step 1 biases the policy toward short exact boxed answers.",
             "Most verified binary rows are converted to boxed-only supervision; only a small diverse subset keeps an ultra-short, answer-free <think> one-liner.",
             "manual_audit_priority rows are excluded from the base positive set and may only re-enter via strict rollout successes.",
+            "The completed dataset precomputes user_message and assistant_message so notebook training only performs tokenizer-dependent rendering and tokenization.",
         ],
     }
 
@@ -514,11 +554,13 @@ def build_dataset(args: argparse.Namespace) -> tuple[list[dict[str, str]], dict[
 
 
 def render_assistant_message(row: dict[str, str]) -> str:
-    if row["assistant_style"] == "trace_boxed":
-        return f"{row['generated_cot']}\n\n\\boxed{{{row['answer']}}}"
-    if row["assistant_style"] == "boxed_only":
-        return f"\\boxed{{{row['answer']}}}"
-    raise ValueError(f"Unsupported assistant_style: {row['assistant_style']}")
+    if row.get("assistant_message"):
+        return row["assistant_message"]
+    return render_assistant_message_from_fields(
+        answer=row["answer"],
+        generated_cot=row.get("generated_cot", ""),
+        assistant_style=row["assistant_style"],
+    )
 
 
 def import_training_stack() -> dict[str, object]:
@@ -585,12 +627,8 @@ def apply_chat_template_safe(
         return "\n".join(rendered)
 
 
-def build_user_message(prompt: str) -> str:
-    return prompt + "\n" + BOXED_INSTRUCTION
-
-
 def render_training_pair(tokenizer: Any, row: dict[str, str]) -> tuple[str, str, str, str]:
-    user_message = build_user_message(row["prompt"])
+    user_message = row.get("user_message") or build_user_message(row["prompt"])
     assistant_message = render_assistant_message(row)
     prompt_prefix = apply_chat_template_safe(
         tokenizer,
@@ -610,44 +648,42 @@ def render_training_pair(tokenizer: Any, row: dict[str, str]) -> tuple[str, str,
     return user_message, assistant_message, prompt_prefix, full_text
 
 
+def shared_token_prefix_length(prefix_ids: list[int], full_ids: list[int]) -> int:
+    limit = min(len(prefix_ids), len(full_ids))
+    index = 0
+    while index < limit and prefix_ids[index] == full_ids[index]:
+        index += 1
+    return index
+
+
 def tokenize_training_row(tokenizer: Any, row: dict[str, str]) -> dict[str, Any]:
-    _, assistant_message, _, full_text = render_training_pair(tokenizer, row)
-    assistant_char_start = full_text.find(assistant_message)
-    if assistant_char_start < 0:
-        raise ValueError(f"Assistant span not found in rendered chat for row {row['id']}")
+    _, _assistant_message, prompt_prefix, full_text = render_training_pair(tokenizer, row)
+    prefix_ids = list(
+        tokenizer(
+            prompt_prefix,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+        )["input_ids"]
+    )
     try:
         full_encoded = tokenizer(
             full_text,
             add_special_tokens=False,
             truncation=True,
             max_length=MAX_SEQ_LEN,
-            return_offsets_mapping=True,
         )
-    except (NotImplementedError, TypeError):
-        full_encoded = tokenizer(
-            full_text,
-            add_special_tokens=False,
-            truncation=True,
-            max_length=MAX_SEQ_LEN,
-        )
+    except TypeError:
+        full_encoded = tokenizer(full_text, add_special_tokens=False, truncation=True, max_length=MAX_SEQ_LEN)
     input_ids = list(full_encoded["input_ids"])
     attention_mask = list(full_encoded["attention_mask"])
-    offset_mapping = full_encoded.get("offset_mapping")
-    assistant_token_start: int | None = None
-    if offset_mapping:
-        for index, (start, _end) in enumerate(offset_mapping):
-            if start >= assistant_char_start:
-                assistant_token_start = index
-                break
-    if assistant_token_start is None:
-        prefix_text = full_text[:assistant_char_start]
-        prefix_ids = tokenizer(
-            prefix_text,
-            add_special_tokens=False,
-            truncation=True,
-            max_length=MAX_SEQ_LEN,
-        )["input_ids"]
-        assistant_token_start = len(prefix_ids)
+    # Supervise from the actual generation boundary, not from the raw assistant content.
+    # For boxed_only rows the chat template renders `<think></think>\boxed{...}` while the
+    # user-only prompt ends at `<think>`. If loss starts at `\boxed{...}`, the model never
+    # learns to emit `</think>` and tends to continue a long reasoning trace at inference.
+    assistant_token_start = shared_token_prefix_length(prefix_ids, input_ids)
+    if assistant_token_start == 0:
+        raise ValueError(f"Prompt prefix did not align with full chat rendering for row {row['id']}")
     if assistant_token_start >= len(input_ids):
         raise ValueError(f"Assistant tokens were truncated out for row {row['id']}")
     labels = [-100] * assistant_token_start + input_ids[assistant_token_start:]
