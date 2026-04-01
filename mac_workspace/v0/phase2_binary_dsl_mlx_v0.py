@@ -322,7 +322,10 @@ def find_token_index_for_text_span(tokenizer: Any, full_text: str, target_text: 
         raise ValueError(
             f"Target text span was not found in rendered chat. target={target_preview!r} rendered_prefix={preview!r}"
         )
-    encoded = tokenizer(
+    offset_tokenizer = tokenizer if callable(tokenizer) else getattr(tokenizer, "_tokenizer", None)
+    if offset_tokenizer is None or not callable(offset_tokenizer):
+        raise TypeError(f"Tokenizer does not support text encoding for offset mapping: {type(tokenizer)!r}")
+    encoded = offset_tokenizer(
         full_text,
         add_special_tokens=False,
         return_offsets_mapping=True,
