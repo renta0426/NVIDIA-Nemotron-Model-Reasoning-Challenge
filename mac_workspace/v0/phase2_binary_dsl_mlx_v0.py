@@ -6,10 +6,13 @@ import hashlib
 import importlib.metadata as importlib_metadata
 import json
 import math
+import os
 import random
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -322,11 +325,13 @@ def select_shadow_validation_records(
     records: Sequence[dict[str, Any]],
     *,
     valid_rows: int,
+    minimum_rows: int,
     seed: int,
 ) -> list[dict[str, Any]]:
     if not records:
         raise ValueError("Training records are empty")
-    valid_rows = max(1, min(valid_rows, len(records)))
+    valid_rows = max(1, valid_rows, minimum_rows)
+    valid_rows = min(valid_rows, len(records))
     rng = random.Random(seed)
     chosen = sorted(rng.sample(range(len(records)), valid_rows))
     return [records[index] for index in chosen]
@@ -427,6 +432,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
     valid_records = select_shadow_validation_records(
         train_records,
         valid_rows=int(args.valid_shadow_rows),
+        minimum_rows=int(args.batch_size),
         seed=int(args.seed),
     )
 
@@ -1286,104 +1292,285 @@ def build_prompts(tokenizer: Any, prompt_series: Sequence[str]) -> list[str]:
     return prompts
 
 
-def run_prepare_train(args: argparse.Namespace) -> None:
-    manifest = prepare_training_run(args)
-    print(json.dumps(manifest, ensure_ascii=False, indent=2))
+def load_jsonl_records(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            rows.append(json.loads(stripped))
+    return rows
 
 
-def run_train(args: argparse.Namespace) -> None:
-    manifest = prepare_training_run(args)
-    run_root = Path(manifest["run_root"])
-    adapter_dir = Path(manifest["artifacts"]["adapter_dir"])
-    config_path = Path(manifest["artifacts"]["config_path"])
-    command = [sys.executable, "-m", "mlx_lm", "lora", "--config", str(config_path)]
-    print("Running MLX LoRA training:")
-    print(" ".join(command))
-    subprocess.run(command, cwd=str(REPO_ROOT), check=True)
-    verify_training_outputs(adapter_dir)
-    training_result = {
-        "created_at": utc_now(),
-        "run_root": str(run_root),
-        "adapter_dir": str(adapter_dir),
-        "adapter_files": summarize_directory(adapter_dir),
-    }
-    write_json(run_root / "training_result.json", training_result)
-    print(json.dumps(training_result, ensure_ascii=False, indent=2))
+def tail_text(path: Path, max_chars: int = 6000) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
 
 
-def run_phase0_eval(args: argparse.Namespace) -> None:
-    from mlx_lm import generate, load
-    from mlx_lm.sample_utils import make_sampler
+def clamp_eval_batch_size(value: int | None, *, default: int, max_num_seqs: int) -> int:
+    candidate = default if value is None or int(value) <= 0 else int(value)
+    return max(1, min(candidate, int(max_num_seqs)))
 
-    adapter_dir = Path(args.adapter_path).resolve()
-    if not adapter_dir.exists():
-        raise FileNotFoundError(f"Adapter directory does not exist: {adapter_dir}")
-    verify_training_outputs(adapter_dir)
 
-    run_root = adapter_dir.parent
-    shadow_model_dir = build_shadow_model_dir(
-        Path(args.model_root),
-        run_root / "shadow_model",
-        force=bool(args.force_shadow_model),
-    )
+def resolve_phase0_eval_num_shards(
+    *,
+    requested_shards: int,
+    total_rows: int,
+    memory_budget_gb: float,
+    estimated_worker_memory_gb: float,
+) -> int:
+    if total_rows <= 0:
+        return 1
+    if requested_shards > 0:
+        return max(1, min(requested_shards, total_rows))
+    auto = int(float(memory_budget_gb) // max(float(estimated_worker_memory_gb), 1.0))
+    auto = max(1, auto)
+    return min(auto, total_rows)
 
-    eval_root = run_root / "phase0_offline_eval"
-    artifact_root = eval_root / "artifacts"
-    report_root = eval_root / "reports"
-    benchmark_rows, holdout_rows, manifest = prepare_phase0_benchmark_artifacts(
-        prebuilt_root=Path(args.phase0_prebuilt_root),
-        analysis_csv=Path(args.phase0_analysis_csv),
-        artifact_root=artifact_root,
-        report_root=report_root,
-        rebuild=bool(args.rebuild_phase0),
-    )
-    if args.max_samples is not None:
-        benchmark_rows = benchmark_rows[: int(args.max_samples)]
 
-    model, tokenizer = load(str(shadow_model_dir), adapter_path=str(adapter_dir), lazy=bool(args.lazy_load))
-    sampler = make_sampler(
-        temp=float(args.temperature),
-        top_p=float(args.top_p) if 0.0 < float(args.top_p) < 1.0 else 0.0,
-    )
+def maybe_patch_batch_generator_stats(mx: Any) -> None:
+    from mlx_lm.generate import BatchGenerator
 
+    if getattr(BatchGenerator.stats, "_copilot_zero_time_safe", False):
+        return
+
+    def _safe_batch_generator_stats(self: Any) -> Any:
+        stats = self._stats
+        prompt_time = float(getattr(stats, "prompt_time", 0.0) or 0.0)
+        generation_time = float(getattr(stats, "generation_time", 0.0) or 0.0)
+        stats.prompt_tps = (
+            float(getattr(stats, "prompt_tokens", 0) or 0) / prompt_time
+            if prompt_time > 0.0
+            else 0.0
+        )
+        stats.generation_tps = (
+            float(getattr(stats, "generation_tokens", 0) or 0) / generation_time
+            if generation_time > 0.0
+            else 0.0
+        )
+        stats.peak_memory = mx.get_peak_memory() / 1e9
+        return stats
+
+    setattr(_safe_batch_generator_stats, "_copilot_zero_time_safe", True)
+    BatchGenerator.stats = _safe_batch_generator_stats
+
+
+def maybe_patch_mamba_cache_extract() -> None:
+    import mlx.core as mx  # type: ignore
+    from mlx_lm.models.cache import MambaCache  # type: ignore
+
+    if hasattr(MambaCache, "extract") and getattr(MambaCache.extract, "_copilot_enabled", False):
+        return
+    if hasattr(MambaCache, "extract") and not getattr(MambaCache.extract, "_copilot_enabled", False):
+        return
+
+    def _extract(self: Any, idx: int) -> Any:
+        cache = MambaCache()
+        cache.cache = [
+            None if state is None else mx.contiguous(state[idx : idx + 1])
+            for state in self.cache
+        ]
+        cache.left_padding = None
+        return cache
+
+    setattr(_extract, "_copilot_enabled", True)
+    MambaCache.extract = _extract
+
+
+def encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
+    bos_token = getattr(tokenizer, "bos_token", None)
+    add_special_tokens = bos_token is None or not prompt.startswith(str(bos_token))
+    encoded = tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
+    return list(encoded)
+
+
+def generate_phase0_records_batched(
+    *,
+    benchmark_rows: Sequence[dict[str, Any]],
+    model_path: Path,
+    adapter_dir: Path,
+    max_tokens: int,
+    top_p: float,
+    temperature: float,
+    max_num_seqs: int,
+    prompt_chunk_size: int,
+    prefill_batch_size: int,
+    completion_batch_size: int,
+    lazy_load: bool,
+    progress_every: int,
+    worker_label: str,
+) -> list[dict[str, Any]]:
+    import mlx.core as mx  # type: ignore
+    from mlx_lm import batch_generate, generate, load  # type: ignore
+    from mlx_lm.sample_utils import make_sampler  # type: ignore
+
+    maybe_patch_batch_generator_stats(mx)
+    maybe_patch_mamba_cache_extract()
+    model, tokenizer = load(str(model_path), adapter_path=str(adapter_dir), lazy=lazy_load)
     prompts = build_prompts(tokenizer, [str(row["prompt"]) for row in benchmark_rows])
-    records: list[dict[str, Any]] = []
-    for index, (row, rendered_prompt) in enumerate(zip(benchmark_rows, prompts), start=1):
-        raw_output = generate(
-            model,
-            tokenizer,
-            prompt=rendered_prompt,
-            verbose=False,
-            max_tokens=int(args.max_tokens),
-            sampler=sampler,
-        )
-        records.append(
-            {
-                "benchmark_name": row["benchmark_name"],
-                "benchmark_role": row["benchmark_role"],
-                "benchmark_index": row["benchmark_index"],
-                "family": row["family"],
-                "family_short": row["family_short"],
-                "template_subtype": row["template_subtype"],
-                "selection_tier": row["selection_tier"],
-                "teacher_solver_candidate": row["teacher_solver_candidate"],
-                "answer_type": row["answer_type"],
-                "num_examples": row["num_examples"],
-                "prompt_len_chars": row["prompt_len_chars"],
-                "id": row["id"],
-                "expected_answer": row["answer"],
-                "rendered_prompt": rendered_prompt,
-                "raw_output": raw_output,
-                "extracted_answer": extract_final_answer(raw_output),
-            }
-        )
-        if int(args.progress_every) > 0 and (
-            index == 1
-            or index % int(args.progress_every) == 0
-            or index == len(benchmark_rows)
-        ):
-            print(f"[phase0-eval] completed {index}/{len(benchmark_rows)} rows")
+    prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
+    sampler = make_sampler(
+        temp=float(temperature),
+        top_p=float(top_p) if 0.0 < float(top_p) < 1.0 else 0.0,
+    )
 
+    chunk_size = clamp_eval_batch_size(
+        prompt_chunk_size,
+        default=max_num_seqs,
+        max_num_seqs=max_num_seqs,
+    )
+    prefill_size = clamp_eval_batch_size(
+        prefill_batch_size,
+        default=min(max_num_seqs, 32),
+        max_num_seqs=max_num_seqs,
+    )
+    completion_size = clamp_eval_batch_size(
+        completion_batch_size,
+        default=min(max_num_seqs, 32),
+        max_num_seqs=max_num_seqs,
+    )
+
+    records: list[dict[str, Any]] = []
+    total_prompts = len(prompt_tokens)
+    total_chunks = max(1, math.ceil(total_prompts / chunk_size))
+    run_started_at = time.perf_counter()
+    heartbeat_sec = 60.0
+
+    for chunk_start in range(0, total_prompts, chunk_size):
+        chunk_prompts = prompt_tokens[chunk_start : chunk_start + chunk_size]
+        chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompts)]
+        chunk_rendered_prompts = prompts[chunk_start : chunk_start + len(chunk_prompts)]
+        chunk_index = (chunk_start // chunk_size) + 1
+        chunk_end = chunk_start + len(chunk_prompts)
+        chunk_started_at = time.perf_counter()
+        print(
+            f"[phase0-eval:{worker_label}] "
+            f"chunk={chunk_index}/{total_chunks} prompts={chunk_start + 1}-{chunk_end}/{total_prompts} status=started",
+            flush=True,
+        )
+
+        heartbeat_stop = threading.Event()
+        heartbeat_thread: threading.Thread | None = None
+        if heartbeat_sec > 0:
+            def emit_heartbeat() -> None:
+                while not heartbeat_stop.wait(heartbeat_sec):
+                    chunk_elapsed = time.perf_counter() - chunk_started_at
+                    total_elapsed = time.perf_counter() - run_started_at
+                    print(
+                        f"[phase0-eval:{worker_label}] "
+                        f"chunk={chunk_index}/{total_chunks} status=running "
+                        f"chunk_elapsed_sec={chunk_elapsed:.1f} total_elapsed_sec={total_elapsed:.1f}",
+                        flush=True,
+                    )
+
+            heartbeat_thread = threading.Thread(target=emit_heartbeat, daemon=True)
+            heartbeat_thread.start()
+
+        try:
+            try:
+                batch_response = batch_generate(
+                    model,
+                    tokenizer,
+                    chunk_prompts,
+                    max_tokens=max_tokens,
+                    sampler=sampler,
+                    verbose=False,
+                    prefill_batch_size=min(prefill_size, len(chunk_prompts)),
+                    completion_batch_size=min(completion_size, len(chunk_prompts)),
+                )
+                chunk_outputs = list(batch_response.texts)
+            except AttributeError as exc:
+                error_text = f"{type(exc).__name__}: {exc}"
+                if "MambaCache" not in error_text or "extract" not in error_text:
+                    raise
+                print(
+                    f"[phase0-eval:{worker_label}] "
+                    f"chunk={chunk_index}/{total_chunks} status=batch_generate_fallback "
+                    f"reason={error_text}",
+                    flush=True,
+                )
+                chunk_outputs = [
+                    generate(
+                        model,
+                        tokenizer,
+                        prompt=prompt_tokens_single,
+                        verbose=False,
+                        max_tokens=max_tokens,
+                        sampler=sampler,
+                    )
+                    for prompt_tokens_single in chunk_prompts
+                ]
+                batch_response = None
+        finally:
+            if heartbeat_thread is not None:
+                heartbeat_stop.set()
+                heartbeat_thread.join()
+
+        for row, rendered_prompt, raw_output in zip(
+            chunk_rows,
+            chunk_rendered_prompts,
+            chunk_outputs,
+        ):
+            records.append(
+                {
+                    "benchmark_name": row["benchmark_name"],
+                    "benchmark_role": row["benchmark_role"],
+                    "benchmark_index": row["benchmark_index"],
+                    "family": row["family"],
+                    "family_short": row["family_short"],
+                    "template_subtype": row["template_subtype"],
+                    "selection_tier": row["selection_tier"],
+                    "teacher_solver_candidate": row["teacher_solver_candidate"],
+                    "answer_type": row["answer_type"],
+                    "num_examples": row["num_examples"],
+                    "prompt_len_chars": row["prompt_len_chars"],
+                    "id": row["id"],
+                    "expected_answer": row["answer"],
+                    "rendered_prompt": rendered_prompt,
+                    "raw_output": raw_output,
+                    "extracted_answer": extract_final_answer(raw_output),
+                }
+            )
+
+        chunk_elapsed = time.perf_counter() - chunk_started_at
+        total_elapsed = time.perf_counter() - run_started_at
+        stats = getattr(batch_response, "stats", None) if batch_response is not None else None
+        stats_suffix = ""
+        if stats is not None:
+            stats_suffix = (
+                f" prompt_tps={getattr(stats, 'prompt_tps', 0.0):.2f}"
+                f" generation_tps={getattr(stats, 'generation_tps', 0.0):.2f}"
+                f" peak_memory_gb={getattr(stats, 'peak_memory', 0.0):.2f}"
+            )
+        print(
+            f"[phase0-eval:{worker_label}] "
+            f"chunk={chunk_index}/{total_chunks} prompts={chunk_start + 1}-{chunk_end}/{total_prompts} "
+            f"status=completed chunk_elapsed_sec={chunk_elapsed:.1f} total_elapsed_sec={total_elapsed:.1f}"
+            f"{stats_suffix}",
+            flush=True,
+        )
+        if progress_every > 0 and (
+            chunk_end == total_prompts
+            or chunk_end % progress_every == 0
+        ):
+            print(
+                f"[phase0-eval:{worker_label}] completed {chunk_end}/{total_prompts} rows",
+                flush=True,
+            )
+        mx.clear_cache()
+
+    return records
+
+
+def score_phase0_records(
+    *,
+    records: Sequence[dict[str, Any]],
+    holdout_rows: Sequence[dict[str, Any]],
+    manifest: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     scored_rows: list[dict[str, Any]] = []
     for row in records:
         derived = analyze_raw_output(str(row["raw_output"]))
@@ -1428,7 +1615,17 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
         "by_benchmark": by_benchmark_summary,
         "binary_holdout_accuracy": binary_holdout_accuracy,
     }
+    return scored_rows, summary_payload
 
+
+def write_phase0_eval_outputs(
+    *,
+    artifact_root: Path,
+    report_root: Path,
+    records: Sequence[dict[str, Any]],
+    scored_rows: Sequence[dict[str, Any]],
+    summary_payload: dict[str, Any],
+) -> None:
     write_csv_rows(
         artifact_root / "phase0_eval_raw_outputs.csv",
         records,
@@ -1481,19 +1678,264 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
     write_json(artifact_root / "phase0_eval_summary.json", summary_payload)
     write_text(
         report_root / "phase0_eval_summary.md",
-        render_markdown_summary("phase0_eval_overall", overall_summary),
+        render_markdown_summary("phase0_eval_overall", summary_payload["overall"]),
     )
+    binary_holdout_accuracy = summary_payload["binary_holdout_accuracy"]
     if binary_holdout_accuracy:
         write_csv_rows(
             artifact_root / "phase0_binary_holdout_accuracy.csv",
             binary_holdout_accuracy,
             ["holdout_kind", "fold", "rows", "correct", "accuracy"],
         )
-    for benchmark_name, payload in by_benchmark_summary.items():
+    for benchmark_name, payload in summary_payload["by_benchmark"].items():
         write_json(artifact_root / f"{benchmark_name}_summary.json", payload)
         write_text(report_root / f"{benchmark_name}_summary.md", render_markdown_summary(benchmark_name, payload))
 
+
+def run_phase0_eval_parallel(
+    *,
+    benchmark_rows: Sequence[dict[str, Any]],
+    model_path: Path,
+    adapter_dir: Path,
+    eval_root: Path,
+    args: argparse.Namespace,
+) -> list[dict[str, Any]]:
+    num_shards = resolve_phase0_eval_num_shards(
+        requested_shards=int(args.num_shards),
+        total_rows=len(benchmark_rows),
+        memory_budget_gb=float(args.memory_budget_gb),
+        estimated_worker_memory_gb=float(args.estimated_worker_memory_gb),
+    )
+    if num_shards <= 1:
+        return generate_phase0_records_batched(
+            benchmark_rows=benchmark_rows,
+            model_path=model_path,
+            adapter_dir=adapter_dir,
+            max_tokens=int(args.max_tokens),
+            top_p=float(args.top_p),
+            temperature=float(args.temperature),
+            max_num_seqs=int(args.max_num_seqs),
+            prompt_chunk_size=int(args.prompt_chunk_size),
+            prefill_batch_size=int(args.prefill_batch_size),
+            completion_batch_size=int(args.completion_batch_size),
+            lazy_load=bool(args.lazy_load),
+            progress_every=int(args.progress_every),
+            worker_label="main",
+        )
+
+    shard_root = eval_root / "_parallel"
+    ensure_dir(shard_root)
+    shard_rows = [
+        list(benchmark_rows[shard_index::num_shards])
+        for shard_index in range(num_shards)
+    ]
+    launched_processes: list[tuple[int, Path, Path, subprocess.Popen[Any], Any]] = []
+
+    print(
+        f"[phase0-eval] launching {num_shards} shard workers "
+        f"(memory_budget_gb={float(args.memory_budget_gb):.1f}, "
+        f"estimated_worker_memory_gb={float(args.estimated_worker_memory_gb):.1f})",
+        flush=True,
+    )
+
+    try:
+        for shard_index, rows in enumerate(shard_rows):
+            shard_input_path = shard_root / f"shard_{shard_index:02d}.jsonl"
+            shard_output_path = shard_root / f"shard_{shard_index:02d}_records.jsonl"
+            shard_log_path = shard_root / f"shard_{shard_index:02d}.log"
+            write_jsonl_records(shard_input_path, rows)
+            command = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "eval-phase0-worker",
+                "--model-path",
+                str(model_path),
+                "--adapter-path",
+                str(adapter_dir),
+                "--input-jsonl",
+                str(shard_input_path),
+                "--output-jsonl",
+                str(shard_output_path),
+                "--max-tokens",
+                str(int(args.max_tokens)),
+                "--temperature",
+                str(float(args.temperature)),
+                "--top-p",
+                str(float(args.top_p)),
+                "--max-num-seqs",
+                str(int(args.max_num_seqs)),
+                "--prompt-chunk-size",
+                str(int(args.prompt_chunk_size)),
+                "--prefill-batch-size",
+                str(int(args.prefill_batch_size)),
+                "--completion-batch-size",
+                str(int(args.completion_batch_size)),
+                "--progress-every",
+                str(int(args.progress_every)),
+                "--worker-label",
+                f"shard{shard_index + 1}of{num_shards}",
+            ]
+            if args.lazy_load:
+                command.append("--lazy-load")
+            log_handle = shard_log_path.open("w", encoding="utf-8")
+            process = subprocess.Popen(
+                command,
+                cwd=str(REPO_ROOT),
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+            )
+            launched_processes.append(
+                (shard_index, shard_output_path, shard_log_path, process, log_handle)
+            )
+            print(
+                f"[phase0-eval] launched shard={shard_index + 1}/{num_shards} "
+                f"rows={len(rows)} log={shard_log_path}",
+                flush=True,
+            )
+
+        for shard_index, shard_output_path, shard_log_path, process, log_handle in launched_processes:
+            return_code = process.wait()
+            log_handle.close()
+            if return_code != 0:
+                raise RuntimeError(
+                    f"phase0 worker failed: shard={shard_index + 1}/{num_shards} "
+                    f"return_code={return_code} log={shard_log_path}\n{tail_text(shard_log_path)}"
+                )
+            if not shard_output_path.exists():
+                raise FileNotFoundError(
+                    f"phase0 worker did not produce output: shard={shard_index + 1}/{num_shards} "
+                    f"path={shard_output_path}"
+                )
+            print(
+                f"[phase0-eval] completed shard={shard_index + 1}/{num_shards} log={shard_log_path}",
+                flush=True,
+            )
+    finally:
+        for _, _, _, process, log_handle in launched_processes:
+            if not log_handle.closed:
+                log_handle.close()
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+
+    records: list[dict[str, Any]] = []
+    for _, shard_output_path, _, _, _ in launched_processes:
+        records.extend(load_jsonl_records(shard_output_path))
+    records.sort(
+        key=lambda row: (
+            str(row.get("benchmark_name", "")),
+            int(row.get("benchmark_index", 0)),
+            str(row.get("id", "")),
+        )
+    )
+    return records
+
+
+def run_prepare_train(args: argparse.Namespace) -> None:
+    manifest = prepare_training_run(args)
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
+
+
+def run_train(args: argparse.Namespace) -> None:
+    manifest = prepare_training_run(args)
+    run_root = Path(manifest["run_root"])
+    adapter_dir = Path(manifest["artifacts"]["adapter_dir"])
+    config_path = Path(manifest["artifacts"]["config_path"])
+    command = [sys.executable, "-m", "mlx_lm", "lora", "--config", str(config_path)]
+    print("Running MLX LoRA training:")
+    print(" ".join(command))
+    subprocess.run(command, cwd=str(REPO_ROOT), check=True)
+    verify_training_outputs(adapter_dir)
+    training_result = {
+        "created_at": utc_now(),
+        "run_root": str(run_root),
+        "adapter_dir": str(adapter_dir),
+        "adapter_files": summarize_directory(adapter_dir),
+    }
+    write_json(run_root / "training_result.json", training_result)
+    print(json.dumps(training_result, ensure_ascii=False, indent=2))
+
+
+def run_phase0_eval(args: argparse.Namespace) -> None:
+    adapter_dir = Path(args.adapter_path).resolve()
+    if not adapter_dir.exists():
+        raise FileNotFoundError(f"Adapter directory does not exist: {adapter_dir}")
+    verify_training_outputs(adapter_dir)
+
+    run_root = adapter_dir.parent
+    shadow_model_dir = build_shadow_model_dir(
+        Path(args.model_root),
+        run_root / "shadow_model",
+        force=bool(args.force_shadow_model),
+    )
+
+    eval_root = run_root / "phase0_offline_eval"
+    artifact_root = eval_root / "artifacts"
+    report_root = eval_root / "reports"
+    benchmark_rows, holdout_rows, manifest = prepare_phase0_benchmark_artifacts(
+        prebuilt_root=Path(args.phase0_prebuilt_root),
+        analysis_csv=Path(args.phase0_analysis_csv),
+        artifact_root=artifact_root,
+        report_root=report_root,
+        rebuild=bool(args.rebuild_phase0),
+    )
+    if args.max_samples is not None:
+        benchmark_rows = benchmark_rows[: int(args.max_samples)]
+    records = run_phase0_eval_parallel(
+        benchmark_rows=benchmark_rows,
+        model_path=shadow_model_dir,
+        adapter_dir=adapter_dir,
+        eval_root=eval_root,
+        args=args,
+    )
+    scored_rows, summary_payload = score_phase0_records(
+        records=records,
+        holdout_rows=holdout_rows,
+        manifest=manifest,
+    )
+    write_phase0_eval_outputs(
+        artifact_root=artifact_root,
+        report_root=report_root,
+        records=records,
+        scored_rows=scored_rows,
+        summary_payload=summary_payload,
+    )
     print(json.dumps(summary_payload["overall"], ensure_ascii=False, indent=2))
+
+
+def run_phase0_eval_worker(args: argparse.Namespace) -> None:
+    adapter_dir = Path(args.adapter_path).resolve()
+    verify_training_outputs(adapter_dir)
+    benchmark_rows = load_jsonl_records(Path(args.input_jsonl))
+    records = generate_phase0_records_batched(
+        benchmark_rows=benchmark_rows,
+        model_path=Path(args.model_path).resolve(),
+        adapter_dir=adapter_dir,
+        max_tokens=int(args.max_tokens),
+        top_p=float(args.top_p),
+        temperature=float(args.temperature),
+        max_num_seqs=int(args.max_num_seqs),
+        prompt_chunk_size=int(args.prompt_chunk_size),
+        prefill_batch_size=int(args.prefill_batch_size),
+        completion_batch_size=int(args.completion_batch_size),
+        lazy_load=bool(args.lazy_load),
+        progress_every=int(args.progress_every),
+        worker_label=str(args.worker_label),
+    )
+    write_jsonl_records(Path(args.output_jsonl), records)
+    print(
+        json.dumps(
+            {
+                "created_at": utc_now(),
+                "worker_label": str(args.worker_label),
+                "rows": len(records),
+                "output_jsonl": str(Path(args.output_jsonl).resolve()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 def add_common_train_args(parser: argparse.ArgumentParser) -> None:
@@ -1544,10 +1986,37 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
     phase0_eval.add_argument("--temperature", type=float, default=README_TEMPERATURE)
     phase0_eval.add_argument("--top-p", type=float, default=README_TOP_P)
+    phase0_eval.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    phase0_eval.add_argument("--num-shards", type=int, default=0)
+    phase0_eval.add_argument("--memory-budget-gb", type=float, default=420.0)
+    phase0_eval.add_argument("--estimated-worker-memory-gb", type=float, default=100.0)
+    phase0_eval.add_argument("--prompt-chunk-size", type=int, default=README_MAX_NUM_SEQS)
+    phase0_eval.add_argument("--prefill-batch-size", type=int, default=32)
+    phase0_eval.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval.add_argument("--progress-every", type=int, default=10)
     phase0_eval.add_argument("--lazy-load", action="store_true")
     phase0_eval.add_argument("--force-shadow-model", action="store_true")
     phase0_eval.set_defaults(func=run_phase0_eval)
+
+    phase0_eval_worker = subparsers.add_parser(
+        "eval-phase0-worker",
+        help="Internal worker for sharded phase0 MLX evaluation.",
+    )
+    phase0_eval_worker.add_argument("--model-path", type=Path, required=True)
+    phase0_eval_worker.add_argument("--adapter-path", type=Path, required=True)
+    phase0_eval_worker.add_argument("--input-jsonl", type=Path, required=True)
+    phase0_eval_worker.add_argument("--output-jsonl", type=Path, required=True)
+    phase0_eval_worker.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
+    phase0_eval_worker.add_argument("--temperature", type=float, default=README_TEMPERATURE)
+    phase0_eval_worker.add_argument("--top-p", type=float, default=README_TOP_P)
+    phase0_eval_worker.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    phase0_eval_worker.add_argument("--prompt-chunk-size", type=int, default=README_MAX_NUM_SEQS)
+    phase0_eval_worker.add_argument("--prefill-batch-size", type=int, default=32)
+    phase0_eval_worker.add_argument("--completion-batch-size", type=int, default=32)
+    phase0_eval_worker.add_argument("--progress-every", type=int, default=10)
+    phase0_eval_worker.add_argument("--worker-label", type=str, default="worker")
+    phase0_eval_worker.add_argument("--lazy-load", action="store_true")
+    phase0_eval_worker.set_defaults(func=run_phase0_eval_worker)
 
     return parser
 
