@@ -1,7 +1,7 @@
 {
-  "source_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
-  "dataset_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/GPRO/step1_binary_answer_only/artifacts/step1_binary_answer_only_training_data.csv",
-  "manifest_json": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/baseline/GPRO/step1_binary_answer_only/artifacts/step1_binary_answer_only_manifest.json",
+  "source_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/GPRO/step1_binary_answer_only/artifacts/step1_binary_answer_only_training_data.csv",
+  "manifest_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/GPRO/step1_binary_answer_only/artifacts/step1_binary_answer_only_manifest.json",
   "seed": 42,
   "dataset_size": 1285,
   "source_binary_non_exclude_count": 1587,
@@ -35,6 +35,7 @@
   },
   "training_plumbing": {
     "assistant_only_loss": true,
+    "precomputed_messages_in_dataset": true,
     "boxed_instruction": "Please put your final answer inside `\\boxed{}`. For example: `\\boxed{your answer}`",
     "max_seq_len": 2048,
     "epochs": 2,
@@ -58,6 +59,7 @@
   "notes": [
     "README evaluation prioritizes boxed extraction and otherwise falls back to heuristic extraction, so Step 1 biases the policy toward short exact boxed answers.",
     "Most verified binary rows are converted to boxed-only supervision; only a small diverse subset keeps an ultra-short, answer-free <think> one-liner.",
-    "manual_audit_priority rows are excluded from the base positive set and may only re-enter via strict rollout successes."
+    "manual_audit_priority rows are excluded from the base positive set and may only re-enter via strict rollout successes.",
+    "The completed dataset precomputes user_message and assistant_message so notebook training only performs tokenizer-dependent rendering and tokenization."
   ]
 }
