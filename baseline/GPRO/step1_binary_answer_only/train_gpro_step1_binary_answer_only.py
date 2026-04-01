@@ -610,44 +610,42 @@ def render_training_pair(tokenizer: Any, row: dict[str, str]) -> tuple[str, str,
     return user_message, assistant_message, prompt_prefix, full_text
 
 
+def shared_token_prefix_length(prefix_ids: list[int], full_ids: list[int]) -> int:
+    limit = min(len(prefix_ids), len(full_ids))
+    index = 0
+    while index < limit and prefix_ids[index] == full_ids[index]:
+        index += 1
+    return index
+
+
 def tokenize_training_row(tokenizer: Any, row: dict[str, str]) -> dict[str, Any]:
-    _, assistant_message, _, full_text = render_training_pair(tokenizer, row)
-    assistant_char_start = full_text.find(assistant_message)
-    if assistant_char_start < 0:
-        raise ValueError(f"Assistant span not found in rendered chat for row {row['id']}")
+    _, _assistant_message, prompt_prefix, full_text = render_training_pair(tokenizer, row)
+    prefix_ids = list(
+        tokenizer(
+            prompt_prefix,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+        )["input_ids"]
+    )
     try:
         full_encoded = tokenizer(
             full_text,
             add_special_tokens=False,
             truncation=True,
             max_length=MAX_SEQ_LEN,
-            return_offsets_mapping=True,
         )
-    except (NotImplementedError, TypeError):
-        full_encoded = tokenizer(
-            full_text,
-            add_special_tokens=False,
-            truncation=True,
-            max_length=MAX_SEQ_LEN,
-        )
+    except TypeError:
+        full_encoded = tokenizer(full_text, add_special_tokens=False, truncation=True, max_length=MAX_SEQ_LEN)
     input_ids = list(full_encoded["input_ids"])
     attention_mask = list(full_encoded["attention_mask"])
-    offset_mapping = full_encoded.get("offset_mapping")
-    assistant_token_start: int | None = None
-    if offset_mapping:
-        for index, (start, _end) in enumerate(offset_mapping):
-            if start >= assistant_char_start:
-                assistant_token_start = index
-                break
-    if assistant_token_start is None:
-        prefix_text = full_text[:assistant_char_start]
-        prefix_ids = tokenizer(
-            prefix_text,
-            add_special_tokens=False,
-            truncation=True,
-            max_length=MAX_SEQ_LEN,
-        )["input_ids"]
-        assistant_token_start = len(prefix_ids)
+    # Supervise from the actual generation boundary, not from the raw assistant content.
+    # For boxed_only rows the chat template renders `<think></think>\boxed{...}` while the
+    # user-only prompt ends at `<think>`. If loss starts at `\boxed{...}`, the model never
+    # learns to emit `</think>` and tends to continue a long reasoning trace at inference.
+    assistant_token_start = shared_token_prefix_length(prefix_ids, input_ids)
+    if assistant_token_start == 0:
+        raise ValueError(f"Prompt prefix did not align with full chat rendering for row {row['id']}")
     if assistant_token_start >= len(input_ids):
         raise ValueError(f"Assistant tokens were truncated out for row {row['id']}")
     labels = [-100] * assistant_token_start + input_ids[assistant_token_start:]
