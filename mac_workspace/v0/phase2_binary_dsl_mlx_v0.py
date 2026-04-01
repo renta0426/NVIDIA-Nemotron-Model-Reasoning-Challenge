@@ -343,6 +343,7 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
         return
 
     original_chat_init = tuner_datasets.ChatDataset.__init__
+    original_completions_init = tuner_datasets.CompletionsDataset.__init__
 
     def patched_chat_init(
         self: Any,
@@ -389,6 +390,54 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
         )
         return (tokens, offset)
 
+    def patched_completions_init(
+        self: Any,
+        data: list[dict[str, Any]],
+        tokenizer: Any,
+        prompt_key: str,
+        completion_key: str,
+        mask_prompt: bool,
+        enable_thinking: bool = False,
+    ) -> None:
+        original_completions_init(
+            self,
+            data=data,
+            tokenizer=tokenizer,
+            prompt_key=prompt_key,
+            completion_key=completion_key,
+            mask_prompt=mask_prompt,
+        )
+        self.enable_thinking = bool(enable_thinking)
+
+    def patched_completions_process(self: Any, row: dict[str, Any]) -> tuple[list[int], int]:
+        tools = row.get("tools", None)
+        messages = [
+            {"role": "user", "content": row[self.prompt_key]},
+            {"role": "assistant", "content": row[self.completion_key]},
+        ]
+        try:
+            tokens = self.tokenizer.apply_chat_template(
+                messages,
+                tools=tools,
+                enable_thinking=self.enable_thinking,
+            )
+        except TypeError:
+            tokens = self.tokenizer.apply_chat_template(messages, tools=tools)
+        if not self.mask_prompt:
+            return (tokens, 0)
+        full_text = apply_chat_template_safe(
+            self.tokenizer,
+            messages,
+            add_generation_prompt=False,
+            enable_thinking=self.enable_thinking,
+        )
+        offset = find_token_index_for_text_span(
+            self.tokenizer,
+            full_text,
+            str(row[self.completion_key]),
+        )
+        return (tokens, offset)
+
     def patched_create_dataset(data: Any, tokenizer: Any, config: Any) -> Any:
         mask_prompt = getattr(config, "mask_prompt", False)
         prompt_feature = getattr(config, "prompt_feature", "prompt")
@@ -404,6 +453,7 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
                 prompt_feature,
                 completion_feature,
                 mask_prompt,
+                enable_thinking,
             )
         if chat_feature in sample:
             return tuner_datasets.ChatDataset(
@@ -424,6 +474,8 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
 
     tuner_datasets.ChatDataset.__init__ = patched_chat_init
     tuner_datasets.ChatDataset.process = patched_chat_process
+    tuner_datasets.CompletionsDataset.__init__ = patched_completions_init
+    tuner_datasets.CompletionsDataset.process = patched_completions_process
     tuner_datasets.create_dataset = patched_create_dataset
     tuner_datasets._nemotron_enable_thinking_patch = True
 
@@ -454,6 +506,28 @@ def build_phase2_chat_records(rows: Sequence[dict[str, str]]) -> list[dict[str, 
                     {"role": "user", "content": build_user_message(prompt)},
                     {"role": "assistant", "content": assistant_content},
                 ],
+                "metadata": {
+                    "id": row.get("id", ""),
+                    "answer": row.get("answer", ""),
+                    "label": row.get("label", ""),
+                    "assistant_style": row.get("assistant_style", ""),
+                    "source_selection_tier": row.get("source_selection_tier", ""),
+                },
+            }
+        )
+    return records
+
+
+def build_phase2_completion_records(rows: Sequence[dict[str, str]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for row in rows:
+        prompt = str(row.get("prompt", "")).strip()
+        if not prompt:
+            raise ValueError(f"Row {row.get('id', '')} is missing prompt")
+        records.append(
+            {
+                "prompt": build_user_message(prompt),
+                "completion": render_assistant_message(row),
                 "metadata": {
                     "id": row.get("id", ""),
                     "answer": row.get("answer", ""),
@@ -609,10 +683,16 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
     )
     source_rows = load_phase2_training_rows(Path(args.train_csv))
     dataset_format = str(args.dataset_format).strip().lower()
-    if dataset_format not in {"chat", "text"}:
+    if dataset_format == "completions":
+        dataset_format = "completion"
+    if dataset_format not in {"chat", "completion", "text"}:
         raise ValueError(f"Unsupported dataset_format: {dataset_format}")
     if dataset_format == "chat":
         train_records = build_phase2_chat_records(source_rows)
+        mask_prompt = True
+        enable_thinking = True
+    elif dataset_format == "completion":
+        train_records = build_phase2_completion_records(source_rows)
         mask_prompt = True
         enable_thinking = True
     else:
@@ -2170,7 +2250,12 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--train-csv", type=Path, default=DEFAULT_TRAIN_CSV)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-name", type=str, default=DEFAULT_RUN_NAME)
-    parser.add_argument("--dataset-format", type=str, choices=("chat", "text"), default="chat")
+    parser.add_argument(
+        "--dataset-format",
+        type=str,
+        choices=("chat", "completion", "completions", "text"),
+        default="chat",
+    )
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--grad-accumulation-steps", type=int, default=4)
     parser.add_argument("--num-epochs", type=float, default=2.0)
