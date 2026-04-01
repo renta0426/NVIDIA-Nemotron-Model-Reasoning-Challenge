@@ -283,6 +283,132 @@ def build_user_message(prompt: str) -> str:
     return f"{prompt}\n{BOXED_INSTRUCTION}"
 
 
+def apply_chat_template_safe(
+    tokenizer: Any,
+    messages: Sequence[dict[str, str]],
+    *,
+    add_generation_prompt: bool,
+    enable_thinking: bool,
+) -> str:
+    try:
+        return tokenizer.apply_chat_template(
+            list(messages),
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+            enable_thinking=enable_thinking,
+        )
+    except TypeError:
+        return tokenizer.apply_chat_template(
+            list(messages),
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+        )
+    except Exception:
+        rendered: list[str] = []
+        for message in messages:
+            rendered.append(f"<|{message['role']}|>\n{message['content']}")
+        if add_generation_prompt:
+            rendered.append("<|assistant|>\n<think>")
+        return "\n".join(rendered)
+
+
+def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
+    import mlx_lm.tuner.datasets as tuner_datasets
+
+    if getattr(tuner_datasets, "_nemotron_enable_thinking_patch", False):
+        return
+
+    original_chat_init = tuner_datasets.ChatDataset.__init__
+
+    def patched_chat_init(
+        self: Any,
+        data: list[dict[str, Any]],
+        tokenizer: Any,
+        chat_key: str = "messages",
+        mask_prompt: bool = False,
+        enable_thinking: bool = False,
+    ) -> None:
+        original_chat_init(
+            self,
+            data=data,
+            tokenizer=tokenizer,
+            chat_key=chat_key,
+            mask_prompt=mask_prompt,
+        )
+        self.enable_thinking = bool(enable_thinking)
+
+    def patched_chat_process(self: Any, row: dict[str, Any]) -> tuple[list[int], int]:
+        messages = row[self.chat_key]
+        tools = row.get("tools", None)
+        try:
+            tokens = self.tokenizer.apply_chat_template(
+                messages,
+                tools=tools,
+                enable_thinking=self.enable_thinking,
+            )
+        except TypeError:
+            tokens = self.tokenizer.apply_chat_template(messages, tools=tools)
+        if not self.mask_prompt:
+            return (tokens, 0)
+        add_generation_prompt = messages[-1].get("role") == "assistant"
+        try:
+            offset = len(
+                self.tokenizer.apply_chat_template(
+                    messages[:-1],
+                    tools=tools,
+                    add_generation_prompt=add_generation_prompt,
+                    enable_thinking=self.enable_thinking,
+                )
+            )
+        except TypeError:
+            offset = len(
+                self.tokenizer.apply_chat_template(
+                    messages[:-1],
+                    tools=tools,
+                    add_generation_prompt=add_generation_prompt,
+                )
+            )
+        return (tokens, offset)
+
+    def patched_create_dataset(data: Any, tokenizer: Any, config: Any) -> Any:
+        mask_prompt = getattr(config, "mask_prompt", False)
+        prompt_feature = getattr(config, "prompt_feature", "prompt")
+        text_feature = getattr(config, "text_feature", "text")
+        completion_feature = getattr(config, "completion_feature", "completion")
+        chat_feature = getattr(config, "chat_feature", "messages")
+        enable_thinking = getattr(config, "enable_thinking", False)
+        sample = data[0]
+        if prompt_feature in sample and completion_feature in sample:
+            return tuner_datasets.CompletionsDataset(
+                data,
+                tokenizer,
+                prompt_feature,
+                completion_feature,
+                mask_prompt,
+            )
+        if chat_feature in sample:
+            return tuner_datasets.ChatDataset(
+                data,
+                tokenizer,
+                chat_key=chat_feature,
+                mask_prompt=mask_prompt,
+                enable_thinking=enable_thinking,
+            )
+        if text_feature in sample:
+            if mask_prompt:
+                raise ValueError("Prompt masking not supported for text dataset.")
+            return tuner_datasets.TextDataset(data, tokenizer, text_key=text_feature)
+        raise ValueError(
+            "Unsupported data format, check the supported formats here:\n"
+            "https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/LORA.md#Data."
+        )
+
+    tuner_datasets.ChatDataset.__init__ = patched_chat_init
+    tuner_datasets.ChatDataset.process = patched_chat_process
+    tuner_datasets.create_dataset = patched_create_dataset
+    tuner_datasets._nemotron_enable_thinking_patch = True
+
+
 def render_assistant_message(row: dict[str, str]) -> str:
     style = str(row.get("assistant_style", "")).strip()
     answer = str(row.get("answer", "")).strip()
@@ -321,6 +447,38 @@ def build_phase2_chat_records(rows: Sequence[dict[str, str]]) -> list[dict[str, 
     return records
 
 
+def build_phase2_text_records(rows: Sequence[dict[str, str]], *, tokenizer: Any) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for row in rows:
+        prompt = str(row.get("prompt", "")).strip()
+        if not prompt:
+            raise ValueError(f"Row {row.get('id', '')} is missing prompt")
+        user_message = build_user_message(prompt)
+        assistant_message = render_assistant_message(row)
+        full_text = apply_chat_template_safe(
+            tokenizer,
+            [
+                {"role": "user", "content": user_message},
+                {"role": "assistant", "content": assistant_message},
+            ],
+            add_generation_prompt=False,
+            enable_thinking=True,
+        )
+        records.append(
+            {
+                "text": full_text,
+                "metadata": {
+                    "id": row.get("id", ""),
+                    "answer": row.get("answer", ""),
+                    "label": row.get("label", ""),
+                    "assistant_style": row.get("assistant_style", ""),
+                    "source_selection_tier": row.get("source_selection_tier", ""),
+                },
+            }
+        )
+    return records
+
+
 def select_shadow_validation_records(
     records: Sequence[dict[str, Any]],
     *,
@@ -347,6 +505,8 @@ def build_mlx_lora_config(
     model_path: Path,
     dataset_dir: Path,
     adapter_dir: Path,
+    mask_prompt: bool,
+    enable_thinking: bool,
     batch_size: int,
     num_epochs: float,
     learning_rate: float,
@@ -371,7 +531,8 @@ def build_mlx_lora_config(
         "data": str(dataset_dir),
         "fine_tune_type": "lora",
         "optimizer": "adamw",
-        "mask_prompt": True,
+        "mask_prompt": mask_prompt,
+        "enable_thinking": enable_thinking,
         "num_layers": num_layers,
         "batch_size": batch_size,
         "iters": total_iters,
@@ -398,7 +559,7 @@ def render_train_command(config_path: Path) -> str:
         [
             "#!/bin/bash",
             "set -euo pipefail",
-            f'"{sys.executable}" -m mlx_lm lora --config "{config_path}"',
+            f'"{sys.executable}" "{Path(__file__).resolve()}" train-mlx-config --config "{config_path}"',
             "",
         ]
     )
@@ -428,7 +589,22 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         force=bool(args.force_shadow_model),
     )
     source_rows = load_phase2_training_rows(Path(args.train_csv))
-    train_records = build_phase2_chat_records(source_rows)
+    dataset_format = str(args.dataset_format).strip().lower()
+    if dataset_format not in {"chat", "text"}:
+        raise ValueError(f"Unsupported dataset_format: {dataset_format}")
+    if dataset_format == "chat":
+        train_records = build_phase2_chat_records(source_rows)
+        mask_prompt = True
+        enable_thinking = True
+    else:
+        from transformers import AutoTokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(str(shadow_model_dir), trust_remote_code=True)
+        if tokenizer.pad_token is None and tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+        train_records = build_phase2_text_records(source_rows, tokenizer=tokenizer)
+        mask_prompt = False
+        enable_thinking = False
     valid_records = select_shadow_validation_records(
         train_records,
         valid_rows=int(args.valid_shadow_rows),
@@ -448,6 +624,8 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         model_path=shadow_model_dir,
         dataset_dir=dataset_dir,
         adapter_dir=adapter_dir,
+        mask_prompt=mask_prompt,
+        enable_thinking=enable_thinking,
         batch_size=int(args.batch_size),
         num_epochs=float(args.num_epochs),
         learning_rate=float(args.learning_rate),
@@ -477,11 +655,14 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         "phase2_rows": len(source_rows),
         "dataset": {
             "dataset_dir": str(dataset_dir),
+            "dataset_format": dataset_format,
+            "enable_thinking": enable_thinking,
             "train_rows": len(train_records),
             "valid_rows": len(valid_records),
             "valid_strategy": f"shadow_sample={int(args.valid_shadow_rows)}",
         },
         "training": {
+            "mask_prompt": mask_prompt,
             "batch_size": int(args.batch_size),
             "grad_accumulation_steps": int(args.grad_accumulation_steps),
             "num_epochs": float(args.num_epochs),
@@ -1837,15 +2018,27 @@ def run_prepare_train(args: argparse.Namespace) -> None:
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 
+def run_mlx_lora_training_from_config(config_path: Path) -> None:
+    import mlx_lm.lora as mlx_lora
+
+    os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    maybe_patch_mlx_chat_dataset_enable_thinking()
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = yaml.load(handle, Loader=mlx_lora.yaml_loader) or {}
+    for key, value in mlx_lora.CONFIG_DEFAULTS.items():
+        config.setdefault(key, value)
+    mlx_lora.run(argparse.Namespace(**config))
+
+
 def run_train(args: argparse.Namespace) -> None:
     manifest = prepare_training_run(args)
     run_root = Path(manifest["run_root"])
     adapter_dir = Path(manifest["artifacts"]["adapter_dir"])
     config_path = Path(manifest["artifacts"]["config_path"])
-    command = [sys.executable, "-m", "mlx_lm", "lora", "--config", str(config_path)]
+    command = [sys.executable, str(Path(__file__).resolve()), "train-mlx-config", "--config", str(config_path)]
     print("Running MLX LoRA training:")
     print(" ".join(command))
-    subprocess.run(command, cwd=str(REPO_ROOT), check=True)
+    run_mlx_lora_training_from_config(config_path)
     verify_training_outputs(adapter_dir)
     training_result = {
         "created_at": utc_now(),
@@ -1855,6 +2048,10 @@ def run_train(args: argparse.Namespace) -> None:
     }
     write_json(run_root / "training_result.json", training_result)
     print(json.dumps(training_result, ensure_ascii=False, indent=2))
+
+
+def run_train_mlx_config(args: argparse.Namespace) -> None:
+    run_mlx_lora_training_from_config(Path(args.config).resolve())
 
 
 def run_phase0_eval(args: argparse.Namespace) -> None:
@@ -1943,6 +2140,7 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--train-csv", type=Path, default=DEFAULT_TRAIN_CSV)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-name", type=str, default=DEFAULT_RUN_NAME)
+    parser.add_argument("--dataset-format", type=str, choices=("chat", "text"), default="chat")
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--grad-accumulation-steps", type=int, default=4)
     parser.add_argument("--num-epochs", type=float, default=2.0)
@@ -1975,6 +2173,13 @@ def build_parser() -> argparse.ArgumentParser:
     train = subparsers.add_parser("train", help="Prepare artifacts and launch mlx_lm.lora training.")
     add_common_train_args(train)
     train.set_defaults(func=run_train)
+
+    train_mlx_config = subparsers.add_parser(
+        "train-mlx-config",
+        help="Internal helper: run mlx_lm.lora in-process so local dataset patches apply.",
+    )
+    train_mlx_config.add_argument("--config", type=Path, required=True)
+    train_mlx_config.set_defaults(func=run_train_mlx_config)
 
     phase0_eval = subparsers.add_parser("eval-phase0", help="Run phase0-style offline evaluation with MLX generation.")
     phase0_eval.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
