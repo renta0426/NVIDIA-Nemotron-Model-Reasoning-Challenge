@@ -312,6 +312,27 @@ def apply_chat_template_safe(
         return "\n".join(rendered)
 
 
+def find_token_index_for_text_span(tokenizer: Any, full_text: str, target_text: str) -> int:
+    if not target_text:
+        raise ValueError("Cannot compute token offset for empty target text.")
+    char_start = full_text.find(target_text)
+    if char_start < 0:
+        preview = full_text[:200].replace("\n", "\\n")
+        target_preview = target_text[:120].replace("\n", "\\n")
+        raise ValueError(
+            f"Target text span was not found in rendered chat. target={target_preview!r} rendered_prefix={preview!r}"
+        )
+    encoded = tokenizer(
+        full_text,
+        add_special_tokens=False,
+        return_offsets_mapping=True,
+    )
+    for token_index, (start, end) in enumerate(encoded["offset_mapping"]):
+        if start <= char_start < end or (start == end == char_start):
+            return token_index
+    raise ValueError(f"Unable to map assistant char offset {char_start} to a token offset.")
+
+
 def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
     import mlx_lm.tuner.datasets as tuner_datasets
 
@@ -350,24 +371,19 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
             tokens = self.tokenizer.apply_chat_template(messages, tools=tools)
         if not self.mask_prompt:
             return (tokens, 0)
-        add_generation_prompt = messages[-1].get("role") == "assistant"
-        try:
-            offset = len(
-                self.tokenizer.apply_chat_template(
-                    messages[:-1],
-                    tools=tools,
-                    add_generation_prompt=add_generation_prompt,
-                    enable_thinking=self.enable_thinking,
-                )
-            )
-        except TypeError:
-            offset = len(
-                self.tokenizer.apply_chat_template(
-                    messages[:-1],
-                    tools=tools,
-                    add_generation_prompt=add_generation_prompt,
-                )
-            )
+        if messages[-1].get("role") != "assistant":
+            raise ValueError("mask_prompt=True requires the last chat message to have role='assistant'.")
+        full_text = apply_chat_template_safe(
+            self.tokenizer,
+            messages,
+            add_generation_prompt=False,
+            enable_thinking=self.enable_thinking,
+        )
+        offset = find_token_index_for_text_span(
+            self.tokenizer,
+            full_text,
+            str(messages[-1].get("content", "")),
+        )
         return (tokens, offset)
 
     def patched_create_dataset(data: Any, tokenizer: Any, config: Any) -> Any:
