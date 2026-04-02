@@ -45,6 +45,12 @@ TRAIN_PROFILE_CHOICES = (
     "baseline",
     "single-adapter-focus-v1",
     "single-adapter-focus-v2",
+    "single-adapter-fusion-v1",
+    "single-adapter-fusion-v2",
+    "single-adapter-fusion-v3",
+    "single-adapter-fusion-v4",
+    "single-adapter-fusion-v5",
+    "single-adapter-fusion-v6",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -582,6 +588,75 @@ def apply_phase2_train_profile(
                 transform_counts[f"repeat:{label}:{tier}"] += 1
             continue
 
+        if normalized_profile in {
+            "single-adapter-fusion-v1",
+            "single-adapter-fusion-v2",
+            "single-adapter-fusion-v3",
+            "single-adapter-fusion-v4",
+            "single-adapter-fusion-v5",
+            "single-adapter-fusion-v6",
+        }:
+            if normalized_profile == "single-adapter-fusion-v3" and label == "binary":
+                boxed_binary = clone_phase2_row(row)
+                if style != "boxed_only":
+                    boxed_binary["assistant_style"] = "boxed_only"
+                    transform_counts[f"force_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                else:
+                    transform_counts[f"keep_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                profiled_rows.append(boxed_binary)
+                for _ in range(2):
+                    profiled_rows.append(clone_phase2_row(boxed_binary))
+                    transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
+                continue
+            profiled_rows.append(row)
+            if label in {"binary", "symbol"}:
+                boxed_clone_repeats = 1
+                if normalized_profile in {
+                    "single-adapter-fusion-v2",
+                    "single-adapter-fusion-v3",
+                    "single-adapter-fusion-v4",
+                    "single-adapter-fusion-v5",
+                    "single-adapter-fusion-v6",
+                } and label == "symbol":
+                    boxed_clone_repeats = 2
+                for repeat_index in range(boxed_clone_repeats):
+                    if style == "boxed_only":
+                        transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(clone_phase2_row(row))
+                    else:
+                        transform_counts[f"add_boxed_clone:{label}:{tier or 'unknown'}"] += 1
+                        boxed_clone = clone_phase2_row(row)
+                        boxed_clone["assistant_style"] = "boxed_only"
+                        profiled_rows.append(boxed_clone)
+            elif (
+                normalized_profile
+                in {
+                    "single-adapter-fusion-v4",
+                    "single-adapter-fusion-v5",
+                    "single-adapter-fusion-v6",
+                }
+                and label == "unit"
+            ):
+                row_key = str(row.get("id") or row.get("prompt") or "")
+                repeat_unit = normalized_profile == "single-adapter-fusion-v4"
+                if normalized_profile == "single-adapter-fusion-v5":
+                    repeat_unit = stable_mod(row_key, 2) == 0
+                elif normalized_profile == "single-adapter-fusion-v6":
+                    repeat_unit = stable_mod(row_key, 3) == 0
+                if repeat_unit:
+                    profiled_rows.append(clone_phase2_row(row))
+                    if normalized_profile == "single-adapter-fusion-v4":
+                        transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+                    elif normalized_profile == "single-adapter-fusion-v5":
+                        transform_counts[f"repeat_half:{label}:{tier or 'unknown'}"] += 1
+                    else:
+                        transform_counts[f"repeat_third:{label}:{tier or 'unknown'}"] += 1
+                else:
+                    transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            else:
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            continue
+
         if normalized_profile.startswith("general-stable-focus"):
             if label in {"binary", "symbol"}:
                 transform_counts[f"drop:{label}"] += 1
@@ -715,6 +790,7 @@ def build_mlx_lora_config(
     model_path: Path,
     dataset_dir: Path,
     adapter_dir: Path,
+    resume_adapter_file: Path | None,
     mask_prompt: bool,
     enable_thinking: bool,
     batch_size: int,
@@ -768,6 +844,8 @@ def build_mlx_lora_config(
             "scale": lora_scale,
         },
     }
+    if resume_adapter_file is not None:
+        config["resume_adapter_file"] = str(resume_adapter_file)
     if schedule_name:
         if schedule_name != "cosine_decay":
             raise ValueError(f"Unsupported lr_schedule_name: {schedule_name}")
@@ -869,6 +947,11 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         model_path=shadow_model_dir,
         dataset_dir=dataset_dir,
         adapter_dir=adapter_dir,
+        resume_adapter_file=(
+            Path(args.resume_adapter_file).resolve()
+            if getattr(args, "resume_adapter_file", None)
+            else None
+        ),
         mask_prompt=mask_prompt,
         enable_thinking=enable_thinking,
         batch_size=int(args.batch_size),
@@ -913,6 +996,11 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "training": {
             "mask_prompt": mask_prompt,
+            "resume_adapter_file": (
+                str(Path(args.resume_adapter_file).resolve())
+                if getattr(args, "resume_adapter_file", None)
+                else ""
+            ),
             "batch_size": int(args.batch_size),
             "grad_accumulation_steps": int(args.grad_accumulation_steps),
             "num_epochs": float(args.num_epochs),
@@ -950,6 +1038,173 @@ def verify_training_outputs(adapter_dir: Path) -> None:
         raise FileNotFoundError(
             "MLX training did not produce expected adapter files: " + ", ".join(missing)
         )
+
+
+def normalize_adapter_config_for_merge(config: dict[str, Any]) -> dict[str, Any]:
+    fine_tune_type = str(config.get("fine_tune_type", "lora"))
+    if fine_tune_type == "full":
+        raise ValueError("Full fine-tune checkpoints are not supported by merge-adapters.")
+    lora_parameters = dict(config.get("lora_parameters") or {})
+    if not lora_parameters:
+        raise ValueError("Adapter config is missing lora_parameters.")
+    rank = int(lora_parameters.get("rank", 0))
+    if rank <= 0:
+        raise ValueError(f"Invalid LoRA rank in adapter config: {rank}")
+    if rank > README_MAX_LORA_RANK:
+        raise ValueError(
+            f"LoRA rank {rank} exceeds README max_lora_rank={README_MAX_LORA_RANK}."
+        )
+    return {
+        "fine_tune_type": fine_tune_type,
+        "num_layers": int(config.get("num_layers", -1)),
+        "lora_parameters": lora_parameters,
+    }
+
+
+def load_adapter_tensors(adapter_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    from safetensors.numpy import load_file
+
+    verify_training_outputs(adapter_dir)
+    config = load_json(adapter_dir / "adapter_config.json", default=None)
+    if not isinstance(config, dict):
+        raise ValueError(f"Invalid adapter_config.json: {adapter_dir / 'adapter_config.json'}")
+    tensors = load_file(str(adapter_dir / "adapters.safetensors"))
+    return config, tensors
+
+
+def resolve_merged_num_layers(*, generalist_layers: int, specialist_layers: int) -> int:
+    if generalist_layers < 0 or specialist_layers < 0:
+        return -1
+    return max(generalist_layers, specialist_layers)
+
+
+def merge_adapter_configs(
+    *,
+    generalist_config: dict[str, Any],
+    specialist_config: dict[str, Any],
+    generalist_source: str,
+    specialist_source: str,
+    generalist_weight: float,
+    specialist_weight: float,
+) -> dict[str, Any]:
+    generalist = normalize_adapter_config_for_merge(generalist_config)
+    specialist = normalize_adapter_config_for_merge(specialist_config)
+    if generalist["fine_tune_type"] != specialist["fine_tune_type"]:
+        raise ValueError(
+            "Cannot merge adapters with different fine_tune_type values: "
+            f"{generalist['fine_tune_type']} vs {specialist['fine_tune_type']}"
+        )
+    if generalist["lora_parameters"] != specialist["lora_parameters"]:
+        raise ValueError(
+            "Cannot merge adapters with different lora_parameters. "
+            f"generalist={generalist['lora_parameters']} specialist={specialist['lora_parameters']}"
+        )
+    return {
+        "created_at": utc_now(),
+        "fine_tune_type": generalist["fine_tune_type"],
+        "num_layers": resolve_merged_num_layers(
+            generalist_layers=int(generalist["num_layers"]),
+            specialist_layers=int(specialist["num_layers"]),
+        ),
+        "lora_parameters": generalist["lora_parameters"],
+        "merge_sources": {
+            "generalist": str(generalist_source),
+            "specialist": str(specialist_source),
+        },
+        "merge_weights": {
+            "generalist": float(generalist_weight),
+            "specialist": float(specialist_weight),
+        },
+        "merge_strategy": "weighted_union_zero_fill",
+    }
+
+
+def merge_adapter_tensors(
+    *,
+    generalist_tensors: dict[str, Any],
+    specialist_tensors: dict[str, Any],
+    generalist_weight: float,
+    specialist_weight: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    merged_tensors: dict[str, Any] = {}
+    overlap_keys = 0
+    generalist_only_keys = 0
+    specialist_only_keys = 0
+    for key in sorted(set(generalist_tensors) | set(specialist_tensors)):
+        generalist_value = generalist_tensors.get(key)
+        specialist_value = specialist_tensors.get(key)
+        if generalist_value is not None and specialist_value is not None:
+            if tuple(generalist_value.shape) != tuple(specialist_value.shape):
+                raise ValueError(
+                    f"Shape mismatch for tensor '{key}': "
+                    f"{tuple(generalist_value.shape)} vs {tuple(specialist_value.shape)}"
+                )
+            merged_value = (
+                float(generalist_weight) * generalist_value.astype("float32")
+                + float(specialist_weight) * specialist_value.astype("float32")
+            )
+            merged_tensors[key] = merged_value.astype(generalist_value.dtype)
+            overlap_keys += 1
+        elif generalist_value is not None:
+            merged_tensors[key] = (
+                float(generalist_weight) * generalist_value.astype("float32")
+            ).astype(generalist_value.dtype)
+            generalist_only_keys += 1
+        elif specialist_value is not None:
+            merged_tensors[key] = (
+                float(specialist_weight) * specialist_value.astype("float32")
+            ).astype(specialist_value.dtype)
+            specialist_only_keys += 1
+    stats = {
+        "merged_tensor_count": len(merged_tensors),
+        "overlap_tensor_count": overlap_keys,
+        "generalist_only_tensor_count": generalist_only_keys,
+        "specialist_only_tensor_count": specialist_only_keys,
+    }
+    return merged_tensors, stats
+
+
+def run_merge_adapters(args: argparse.Namespace) -> None:
+    from safetensors.numpy import save_file
+
+    generalist_adapter_dir = Path(args.generalist_adapter).resolve()
+    specialist_adapter_dir = Path(args.specialist_adapter).resolve()
+    run_root = Path(args.output_root).resolve() / str(args.merge_name)
+    adapter_dir = run_root / "adapter"
+    ensure_dir(adapter_dir)
+
+    generalist_config, generalist_tensors = load_adapter_tensors(generalist_adapter_dir)
+    specialist_config, specialist_tensors = load_adapter_tensors(specialist_adapter_dir)
+    merged_config = merge_adapter_configs(
+        generalist_config=generalist_config,
+        specialist_config=specialist_config,
+        generalist_source=str(generalist_adapter_dir),
+        specialist_source=str(specialist_adapter_dir),
+        generalist_weight=float(args.generalist_weight),
+        specialist_weight=float(args.specialist_weight),
+    )
+    merged_tensors, merge_stats = merge_adapter_tensors(
+        generalist_tensors=generalist_tensors,
+        specialist_tensors=specialist_tensors,
+        generalist_weight=float(args.generalist_weight),
+        specialist_weight=float(args.specialist_weight),
+    )
+    save_file(merged_tensors, str(adapter_dir / "adapters.safetensors"))
+    write_json(adapter_dir / "adapter_config.json", merged_config)
+    manifest = {
+        "created_at": utc_now(),
+        "run_root": str(run_root),
+        "adapter_dir": str(adapter_dir),
+        "generalist_adapter_dir": str(generalist_adapter_dir),
+        "specialist_adapter_dir": str(specialist_adapter_dir),
+        "generalist_weight": float(args.generalist_weight),
+        "specialist_weight": float(args.specialist_weight),
+        "adapter_config": merged_config,
+        "merge_stats": merge_stats,
+    }
+    write_json(run_root / "merge_manifest.json", manifest)
+    verify_training_outputs(adapter_dir)
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 
 def benchmark_columns() -> list[str]:
@@ -1765,6 +2020,37 @@ def resolve_phase0_eval_num_shards(
     return min(auto, total_rows)
 
 
+def parse_comma_separated_set(raw: str) -> set[str]:
+    return {part.strip() for part in str(raw).split(",") if part.strip()}
+
+
+def filter_phase0_benchmark_rows(
+    benchmark_rows: Sequence[dict[str, Any]],
+    *,
+    family_short_filter: str,
+    per_family_limit: int,
+) -> list[dict[str, Any]]:
+    filtered = list(benchmark_rows)
+    allowed_family_short = parse_comma_separated_set(family_short_filter)
+    if allowed_family_short:
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("family_short", "")).strip() in allowed_family_short
+        ]
+    if per_family_limit > 0:
+        counts: Counter[str] = Counter()
+        limited: list[dict[str, Any]] = []
+        for row in filtered:
+            family_short = str(row.get("family_short", "")).strip()
+            if counts[family_short] >= int(per_family_limit):
+                continue
+            counts[family_short] += 1
+            limited.append(row)
+        filtered = limited
+    return filtered
+
+
 def maybe_patch_batch_generator_stats(mx: Any) -> None:
     from mlx_lm.generate import BatchGenerator
 
@@ -2349,14 +2635,24 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
             raise FileNotFoundError(f"Adapter directory does not exist: {adapter_dir}")
         verify_training_outputs(adapter_dir)
 
+    separate_eval_output_root = None
+    if getattr(args, "eval_output_root", None):
+        separate_eval_output_root = Path(args.eval_output_root).resolve()
+
     if adapter_dir is not None:
-        run_root = adapter_dir.parent
+        shadow_run_root = adapter_dir.parent
+        if separate_eval_output_root is None:
+            run_root = shadow_run_root
+        else:
+            run_root = separate_eval_output_root / str(args.eval_name)
+            ensure_dir(run_root)
     else:
         run_root = Path(args.output_root).resolve() / str(args.eval_name)
         ensure_dir(run_root)
+        shadow_run_root = run_root
     shadow_model_dir = build_shadow_model_dir(
         Path(args.model_root),
-        run_root / "shadow_model",
+        shadow_run_root / "shadow_model",
         force=bool(args.force_shadow_model),
     )
 
@@ -2369,6 +2665,11 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
         artifact_root=artifact_root,
         report_root=report_root,
         rebuild=bool(args.rebuild_phase0),
+    )
+    benchmark_rows = filter_phase0_benchmark_rows(
+        benchmark_rows,
+        family_short_filter=str(getattr(args, "family_short_filter", "")),
+        per_family_limit=int(getattr(args, "per_family_limit", 0)),
     )
     if args.max_samples is not None:
         benchmark_rows = benchmark_rows[: int(args.max_samples)]
@@ -2456,6 +2757,7 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--lora-alpha", type=float, default=32.0)
     parser.add_argument("--lora-dropout", type=float, default=0.05)
     parser.add_argument("--num-layers", type=int, default=-1)
+    parser.add_argument("--resume-adapter-file", type=Path, default=None)
     parser.add_argument("--valid-shadow-rows", type=int, default=32)
     parser.add_argument("--steps-per-report", type=int, default=5)
     parser.add_argument("--steps-per-eval", type=int, default=900)
@@ -2487,6 +2789,18 @@ def build_parser() -> argparse.ArgumentParser:
     train_mlx_config.add_argument("--config", type=Path, required=True)
     train_mlx_config.set_defaults(func=run_train_mlx_config)
 
+    merge_adapters = subparsers.add_parser(
+        "merge-adapters",
+        help="Merge two MLX LoRA adapters into a single weighted adapter.",
+    )
+    merge_adapters.add_argument("--generalist-adapter", type=Path, required=True)
+    merge_adapters.add_argument("--specialist-adapter", type=Path, required=True)
+    merge_adapters.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    merge_adapters.add_argument("--merge-name", type=str, required=True)
+    merge_adapters.add_argument("--generalist-weight", type=float, default=1.0)
+    merge_adapters.add_argument("--specialist-weight", type=float, default=1.0)
+    merge_adapters.set_defaults(func=run_merge_adapters)
+
     phase0_eval = subparsers.add_parser("eval-phase0", help="Run phase0-style offline evaluation with MLX generation.")
     phase0_eval.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
     phase0_eval.add_argument("--adapter-path", type=Path, default=None)
@@ -2503,6 +2817,9 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval.add_argument("--num-shards", type=int, default=0)
     phase0_eval.add_argument("--memory-budget-gb", type=float, default=420.0)
     phase0_eval.add_argument("--estimated-worker-memory-gb", type=float, default=100.0)
+    phase0_eval.add_argument("--eval-output-root", type=Path, default=None)
+    phase0_eval.add_argument("--family-short-filter", type=str, default="")
+    phase0_eval.add_argument("--per-family-limit", type=int, default=0)
     phase0_eval.add_argument("--prompt-chunk-size", type=int, default=README_MAX_NUM_SEQS)
     phase0_eval.add_argument("--prefill-batch-size", type=int, default=32)
     phase0_eval.add_argument("--completion-batch-size", type=int, default=32)
