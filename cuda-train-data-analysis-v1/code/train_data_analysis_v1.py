@@ -128,6 +128,10 @@ BIT_STRUCTURED_BYTE_TERNARY_OPERATIONS = {
 BIT_STRUCTURED_BYTE_COMMUTATIVE_OPERATIONS = {"xor", "and", "or", "majority"}
 BIT_STRUCTURED_ABSTRACT_MIN_SUPPORT = 12
 BIT_STRUCTURED_ABSTRACT_MIN_DISTINCT = 6
+BIT_PROMPT_LOCAL_STAGE1_MIN_SUPPORT = 3
+BIT_PROMPT_LOCAL_STAGE2_MIN_SUPPORT = 3
+BIT_PROMPT_LOCAL_STAGE2_ABSTRACT_MIN_SUPPORT = 4
+BIT_PROMPT_LOCAL_STAGE2_ABSTRACT_MIN_DISTINCT = 2
 
 SYMBOL_NUMERIC_EXPRESSION_PATTERN = re.compile(r"^(\d{2})(.)(\d{2})$")
 SYMBOL_NUMERIC_FORMULAS = {
@@ -1310,6 +1314,109 @@ def infer_bit_structured_byte_not_formula_matches(examples: list[tuple[str, str]
     return matches
 
 
+@lru_cache(maxsize=1)
+def build_bit_prompt_local_extended_sources() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    raw_sources = [
+        ("x", lambda value: value & 0xFF),
+        ("reverse", reverse_byte_bits),
+        ("nibble_swap", nibble_swap_byte),
+        ("zero", lambda value: 0),
+        ("ones", lambda value: 0xFF),
+    ]
+    for shift in range(1, 8):
+        raw_sources.append((f"rol{shift}", lambda value, shift=shift: rotate_left_byte(value, shift)))
+        raw_sources.append((f"ror{shift}", lambda value, shift=shift: rotate_right_byte(value, shift)))
+    for shift in range(1, 8):
+        raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
+        raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
+
+    extended_sources = list(raw_sources)
+    for name, function in raw_sources:
+        if name in {"zero", "ones"}:
+            continue
+        extended_sources.append((f"not({name})", lambda value, function=function: (~function(value)) & 0xFF))
+    for bit in range(8):
+        mask = 1 << bit
+        extended_sources.append((f"const_{mask:08b}", lambda value, mask=mask: mask))
+        extended_sources.append((f"const_not_{mask:08b}", lambda value, mask=mask: (~mask) & 0xFF))
+
+    canonical_sources: dict[tuple[int, ...], str] = {}
+    for name, function in extended_sources:
+        signature = tuple(function(value) & 0xFF for value in range(256))
+        canonical_sources.setdefault(signature, name)
+    return tuple((name, signature) for signature, name in sorted(canonical_sources.items(), key=lambda item: item[1]))
+
+
+@lru_cache(maxsize=1)
+def build_bit_prompt_local_stage1_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    sources = build_bit_prompt_local_extended_sources()
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in sources:
+        formulas.setdefault(signature, name)
+    for (name_a, signature_a), (name_b, signature_b) in combinations_with_replacement(sources, 2):
+        for op_name, operation in BIT_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+            signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
+            formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+@lru_cache(maxsize=1)
+def build_bit_prompt_local_stage2_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    sources = build_bit_prompt_local_extended_sources()
+    stage1_formulas = build_bit_prompt_local_stage1_formulas()
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in stage1_formulas:
+        formulas.setdefault(signature, name)
+    for source_name, source_signature in sources:
+        for formula_name, formula_signature in stage1_formulas:
+            for op_name, operation in BIT_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+                signature = tuple(
+                    operation(source_signature[value], formula_signature[value]) & 0xFF for value in range(256)
+                )
+                formulas.setdefault(signature, f"{op_name}({source_name},{formula_name})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+def infer_bit_prompt_local_formula_matches(
+    formulas: tuple[tuple[str, tuple[int, ...]], ...], examples: list[tuple[str, str]], query_bits: str
+) -> list[tuple[str, str]]:
+    if len(query_bits) != 8 or not examples:
+        return []
+    pairs = [(int(input_bits, 2), int(output_bits, 2)) for input_bits, output_bits in examples]
+    query_value = int(query_bits, 2)
+    matches: list[tuple[str, str]] = []
+    for formula_name, signature in formulas:
+        if all(signature[input_value] == output_value for input_value, output_value in pairs):
+            matches.append((formula_name, format(signature[query_value] & 0xFF, "08b")))
+    return matches
+
+
+def infer_bit_prompt_local_stage1_formula_matches(examples: list[tuple[str, str]], query_bits: str) -> list[tuple[str, str]]:
+    return infer_bit_prompt_local_formula_matches(build_bit_prompt_local_stage1_formulas(), examples, query_bits)
+
+
+def infer_bit_prompt_local_stage2_formula_matches(examples: list[tuple[str, str]], query_bits: str) -> list[tuple[str, str]]:
+    return infer_bit_prompt_local_formula_matches(build_bit_prompt_local_stage2_formulas(), examples, query_bits)
+
+
+def split_formula_arguments(text: str) -> list[str]:
+    arguments: list[str] = []
+    depth = 0
+    start = 0
+    for index, character in enumerate(str(text)):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+        elif character == "," and depth == 0:
+            arguments.append(str(text)[start:index].strip())
+            start = index + 1
+    tail = str(text)[start:].strip()
+    if tail:
+        arguments.append(tail)
+    return arguments
+
+
 def abstract_bit_structured_source_name(name: str) -> str:
     if re.fullmatch(r"rol\d+", str(name)):
         return "rol"
@@ -1319,6 +1426,10 @@ def abstract_bit_structured_source_name(name: str) -> str:
         return "shl"
     if re.fullmatch(r"shr\d+", str(name)):
         return "shr"
+    if re.fullmatch(r"const_[01]{8}", str(name)):
+        return "const_mask"
+    if re.fullmatch(r"const_not_[01]{8}", str(name)):
+        return "const_not_mask"
     return str(name)
 
 
@@ -1330,6 +1441,21 @@ def abstract_bit_structured_formula_name(name: str) -> str:
         return abstract_bit_structured_source_name(formula_name)
     operation, remainder = formula_name.split("(", 1)
     arguments = [abstract_bit_structured_source_name(part) for part in remainder[:-1].split(",")]
+    if operation in BIT_STRUCTURED_BYTE_COMMUTATIVE_OPERATIONS:
+        arguments = sorted(arguments)
+    return f"{operation}({','.join(arguments)})"
+
+
+def abstract_bit_prompt_local_formula_name(name: str) -> str:
+    formula_name = str(name)
+    if not formula_name:
+        return ""
+    if formula_name.startswith("not(") and formula_name.endswith(")"):
+        return f"not({abstract_bit_prompt_local_formula_name(formula_name[4:-1])})"
+    if "(" not in formula_name:
+        return abstract_bit_structured_source_name(formula_name)
+    operation, remainder = formula_name.split("(", 1)
+    arguments = [abstract_bit_prompt_local_formula_name(part) for part in split_formula_arguments(remainder[:-1])]
     if operation in BIT_STRUCTURED_BYTE_COMMUTATIVE_OPERATIONS:
         arguments = sorted(arguments)
     return f"{operation}({','.join(arguments)})"
@@ -3217,6 +3343,317 @@ def apply_bit_trace_training_safety_reaudit(analysis_df: pd.DataFrame) -> pd.Dat
         analysis_df.loc[manual_prompt_mask, "analysis_notes"] = "bit_manual_prompt_answer_only"
 
     return analysis_df
+
+
+def apply_bit_prompt_local_consensus_promotions(
+    analysis_df: pd.DataFrame, v1: Any
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    current_candidate_columns = [
+        "id",
+        "selection_tier",
+        "answer",
+        "query_raw",
+        "safe_prediction",
+        "safe_prediction_count",
+        "safe_formula_count",
+        "safe_formulas",
+        "all_predictions",
+    ]
+    support_columns = ["formula_name", "support_rows", "gold_match_rows", "error_rows", "safe_formula"]
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "answer",
+        "query_raw",
+        "safe_prediction",
+        "safe_prediction_count",
+        "safe_formula_count",
+        "safe_support_max",
+        "safe_formulas",
+        "all_predictions",
+    ]
+    empty_current_df = pd.DataFrame(columns=current_candidate_columns)
+    empty_support_df = pd.DataFrame(columns=support_columns)
+    empty_candidate_df = pd.DataFrame(columns=candidate_columns)
+    empty_abstract_support_df = pd.DataFrame(
+        columns=[
+            "abstract_family",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "distinct_exact_formula_count",
+            "safe_abstract_family",
+        ]
+    )
+
+    bit_candidate_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & (analysis_df["selection_tier"].isin(["answer_only_keep", "manual_audit_priority"]))
+    )
+    if not bit_candidate_mask.any():
+        return (
+            analysis_df,
+            empty_current_df,
+            empty_support_df,
+            empty_candidate_df,
+            empty_support_df.copy(),
+            empty_candidate_df.copy(),
+            empty_abstract_support_df,
+        )
+
+    parsed_rows: dict[str, dict[str, Any]] = {}
+    for row in analysis_df.loc[
+        bit_candidate_mask, ["id", "prompt", "answer", "query_raw", "selection_tier"]
+    ].to_dict(orient="records"):
+        row_id = str(row["id"])
+        answer = str(row["answer"])
+        parsed = v1.parse_prompt(str(row["prompt"]), answer)
+        examples = extract_examples(parsed)
+        query_bits = str(parsed.bit_query_binary or "")
+        if len(query_bits) != 8 or not examples:
+            continue
+        parsed_rows[row_id] = {
+            "selection_tier": str(row["selection_tier"]),
+            "answer": answer,
+            "query_raw": str(row["query_raw"]),
+            "examples": examples,
+            "query_bits": query_bits,
+        }
+
+    def curate_answer_only_rows(row_ids: set[str], prediction_map: dict[str, str], note: str) -> None:
+        if not row_ids:
+            return
+        curate_mask = analysis_df["id"].astype(str).isin(row_ids)
+        analysis_df.loc[curate_mask, "teacher_solver_candidate"] = ""
+        analysis_df.loc[curate_mask, "auto_solver_predicted_answer"] = (
+            analysis_df.loc[curate_mask, "id"].astype(str).map(prediction_map)
+        )
+        analysis_df.loc[curate_mask, "auto_solver_match"] = True
+        analysis_df.loc[curate_mask, "verified_trace_ready"] = False
+        analysis_df.loc[curate_mask, "answer_only_ready"] = True
+        analysis_df.loc[curate_mask, "example_consistency_ok"] = True
+        analysis_df.loc[curate_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[curate_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[curate_mask, "audit_reasons"] = ""
+        analysis_df.loc[curate_mask, "analysis_notes"] = note
+        analysis_df.loc[curate_mask, "suspect_label"] = False
+
+    current_candidate_rows: list[dict[str, Any]] = []
+    current_promote_predictions: dict[str, str] = {}
+    for row_id, info in parsed_rows.items():
+        structured_matches = infer_bit_structured_byte_formula_matches(info["examples"], info["query_bits"])
+        not_structured_matches = infer_bit_structured_byte_not_formula_matches(info["examples"], info["query_bits"])
+        safe_matches = sorted(structured_matches + not_structured_matches, key=lambda item: (item[0], item[1]))
+        if not safe_matches:
+            continue
+        safe_prediction_set = sorted({prediction for _, prediction in safe_matches})
+        current_candidate_rows.append(
+            {
+                "id": row_id,
+                "selection_tier": info["selection_tier"],
+                "answer": info["answer"],
+                "query_raw": info["query_raw"],
+                "safe_prediction": safe_prediction_set[0] if len(safe_prediction_set) == 1 else "",
+                "safe_prediction_count": len(safe_prediction_set),
+                "safe_formula_count": len(safe_matches),
+                "safe_formulas": "|".join(name for name, _ in safe_matches),
+                "all_predictions": "|".join(safe_prediction_set),
+            }
+        )
+        if len(safe_prediction_set) == 1 and safe_prediction_set[0] == info["answer"]:
+            current_promote_predictions[row_id] = safe_prediction_set[0]
+
+    current_candidate_df = pd.DataFrame(current_candidate_rows, columns=current_candidate_columns)
+    current_promote_ids = set(current_promote_predictions)
+    curate_answer_only_rows(
+        current_promote_ids,
+        current_promote_predictions,
+        "bit_prompt_local_current_consensus_answer_only",
+    )
+
+    remaining_after_current = {
+        row_id: info for row_id, info in parsed_rows.items() if row_id not in current_promote_ids
+    }
+
+    def build_support_and_candidates(
+        rows: dict[str, dict[str, Any]],
+        infer_matches: Any,
+        exact_min_support: int,
+        abstract_name_fn: Any | None = None,
+        abstract_min_support: int = 0,
+        abstract_min_distinct: int = 0,
+    ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str], pd.DataFrame]:
+        match_records: list[dict[str, Any]] = []
+        row_match_map: dict[str, list[tuple[str, str]]] = {}
+        for row_id, info in rows.items():
+            matches = infer_matches(info["examples"], info["query_bits"])
+            row_match_map[row_id] = matches
+            for formula_name, predicted_answer in matches:
+                match_records.append(
+                    {
+                        "id": row_id,
+                        "formula_name": formula_name,
+                        "predicted_answer": predicted_answer,
+                        "matches_gold": bool(predicted_answer == info["answer"]),
+                    }
+                )
+        if not match_records:
+            return empty_support_df.copy(), empty_candidate_df.copy(), {}, empty_abstract_support_df.copy()
+
+        match_df = pd.DataFrame(match_records)
+        support_df = (
+            match_df.groupby("formula_name", dropna=False)
+            .agg(
+                support_rows=("id", "size"),
+                gold_match_rows=("matches_gold", "sum"),
+            )
+            .reset_index()
+        )
+        support_df["support_rows"] = support_df["support_rows"].astype(int)
+        support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+        support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+        support_df["safe_formula"] = (support_df["support_rows"] >= exact_min_support) & (support_df["error_rows"] == 0)
+        safe_formula_names = set(support_df.loc[support_df["safe_formula"], "formula_name"].astype(str))
+        support_map = {
+            str(row["formula_name"]): int(row["support_rows"])
+            for row in support_df.to_dict(orient="records")
+        }
+        abstract_support_df = empty_abstract_support_df.copy()
+        safe_abstract_family_names: set[str] = set()
+        abstract_support_map: dict[str, int] = {}
+        if abstract_name_fn is not None:
+            match_df["abstract_family"] = match_df["formula_name"].map(abstract_name_fn)
+            abstract_support_df = (
+                match_df.groupby("abstract_family", dropna=False)
+                .agg(
+                    support_rows=("id", "size"),
+                    gold_match_rows=("matches_gold", "sum"),
+                    distinct_exact_formula_count=("formula_name", "nunique"),
+                )
+                .reset_index()
+            )
+            abstract_support_df["support_rows"] = abstract_support_df["support_rows"].astype(int)
+            abstract_support_df["gold_match_rows"] = abstract_support_df["gold_match_rows"].astype(int)
+            abstract_support_df["distinct_exact_formula_count"] = abstract_support_df["distinct_exact_formula_count"].astype(int)
+            abstract_support_df["error_rows"] = abstract_support_df["support_rows"] - abstract_support_df["gold_match_rows"]
+            abstract_support_df["safe_abstract_family"] = (
+                (abstract_support_df["support_rows"] >= abstract_min_support)
+                & (abstract_support_df["error_rows"] == 0)
+                & (abstract_support_df["distinct_exact_formula_count"] >= abstract_min_distinct)
+            )
+            safe_abstract_family_names = set(
+                abstract_support_df.loc[abstract_support_df["safe_abstract_family"], "abstract_family"].astype(str)
+            )
+            abstract_support_map = {
+                str(row["abstract_family"]): int(row["support_rows"])
+                for row in abstract_support_df.to_dict(orient="records")
+            }
+
+        candidate_rows: list[dict[str, Any]] = []
+        promote_predictions: dict[str, str] = {}
+        for row_id, info in rows.items():
+            safe_matches: list[tuple[str, str]] = []
+            for formula_name, predicted_answer in row_match_map.get(row_id, []):
+                exact_safe = str(formula_name) in safe_formula_names
+                abstract_safe = bool(
+                    abstract_name_fn is not None
+                    and abstract_name_fn(str(formula_name)) in safe_abstract_family_names
+                )
+                if exact_safe or abstract_safe:
+                    safe_matches.append((formula_name, predicted_answer))
+            if not safe_matches:
+                continue
+            safe_prediction_set = sorted({predicted_answer for _, predicted_answer in safe_matches})
+            safe_support_max = max(
+                max(
+                    support_map.get(str(formula_name), 0) if str(formula_name) in safe_formula_names else 0,
+                    abstract_support_map.get(abstract_name_fn(str(formula_name)), 0)
+                    if abstract_name_fn is not None
+                    and abstract_name_fn(str(formula_name)) in safe_abstract_family_names
+                    else 0,
+                )
+                for formula_name, _ in safe_matches
+            )
+            candidate_rows.append(
+                {
+                    "id": row_id,
+                    "selection_tier": info["selection_tier"],
+                    "answer": info["answer"],
+                    "query_raw": info["query_raw"],
+                    "safe_prediction": safe_prediction_set[0] if len(safe_prediction_set) == 1 else "",
+                    "safe_prediction_count": len(safe_prediction_set),
+                    "safe_formula_count": len(safe_matches),
+                    "safe_support_max": int(safe_support_max),
+                    "safe_formulas": "|".join(sorted(formula_name for formula_name, _ in safe_matches)),
+                    "all_predictions": "|".join(sorted({predicted_answer for _, predicted_answer in row_match_map.get(row_id, [])})),
+                }
+            )
+            if len(safe_prediction_set) == 1 and safe_prediction_set[0] == info["answer"]:
+                promote_predictions[row_id] = safe_prediction_set[0]
+
+        support_df = support_df.sort_values(
+            ["safe_formula", "support_rows", "gold_match_rows", "formula_name"],
+            ascending=[False, False, False, True],
+        ).reset_index(drop=True)
+        candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+        if not candidate_df.empty:
+            candidate_df = candidate_df.sort_values(
+                ["selection_tier", "safe_support_max", "safe_prediction_count", "safe_formula_count", "id"],
+                ascending=[True, False, True, False, True],
+            ).reset_index(drop=True)
+        if not abstract_support_df.empty:
+            abstract_support_df = abstract_support_df.sort_values(
+                ["safe_abstract_family", "support_rows", "distinct_exact_formula_count", "gold_match_rows", "abstract_family"],
+                ascending=[False, False, False, False, True],
+            ).reset_index(drop=True)
+        return support_df, candidate_df, promote_predictions, abstract_support_df
+
+    stage1_support_df, stage1_candidate_df, stage1_promote_predictions, _ = build_support_and_candidates(
+        remaining_after_current,
+        infer_bit_prompt_local_stage1_formula_matches,
+        BIT_PROMPT_LOCAL_STAGE1_MIN_SUPPORT,
+    )
+    stage1_promote_ids = set(stage1_promote_predictions)
+    curate_answer_only_rows(
+        stage1_promote_ids,
+        stage1_promote_predictions,
+        "bit_prompt_local_extended_support3_answer_only",
+    )
+
+    remaining_after_stage1 = {
+        row_id: info
+        for row_id, info in remaining_after_current.items()
+        if row_id not in stage1_promote_ids
+    }
+    (
+        stage2_support_df,
+        stage2_candidate_df,
+        stage2_promote_predictions,
+        stage2_abstract_support_df,
+    ) = build_support_and_candidates(
+        remaining_after_stage1,
+        infer_bit_prompt_local_stage2_formula_matches,
+        BIT_PROMPT_LOCAL_STAGE2_MIN_SUPPORT,
+        abstract_bit_prompt_local_formula_name,
+        BIT_PROMPT_LOCAL_STAGE2_ABSTRACT_MIN_SUPPORT,
+        BIT_PROMPT_LOCAL_STAGE2_ABSTRACT_MIN_DISTINCT,
+    )
+    curate_answer_only_rows(
+        set(stage2_promote_predictions),
+        stage2_promote_predictions,
+        "bit_prompt_local_nested_support3_or_abstract_answer_only",
+    )
+
+    return (
+        analysis_df,
+        current_candidate_df,
+        stage1_support_df,
+        stage1_candidate_df,
+        stage2_support_df,
+        stage2_candidate_df,
+        stage2_abstract_support_df,
+    )
 
 
 def collect_symbol_minus_prefix_subfamily_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
@@ -5231,6 +5668,15 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df = apply_bit_not_structured_low_support_answer_only_promotions(analysis_df)
     analysis_df = apply_bit_not_structured_manual_prompt_curation(analysis_df)
     analysis_df = apply_bit_trace_training_safety_reaudit(analysis_df)
+    (
+        analysis_df,
+        bit_prompt_local_current_candidate_df,
+        bit_prompt_local_stage1_support_df,
+        bit_prompt_local_stage1_candidate_df,
+        bit_prompt_local_stage2_support_df,
+        bit_prompt_local_stage2_candidate_df,
+        bit_prompt_local_stage2_abstract_support_df,
+    ) = apply_bit_prompt_local_consensus_promotions(analysis_df, v1)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
     analysis_df, symbol_minus_direct_support_df, symbol_minus_direct_candidate_df = apply_symbol_minus_direct_plain_promotions(analysis_df)
@@ -5452,6 +5898,12 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(structured_manual_exact_exclude_df, artifacts_dir / "binary_structured_byte_manual_exact_excludes_v1.csv")
     write_dataframe(structured_formula_support_df, artifacts_dir / "binary_structured_byte_formula_support_v1.csv")
     write_dataframe(structured_formula_abstract_support_df, artifacts_dir / "binary_structured_byte_abstract_support_v1.csv")
+    write_dataframe(bit_prompt_local_current_candidate_df, artifacts_dir / "binary_prompt_local_current_consensus_candidates_v1.csv")
+    write_dataframe(bit_prompt_local_stage1_support_df, artifacts_dir / "binary_prompt_local_extended_support_v1.csv")
+    write_dataframe(bit_prompt_local_stage1_candidate_df, artifacts_dir / "binary_prompt_local_extended_candidates_v1.csv")
+    write_dataframe(bit_prompt_local_stage2_support_df, artifacts_dir / "binary_prompt_local_nested_support_v1.csv")
+    write_dataframe(bit_prompt_local_stage2_abstract_support_df, artifacts_dir / "binary_prompt_local_nested_abstract_support_v1.csv")
+    write_dataframe(bit_prompt_local_stage2_candidate_df, artifacts_dir / "binary_prompt_local_nested_candidates_v1.csv")
     write_dataframe(symbol_operator_spec_support_df, artifacts_dir / "symbol_operator_specific_formula_support_v1.csv")
     write_dataframe(symbol_operator_spec_candidate_df, artifacts_dir / "symbol_operator_specific_formula_candidates_v1.csv")
     write_dataframe(symbol_minus_prefix_support_df, artifacts_dir / "symbol_minus_prefix_subfamily_support_v1.csv")

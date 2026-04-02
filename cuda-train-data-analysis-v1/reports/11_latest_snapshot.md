@@ -1,16 +1,16 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-03-30T03:54:04.819458+00:00`
+- generated_at_utc: `2026-04-01T14:05:52.481700+00:00`
 - verified_trace_ready: `6486`
-- answer_only_keep: `1397`
-- manual_audit_priority: `1591`
+- answer_only_keep: `1561`
+- manual_audit_priority: `1427`
 - exclude_suspect: `26`
 
 ## Family summary
 
 | family | rows | parse_ok_rate | verified_trace_ready | answer_only_keep | manual_audit_priority | exclude_suspect | suspect_labels | avg_hard_score |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_manipulation | 1602 | 1.0 | 1004 | 281 | 302 | 15 | 19 | 4.2166 |
+| bit_manipulation | 1602 | 1.0 | 1004 | 445 | 138 | 15 | 15 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
 | symbol_equation | 1555 | 1.0 | 110 | 145 | 1289 | 11 | 11 | 3.1775 |
@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | symbol_numeric_same_op | symbol_equation | 330 |
 | symbol_glyph_multiset | symbol_equation | 46 |
-| binary_low_gap | bit_manipulation | 16 |
+| binary_low_gap | bit_manipulation | 6 |
 
 ## Key changes in this snapshot
 
