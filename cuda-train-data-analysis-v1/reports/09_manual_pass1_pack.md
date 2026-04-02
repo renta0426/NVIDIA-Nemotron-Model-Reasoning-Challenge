@@ -4,8 +4,7 @@
 
 | audit_focus | family | rows |
 | --- | --- | --- |
-| symbol_numeric_same_op | symbol_equation | 330 |
-| symbol_glyph_multiset | symbol_equation | 46 |
+| symbol_numeric_same_op | symbol_equation | 26 |
 | binary_low_gap | bit_manipulation | 6 |
 
 ## Top rows in pass1 pack
@@ -18,39 +17,31 @@
 | binary_low_gap | b45003a6 | bit_manipulation | bit_other | 3.0 | 00110110 | 10110101 |
 | binary_low_gap | cf5b4ab4 | bit_manipulation | bit_other | 3.0 | 11101100 | 11011001 |
 | binary_low_gap | e5bb9b26 | bit_manipulation | bit_other | 3.0 | 11110001 | 11000111 |
-| symbol_glyph_multiset | 5c9f274a | symbol_equation | glyph_len5 | 7.0 | :[`` | }:*?: |
-| symbol_glyph_multiset | e401ee4f | symbol_equation | glyph_len5 | 7.0 | ^^@} | [<*"> |
-| symbol_glyph_multiset | eb1a62f7 | symbol_equation | glyph_len5 | 7.0 | >!>} | )}*>) |
-| symbol_glyph_multiset | f4f92956 | symbol_equation | glyph_len5 | 7.0 | (`)) | ()"%} |
-| symbol_glyph_multiset | 8962872b | symbol_equation | glyph_len5 | 6.0 | %`& | ``?`\ |
-| symbol_glyph_multiset | 9fdb18b7 | symbol_equation | glyph_len5 | 6.0 | ^} | \|%-^^ |
-| symbol_glyph_multiset | be7a9eb1 | symbol_equation | glyph_len5 | 6.0 | []`' | ?]&[] |
-| symbol_glyph_multiset | e582df31 | symbol_equation | glyph_len5 | 6.0 | }@ | "'?]@ |
-| symbol_glyph_multiset | 02664ad5 | symbol_equation | glyph_len5 | 5.0 | :}' | !}-(! |
-| symbol_glyph_multiset | 0d4b2baa | symbol_equation | glyph_len5 | 5.0 | :(\|# | :(*\|# |
-| symbol_glyph_multiset | 1d10ccaf | symbol_equation | glyph_len5 | 5.0 | <({& | <(*{& |
-| symbol_glyph_multiset | 24b2d8eb | symbol_equation | glyph_len5 | 5.0 | /[:` | `!*/[ |
-| symbol_glyph_multiset | 26a2a1b8 | symbol_equation | glyph_len5 | 5.0 | (: | (\#</ |
-| symbol_glyph_multiset | 51352792 | symbol_equation | glyph_len5 | 5.0 | `"<` | "/*\|" |
-| symbol_glyph_multiset | 52f499f4 | symbol_equation | glyph_len5 | 5.0 | $[^% | /(>}@ |
-| symbol_glyph_multiset | 64553a64 | symbol_equation | glyph_len5 | 5.0 | }#' | !@"`/ |
-| symbol_glyph_multiset | 97abca56 | symbol_equation | glyph_len5 | 5.0 | `#:: | (:*`' |
-| symbol_glyph_multiset | a77be9fa | symbol_equation | glyph_len5 | 5.0 | [" | {>\|$[ |
-| symbol_glyph_multiset | ae6be599 | symbol_equation | glyph_len5 | 5.0 | #` | $?+]$ |
-| symbol_glyph_multiset | afdb7326 | symbol_equation | glyph_len5 | 5.0 | %\ | @^%(^ |
-| symbol_glyph_multiset | c9e16aff | symbol_equation | glyph_len5 | 5.0 | ]:(] | (]*]: |
-| symbol_glyph_multiset | fc137acd | symbol_equation | glyph_len5 | 5.0 | ^^{> | )#*[` |
-| symbol_glyph_multiset | 0625f633 | symbol_equation | glyph_len5 | 4.0 | @@// | ))*!( |
-| symbol_glyph_multiset | 3b7148f6 | symbol_equation | glyph_len5 | 4.0 | &&$ | &)+)\ |
-| symbol_glyph_multiset | 771472d6 | symbol_equation | glyph_len5 | 4.0 | -'? | ?'-\\ |
-| symbol_glyph_multiset | 93e6d0c0 | symbol_equation | glyph_len5 | 4.0 | ^< | ^\|(>^ |
-| symbol_glyph_multiset | b4b73143 | symbol_equation | glyph_len5 | 4.0 | >\: | >!%!/ |
-| symbol_glyph_multiset | 177f0c22 | symbol_equation | glyph_len5 | 3.0 | /> | >?-#[ |
-| symbol_glyph_multiset | 1a28140b | symbol_equation | glyph_len5 | 3.0 | %`& | "[*#/ |
-| symbol_glyph_multiset | 2d624cab | symbol_equation | glyph_len5 | 3.0 | ![)] | >)`#' |
-| symbol_glyph_multiset | 2e1b9d84 | symbol_equation | glyph_len5 | 3.0 | ]>" | [`+'} |
-| symbol_glyph_multiset | 58eadc55 | symbol_equation | glyph_len5 | 3.0 | !# | @@\|@` |
-| symbol_glyph_multiset | 6c7f24b7 | symbol_equation | glyph_len5 | 3.0 | ^ | $'-^$ |
-| symbol_glyph_multiset | 76587d66 | symbol_equation | glyph_len5 | 3.0 | ] | ]`-]> |
+| symbol_numeric_same_op | 34c563c5 | symbol_equation | numeric_2x2 | 5.0 | 04` | 45`41 |
+| symbol_numeric_same_op | 45076dc9 | symbol_equation | numeric_2x2 | 5.0 | 6 | 56}17 |
+| symbol_numeric_same_op | 07cbed38 | symbol_equation | numeric_2x2 | 4.0 | 93 | 52}51 |
+| symbol_numeric_same_op | 3b2e0cc3 | symbol_equation | numeric_2x2 | 3.0 | 8 | 57-38 |
+| symbol_numeric_same_op | 64fe405e | symbol_equation | numeric_2x2 | 3.0 | 1 | 32<33 |
+| symbol_numeric_same_op | 00d8b3db | symbol_equation | numeric_2x2 | 2.0 | 17/ | 69/52 |
+| symbol_numeric_same_op | 12d4a2df | symbol_equation | numeric_2x2 | 2.0 | -6 | 68-08 |
+| symbol_numeric_same_op | 1b6366af | symbol_equation | numeric_2x2 | 2.0 | 03! | 65!68 |
+| symbol_numeric_same_op | 58fed63a | symbol_equation | numeric_2x2 | 2.0 | 5 | 11-39 |
+| symbol_numeric_same_op | 74fff108 | symbol_equation | numeric_2x2 | 2.0 | 49 | 65^16 |
+| symbol_numeric_same_op | 8373daa8 | symbol_equation | numeric_2x2 | 2.0 | 84 | 08-23 |
+| symbol_numeric_same_op | c11777c0 | symbol_equation | numeric_2x2 | 2.0 | 56 | 22?34 |
+| symbol_numeric_same_op | e102a09d | symbol_equation | numeric_2x2 | 2.0 | -02 | 42-44 |
+| symbol_numeric_same_op | 2afebbc3 | symbol_equation | numeric_2x2 | 1.0 | 16 | 18/52 |
+| symbol_numeric_same_op | 49919931 | symbol_equation | numeric_2x2 | 1.0 | 32 | 42*59 |
+| symbol_numeric_same_op | 50adfd54 | symbol_equation | numeric_2x2 | 1.0 | -75 | 42-18 |
+| symbol_numeric_same_op | 87711597 | symbol_equation | numeric_2x2 | 1.0 | 01 | 49!82 |
+| symbol_numeric_same_op | 891942ba | symbol_equation | numeric_2x2 | 1.0 | 03 | 85-88 |
+| symbol_numeric_same_op | 91b34547 | symbol_equation | numeric_2x2 | 1.0 | -84 | 26-41 |
+| symbol_numeric_same_op | 92471ca4 | symbol_equation | numeric_2x2 | 1.0 | 36 | 02-38 |
+| symbol_numeric_same_op | 96efb93a | symbol_equation | numeric_2x2 | 1.0 | 61 | 95"57 |
+| symbol_numeric_same_op | 9d68ef62 | symbol_equation | numeric_2x2 | 1.0 | 83( | 69(85 |
+| symbol_numeric_same_op | db5a5b71 | symbol_equation | numeric_2x2 | 1.0 | 31 | 58"42 |
+| symbol_numeric_same_op | e2bb1d9f | symbol_equation | numeric_2x2 | 1.0 | -91 | 03-94 |
+| symbol_numeric_same_op | eb68289b | symbol_equation | numeric_2x2 | 1.0 | -82 | 72-55 |
+| symbol_numeric_same_op | fb623471 | symbol_equation | numeric_2x2 | 1.0 | -21 | 08-29 |
 
 Use `artifacts/manual_pass1_priority_pack_v1.csv` as the first human-review queue.

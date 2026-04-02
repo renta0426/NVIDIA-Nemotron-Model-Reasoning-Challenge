@@ -7,16 +7,16 @@
 | verified_trace_ready | gravity_constant | 1597 |
 | verified_trace_ready | unit_conversion | 1594 |
 | verified_trace_ready | roman_numeral | 1576 |
-| manual_audit_priority | symbol_equation | 1289 |
+| answer_only_keep | symbol_equation | 1410 |
 | verified_trace_ready | bit_manipulation | 1004 |
 | answer_only_keep | text_decryption | 971 |
 | verified_trace_ready | text_decryption | 605 |
 | answer_only_keep | bit_manipulation | 445 |
-| answer_only_keep | symbol_equation | 145 |
 | manual_audit_priority | bit_manipulation | 138 |
 | verified_trace_ready | symbol_equation | 110 |
+| manual_audit_priority | symbol_equation | 26 |
 | exclude_suspect | bit_manipulation | 15 |
-| exclude_suspect | symbol_equation | 11 |
+| exclude_suspect | symbol_equation | 9 |
 
 ## Recommended data policy for the next `try-cuda-train.md` revision
 

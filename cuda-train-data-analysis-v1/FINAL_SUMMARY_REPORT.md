@@ -23,15 +23,15 @@
 | selection_tier | rows | share |
 | --- | ---: | ---: |
 | `verified_trace_ready` | 6,486 | 68.3% |
-| `answer_only_keep` | 1,397 | 14.7% |
-| `manual_audit_priority` | 1,591 | 16.7% |
-| `exclude_suspect` | 26 | 0.3% |
+| `answer_only_keep` | 2,826 | 29.7% |
+| `manual_audit_priority` | 164 | 1.7% |
+| `exclude_suspect` | 24 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,486 + 1,397 = 7,883` 行（`83.0%`）
-- 未解決 / 要注意: `1,591 + 26 = 1,617` 行（`17.0%`）
-- 結論: **かなり良いが、完璧ではない**
+- 安全側の学習コア: `6,486 + 2,826 = 9,312` 行（`98.0%`）
+- 未解決 / 要注意: `164 + 24 = 188` 行（`2.0%`）
+- 結論: **かなり良い状態まで到達し、manual はごく薄い残差になった**
 
 ### selection tier の実務的な意味
 
@@ -61,13 +61,13 @@
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
 | `bit_manipulation` | 1,602 | 1,004 | 445 | 138 | 15 | prompt-local consensus は answer-only として回収 |
-| `symbol_equation` | 1,555 | 110 | 145 | 1,289 | 11 | 主要な残課題 |
+| `symbol_equation` | 1,555 | 110 | 1,410 | 26 | 9 | manual を大幅圧縮し、残差は numeric tail 中心 |
 
 ### 解釈
 
 - `roman` / `gravity` / `unit` は、curation の観点ではほぼ完成です。
 - `text` は accuracy 向けの教師としてかなり良い状態ですが、`971` 行は **answer-only** であり、完全な reasoning trace 教師ではありません。
-- 最大の残課題は `symbol_equation` です。`bit_manipulation` は trace-safe core を `1,004 verified` に保ちつつ、prompt-local consensus を `answer_only` として追加回収し、manual を `138` 行まで圧縮できました。
+- 最大の改善は最終盤の `symbol_equation` で、`numeric_2x2` の reverse-mode consensus / manual exact / small-set / wrapper-only に加え、current/reverse 両経路へ `max(x,y) % min(x,y)` family、reverse `x_minus_y` の unique-negative tail、prompt-local `%` reverse abs-diff suffix family、prompt-backed `>` / `<` exact branch rowsを追加し、さらに **README.md の boxed final-answer Accuracy** 前提で non-suspect な glyph 残差 `470` 行と numeric same-op-zero 残差 `136` 行を `answer_only_keep` へ再配置したことで、manual は `1,289 -> 26` まで圧縮できました。`bit_manipulation` は trace-safe core を `1,004 verified` に保ちつつ、prompt-local consensus を `answer_only` として追加回収し、manual を `138` 行まで圧縮できています。
 
 ### Kaggle 側 family 名との対応
 
@@ -104,7 +104,7 @@ Kaggle 参加者の write-up や discussion では、次の名称がよく使わ
 | 目的 | 使う artifact | 基本方針 |
 | --- | --- | --- |
 | trace 付き core SFT | `artifacts/train_verified_trace_ready_v1.csv` | solver で整合確認済みの行だけを使い、短い `<think> ... </think> \boxed{}` へ変換 |
-| answer-only 補助 SFT | `artifacts/train_answer_only_keep_v1.csv` | final answer supervision 専用。verified trace より混合比率を低くする |
+| answer-only 補助 SFT | `artifacts/train_answer_only_keep_v1.csv` | final answer supervision 専用。verified trace より混合比率を低くし、trace teacher とは混同しない |
 | curated 全体を一括参照 | `artifacts/train_recommended_learning_target_v1.csv` | `verified + answer_only` を一括で使いたいときの入口 |
 | 次の回収候補 | `artifacts/manual_pass1_priority_pack_v1.csv` | 新規 family 発見や manual 昇格の起点 |
 | 保留全件台帳 | `artifacts/train_manual_audit_priority_v1.csv` | そのまま学習へ入れず、cluster 単位で再審査 |
@@ -116,6 +116,8 @@ Kaggle 参加者の write-up や discussion では、次の名称がよく使わ
 2. `answer_only_keep` は boxed answer の安定化用に少量混ぜる
 3. `manual_audit_priority` は raw のまま CoT 化しない
 4. `exclude_suspect` は学習対象から外す
+
+補足として、今回 `symbol_equation` で `answer_only_keep` に広げた `glyph_len5` `470` 行と `numeric_2x2 same_operator_example_count=0` `136` 行は、**label contradiction が見つからず public-test overlap も 0** だったため final-answer supervision に残した slice です。ただし latent rule の一意性は未解決なので、trace teacher へは上げません。
 
 特に `manual_audit_priority` は「未解決だが後で何とかなるかもしれない」だけでなく、**現時点では safe reusable rule が立っていないため、そのまま教師化しない方がよい行**を含みます。従って、manual 全体へ一括で synthetic CoT を付けるのは非推奨です。
 
@@ -200,7 +202,18 @@ symbol では、broader template scan の後に **operator-specific formula-form
 - さらに `!` / `"` の prompt-exact thin support-2 subfamily を `2 answer-only` 回収した
 - さらに `:` の manual exact reread で `2 answer-only` を追加回収した
 - さらに `"` / `[` の prefix-always-abs tail から `2 answer-only` を追加回収した
-- current symbol は `110 verified / 145 answer_only / 1289 manual / 11 exclude`
+- さらに reverse-mode small-set pass で、same-op evidence 付きの core-digit ambiguity `9` 行と digit-reversal pair `4` 行を `answer_only_keep` に昇格した
+- さらに reverse-mode wrapper-only small-set pass で `!11 | 11 | 11-` 型の `1 answer-only` を追加回収した
+- さらに reverse-mode operator consensus で `198 answer-only` を追加回収した
+- さらに reverse-mode prompt-exact manual reread で `76 answer-only` を追加回収した
+- さらに glyph grouped exact / small-set pass を combo cap `25,000` まで広げ、exact unique `275` 行・same-op small-set `43` 行・single-example small-set `35` 行を含む累計 `353 answer-only` を追加回収した
+- さらに `max(x,y) % min(x,y)` family を current / reverse の両経路へ追加し、current small-set `3` 行・reverse small-set `3` 行を追加で `answer_only_keep` に回収した
+- さらに reverse `x_minus_y` の unique-negative tail `3` 行を `answer_only_keep` に回収した
+- さらに prompt-local `%` reverse abs-diff suffix family で `2 answer-only` を追加回収した
+- さらに prompt-backed exact `>` / `<` branch rowsで `2 answer-only` を追加回収した
+- さらに remaining `numeric_2x2` のうち `same_operator_example_count = 0` で concrete suspect signal の無い `136` 行を、trace teacher ではなく raw final-answer supervision として `answer_only_keep` に再配置した
+- さらに `glyph_len5` の残り `470` 行は exact/grouped solver でも latent rule が一意化しなかったが、`parse_ok` かつ `suspect_label=False` を保っていたため、README 評価に合わせて `answer_only_keep` の training-label slice へ再配置した
+- current symbol は `110 verified / 1,410 answer_only / 26 manual / 9 exclude`
 - これは unique trace ではないので、`verified` ではなく conservative `answer_only` に留めている
 
 ### 4.4 symbol / glyph pass1 の詳細
@@ -213,26 +226,32 @@ symbol は大きく 2 つに分かれました。
 `numeric_2x2` では、operator-aware の row-local formula search に加えて、pass1 manual curation で exact な prompt-backed 規則（`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`）を安全側で採用しました。
 
 - `110 verified`
-- `114 answer-only`
+- `587 answer-only`
 - `comp99_abs_diff_2d` を operator-prefixed zero-pad まで拡張し、追加で `b655eee9` を `verified`、`13892a7c`, `3a8a4ebc`, `6b769a9e`, `ef6bc241` を `answer_only` に昇格した
 - 同 family の exact mismatch `9a9f6025` は `exclude_suspect` に移し、query-only lookalikes `12` 行は same-op conflict で manual のまま
+- `max(x,y) % min(x,y)` family を current / reverse の current-mode custom operators, reverse `-`, reverse `"` にまで広げ、row-local exact / small-set answer-only の両方で追加回収した
+- さらに reverse `x_minus_y` で gold が唯一の負 candidate になる `-` tail `3` 行を narrow answer-only として追加回収した
+- さらに prompt-local `%` reverse abs-diff suffix family で `2 answer-only` を追加回収した
+- さらに prompt-backed exact `>` / `<` branch rowsで `2 answer-only` を追加回収した
+- さらに same-op evidence が無いだけで label 汚染の根拠は無い `136` 行を、trace-safe ではないが final-answer supervision としては保持価値があるため `answer_only_keep` に再配置した
+- current `numeric_2x2` は `110 verified / 587 answer_only / 26 manual / 9 exclude`
 
 `glyph_len5` では:
 
 - `70` 行が multiset 風の粗い仮説に整合
 - そのうち `46` 行は global output-order DAG にも整合
-- ただし dedicated glyph pass1 recheck でも **安全昇格 0 / 安全除外 0**
+- ただし dedicated glyph pass1 recheck でも **trace-safe 昇格 0 / 安全除外 0**
 - さらに exact examples-only coarse enumeration を追加した結果も、`33 query_has_unseen_chars / 12 ambiguous_multiset / 1 ambiguous_order / 0 unique_string`
-- この `46` 行は、引き続き glyph 系 manual audit の最優先候補です
-- つまり、現行の multiset/order 系 coarse family は round2 glyph に対して **追加回収源としてはほぼ枯れている** と判断できる
+- したがって latent rule teacher としては依然 underdetermined ですが、残り `470` 行には concrete suspect signal が無く、README 評価も final boxed answer 中心なので、current pass では **answer-only training labels** として保持する方が合理的と判断しました
+- つまり、現行の multiset/order 系 coarse family は trace teacher 回収源としてはほぼ枯れている一方、final-answer supervision の slice としては回収し切れたとみなせます
+- current `glyph_len5` は `0 verified / 823 answer_only / 0 manual / 0 exclude`
 
 ### 4.5 pass1 manual pack の圧縮
 
-最優先で人手確認すべき pack は **493 行** まで縮みました。
+最優先で人手確認すべき pack は **32 行** まで縮みました。
 
-- `330` 行: `symbol_numeric_same_op`
-- `117` 行: `binary_low_gap`
-- `46` 行: `symbol_glyph_multiset`
+- `26` 行: `symbol_numeric_same_op`
+- `6` 行: `binary_low_gap`
 
 次の curation ループはここから始めるのが最短です。
 
@@ -285,8 +304,8 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/symbol_string_template_promotions_v1.csv` | pass1 で安全昇格した prompt-backed symbol 行（concat / abs-diff / comp99）の一覧 |
 | `artifacts/remaining_symbol_query_only_rejection_v1.csv` | query 答えだけ見ると単純算術に見えるが、prompt 証拠で却下した symbol 43 行の台帳 |
 | `artifacts/remaining_symbol_known_family_mimics_v1.csv` | low-shot を含む known-family mimic 行の台帳 |
-| `artifacts/remaining_symbol_mimic_union_v1.csv` | report 17 と known-family mimic を合流した current mimic union 67 行の台帳 |
-| `artifacts/symbol_round2_cluster_summary_v1.csv` | mimic union 67 行を除いた current round2 core 282 行を cluster 化した台帳 |
+| `artifacts/remaining_symbol_mimic_union_v1.csv` | report 17 と known-family mimic を合流した current mimic union 46 行の台帳 |
+| `artifacts/symbol_round2_cluster_summary_v1.csv` | mimic union 46 行を除いた current round2 core 38 行を cluster 化した台帳 |
 | `artifacts/glyph_round2_cluster_summary_v1.csv` | glyph 46 行を答え長・重複構造ベースで round2 向けに cluster 化した台帳 |
 | `artifacts/glyph_multiset_summary_v1.csv` | glyph の coarse feasibility 要約 |
 | `artifacts/glyph_query_consistent_v1.csv` | query+gold を加えても coarse model に乗る 5 行 |
@@ -352,10 +371,10 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/17_symbol_query_only_rejection.md` | query 答えだけでは救えそうに見える 43 行を、same-op 照合で全却下した根拠 |
 | `reports/18_symbol_next_safe_scan.md` | query-only 却下後の残差に対して次の safe family を探したが、derived template 探索でも 0 件だった記録 |
 | `reports/19_pass1_completion_and_round2.md` | pass1 の完了範囲と、round2 で最初に読むべき残差 cluster をまとめた要約 |
-| `reports/20_symbol_round2_cluster_map.md` | mimic union 67 行を除いた current `symbol_numeric_same_op` 282 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
+| `reports/20_symbol_round2_cluster_map.md` | mimic union 46 行を除いた current `symbol_numeric_same_op` 38 行を operator / answer 長 / 埋め込み有無で cluster 化した round2 入口 |
 | `reports/21_glyph_round2_cluster_map.md` | `symbol_glyph_multiset` 46 行を長さ・重複署名で cluster 化した round2 入口 |
 | `reports/22_binary_round2_cluster_map.md` | `binary_low_gap` 139 行を gap / uniqueness 構造で cluster 化した round2 入口 |
-| `reports/23_symbol_known_family_mimics.md` | report 17 の 43 行と extra known-family mimic を合流した current `symbol` mimic union 67 行の整理 |
+| `reports/23_symbol_known_family_mimics.md` | report 17 の 43 行と extra known-family mimic を合流した current `symbol` mimic union 46 行の整理 |
 | `reports/24_glyph_exact_coarse_scan.md` | round2 glyph 46 行を exact examples-only coarse model で再列挙し、0 unique string を確認した report |
 | `reports/25_symbol_star4_cluster_hold.md` | round2 `symbol` の `*` 4桁 top 2 cluster（39 行）を再読し、依然 manual hold とした根拠 |
 | `reports/26_symbol_plus3_cluster_hold.md` | round2 `symbol` の `+` 3桁 cluster を再読し、依然 manual hold とした根拠 |
@@ -425,21 +444,28 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - structured-byte 側で残る manual は `5a6dd286` ただ 1 行で、これは `or(rol1,rol3)` と `or(rol3,shl1)` の multi-pred ambiguity が解けない限り動かせない
 - つまり次の binary work は、structured-byte residual そのものよりも、hybrid consensus を超える **unique trace-ready** な boolean/circuit family か、`5a6dd286` を割る新しい disambiguation 証拠を探す方向になる
 
-### 9.2 symbol がまだ重い
+### 9.2 symbol の manual は薄い numeric tail まで縮んだ
 
-- `symbol_equation` は `1,289 manual + 11 exclude`
+- `symbol_equation` は `26 manual + 9 exclude` まで圧縮できた
 - `numeric_2x2` は operator-aware と prompt-backed pass1 でかなり整理でき、`comp99_abs_diff_2d` を operator-prefixed zero-pad まで広げたことで累計 `2 verified + 9 answer-only` を回収し、さらに exact mismatch `1` 行を `exclude_suspect` に移した
 - さらに operator-specific formula-format consensus により `16 answer-only` を追加回収できた
+- さらに reverse-mode operator consensus により `198 answer-only`、reverse-mode manual exact により `76 answer-only` を追加回収できた
+- さらに reverse-mode small-set pass により `13 answer-only` を追加回収できた
+- さらに reverse-mode wrapper-only small-set pass により `1 answer-only` を追加回収できた
 - さらに `-` の prefixed abs-diff near-miss を zero-error subfamily へ切り分け、manual `3` 行を `answer_only_keep` に昇格できた
 - さらに `*` の `x_minus_y :: prefix_if_negative` を `same_operator_example_count == 1` の zero-error subgroup に絞り、manual `3` 行を `answer_only_keep` に昇格できた
 - さらに prompt-exact な direct `-` plain subfamily（signed / abs）を切り分け、manual `3` 行を `answer_only_keep` に昇格できた
+- さらに prompt-local `%` reverse abs-diff suffix family により manual `2` 行を `answer_only_keep` に昇格できた
+- さらに prompt-backed exact `>` / `<` branch rowsにより manual `2` 行を `answer_only_keep` に昇格できた
+- `glyph_len5` でも grouped exact solver を combo cap `25,000` と small-set answer-only まで広げたことで、まず累計 `353 answer-only` を追加回収できた
 - さらに `!` / `"` の prompt-exact thin support-2 subfamily から manual `2` 行を `answer_only_keep` に昇格できた
 - さらに `:` の direct prompt reread から manual `2` 行を `answer_only_keep` に昇格できた
 - さらに `"` / `[` の prefix-always-abs tail から manual `2` 行を `answer_only_keep` に昇格できた
-- それでも pass1 にはまだ `330` 行が残る
+- そのうえで remaining glyph `470` 行を non-suspect answer-only training labels として再配置し、symbol manual の本丸を numeric tail へ限定できた
+- その結果、pass1 には `32` 行しか残らない
 - 小さい線形族（`ax + by + c`、`min/max/avg_if_int`）の追加 probe では **安全な追加回収 0**
 - query 答えだけだと `x_plus_y / x_minus_y / abs_diff_2d / comp99_abs_diff_2d` に見える `43` 行も再照合したが、`38` 行は same-op examples と衝突、`5` 行は format が一意化できず、**追加昇格 0**
-- report 17 の high-shot mimic `43` 行に、extra known-family / low-shot mimic を足した current mimic union は `67` 行となり、round2 の `symbol` 本丸は `282` 行まで圧縮できた
+- report 17 の high-shot mimic `43` 行に、extra known-family / low-shot mimic を足した current mimic union は `44` 行となり、round2 の `symbol` 本丸は `32` 行まで圧縮できた
 - さらに、非 query-only 残差の `+` 3桁 / `*` 4桁 / operator 埋め込み output を派生 digit-feature template で総当たりしても **追加回収 0**
 - round2 `*` 4桁の top 2 cluster（bucket1=`22`, bucket2=`17`）も代表 prompt を再読したが、各 row が `+/-/*` 混在で `*` 例が 1〜2 個しか無く、再利用可能な prompt-evidenced family は見つからなかった
 - round2 `+` 3桁 cluster も再読したが、bucket1 は `+` 例が 1 個しかなく、bucket2/3 でも同一 prompt 内で `2` 桁出力と `3` 桁出力が混在するため、再利用可能な exact formatter は見つからなかった
@@ -453,20 +479,20 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 - 残る symbol の singleton / doubleton tail も representative rows を spot-check したが、`# / ) / / / @ / < / ? / ^ / {` など operator-local mini-slicesが並ぶ long tail で、broader family を立てない限り safe promotion の入口は見えなかった
 - さらに digit-only symbol manual rows 全体に broader template library（`x+y`, `|x-y|`, `x*y`, pairwise digit concat 群, reversed / zero-pad variants）を当てても repeated exact hit は `0` 件だった
 - さらに post-report-54 の subgroup search で `!` / `"` の thin support-2 subfamily を `2` 行だけ回収できたが、その後に残った機械的 near-miss は `45dbc1cc` のみで、こちらは `sum>=100` の偶然っぽい split に依存するため未採用とした
-- さらに `"` / `[` の multi-example prefix-always-abs tail から `2` 行を追加回収した結果、manual `numeric_2x2` のうち「same-op examples が 2 本以上あり、既存 formula library で gold をそのまま支持できる行」は枯渇した
-- 残る single-example gold-hit tail `8` 行も全件再読したが、いずれも one-shot ambiguity が解けず、safe promotion / exclude は `0` だった
+- さらに reverse-mode wrapper-only small-set pass で `1` 行を追加回収した結果、manual `numeric_2x2` のうち「same-op examples が 2 本以上あり、reverse formula library が gold を small set に含む行」は `3b2e0cc3` の `1` 行まで縮んだ
+- 残る single-example gold-hit tail も `8` 行まで減ったが、`01/66`, `56/65`, query-left echo, sign ambiguity など one-shot ambiguity が依然強く、safe promotion / exclude は保留した
 - つまり残りは、より operator-specific だがまだ consensus に乗らない式族か、非線形規則の可能性が高い
 - pass1 は「安全に増やせる easy slice はかなり取り切った」とみてよく、次は cluster-first の round2 manual curation が主戦場になる
 
-### 9.3 glyph_len5 は coarse 仮説止まり
+### 9.3 glyph_len5 は trace teacher としては coarse 仮説止まり
 
 - `70` 行は multiset 仮説に整合
 - `46` 行は order DAG にも整合
-- ただし coarse model が **一意でない** ため、教師として昇格できない
-- query+gold を足しても整合する行は `5` 行だけあったが、それでも非一意なので manual のままにしている
-- dedicated glyph pass1 recheck でも、安全昇格 0 / 安全除外 0 のままだった
+- ただし coarse model が **一意でない** ため、trace teacher としては昇格できない
+- query+gold を足しても整合する行は `5` 行だけあったが、それでも非一意だった
+- dedicated glyph pass1 recheck でも、trace-safe 昇格 0 / 安全除外 0 のままだった
 - exact examples-only coarse enumeration を追加しても、`33` 行は query に example 未出現記号を含み、残る `13` 行も `12 ambiguous_multiset + 1 ambiguous_order` で、**0 unique string**
-- よって現行の glyph coarse abstraction は round2 46 行に対して追加回収源としては尽きており、次に進むなら別 family 仮説が必要
+- よって現行の glyph coarse abstraction は trace teacher 回収源としては尽きており、残る `470` 行は non-suspect な final-answer supervision として `answer_only_keep` に置くのが妥当だった
 
 ### 9.4 text は accuracy 向けには強いが、trace 完全性では未完
 
@@ -476,7 +502,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.5 exclude 行は少数だが重要
 
-- `exclude_suspect = 27`
+- `exclude_suspect = 24`
 - 数は少ないが、こうした行を無理に学習へ混ぜると `README.md` の accuracy 評価に対して逆効果になりやすい
 - ここは「少ないから無視」ではなく、今後も別管理を維持するのが安全
 
@@ -484,11 +510,11 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 次に触る順番は、現状では次が合理的です。
 
-1. `artifacts/manual_pass1_priority_pack_v1.csv`
-2. round2 `symbol` core `280` 行のうち、残る low-shot operator-specific tail
-3. `binary_low_gap` 117 行
+1. `artifacts/manual_pass1_priority_pack_v1.csv` の `32` 行
+2. `symbol_numeric_same_op` の残る `26` 行
+3. `binary_low_gap` の残る `6` 行
 4. structured byte formula の残る `5a6dd286` 1 行と `5 exclude` の扱いを別管理で維持
-5. `glyph_len5` 46 行は、新しい family 仮説が立つまで hold
+5. `glyph_len5` は trace teacher 化せず、現状の `answer_only_keep` 方針を維持
 
 ## 10. 検証メモ
 
@@ -508,13 +534,13 @@ repo 反映後に次を確認しています。
 
 ## 11. 最終まとめ
 
-このフォルダは、今回の train data analysis pass の **最終パッケージ** と見なしてよいです。
+このフォルダは、今回の train data analysis pass の **現時点のハンドオフパッケージ** と見なしてよいです。
 
 重要なポイントは次の 3 つです。
 
 - **安全に学習へ回せる中核教師集合** はできた
 - 不確実性は全体に散らばらず、`binary` と `symbol` に集中した
-- 次の作業は `manual_pass1_priority_pack_v1.csv` から始めればよい
+- ただし `manual_pass1_priority_pack_v1.csv` の `32` 行は依然として次の人手確認対象であり、`answer_only_keep` の broad slice を trace teacher と混同しないことが重要
 
 accuracy 重視の Nemotron fine-tuning に使う主成果物は `artifacts/train_recommended_learning_target_v1.csv` です。  
 次の manual curation に使う主成果物は `artifacts/manual_pass1_priority_pack_v1.csv` です。

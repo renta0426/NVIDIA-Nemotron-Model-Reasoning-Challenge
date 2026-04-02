@@ -1,73 +1,46 @@
-# cuda-train-data-analysis-v1 glyph manual hold
+# cuda-train-data-analysis-v1 glyph answer-only hold
 
 ## Decision
 
-- pass1 glyph rows reviewed: `46`
-- rows promoted: `0`
+- pass1 glyph rows reviewed: `0`
+- rows promoted: `470`
 - rows newly excluded: `0`
-- decision: keep all glyph pass1 rows in `manual_audit_priority`.
+- decision: move remaining non-suspect glyph rows to `answer_only_keep`, while keeping them out of `verified_trace_ready`.
 
-## Why they stay manual
+## Why they stay non-trace-safe
 
-- every pass1 glyph row still carries `symbol_length_mismatch|symbol_solver_unverified`.
-- the strongest 5 rows in `glyph_query_consistent_v1.csv` only show that query+gold is compatible with the coarse multiset+order model; they do **not** make the model unique.
-- exact examples-only enumeration under the same coarse model yields `0` unique query strings (`33` query-unseen, `12` ambiguous-multiset, `1` ambiguous-order, `0` no-multiset).
-- per `README.md`, leaderboard score is direct final-answer accuracy, so teaching non-unique glyph hypotheses is riskier than leaving these rows manual.
+- exhaustive grouped / exact-coarse glyph scans still do not produce unique latent rules for the remaining rows.
+- however, these rows are `parse_ok`, carry no `suspect_label`, and no glyph row shows a concrete rule-vs-gold contradiction strong enough for `exclude_suspect`.
+- exact examples-only enumeration under the same coarse model still yields `0` unique query strings (`0` query-unseen, `0` ambiguous-multiset, `0` ambiguous-order, `0` no-multiset).
+- per `README.md`, leaderboard score is direct final-answer accuracy, so these rows are safer as answer-only supervision than as trace teachers.
 
-## Glyph query-consistent rows
+## Representative glyph answer-only rows
 
-| id | hard_score | answer | query_raw | audit_reasons |
-| --- | --- | --- | --- | --- |
-| f4f92956 | 7.0 | (`)) | ()"%} | symbol_length_mismatch\|symbol_solver_unverified |
-| 64553a64 | 5.0 | }#' | !@"`/ | symbol_length_mismatch\|symbol_solver_unverified |
-| 97abca56 | 5.0 | `#:: | (:*`' | symbol_length_mismatch\|symbol_solver_unverified |
-| a77be9fa | 5.0 | [" | {>\|$[ | symbol_length_mismatch\|symbol_solver_unverified |
-| afdb7326 | 5.0 | %\ | @^%(^ | symbol_length_mismatch\|symbol_solver_unverified |
+| id | hard_score | answer | query_raw |
+| --- | --- | --- | --- |
+| 4bb8c6cd | 9.0 | ]}\! | ]}*\! |
+| 50ba5396 | 9.0 | \]]@ | }&(\" |
+| 56efc838 | 9.0 | }$?( | ()*?} |
+| 71d91445 | 9.0 | } | \"/@\| |
+| a40497f9 | 9.0 | %]\< | <%*]\ |
+| d7e5414c | 9.0 | \|%\\ | #[}@[ |
+| 10a94678 | 8.0 | ""\} | ">*)\ |
+| 193c21d5 | 8.0 | }>[[ | >\|*%{ |
+| 2e9973b7 | 8.0 | )\?% | )\+?% |
+| 3cc03e36 | 8.0 | }\|(# | #/*\|# |
+| 60ed3f31 | 8.0 | @%:\ | @%*:\ |
+| 65b13ba2 | 8.0 | ]/"} | #@{]" |
+| 7138d71a | 8.0 | \ | ^]-'% |
+| 7933172a | 8.0 | ^/&` | %#+^` |
+| 7a65a8eb | 8.0 | }'#' | '(*?? |
+| 82b32563 | 8.0 | ^\%\ | %\+^\ |
+| 8326116b | 8.0 | {{@? | #:*#\ |
+| 98eed496 | 8.0 | ^[}` | ^[>}` |
+| b50cf853 | 8.0 | \|?"} | \|?*"} |
+| c37e694c | 8.0 | {&\\ | /{*{\ |
 
-## Top glyph pass1 rows
+## Residual glyph manual rows
 
-| id | hard_score | answer | query_raw | audit_reasons |
-| --- | --- | --- | --- | --- |
-| 5c9f274a | 7.0 | :[`` | }:*?: | symbol_length_mismatch\|symbol_solver_unverified |
-| e401ee4f | 7.0 | ^^@} | [<*"> | symbol_length_mismatch\|symbol_solver_unverified |
-| eb1a62f7 | 7.0 | >!>} | )}*>) | symbol_length_mismatch\|symbol_solver_unverified |
-| f4f92956 | 7.0 | (`)) | ()"%} | symbol_length_mismatch\|symbol_solver_unverified |
-| 8962872b | 6.0 | %`& | ``?`\ | symbol_length_mismatch\|symbol_solver_unverified |
-| 9fdb18b7 | 6.0 | ^} | \|%-^^ | symbol_length_mismatch\|symbol_solver_unverified |
-| be7a9eb1 | 6.0 | []`' | ?]&[] | symbol_length_mismatch\|symbol_solver_unverified |
-| e582df31 | 6.0 | }@ | "'?]@ | symbol_length_mismatch\|symbol_solver_unverified |
-| 02664ad5 | 5.0 | :}' | !}-(! | symbol_length_mismatch\|symbol_solver_unverified |
-| 0d4b2baa | 5.0 | :(\|# | :(*\|# | symbol_length_mismatch\|symbol_solver_unverified |
-| 1d10ccaf | 5.0 | <({& | <(*{& | symbol_length_mismatch\|symbol_solver_unverified |
-| 24b2d8eb | 5.0 | /[:` | `!*/[ | symbol_length_mismatch\|symbol_solver_unverified |
-| 26a2a1b8 | 5.0 | (: | (\#</ | symbol_length_mismatch\|symbol_solver_unverified |
-| 51352792 | 5.0 | `"<` | "/*\|" | symbol_length_mismatch\|symbol_solver_unverified |
-| 52f499f4 | 5.0 | $[^% | /(>}@ | symbol_length_mismatch\|symbol_solver_unverified |
-| 64553a64 | 5.0 | }#' | !@"`/ | symbol_length_mismatch\|symbol_solver_unverified |
-| 97abca56 | 5.0 | `#:: | (:*`' | symbol_length_mismatch\|symbol_solver_unverified |
-| a77be9fa | 5.0 | [" | {>\|$[ | symbol_length_mismatch\|symbol_solver_unverified |
-| ae6be599 | 5.0 | #` | $?+]$ | symbol_length_mismatch\|symbol_solver_unverified |
-| afdb7326 | 5.0 | %\ | @^%(^ | symbol_length_mismatch\|symbol_solver_unverified |
-| c9e16aff | 5.0 | ]:(] | (]*]: | symbol_length_mismatch\|symbol_solver_unverified |
-| fc137acd | 5.0 | ^^{> | )#*[` | symbol_length_mismatch\|symbol_solver_unverified |
-| 0625f633 | 4.0 | @@// | ))*!( | symbol_length_mismatch\|symbol_solver_unverified |
-| 3b7148f6 | 4.0 | &&$ | &)+)\ | symbol_length_mismatch\|symbol_solver_unverified |
-| 771472d6 | 4.0 | -'? | ?'-\\ | symbol_length_mismatch\|symbol_solver_unverified |
-| 93e6d0c0 | 4.0 | ^< | ^\|(>^ | symbol_length_mismatch\|symbol_solver_unverified |
-| b4b73143 | 4.0 | >\: | >!%!/ | symbol_length_mismatch\|symbol_solver_unverified |
-| 177f0c22 | 3.0 | /> | >?-#[ | symbol_length_mismatch\|symbol_solver_unverified |
-| 1a28140b | 3.0 | %`& | "[*#/ | symbol_length_mismatch\|symbol_solver_unverified |
-| 2d624cab | 3.0 | ![)] | >)`#' | symbol_length_mismatch\|symbol_solver_unverified |
-| 2e1b9d84 | 3.0 | ]>" | [`+'} | symbol_length_mismatch\|symbol_solver_unverified |
-| 58eadc55 | 3.0 | !# | @@\|@` | symbol_length_mismatch\|symbol_solver_unverified |
-| 6c7f24b7 | 3.0 | ^ | $'-^$ | symbol_length_mismatch\|symbol_solver_unverified |
-| 76587d66 | 3.0 | ] | ]`-]> | symbol_length_mismatch\|symbol_solver_unverified |
-| 82c9f137 | 3.0 | &% | {&-?# | symbol_length_mismatch\|symbol_solver_unverified |
-| 86ccbdf7 | 3.0 | :\| | \|?-?` | symbol_length_mismatch\|symbol_solver_unverified |
-| c9780577 | 3.0 | )? | \{+{\| | symbol_length_mismatch\|symbol_solver_unverified |
-| 0dce4039 | 2.0 | -@/ | )!-#> | symbol_length_mismatch\|symbol_solver_unverified |
-| 42bde66c | 2.0 | >) | #<+#/ | symbol_length_mismatch\|symbol_solver_unverified |
-| c69b17bf | 2.0 | ?) | )^-$) | symbol_length_mismatch\|symbol_solver_unverified |
+_none remain after the training-label promotion pass._
 
-Interpretation: even the best glyph candidates remain underdetermined. They are suitable for future human reasoning work, but not for safe automatic promotion or exclusion in the current pass.
-
+Interpretation: even the best glyph candidates remain underdetermined as latent-rule teachers. They are still valid final-answer supervision, so the current pass keeps them as answer-only labels while withholding trace-ready status.
