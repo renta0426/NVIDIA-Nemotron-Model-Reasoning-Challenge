@@ -729,13 +729,19 @@ def build_mlx_lora_config(
     steps_per_report: int,
     steps_per_eval: int,
     seed: int,
+    lr_schedule_name: str | None,
+    lr_schedule_end: float,
+    lr_warmup_ratio: float,
 ) -> dict[str, Any]:
     total_iters = compute_total_iters(
         num_rows=sum(1 for _ in (dataset_dir / "train.jsonl").open("r", encoding="utf-8")),
         num_epochs=num_epochs,
         batch_size=batch_size,
     )
-    return {
+    schedule_name = str(lr_schedule_name or "").strip()
+    if lr_warmup_ratio < 0.0 or lr_warmup_ratio >= 1.0:
+        raise ValueError(f"lr_warmup_ratio must be in [0, 1), got {lr_warmup_ratio}")
+    config: dict[str, Any] = {
         "model": str(model_path),
         "train": True,
         "data": str(dataset_dir),
@@ -762,6 +768,18 @@ def build_mlx_lora_config(
             "scale": lora_scale,
         },
     }
+    if schedule_name:
+        if schedule_name != "cosine_decay":
+            raise ValueError(f"Unsupported lr_schedule_name: {schedule_name}")
+        schedule_config: dict[str, Any] = {
+            "name": schedule_name,
+            "arguments": [learning_rate, total_iters, float(lr_schedule_end)],
+        }
+        warmup_steps = int(total_iters * lr_warmup_ratio)
+        if warmup_steps > 0:
+            schedule_config["warmup"] = warmup_steps
+        config["lr_schedule"] = schedule_config
+    return config
 
 
 def render_train_command(config_path: Path) -> str:
@@ -858,6 +876,9 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         steps_per_report=int(args.steps_per_report),
         steps_per_eval=int(args.steps_per_eval),
         seed=int(args.seed),
+        lr_schedule_name=getattr(args, "lr_schedule_name", None),
+        lr_schedule_end=float(getattr(args, "lr_schedule_end", 0.0)),
+        lr_warmup_ratio=float(getattr(args, "lr_warmup_ratio", 0.0)),
     )
 
     config_path = run_root / "mlx_lora_config.yaml"
@@ -888,6 +909,9 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "grad_accumulation_steps": int(args.grad_accumulation_steps),
             "num_epochs": float(args.num_epochs),
             "learning_rate": float(args.learning_rate),
+            "lr_schedule_name": str(getattr(args, "lr_schedule_name", "") or ""),
+            "lr_schedule_end": float(getattr(args, "lr_schedule_end", 0.0)),
+            "lr_warmup_ratio": float(getattr(args, "lr_warmup_ratio", 0.0)),
             "max_seq_length": int(args.max_seq_length),
             "lora_rank": int(args.lora_rank),
             "lora_alpha": float(args.lora_alpha),
@@ -2402,6 +2426,9 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--grad-accumulation-steps", type=int, default=4)
     parser.add_argument("--num-epochs", type=float, default=2.0)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--lr-schedule-name", type=str, default="")
+    parser.add_argument("--lr-schedule-end", type=float, default=0.0)
+    parser.add_argument("--lr-warmup-ratio", type=float, default=0.0)
     parser.add_argument("--max-seq-length", type=int, default=2048)
     parser.add_argument("--lora-rank", type=int, default=32)
     parser.add_argument("--lora-alpha", type=float, default=32.0)
