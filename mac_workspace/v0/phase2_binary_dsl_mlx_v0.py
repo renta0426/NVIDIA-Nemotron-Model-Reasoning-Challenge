@@ -51,6 +51,10 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v4",
     "single-adapter-fusion-v5",
     "single-adapter-fusion-v6",
+    "single-adapter-fusion-v7",
+    "single-adapter-fusion-v8",
+    "single-adapter-fusion-v9",
+    "single-adapter-fusion-v10",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -595,7 +599,111 @@ def apply_phase2_train_profile(
             "single-adapter-fusion-v4",
             "single-adapter-fusion-v5",
             "single-adapter-fusion-v6",
+            "single-adapter-fusion-v7",
+            "single-adapter-fusion-v8",
+            "single-adapter-fusion-v9",
+            "single-adapter-fusion-v10",
         }:
+            if normalized_profile in {
+                "single-adapter-fusion-v7",
+                "single-adapter-fusion-v8",
+                "single-adapter-fusion-v9",
+                "single-adapter-fusion-v10",
+            }:
+                row_key = str(row.get("id") or row.get("prompt") or "")
+                fusion_settings = {
+                    "single-adapter-fusion-v7": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 0,
+                        "tier_aware_boxing": False,
+                    },
+                    "single-adapter-fusion-v8": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 1,
+                        "unit_mod": 3,
+                        "text_repeats": 1,
+                        "roman_mod": 0,
+                        "tier_aware_boxing": False,
+                    },
+                    "single-adapter-fusion-v9": {
+                        "binary_repeats": 2,
+                        "symbol_repeats": 2,
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 0,
+                        "tier_aware_boxing": False,
+                    },
+                    "single-adapter-fusion-v10": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                }[normalized_profile]
+                if label in {"binary", "symbol"}:
+                    use_boxed_primary = True
+                    if fusion_settings["tier_aware_boxing"]:
+                        use_boxed_primary = tier == "answer_only_keep"
+                    if use_boxed_primary:
+                        specialist_row = clone_phase2_row(row)
+                        if style != "boxed_only":
+                            specialist_row["assistant_style"] = "boxed_only"
+                            transform_counts[f"force_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"keep_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(specialist_row)
+                        specialist_style = "boxed_only"
+                    else:
+                        profiled_rows.append(row)
+                        transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+                        specialist_row = clone_phase2_row(row)
+                        if style != "boxed_only":
+                            specialist_row["assistant_style"] = "boxed_only"
+                            transform_counts[f"add_boxed_anchor:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"reuse_boxed_anchor:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(specialist_row)
+                        specialist_style = str(specialist_row.get("assistant_style", "")).strip().lower()
+                    repeat_count = fusion_settings["binary_repeats"] if label == "binary" else fusion_settings["symbol_repeats"]
+                    for _ in range(repeat_count):
+                        if specialist_style == "boxed_only":
+                            transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(clone_phase2_row(specialist_row))
+                    continue
+
+                profiled_rows.append(row)
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+                if label == "text":
+                    for _ in range(fusion_settings["text_repeats"]):
+                        profiled_rows.append(clone_phase2_row(row))
+                        transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+                elif label == "unit":
+                    unit_mod = fusion_settings["unit_mod"]
+                    if unit_mod > 0 and stable_mod(row_key, unit_mod) == 0:
+                        profiled_rows.append(clone_phase2_row(row))
+                        if unit_mod == 2:
+                            transform_counts[f"repeat_half:{label}:{tier or 'unknown'}"] += 1
+                        elif unit_mod == 3:
+                            transform_counts[f"repeat_third:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"repeat_mod{unit_mod}:{label}:{tier or 'unknown'}"] += 1
+                elif label == "roman":
+                    roman_mod = fusion_settings["roman_mod"]
+                    if roman_mod > 0 and stable_mod(row_key, roman_mod) == 0:
+                        profiled_rows.append(clone_phase2_row(row))
+                        if roman_mod == 2:
+                            transform_counts[f"repeat_half:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"repeat_mod{roman_mod}:{label}:{tier or 'unknown'}"] += 1
+                continue
+
             if normalized_profile == "single-adapter-fusion-v3" and label == "binary":
                 boxed_binary = clone_phase2_row(row)
                 if style != "boxed_only":
