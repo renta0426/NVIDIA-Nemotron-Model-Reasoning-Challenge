@@ -834,6 +834,13 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         train_records = build_phase2_completion_records(profiled_rows)
         mask_prompt = True
         enable_thinking = True
+        completion_thinking = str(getattr(args, "completion_thinking", "auto")).strip().lower()
+        if completion_thinking not in {"auto", "on", "off"}:
+            raise ValueError(f"Unsupported completion_thinking: {completion_thinking}")
+        if completion_thinking == "on":
+            enable_thinking = True
+        elif completion_thinking == "off":
+            enable_thinking = False
     else:
         from transformers import AutoTokenizer
 
@@ -899,6 +906,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "dataset_dir": str(dataset_dir),
             "dataset_format": dataset_format,
             "enable_thinking": enable_thinking,
+            "completion_thinking": str(getattr(args, "completion_thinking", "auto")).strip().lower(),
             "train_rows": len(train_records),
             "valid_rows": len(valid_records),
             "valid_strategy": f"shadow_sample={int(args.valid_shadow_rows)}",
@@ -2426,6 +2434,7 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--grad-accumulation-steps", type=int, default=4)
     parser.add_argument("--num-epochs", type=float, default=2.0)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--completion-thinking", type=str, default="auto")
     parser.add_argument("--lr-schedule-name", type=str, default="")
     parser.add_argument("--lr-schedule-end", type=float, default=0.0)
     parser.add_argument("--lr-warmup-ratio", type=float, default=0.0)
