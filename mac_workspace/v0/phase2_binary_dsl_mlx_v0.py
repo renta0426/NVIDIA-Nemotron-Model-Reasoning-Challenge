@@ -41,6 +41,11 @@ DEFAULT_PHASE0_ANALYSIS_CSV = (
 )
 DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
+TRAIN_PROFILE_CHOICES = (
+    "baseline",
+    "single-adapter-focus-v1",
+    "single-adapter-focus-v2",
+)
 
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 EXPECTED_PHASE2_COLUMNS = [
@@ -493,6 +498,96 @@ def render_assistant_message(row: dict[str, str]) -> str:
     raise ValueError(f"Unsupported assistant_style: {style}")
 
 
+def clone_phase2_row(row: dict[str, str]) -> dict[str, str]:
+    return {str(key): "" if value is None else str(value) for key, value in row.items()}
+
+
+def summarize_phase2_rows(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
+    by_label = Counter(str(row.get("label", "")).strip() or "unknown" for row in rows)
+    by_label_and_style = Counter(
+        (
+            str(row.get("label", "")).strip() or "unknown",
+            str(row.get("assistant_style", "")).strip() or "unknown",
+        )
+        for row in rows
+    )
+    by_label_and_tier = Counter(
+        (
+            str(row.get("label", "")).strip() or "unknown",
+            str(row.get("source_selection_tier", "")).strip() or "unknown",
+        )
+        for row in rows
+    )
+    return {
+        "rows": len(rows),
+        "by_label": {label: count for label, count in sorted(by_label.items())},
+        "by_label_and_style": {
+            f"{label}|{style}": count
+            for (label, style), count in sorted(by_label_and_style.items())
+        },
+        "by_label_and_tier": {
+            f"{label}|{tier}": count
+            for (label, tier), count in sorted(by_label_and_tier.items())
+        },
+    }
+
+
+def apply_phase2_train_profile(
+    rows: Sequence[dict[str, str]],
+    *,
+    profile: str,
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    normalized_profile = str(profile).strip().lower() or "baseline"
+    input_rows = [clone_phase2_row(row) for row in rows]
+    if normalized_profile == "baseline":
+        summary = summarize_phase2_rows(input_rows)
+        return input_rows, {
+            "profile": normalized_profile,
+            "input": summary,
+            "output": summary,
+            "transform_counts": {},
+        }
+    if normalized_profile not in TRAIN_PROFILE_CHOICES:
+        raise ValueError(f"Unsupported train profile: {profile}")
+
+    profiled_rows: list[dict[str, str]] = []
+    transform_counts: Counter[str] = Counter()
+    for original_row in input_rows:
+        row = clone_phase2_row(original_row)
+        label = str(row.get("label", "")).strip().lower()
+        tier = str(row.get("source_selection_tier", "")).strip().lower()
+        style = str(row.get("assistant_style", "")).strip().lower()
+        if label in {"roman", "text"}:
+            transform_counts[f"drop:{label}"] += 1
+            continue
+        if label in {"binary", "symbol"}:
+            if style != "boxed_only":
+                row["assistant_style"] = "boxed_only"
+                transform_counts[f"force_boxed_only:{label}:{tier or 'unknown'}"] += 1
+            else:
+                transform_counts[f"keep_boxed_only:{label}:{tier or 'unknown'}"] += 1
+        else:
+            transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+        profiled_rows.append(row)
+        if (
+            normalized_profile == "single-adapter-focus-v2"
+            and label in {"binary", "symbol"}
+            and tier == "answer_only_keep"
+        ):
+            profiled_rows.append(clone_phase2_row(row))
+            transform_counts[f"repeat:{label}:{tier}"] += 1
+    if not profiled_rows:
+        raise ValueError(f"Train profile {profile} removed all training rows.")
+    return profiled_rows, {
+        "profile": normalized_profile,
+        "input": summarize_phase2_rows(input_rows),
+        "output": summarize_phase2_rows(profiled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+    }
+
+
 def build_phase2_chat_records(rows: Sequence[dict[str, str]]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for row in rows:
@@ -682,17 +777,21 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         force=bool(args.force_shadow_model),
     )
     source_rows = load_phase2_training_rows(Path(args.train_csv))
+    profiled_rows, profile_summary = apply_phase2_train_profile(
+        source_rows,
+        profile=str(args.train_profile),
+    )
     dataset_format = str(args.dataset_format).strip().lower()
     if dataset_format == "completions":
         dataset_format = "completion"
     if dataset_format not in {"chat", "completion", "text"}:
         raise ValueError(f"Unsupported dataset_format: {dataset_format}")
     if dataset_format == "chat":
-        train_records = build_phase2_chat_records(source_rows)
+        train_records = build_phase2_chat_records(profiled_rows)
         mask_prompt = True
         enable_thinking = True
     elif dataset_format == "completion":
-        train_records = build_phase2_completion_records(source_rows)
+        train_records = build_phase2_completion_records(profiled_rows)
         mask_prompt = True
         enable_thinking = True
     else:
@@ -701,7 +800,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         tokenizer = AutoTokenizer.from_pretrained(str(shadow_model_dir), trust_remote_code=True)
         if tokenizer.pad_token is None and tokenizer.eos_token is not None:
             tokenizer.pad_token = tokenizer.eos_token
-        train_records = build_phase2_text_records(source_rows, tokenizer=tokenizer)
+        train_records = build_phase2_text_records(profiled_rows, tokenizer=tokenizer)
         mask_prompt = False
         enable_thinking = False
     valid_records = select_shadow_validation_records(
@@ -752,6 +851,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         "shadow_model_dir": str(shadow_model_dir),
         "train_csv": str(Path(args.train_csv).resolve()),
         "phase2_rows": len(source_rows),
+        "training_profile": profile_summary,
         "dataset": {
             "dataset_dir": str(dataset_dir),
             "dataset_format": dataset_format,
@@ -2269,6 +2369,7 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--train-csv", type=Path, default=DEFAULT_TRAIN_CSV)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-name", type=str, default=DEFAULT_RUN_NAME)
+    parser.add_argument("--train-profile", type=str, choices=TRAIN_PROFILE_CHOICES, default="baseline")
     parser.add_argument(
         "--dataset-format",
         type=str,
