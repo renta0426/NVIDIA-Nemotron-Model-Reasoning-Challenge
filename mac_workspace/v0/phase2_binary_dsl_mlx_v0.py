@@ -45,6 +45,9 @@ TRAIN_PROFILE_CHOICES = (
     "baseline",
     "single-adapter-focus-v1",
     "single-adapter-focus-v2",
+    "general-stable-focus-v1",
+    "general-stable-focus-v2",
+    "general-stable-focus-v3",
 )
 
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
@@ -557,25 +560,44 @@ def apply_phase2_train_profile(
         label = str(row.get("label", "")).strip().lower()
         tier = str(row.get("source_selection_tier", "")).strip().lower()
         style = str(row.get("assistant_style", "")).strip().lower()
-        if label in {"roman", "text"}:
-            transform_counts[f"drop:{label}"] += 1
+        if normalized_profile.startswith("single-adapter-focus"):
+            if label in {"roman", "text"}:
+                transform_counts[f"drop:{label}"] += 1
+                continue
+            if label in {"binary", "symbol"}:
+                if style != "boxed_only":
+                    row["assistant_style"] = "boxed_only"
+                    transform_counts[f"force_boxed_only:{label}:{tier or 'unknown'}"] += 1
+                else:
+                    transform_counts[f"keep_boxed_only:{label}:{tier or 'unknown'}"] += 1
+            else:
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            profiled_rows.append(row)
+            if (
+                normalized_profile == "single-adapter-focus-v2"
+                and label in {"binary", "symbol"}
+                and tier == "answer_only_keep"
+            ):
+                profiled_rows.append(clone_phase2_row(row))
+                transform_counts[f"repeat:{label}:{tier}"] += 1
             continue
-        if label in {"binary", "symbol"}:
-            if style != "boxed_only":
+
+        if normalized_profile.startswith("general-stable-focus"):
+            if label in {"binary", "symbol"}:
+                transform_counts[f"drop:{label}"] += 1
+                continue
+            if normalized_profile == "general-stable-focus-v3" and label == "text" and style != "boxed_only":
                 row["assistant_style"] = "boxed_only"
                 transform_counts[f"force_boxed_only:{label}:{tier or 'unknown'}"] += 1
             else:
-                transform_counts[f"keep_boxed_only:{label}:{tier or 'unknown'}"] += 1
-        else:
-            transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
-        profiled_rows.append(row)
-        if (
-            normalized_profile == "single-adapter-focus-v2"
-            and label in {"binary", "symbol"}
-            and tier == "answer_only_keep"
-        ):
-            profiled_rows.append(clone_phase2_row(row))
-            transform_counts[f"repeat:{label}:{tier}"] += 1
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            profiled_rows.append(row)
+            if normalized_profile in {"general-stable-focus-v2", "general-stable-focus-v3"} and label == "text":
+                profiled_rows.append(clone_phase2_row(row))
+                transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+            continue
+
+        raise ValueError(f"Unsupported train profile: {profile}")
     if not profiled_rows:
         raise ValueError(f"Train profile {profile} removed all training rows.")
     return profiled_rows, {
