@@ -1703,7 +1703,7 @@ def prepare_phase0_benchmark_artifacts(
     return benchmark_rows, holdout_rows, manifest
 
 
-def build_prompts(tokenizer: Any, prompt_series: Sequence[str]) -> list[str]:
+def build_prompts(tokenizer: Any, prompt_series: Sequence[str], *, enable_thinking: bool = True) -> list[str]:
     prompts: list[str] = []
     for prompt_text in prompt_series:
         user_content = f"{prompt_text}\n{BOXED_INSTRUCTION}"
@@ -1712,7 +1712,7 @@ def build_prompts(tokenizer: Any, prompt_series: Sequence[str]) -> list[str]:
                 [{"role": "user", "content": user_content}],
                 tokenize=False,
                 add_generation_prompt=True,
-                enable_thinking=True,
+                enable_thinking=enable_thinking,
             )
         except TypeError:
             rendered = tokenizer.apply_chat_template(
@@ -1854,6 +1854,7 @@ def generate_phase0_records_batched(
     lazy_load: bool,
     progress_every: int,
     worker_label: str,
+    eval_thinking: str,
 ) -> list[dict[str, Any]]:
     import mlx.core as mx  # type: ignore
     from mlx_lm import batch_generate, generate, load  # type: ignore
@@ -1866,7 +1867,15 @@ def generate_phase0_records_batched(
         load_kwargs["adapter_path"] = str(adapter_dir)
     model, tokenizer = load(str(model_path), **load_kwargs)
     maybe_fix_tokenizer_eos_ids(tokenizer)
-    prompts = build_prompts(tokenizer, [str(row["prompt"]) for row in benchmark_rows])
+    eval_thinking_value = str(eval_thinking).strip().lower()
+    if eval_thinking_value not in {"auto", "on", "off"}:
+        raise ValueError(f"Unsupported eval_thinking: {eval_thinking_value}")
+    prompt_enable_thinking = eval_thinking_value != "off"
+    prompts = build_prompts(
+        tokenizer,
+        [str(row["prompt"]) for row in benchmark_rows],
+        enable_thinking=prompt_enable_thinking,
+    )
     prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
     sampler = make_sampler(
         temp=float(temperature),
@@ -2177,6 +2186,7 @@ def run_phase0_eval_parallel(
             lazy_load=bool(args.lazy_load),
             progress_every=int(args.progress_every),
             worker_label="main",
+            eval_thinking=str(getattr(args, "eval_thinking", "auto")),
         )
 
     shard_root = eval_root / "_parallel"
@@ -2228,6 +2238,8 @@ def run_phase0_eval_parallel(
                 str(int(args.progress_every)),
                 "--worker-label",
                 f"shard{shard_index + 1}of{num_shards}",
+                "--eval-thinking",
+                str(getattr(args, "eval_thinking", "auto")),
             ]
             if adapter_dir is not None:
                 command.extend(["--adapter-path", str(adapter_dir)])
@@ -2402,6 +2414,7 @@ def run_phase0_eval_worker(args: argparse.Namespace) -> None:
         lazy_load=bool(args.lazy_load),
         progress_every=int(args.progress_every),
         worker_label=str(args.worker_label),
+        eval_thinking=str(getattr(args, "eval_thinking", "auto")),
     )
     write_jsonl_records(Path(args.output_jsonl), records)
     print(
@@ -2494,6 +2507,7 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval.add_argument("--prefill-batch-size", type=int, default=32)
     phase0_eval.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval.add_argument("--progress-every", type=int, default=10)
+    phase0_eval.add_argument("--eval-thinking", type=str, default="auto")
     phase0_eval.add_argument("--lazy-load", action="store_true")
     phase0_eval.add_argument("--force-shadow-model", action="store_true")
     phase0_eval.set_defaults(func=run_phase0_eval)
@@ -2515,6 +2529,7 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval_worker.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval_worker.add_argument("--progress-every", type=int, default=10)
     phase0_eval_worker.add_argument("--worker-label", type=str, default="worker")
+    phase0_eval_worker.add_argument("--eval-thinking", type=str, default="auto")
     phase0_eval_worker.add_argument("--lazy-load", action="store_true")
     phase0_eval_worker.set_defaults(func=run_phase0_eval_worker)
 
