@@ -7,9 +7,9 @@
 | answer_only_keep | concat_xy | 1 | 19 |
 | answer_only_keep | concat_yx | 1 | 19 |
 | verified_trace_ready | concat_xy | 2 | 16 |
+| answer_only_keep | comp99_abs_diff_2d | 1 | 14 |
 | verified_trace_ready | concat_yx | 2 | 12 |
-| answer_only_keep | comp99_abs_diff_2d | 1 | 9 |
-| answer_only_keep | abs_diff_2d | 1 | 8 |
+| answer_only_keep | abs_diff_2d | 1 | 9 |
 | verified_trace_ready | abs_diff_2d | 2 | 4 |
 | verified_trace_ready | concat_yx | 3 | 4 |
 | verified_trace_ready | comp99_abs_diff_2d | 2 | 2 |
@@ -27,16 +27,22 @@
 | 9cb03277 | answer_only_keep | ! | abs_diff_2d | 1 | 26 | 52!78 |
 | 9d4ae6b8 | answer_only_keep | - | abs_diff_2d | 1 | 16 | 51-35 |
 | bad6f95d | answer_only_keep | - | abs_diff_2d | 1 | 41 | 54-95 |
+| d3092ac1 | answer_only_keep | - | abs_diff_2d | 1 | -7 | 92-63 |
 | e518256e | answer_only_keep | " | abs_diff_2d | 1 | 84 | 94"10 |
 | e836fb20 | answer_only_keep | - | abs_diff_2d | 1 | 68 | 89-21 |
 | 13892a7c | answer_only_keep | - | comp99_abs_diff_2d | 1 | -85 | 61-47 |
 | 1bc85bd9 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 93 | 16-22 |
+| 2049f01d | answer_only_keep | - | comp99_abs_diff_2d | 1 | 23 | 52-75 |
+| 33093ed0 | answer_only_keep | - | comp99_abs_diff_2d | 1 | -72 | 07-79 |
 | 3a8a4ebc | answer_only_keep | ' | comp99_abs_diff_2d | 1 | '54 | 74'29 |
 | 5c008804 | answer_only_keep | @ | comp99_abs_diff_2d | 1 | 52 | 83@36 |
 | 6b769a9e | answer_only_keep | + | comp99_abs_diff_2d | 1 | +92 | 24+17 |
+| 8d652f91 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 4 | 97-57 |
 | c7a7b13a | answer_only_keep | - | comp99_abs_diff_2d | 1 | 35 | 93-29 |
 | cde9f7ba | answer_only_keep | [ | comp99_abs_diff_2d | 1 | 81 | 15[33 |
+| d17d3a7a | answer_only_keep | - | comp99_abs_diff_2d | 1 | -01 | 66-67 |
 | debff779 | answer_only_keep | - | comp99_abs_diff_2d | 1 | 94 | 36-41 |
+| e247d364 | answer_only_keep | ! | comp99_abs_diff_2d | 1 | 11 | 65!76 |
 | ef6bc241 | answer_only_keep | $ | comp99_abs_diff_2d | 1 | $55 | 73$29 |
 | 047c4111 | answer_only_keep | $ | concat_xy | 1 | 2596 | 25$96 |
 | 2a73a462 | answer_only_keep | : | concat_xy | 1 | 9302 | 93:02 |
@@ -95,12 +101,6 @@
 | 680f19b3 | verified_trace_ready | ? | concat_xy | 2 | 9756 | 97?56 |
 | 76e6f646 | verified_trace_ready | { | concat_xy | 2 | 6557 | 65{57 |
 | 91488dc9 | verified_trace_ready | ? | concat_xy | 2 | 3431 | 34?31 |
-| a8e033fe | verified_trace_ready | ? | concat_xy | 2 | 6854 | 68?54 |
-| dbd0e3c9 | verified_trace_ready | * | concat_xy | 2 | 5631 | 56*31 |
-| dfec0ed4 | verified_trace_ready | * | concat_xy | 2 | 9370 | 93*70 |
-| f7d90ae3 | verified_trace_ready | / | concat_xy | 2 | 9819 | 98/19 |
-| f94810f5 | verified_trace_ready | { | concat_xy | 2 | 1592 | 15{92 |
-| 552e14d7 | verified_trace_ready | + | concat_yx | 4 | 1756 | 56+17 |
 
 ## Binary rows now excluded
 
@@ -137,15 +137,30 @@
 | c424dcd4 | 11001111 | 11000001 | 4 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_hybrid_consensus_ambiguous |
 | e266959e | 11100110 | 10100000 | 2 | bit_no_candidate\|bit_independent_ambiguous\|bit_bijection_ambiguous\|bit_boolean2_ambiguous\|bit_boolean3_ambiguous\|bit_affine_answer_mismatch\|bit_byte_transform_ambiguous\|bit_hybrid_consensus_ambiguous |
 
-## Glyph rows still kept manual
+## Glyph rows promoted as answer-only training labels
 
-| id | hard_score | answer | query_raw | audit_reasons |
-| --- | --- | --- | --- | --- |
-| f4f92956 | 7.0 | (`)) | ()"%} | symbol_length_mismatch\|symbol_solver_unverified |
-| 64553a64 | 5.0 | }#' | !@"`/ | symbol_length_mismatch\|symbol_solver_unverified |
-| 97abca56 | 5.0 | `#:: | (:*`' | symbol_length_mismatch\|symbol_solver_unverified |
-| a77be9fa | 5.0 | [" | {>\|$[ | symbol_length_mismatch\|symbol_solver_unverified |
-| afdb7326 | 5.0 | %\ | @^%(^ | symbol_length_mismatch\|symbol_solver_unverified |
+| id | hard_score | answer | query_raw |
+| --- | --- | --- | --- |
+| 4bb8c6cd | 9.0 | ]}\! | ]}*\! |
+| 50ba5396 | 9.0 | \]]@ | }&(\" |
+| 56efc838 | 9.0 | }$?( | ()*?} |
+| 71d91445 | 9.0 | } | \"/@\| |
+| a40497f9 | 9.0 | %]\< | <%*]\ |
+| d7e5414c | 9.0 | \|%\\ | #[}@[ |
+| 10a94678 | 8.0 | ""\} | ">*)\ |
+| 193c21d5 | 8.0 | }>[[ | >\|*%{ |
+| 2e9973b7 | 8.0 | )\?% | )\+?% |
+| 3cc03e36 | 8.0 | }\|(# | #/*\|# |
+| 60ed3f31 | 8.0 | @%:\ | @%*:\ |
+| 65b13ba2 | 8.0 | ]/"} | #@{]" |
+| 7138d71a | 8.0 | \ | ^]-'% |
+| 7933172a | 8.0 | ^/&` | %#+^` |
+| 7a65a8eb | 8.0 | }'#' | '(*?? |
+| 82b32563 | 8.0 | ^\%\ | %\+^\ |
+| 8326116b | 8.0 | {{@? | #:*#\ |
+| 98eed496 | 8.0 | ^[}` | ^[>}` |
+| b50cf853 | 8.0 | \|?"} | \|?*"} |
+| c37e694c | 8.0 | {&\\ | /{*{\ |
 
-Decision summary: current pass1 safely keeps only exact `numeric_2x2` prompt-backed rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.
+Decision summary: current pass1 safely keeps exact `numeric_2x2` prompt-backed rows on the promotion list, moves remaining non-suspect `glyph_len5` rows and non-suspect `numeric_2x2` same-op-zero rows to `answer_only_keep` as raw final-answer supervision, and still sends only clear rule-vs-gold contradictions to `exclude_suspect`.
 

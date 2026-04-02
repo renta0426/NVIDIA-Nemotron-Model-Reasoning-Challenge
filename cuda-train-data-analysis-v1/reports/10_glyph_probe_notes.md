@@ -21,5 +21,6 @@
 
 ## Practical consequence
 
-- `glyph_len5` should remain in `manual_audit_priority`.
-- Human review should focus on discovering smaller subfamilies before any further automatic solver is trusted.
+- `glyph_len5` should **not** be treated as trace-ready under the current transducer probe.
+- In the latest curation pass, the remaining non-suspect glyph rows were moved to `answer_only_keep`, not because the latent rule was solved, but because `README.md` scores final boxed answers and no concrete suspect signal was found.
+- Human review should still focus on discovering smaller subfamilies before any further automatic solver is trusted.

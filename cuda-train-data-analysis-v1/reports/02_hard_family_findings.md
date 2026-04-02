@@ -36,15 +36,24 @@
 
 | template_subtype | teacher_solver_candidate | selection_tier | analysis_notes | rows |
 | --- | --- | --- | --- | --- |
-| glyph_len5 |  | manual_audit_priority | symbol_audit_needed | 823 |
-| numeric_2x2 |  | manual_audit_priority | symbol_audit_needed | 466 |
+| glyph_len5 |  | answer_only_keep | symbol_glyph_training_answer_only | 470 |
+| glyph_len5 |  | answer_only_keep | symbol_glyph_grouped_exact_answer_only | 275 |
+| numeric_2x2 |  | answer_only_keep | symbol_reverse_operator_spec_consensus | 198 |
+| numeric_2x2 |  | answer_only_keep | symbol_numeric_no_same_op_training_answer_only | 136 |
 | numeric_2x2 | symbol_numeric_operator_formula | answer_only_keep | symbol_numeric_formula_low_shot | 114 |
 | numeric_2x2 | symbol_numeric_operator_formula | verified_trace_ready | symbol_numeric_formula_exact | 110 |
-| numeric_2x2 |  | answer_only_keep | symbol_operator_spec_consensus | 16 |
-| numeric_2x2 |  | exclude_suspect | symbol_audit_needed | 11 |
-| numeric_2x2 |  | answer_only_keep | symbol_manual_prompt_exact_answer_only | 4 |
+| numeric_2x2 |  | answer_only_keep | symbol_reverse_manual_exact_answer_only | 76 |
+| glyph_len5 |  | answer_only_keep | symbol_glyph_grouped_small_set_answer_only | 43 |
+| glyph_len5 |  | answer_only_keep | symbol_glyph_grouped_single_example_small_set_answer_only | 35 |
+| numeric_2x2 |  | manual_audit_priority | symbol_audit_needed | 26 |
+| numeric_2x2 |  | answer_only_keep | symbol_operator_spec_consensus | 21 |
+| numeric_2x2 |  | answer_only_keep | symbol_reverse_small_core_digit_answer_only | 9 |
+| numeric_2x2 |  | exclude_suspect | symbol_audit_needed | 9 |
+| numeric_2x2 |  | answer_only_keep | symbol_manual_prompt_exact_answer_only | 6 |
+| numeric_2x2 |  | answer_only_keep | symbol_reverse_digit_reversal_answer_only | 4 |
 | numeric_2x2 |  | answer_only_keep | symbol_minus_direct_plain_subfamily | 3 |
-| numeric_2x2 |  | answer_only_keep | symbol_minus_prefix_subfamily | 3 |
+| numeric_2x2 |  | answer_only_keep | symbol_reverse_max_mod_min_answer_only | 3 |
+| numeric_2x2 |  | answer_only_keep | symbol_reverse_negative_x_minus_y_answer_only | 3 |
 | numeric_2x2 |  | answer_only_keep | symbol_star_prefix_if_negative_subfamily | 3 |
-| numeric_2x2 |  | answer_only_keep | symbol_thin_support2_subfamily | 2 |
+| numeric_2x2 |  | answer_only_keep | symbol_current_max_mod_min_answer_only | 2 |
 

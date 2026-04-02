@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import importlib.util
 import json
 import math
@@ -9,9 +10,11 @@ import re
 import statistics
 import sys
 from collections import Counter, defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from functools import lru_cache
-from itertools import combinations_with_replacement
+from itertools import combinations_with_replacement, permutations, product
+from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +152,7 @@ SYMBOL_NUMERIC_FORMULAS = {
     "y_div_x": lambda x, y: None if x == 0 or y % x else y // x,
     "x_mod_y": lambda x, y: None if y == 0 else x % y,
     "y_mod_x": lambda x, y: None if x == 0 else y % x,
+    "max_mod_min": lambda x, y: None if min(x, y) == 0 else max(x, y) % min(x, y),
     "x": lambda x, y: x,
     "y": lambda x, y: y,
 }
@@ -170,6 +174,28 @@ SYMBOL_NUMERIC_FORMAT_OVERRIDES = {
     "comp99_abs_diff_2d": ("zpad2", "prefix_abs_zpad2"),
 }
 SYMBOL_PROMOTION_FORMULA_NAMES = set(SYMBOL_NUMERIC_STRING_TEMPLATES) | set(SYMBOL_NUMERIC_FORMAT_OVERRIDES)
+SYMBOL_GLYPH_GROUPED_FORMULA_NAMES = (
+    "x_plus_y",
+    "x_plus_y_plus1",
+    "x_plus_y_minus1",
+    "x_mul_y",
+    "x_mul_y_plus1",
+    "x_mul_y_minus1",
+    "abs_diff",
+    "x_minus_y",
+    "x",
+    "y",
+)
+SYMBOL_GLYPH_GROUPED_TEMPLATE_NAMES = (
+    "concat_xy",
+    "concat_yx",
+    "abs_diff_2d",
+    "abs_diff_2d_op_suffix",
+)
+SYMBOL_GLYPH_GROUPED_MAX_COMBOS = 25000
+SYMBOL_GLYPH_GROUPED_MAX_PARTIAL_MAPS = 5000
+SYMBOL_GLYPH_GROUPED_MAX_PREDICTIONS = 8
+SYMBOL_GLYPH_GROUPED_MAX_WORKERS = 8
 
 
 def utc_now() -> str:
@@ -351,6 +377,121 @@ def iter_symbol_numeric_formatters(formula_name: str) -> list[tuple[str, Any]]:
     if format_names is None:
         format_names = tuple(name for name in SYMBOL_NUMERIC_FORMATS if name != "zpad2")
     return [(format_name, SYMBOL_NUMERIC_FORMATS[format_name]) for format_name in format_names]
+
+
+def reverse_symbol_numeric_text(text: str) -> str:
+    return str(text)[::-1]
+
+
+def reverse_symbol_numeric_rendered_output(rendered_text: str, operator: str) -> str:
+    rendered = str(rendered_text)
+    if not rendered:
+        return rendered
+    if rendered.startswith(str(operator)):
+        return f"{operator}{rendered[len(str(operator)) :][::-1]}"
+    return rendered[::-1]
+
+
+def iter_symbol_numeric_reverse_specs() -> list[tuple[str, str, Any]]:
+    specs: list[tuple[str, str, Any]] = []
+    for template_name, template in SYMBOL_NUMERIC_STRING_TEMPLATES.items():
+        for reverse_inputs in (False, True):
+            for reverse_output in (False, True):
+                if not reverse_inputs and not reverse_output:
+                    continue
+                spec_formula_name = f"{template_name}__rev_in{int(reverse_inputs)}_rev_out{int(reverse_output)}"
+
+                def render_template(
+                    operator: str,
+                    x_text: str,
+                    y_text: str,
+                    template: tuple[str, ...] = template,
+                    reverse_inputs: bool = reverse_inputs,
+                    reverse_output: bool = reverse_output,
+                ) -> str:
+                    rendered = render_symbol_numeric_string_template(
+                        template,
+                        reverse_symbol_numeric_text(x_text) if reverse_inputs else str(x_text),
+                        operator,
+                        reverse_symbol_numeric_text(y_text) if reverse_inputs else str(y_text),
+                    )
+                    if reverse_output:
+                        return reverse_symbol_numeric_rendered_output(rendered, operator)
+                    return rendered
+
+                specs.append((spec_formula_name, "string_template", render_template))
+    for formula_name, formula in SYMBOL_NUMERIC_FORMULAS.items():
+        for format_name, formatter in iter_symbol_numeric_formatters(formula_name):
+            for reverse_inputs in (False, True):
+                for reverse_output in (False, True):
+                    if not reverse_inputs and not reverse_output:
+                        continue
+                    spec_formula_name = f"{formula_name}__rev_in{int(reverse_inputs)}_rev_out{int(reverse_output)}"
+
+                    def render_formula(
+                        operator: str,
+                        x_text: str,
+                        y_text: str,
+                        formula: Any = formula,
+                        formatter: Any = formatter,
+                        reverse_inputs: bool = reverse_inputs,
+                        reverse_output: bool = reverse_output,
+                    ) -> str | None:
+                        x_value = int(reverse_symbol_numeric_text(x_text) if reverse_inputs else str(x_text))
+                        y_value = int(reverse_symbol_numeric_text(y_text) if reverse_inputs else str(y_text))
+                        numeric_value = formula(x_value, y_value)
+                        if numeric_value is None:
+                            return None
+                        rendered = formatter(operator, numeric_value)
+                        if reverse_output:
+                            return reverse_symbol_numeric_rendered_output(rendered, operator)
+                        return rendered
+
+                    specs.append((spec_formula_name, format_name, render_formula))
+    return specs
+
+
+def collect_symbol_numeric_reverse_operator_formula_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+    query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
+    if query_match is None:
+        return {
+            "query_operator": "",
+            "same_operator_example_count": 0,
+            "candidate_predictions": [],
+            "winning_specs": [],
+        }
+    query_x_text = query_match.group(1)
+    query_operator = query_match.group(2)
+    query_y_text = query_match.group(3)
+    same_operator_examples = [
+        (left_value, right_value, output_text)
+        for left_value, operator, right_value, output_text in parse_symbol_numeric_examples(prompt)
+        if operator == query_operator
+    ]
+    candidate_predictions: set[str] = set()
+    winning_specs: list[tuple[str, str, str]] = []
+    for formula_name, format_name, renderer in iter_symbol_numeric_reverse_specs():
+        valid = True
+        for left_value_text, right_value_text, output_text in same_operator_examples:
+            predicted_example_output = renderer(query_operator, left_value_text, right_value_text)
+            if predicted_example_output is None or str(predicted_example_output) != str(output_text):
+                valid = False
+                break
+        if not valid:
+            continue
+        predicted_answer = renderer(query_operator, query_x_text, query_y_text)
+        if predicted_answer is None:
+            continue
+        if formula_name.startswith("abs_diff_2d") and len(str(answer).strip()) != len(str(predicted_answer)):
+            continue
+        candidate_predictions.add(str(predicted_answer))
+        winning_specs.append((formula_name, format_name, str(predicted_answer)))
+    return {
+        "query_operator": query_operator,
+        "same_operator_example_count": len(same_operator_examples),
+        "candidate_predictions": sorted(candidate_predictions),
+        "winning_specs": winning_specs,
+    }
 
 
 def collect_symbol_numeric_operator_formula_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
@@ -2726,6 +2867,162 @@ def apply_symbol_operator_consensus_promotions(analysis_df: pd.DataFrame) -> tup
     return analysis_df, support_df, candidate_df
 
 
+def apply_symbol_reverse_operator_consensus_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    numeric_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+    )
+    support_df = pd.DataFrame(
+        columns=[
+            "query_operator",
+            "formula_name",
+            "format_name",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "safe_operator_spec",
+        ]
+    )
+    candidate_df = pd.DataFrame(
+        columns=[
+            "id",
+            "selection_tier",
+            "query_operator",
+            "same_operator_example_count",
+            "answer",
+            "query_raw",
+            "safe_prediction",
+            "safe_prediction_count",
+            "safe_spec_count",
+            "safe_support_max",
+            "safe_specs",
+            "all_predictions",
+        ]
+    )
+    if not numeric_mask.any():
+        return analysis_df, support_df, candidate_df
+
+    match_records: list[dict[str, Any]] = []
+    row_match_map: dict[str, dict[str, Any]] = {}
+    for row in analysis_df.loc[numeric_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_reverse_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        if int(match_info["same_operator_example_count"]) <= 0:
+            continue
+        row_match_map[str(row["id"])] = {
+            "selection_tier": str(row["selection_tier"]),
+            "answer": str(row["answer"]),
+            "query_raw": str(row["query_raw"]),
+            "query_operator": str(match_info["query_operator"]),
+            "same_operator_example_count": int(match_info["same_operator_example_count"]),
+            "winning_specs": [(str(formula_name), str(format_name), str(predicted_answer)) for formula_name, format_name, predicted_answer in match_info["winning_specs"]],
+        }
+        for formula_name, format_name, predicted_answer in match_info["winning_specs"]:
+            match_records.append(
+                {
+                    "id": str(row["id"]),
+                    "query_operator": str(match_info["query_operator"]),
+                    "formula_name": str(formula_name),
+                    "format_name": str(format_name),
+                    "predicted_answer": str(predicted_answer),
+                    "matches_gold": bool(str(predicted_answer) == str(row["answer"])),
+                    "same_operator_example_count": int(match_info["same_operator_example_count"]),
+                }
+            )
+    if not match_records:
+        return analysis_df, support_df, candidate_df
+
+    match_df = pd.DataFrame(match_records)
+    support_df = (
+        match_df.groupby(["query_operator", "formula_name", "format_name"], dropna=False)
+        .agg(
+            support_rows=("id", "size"),
+            gold_match_rows=("matches_gold", "sum"),
+        )
+        .reset_index()
+    )
+    support_df["support_rows"] = support_df["support_rows"].astype(int)
+    support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+    support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+    support_df["safe_operator_spec"] = (support_df["support_rows"] >= 2) & (support_df["error_rows"] == 0)
+    safe_spec_keys = {
+        (str(row["query_operator"]), str(row["formula_name"]), str(row["format_name"]))
+        for row in support_df.loc[support_df["safe_operator_spec"]].to_dict(orient="records")
+    }
+    support_map = {
+        (str(row["query_operator"]), str(row["formula_name"]), str(row["format_name"])): int(row["support_rows"])
+        for row in support_df.to_dict(orient="records")
+    }
+
+    candidate_rows: list[dict[str, Any]] = []
+    promote_predictions: dict[str, str] = {}
+    for row_id, info in row_match_map.items():
+        safe_matches = [
+            (formula_name, format_name, predicted_answer)
+            for formula_name, format_name, predicted_answer in info["winning_specs"]
+            if (info["query_operator"], formula_name, format_name) in safe_spec_keys
+        ]
+        if not safe_matches:
+            continue
+        safe_prediction_set = sorted({predicted_answer for _, _, predicted_answer in safe_matches})
+        safe_support_max = max(
+            support_map[(info["query_operator"], formula_name, format_name)]
+            for formula_name, format_name, _ in safe_matches
+        )
+        candidate_rows.append(
+            {
+                "id": row_id,
+                "selection_tier": info["selection_tier"],
+                "query_operator": info["query_operator"],
+                "same_operator_example_count": info["same_operator_example_count"],
+                "answer": info["answer"],
+                "query_raw": info["query_raw"],
+                "safe_prediction": safe_prediction_set[0] if len(safe_prediction_set) == 1 else "",
+                "safe_prediction_count": len(safe_prediction_set),
+                "safe_spec_count": len(safe_matches),
+                "safe_support_max": int(safe_support_max),
+                "safe_specs": "|".join(
+                    sorted(f"{info['query_operator']}::{formula_name}::{format_name}" for formula_name, format_name, _ in safe_matches)
+                ),
+                "all_predictions": "|".join(sorted({predicted_answer for _, _, predicted_answer in info["winning_specs"]})),
+            }
+        )
+        if (
+            info["selection_tier"] == "manual_audit_priority"
+            and len(safe_prediction_set) == 1
+            and safe_prediction_set[0] == info["answer"]
+        ):
+            promote_predictions[row_id] = safe_prediction_set[0]
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=list(candidate_df.columns))
+    if promote_predictions:
+        promote_mask = analysis_df["id"].astype(str).isin(set(promote_predictions))
+        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "id"].astype(str).map(promote_predictions)
+        analysis_df.loc[promote_mask, "auto_solver_match"] = True
+        analysis_df.loc[promote_mask, "answer_only_ready"] = True
+        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+        analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[promote_mask, "audit_reasons"] = ""
+        analysis_df.loc[promote_mask, "analysis_notes"] = "symbol_reverse_operator_spec_consensus"
+        analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    support_df = support_df.sort_values(
+        ["safe_operator_spec", "support_rows", "gold_match_rows", "query_operator", "formula_name", "format_name"],
+        ascending=[False, False, False, True, True, True],
+    ).reset_index(drop=True)
+    if not candidate_df.empty:
+        candidate_df = candidate_df.sort_values(
+            ["selection_tier", "safe_support_max", "safe_prediction_count", "same_operator_example_count", "id"],
+            ascending=[True, False, True, False, True],
+        ).reset_index(drop=True)
+    return analysis_df, support_df, candidate_df
+
+
 def apply_bit_structured_low_support_answer_only_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     analysis_df = analysis_df.copy()
     candidate_mask = (
@@ -4326,6 +4623,16 @@ SYMBOL_MANUAL_PROMPT_EXACT_ANSWER_ONLY_SPECS: dict[str, dict[str, str]] = {
         "predicted_answer": "[4",
         "decision_note": "bracket_manual_prefix_always_abs_answer_only",
     },
+    "936b3ae5": {
+        "query_operator": ">",
+        "predicted_answer": "14>",
+        "decision_note": "gt_manual_abs_diff_suffix_answer_only",
+    },
+    "f0a2d457": {
+        "query_operator": "<",
+        "predicted_answer": "22",
+        "decision_note": "lt_manual_reverse_abs_diff_suffix_answer_only",
+    },
 }
 
 
@@ -4403,6 +4710,1507 @@ def apply_symbol_manual_prompt_exact_answer_only_curation(analysis_df: pd.DataFr
     analysis_df.loc[promote_mask, "suspect_label"] = False
 
     candidate_df = candidate_df.sort_values(["query_operator", "same_operator_example_count", "id"], ascending=[True, False, True]).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def render_symbol_percent_reverse_abs_diff_suffix(x_text: str, y_text: str) -> str:
+    reverse_x = int(str(x_text)[::-1])
+    reverse_y = int(str(y_text)[::-1])
+    core = str(abs(reverse_x - reverse_y))[::-1]
+    return f"{core}%" if reverse_x > reverse_y else core
+
+
+def collect_symbol_percent_reverse_abs_diff_suffix_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+    match_info = collect_symbol_numeric_operator_formula_matches(prompt, query_text, answer)
+    query_operator = str(match_info["query_operator"])
+    if query_operator != "%":
+        return {
+            "query_operator": "",
+            "same_operator_example_count": 0,
+            "candidate_predictions": [],
+            "all_predictions": [],
+            "winning_specs": [],
+        }
+
+    examples = parse_symbol_numeric_examples(prompt)
+    same_operator_examples = [(left_text, right_text, output_text) for left_text, op_text, right_text, output_text in examples if op_text == query_operator]
+    same_operator_example_count = len(same_operator_examples)
+    if same_operator_example_count < 2:
+        return {
+            "query_operator": query_operator,
+            "same_operator_example_count": same_operator_example_count,
+            "candidate_predictions": [],
+            "all_predictions": [],
+            "winning_specs": [],
+        }
+
+    for left_text, right_text, output_text in same_operator_examples:
+        if render_symbol_percent_reverse_abs_diff_suffix(left_text, right_text) != str(output_text):
+            return {
+                "query_operator": query_operator,
+                "same_operator_example_count": same_operator_example_count,
+                "candidate_predictions": [],
+                "all_predictions": [],
+                "winning_specs": [],
+            }
+
+    query_x_text, query_y_text = str(query_text).split(query_operator, 1)
+    predicted_answer = render_symbol_percent_reverse_abs_diff_suffix(query_x_text, query_y_text)
+    winning_specs = [("percent_reverse_abs_diff_suffix_prompt_local", "string_template", str(predicted_answer))]
+    return {
+        "query_operator": query_operator,
+        "same_operator_example_count": same_operator_example_count,
+        "candidate_predictions": [str(predicted_answer)],
+        "all_predictions": [str(predicted_answer)],
+        "winning_specs": winning_specs,
+    }
+
+
+def apply_symbol_percent_reverse_abs_diff_suffix_promotions(
+    analysis_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    numeric_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+    )
+    support_df = pd.DataFrame(
+        columns=[
+            "query_operator",
+            "subfamily_name",
+            "support_rows",
+            "gold_match_rows",
+            "error_rows",
+            "safe_subfamily",
+        ]
+    )
+    candidate_df = pd.DataFrame(
+        columns=[
+            "id",
+            "selection_tier",
+            "query_operator",
+            "same_operator_example_count",
+            "answer",
+            "query_raw",
+            "safe_prediction",
+            "safe_support_rows",
+            "safe_subfamily_name",
+            "all_predictions",
+        ]
+    )
+    if not numeric_mask.any():
+        return analysis_df, support_df, candidate_df
+
+    match_records: list[dict[str, Any]] = []
+    row_match_map: dict[str, dict[str, Any]] = {}
+    for row in analysis_df.loc[numeric_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_percent_reverse_abs_diff_suffix_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        if int(match_info["same_operator_example_count"]) <= 0 or not match_info["winning_specs"]:
+            continue
+        row_match_map[str(row["id"])] = {
+            "selection_tier": str(row["selection_tier"]),
+            "answer": str(row["answer"]),
+            "query_raw": str(row["query_raw"]),
+            "query_operator": str(match_info["query_operator"]),
+            "same_operator_example_count": int(match_info["same_operator_example_count"]),
+            "all_predictions": [str(prediction) for prediction in match_info["all_predictions"]],
+            "winning_specs": [
+                (str(subfamily_name), str(format_name), str(predicted_answer))
+                for subfamily_name, format_name, predicted_answer in match_info["winning_specs"]
+            ],
+        }
+        for subfamily_name, format_name, predicted_answer in match_info["winning_specs"]:
+            match_records.append(
+                {
+                    "id": str(row["id"]),
+                    "query_operator": str(match_info["query_operator"]),
+                    "subfamily_name": str(subfamily_name),
+                    "format_name": str(format_name),
+                    "predicted_answer": str(predicted_answer),
+                    "matches_gold": bool(str(predicted_answer) == str(row["answer"])),
+                }
+            )
+    if not match_records:
+        return analysis_df, support_df, candidate_df
+
+    match_df = pd.DataFrame(match_records)
+    support_df = (
+        match_df.groupby(["query_operator", "subfamily_name"], dropna=False)
+        .agg(
+            support_rows=("id", "size"),
+            gold_match_rows=("matches_gold", "sum"),
+        )
+        .reset_index()
+    )
+    support_df["support_rows"] = support_df["support_rows"].astype(int)
+    support_df["gold_match_rows"] = support_df["gold_match_rows"].astype(int)
+    support_df["error_rows"] = support_df["support_rows"] - support_df["gold_match_rows"]
+    support_df["safe_subfamily"] = (support_df["support_rows"] >= 2) & (support_df["error_rows"] == 0)
+    safe_keys = {
+        (str(row["query_operator"]), str(row["subfamily_name"]))
+        for row in support_df.loc[support_df["safe_subfamily"]].to_dict(orient="records")
+    }
+    support_map = {
+        (str(row["query_operator"]), str(row["subfamily_name"])): int(row["support_rows"])
+        for row in support_df.to_dict(orient="records")
+    }
+
+    candidate_rows: list[dict[str, Any]] = []
+    promote_predictions: dict[str, str] = {}
+    for row_id, info in row_match_map.items():
+        safe_matches = [
+            (subfamily_name, predicted_answer)
+            for subfamily_name, _, predicted_answer in info["winning_specs"]
+            if (info["query_operator"], subfamily_name) in safe_keys
+        ]
+        if not safe_matches:
+            continue
+        safe_prediction_set = sorted({predicted_answer for _, predicted_answer in safe_matches})
+        safe_subfamily_names = sorted({subfamily_name for subfamily_name, _ in safe_matches})
+        safe_support_rows = max(
+            support_map[(info["query_operator"], subfamily_name)]
+            for subfamily_name in safe_subfamily_names
+        )
+        candidate_rows.append(
+            {
+                "id": row_id,
+                "selection_tier": info["selection_tier"],
+                "query_operator": info["query_operator"],
+                "same_operator_example_count": info["same_operator_example_count"],
+                "answer": info["answer"],
+                "query_raw": info["query_raw"],
+                "safe_prediction": safe_prediction_set[0] if len(safe_prediction_set) == 1 else "",
+                "safe_support_rows": int(safe_support_rows),
+                "safe_subfamily_name": "|".join(safe_subfamily_names),
+                "all_predictions": "|".join(info["all_predictions"]),
+            }
+        )
+        if (
+            info["selection_tier"] == "manual_audit_priority"
+            and len(safe_prediction_set) == 1
+            and safe_prediction_set[0] == info["answer"]
+        ):
+            promote_predictions[row_id] = safe_prediction_set[0]
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=list(candidate_df.columns))
+    if promote_predictions:
+        promote_mask = analysis_df["id"].astype(str).isin(set(promote_predictions))
+        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "id"].astype(str).map(promote_predictions)
+        analysis_df.loc[promote_mask, "auto_solver_match"] = True
+        analysis_df.loc[promote_mask, "answer_only_ready"] = True
+        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+        analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[promote_mask, "audit_reasons"] = ""
+        analysis_df.loc[promote_mask, "analysis_notes"] = "symbol_percent_reverse_abs_diff_suffix"
+        analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    support_df = support_df.sort_values(
+        ["safe_subfamily", "support_rows", "gold_match_rows", "query_operator", "subfamily_name"],
+        ascending=[False, False, False, True, True],
+    ).reset_index(drop=True)
+    if not candidate_df.empty:
+        candidate_df = candidate_df.sort_values(
+            ["selection_tier", "safe_support_rows", "same_operator_example_count", "id"],
+            ascending=[True, False, False, True],
+        ).reset_index(drop=True)
+    return analysis_df, support_df, candidate_df
+
+
+def apply_symbol_reverse_manual_exact_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "predicted_answer",
+        "reverse_spec_count",
+        "reverse_specs",
+        "decision_note",
+    ]
+    candidate_rows: list[dict[str, Any]] = []
+    promote_predictions: dict[str, str] = {}
+
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    for row in analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_reverse_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        candidate_predictions = sorted({str(value) for value in match_info["candidate_predictions"]})
+        if int(match_info["same_operator_example_count"]) <= 0 or len(candidate_predictions) != 1:
+            continue
+        predicted_answer = candidate_predictions[0]
+        if predicted_answer != str(row["answer"]):
+            continue
+        winning_specs = [(str(formula_name), str(format_name), str(predicted)) for formula_name, format_name, predicted in match_info["winning_specs"]]
+        exact_specs = [
+            f"{match_info['query_operator']}::{formula_name}::{format_name}"
+            for formula_name, format_name, predicted in winning_specs
+            if predicted == predicted_answer
+        ]
+        candidate_rows.append(
+            {
+                "id": str(row["id"]),
+                "selection_tier": str(row["selection_tier"]),
+                "query_operator": str(match_info["query_operator"]),
+                "same_operator_example_count": int(match_info["same_operator_example_count"]),
+                "query_raw": str(row["query_raw"]),
+                "answer": str(row["answer"]),
+                "predicted_answer": predicted_answer,
+                "reverse_spec_count": len(exact_specs),
+                "reverse_specs": "|".join(sorted(set(exact_specs))),
+                "decision_note": "prompt-local reverse-mode exact consensus; kept answer-only to avoid trace overclaim",
+            }
+        )
+        promote_predictions[str(row["id"])] = predicted_answer
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_predictions:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_predictions))
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = analysis_df.loc[promote_mask, "id"].astype(str).map(promote_predictions)
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = "symbol_reverse_manual_exact_answer_only"
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(["query_operator", "same_operator_example_count", "id"], ascending=[True, False, True]).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def canonicalize_symbol_numeric_digit_core(value: str) -> str:
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    if not digits:
+        return ""
+    return str(int(digits))
+
+
+def is_symbol_numeric_reverse_digit_reversal_pair(candidate_predictions: list[str], gold_answer: str) -> bool:
+    if len(candidate_predictions) != 2 or str(gold_answer) not in candidate_predictions:
+        return False
+    gold_digits = "".join(ch for ch in str(gold_answer) if ch.isdigit())
+    if not gold_digits:
+        return False
+    other_predictions = [value for value in candidate_predictions if value != str(gold_answer)]
+    if len(other_predictions) != 1:
+        return False
+    other_digits = "".join(ch for ch in other_predictions[0] if ch.isdigit())
+    return bool(other_digits) and other_digits == gold_digits[::-1] and other_digits != gold_digits
+
+
+def is_symbol_numeric_reverse_wrapper_only_same_core(candidate_predictions: list[str], gold_answer: str) -> bool:
+    if str(gold_answer) not in candidate_predictions:
+        return False
+    gold_text = str(gold_answer)
+    gold_digits = "".join(ch for ch in gold_text if ch.isdigit())
+    if not gold_digits:
+        return False
+    for candidate_prediction in candidate_predictions:
+        candidate_text = str(candidate_prediction)
+        digit_start = candidate_text.find(gold_digits)
+        if digit_start < 0:
+            return False
+        digit_end = digit_start + len(gold_digits)
+        prefix = candidate_text[:digit_start]
+        suffix = candidate_text[digit_end:]
+        if any(ch.isdigit() for ch in prefix + suffix):
+            return False
+        if not gold_text.startswith("-") and prefix.startswith("-"):
+            return False
+    return True
+
+
+def is_symbol_numeric_current_max_mod_orientation_pair(
+    candidate_predictions: list[str],
+    winning_specs: list[tuple[str, str, str]],
+    gold_answer: str,
+) -> bool:
+    if len(candidate_predictions) != 2 or str(gold_answer) not in candidate_predictions:
+        return False
+    formulas_by_prediction: dict[str, set[str]] = {}
+    for formula_name, _format_name, predicted_answer in winning_specs:
+        formulas_by_prediction.setdefault(str(predicted_answer), set()).add(str(formula_name))
+    gold_formulas = formulas_by_prediction.get(str(gold_answer), set())
+    if gold_formulas != {"max_mod_min"}:
+        return False
+    other_predictions = [value for value in candidate_predictions if value != str(gold_answer)]
+    if len(other_predictions) != 1:
+        return False
+    other_formulas = formulas_by_prediction.get(other_predictions[0], set())
+    return bool(other_formulas) and other_formulas.issubset({"x_mod_y", "y_mod_x"})
+
+
+def is_symbol_numeric_current_max_mod_diff_pair(
+    candidate_predictions: list[str],
+    winning_specs: list[tuple[str, str, str]],
+    gold_answer: str,
+) -> bool:
+    if len(candidate_predictions) != 2 or str(gold_answer) not in candidate_predictions:
+        return False
+    formulas_by_prediction: dict[str, set[str]] = {}
+    for formula_name, _format_name, predicted_answer in winning_specs:
+        formulas_by_prediction.setdefault(str(predicted_answer), set()).add(str(formula_name))
+    gold_formulas = formulas_by_prediction.get(str(gold_answer), set())
+    if gold_formulas != {"max_mod_min"}:
+        return False
+    other_predictions = [value for value in candidate_predictions if value != str(gold_answer)]
+    if len(other_predictions) != 1:
+        return False
+    other_formulas = formulas_by_prediction.get(other_predictions[0], set())
+    return bool(other_formulas) and other_formulas.issubset({"abs_diff", "x_minus_y", "y_minus_x"})
+
+
+def is_symbol_numeric_reverse_max_mod_orientation_pair(
+    candidate_predictions: list[str],
+    winning_specs: list[tuple[str, str, str]],
+    gold_answer: str,
+) -> bool:
+    if len(candidate_predictions) != 2 or str(gold_answer) not in candidate_predictions:
+        return False
+    formulas_by_prediction: dict[str, set[str]] = {}
+    for formula_name, _format_name, predicted_answer in winning_specs:
+        formulas_by_prediction.setdefault(str(predicted_answer), set()).add(str(formula_name))
+    gold_formulas = formulas_by_prediction.get(str(gold_answer), set())
+    if gold_formulas != {"max_mod_min__rev_in1_rev_out1"}:
+        return False
+    other_predictions = [value for value in candidate_predictions if value != str(gold_answer)]
+    if len(other_predictions) != 1:
+        return False
+    other_formulas = formulas_by_prediction.get(other_predictions[0], set())
+    return bool(other_formulas) and other_formulas.issubset({"x_mod_y__rev_in1_rev_out1", "y_mod_x__rev_in1_rev_out1"})
+
+
+def is_symbol_numeric_reverse_unique_negative_x_minus_y(
+    candidate_predictions: list[str],
+    winning_specs: list[tuple[str, str, str]],
+    gold_answer: str,
+) -> bool:
+    gold_text = str(gold_answer)
+    if not gold_text.startswith("-") or gold_text not in candidate_predictions:
+        return False
+    negative_predictions = [value for value in candidate_predictions if str(value).startswith("-")]
+    if negative_predictions != [gold_text]:
+        return False
+    formulas_by_prediction: dict[str, set[str]] = {}
+    for formula_name, _format_name, predicted_answer in winning_specs:
+        formulas_by_prediction.setdefault(str(predicted_answer), set()).add(str(formula_name))
+    return formulas_by_prediction.get(gold_text, set()) == {"x_minus_y__rev_in1_rev_out1"}
+
+
+def is_symbol_numeric_reverse_negative_diff_vs_max_mod_pair(
+    candidate_predictions: list[str],
+    winning_specs: list[tuple[str, str, str]],
+    gold_answer: str,
+) -> bool:
+    gold_text = str(gold_answer)
+    if not gold_text.startswith("-") or gold_text not in candidate_predictions or len(candidate_predictions) != 2:
+        return False
+    if not all(str(value).startswith("-") for value in candidate_predictions):
+        return False
+    formulas_by_prediction: dict[str, set[str]] = {}
+    for formula_name, _format_name, predicted_answer in winning_specs:
+        formulas_by_prediction.setdefault(str(predicted_answer), set()).add(str(formula_name))
+    gold_formulas = formulas_by_prediction.get(gold_text, set())
+    if not gold_formulas or not gold_formulas.issubset(
+        {"abs_diff__rev_in1_rev_out1", "x_minus_y__rev_in1_rev_out1", "y_minus_x__rev_in1_rev_out1"}
+    ):
+        return False
+    other_predictions = [value for value in candidate_predictions if value != gold_text]
+    if len(other_predictions) != 1:
+        return False
+    return formulas_by_prediction.get(other_predictions[0], set()) == {"max_mod_min__rev_in1_rev_out1"}
+
+
+def apply_symbol_reverse_small_set_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "decision_rule",
+        "decision_note",
+    ]
+    candidate_rows: list[dict[str, Any]] = []
+    promote_rows: dict[str, dict[str, str]] = {}
+
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    for row in analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_reverse_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        same_operator_example_count = int(match_info["same_operator_example_count"])
+        if same_operator_example_count <= 0:
+            continue
+        candidate_predictions = sorted({str(value) for value in match_info["candidate_predictions"]})
+        if len(candidate_predictions) < 2 or len(candidate_predictions) > 3:
+            continue
+        gold_answer = str(row["answer"])
+        if gold_answer not in candidate_predictions:
+            continue
+
+        candidate_digit_cores = {canonicalize_symbol_numeric_digit_core(value) for value in candidate_predictions}
+        same_digit_core = "" not in candidate_digit_cores and len(candidate_digit_cores) == 1
+        allow_same_digit_core = (
+            same_digit_core
+            and (
+                same_operator_example_count >= 2
+                or (same_operator_example_count == 1 and len(candidate_predictions) == 2)
+            )
+        )
+        reverse_pair = (
+            same_operator_example_count >= 2
+            and is_symbol_numeric_reverse_digit_reversal_pair(candidate_predictions, gold_answer)
+        )
+        wrapper_only_same_core = (
+            same_digit_core
+            and same_operator_example_count >= 1
+            and len(candidate_predictions) == 3
+            and is_symbol_numeric_reverse_wrapper_only_same_core(candidate_predictions, gold_answer)
+        )
+        if not allow_same_digit_core and not reverse_pair and not wrapper_only_same_core:
+            continue
+
+        if allow_same_digit_core:
+            decision_rule = "core_digit_small_set"
+            decision_note = (
+                "prompt-local reverse-mode small-set ambiguity stayed within one digit core "
+                "(sign/padding/operator decoration only); kept answer-only"
+            )
+            analysis_note = "symbol_reverse_small_core_digit_answer_only"
+        elif reverse_pair:
+            decision_rule = "digit_reversal_pair"
+            decision_note = (
+                "prompt-local reverse-mode ambiguity narrowed to gold vs digit-reversal under multi-example "
+                "same-operator evidence; kept answer-only"
+            )
+            analysis_note = "symbol_reverse_digit_reversal_answer_only"
+        else:
+            decision_rule = "wrapper_only_same_core"
+            decision_note = (
+                "prompt-local reverse-mode ambiguity kept one numeric core and varied only by operator wrappers "
+                "around that core; kept answer-only"
+            )
+            analysis_note = "symbol_reverse_wrapper_only_answer_only"
+        candidate_rows.append(
+            {
+                "id": str(row["id"]),
+                "selection_tier": str(row["selection_tier"]),
+                "query_operator": str(match_info["query_operator"]),
+                "same_operator_example_count": same_operator_example_count,
+                "query_raw": str(row["query_raw"]),
+                "answer": gold_answer,
+                "candidate_prediction_count": len(candidate_predictions),
+                "candidate_predictions": "|".join(candidate_predictions),
+                "decision_rule": decision_rule,
+                "decision_note": decision_note,
+            }
+        )
+        promote_rows[str(row["id"])] = {"predicted_answer": gold_answer, "analysis_note": analysis_note}
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_rows:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_rows))
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["predicted_answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["analysis_note"])
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["decision_rule", "same_operator_example_count", "candidate_prediction_count", "id"],
+        ascending=[True, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def apply_symbol_reverse_max_mod_small_set_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "decision_rule",
+        "decision_note",
+    ]
+    candidate_rows: list[dict[str, Any]] = []
+    promote_rows: dict[str, dict[str, str]] = {}
+
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    for row in analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_reverse_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        same_operator_example_count = int(match_info["same_operator_example_count"])
+        if same_operator_example_count < 2:
+            continue
+        candidate_predictions = sorted({str(value) for value in match_info["candidate_predictions"]})
+        if len(candidate_predictions) != 2:
+            continue
+        gold_answer = str(row["answer"])
+        if gold_answer not in candidate_predictions:
+            continue
+        winning_specs = [(str(formula_name), str(format_name), str(predicted)) for formula_name, format_name, predicted in match_info["winning_specs"]]
+        if not is_symbol_numeric_reverse_max_mod_orientation_pair(candidate_predictions, winning_specs, gold_answer):
+            continue
+
+        candidate_rows.append(
+            {
+                "id": str(row["id"]),
+                "selection_tier": str(row["selection_tier"]),
+                "query_operator": str(match_info["query_operator"]),
+                "same_operator_example_count": same_operator_example_count,
+                "query_raw": str(row["query_raw"]),
+                "answer": gold_answer,
+                "candidate_prediction_count": len(candidate_predictions),
+                "candidate_predictions": "|".join(candidate_predictions),
+                "decision_rule": "reverse_max_mod_min_vs_oriented_mod",
+                "decision_note": (
+                    "prompt-local reverse-mode ambiguity narrowed to reverse(max(x,y)%min(x,y)) vs reverse oriented mod "
+                    "under multi-example same-operator evidence; kept answer-only"
+                ),
+            }
+        )
+        promote_rows[str(row["id"])] = {
+            "predicted_answer": gold_answer,
+            "analysis_note": "symbol_reverse_max_mod_min_answer_only",
+        }
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_rows:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_rows))
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["predicted_answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["analysis_note"])
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["query_operator", "same_operator_example_count", "candidate_prediction_count", "id"],
+        ascending=[True, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def apply_symbol_reverse_negative_diff_vs_max_mod_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "decision_rule",
+        "decision_note",
+    ]
+    candidate_rows: list[dict[str, Any]] = []
+    promote_rows: dict[str, dict[str, str]] = {}
+
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    for row in analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_reverse_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        same_operator_example_count = int(match_info["same_operator_example_count"])
+        if same_operator_example_count < 2 or str(match_info["query_operator"]) != "-":
+            continue
+        candidate_predictions = sorted({str(value) for value in match_info["candidate_predictions"]})
+        gold_answer = str(row["answer"])
+        if gold_answer not in candidate_predictions:
+            continue
+        winning_specs = [(str(formula_name), str(format_name), str(predicted)) for formula_name, format_name, predicted in match_info["winning_specs"]]
+        if not is_symbol_numeric_reverse_negative_diff_vs_max_mod_pair(candidate_predictions, winning_specs, gold_answer):
+            continue
+
+        candidate_rows.append(
+            {
+                "id": str(row["id"]),
+                "selection_tier": str(row["selection_tier"]),
+                "query_operator": str(match_info["query_operator"]),
+                "same_operator_example_count": same_operator_example_count,
+                "query_raw": str(row["query_raw"]),
+                "answer": gold_answer,
+                "candidate_prediction_count": len(candidate_predictions),
+                "candidate_predictions": "|".join(candidate_predictions),
+                "decision_rule": "reverse_negative_diff_vs_max_mod",
+                "decision_note": (
+                    "prompt-local reverse-mode minus ambiguity narrowed to negative diff-family vs negative max_mod_min "
+                    "under multi-example same-operator evidence; kept answer-only"
+                ),
+            }
+        )
+        promote_rows[str(row["id"])] = {
+            "predicted_answer": gold_answer,
+            "analysis_note": "symbol_reverse_negative_diff_vs_max_mod_answer_only",
+        }
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_rows:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_rows))
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["predicted_answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["analysis_note"])
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["query_operator", "same_operator_example_count", "candidate_prediction_count", "id"],
+        ascending=[True, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def apply_symbol_reverse_negative_x_minus_y_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "decision_rule",
+        "decision_note",
+    ]
+    candidate_rows: list[dict[str, Any]] = []
+    promote_rows: dict[str, dict[str, str]] = {}
+
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    for row in analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_reverse_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        same_operator_example_count = int(match_info["same_operator_example_count"])
+        if same_operator_example_count != 1 or str(match_info["query_operator"]) != "-":
+            continue
+        candidate_predictions = sorted({str(value) for value in match_info["candidate_predictions"]})
+        gold_answer = str(row["answer"])
+        if gold_answer not in candidate_predictions:
+            continue
+        winning_specs = [(str(formula_name), str(format_name), str(predicted)) for formula_name, format_name, predicted in match_info["winning_specs"]]
+        if not is_symbol_numeric_reverse_unique_negative_x_minus_y(candidate_predictions, winning_specs, gold_answer):
+            continue
+
+        candidate_rows.append(
+            {
+                "id": str(row["id"]),
+                "selection_tier": str(row["selection_tier"]),
+                "query_operator": str(match_info["query_operator"]),
+                "same_operator_example_count": same_operator_example_count,
+                "query_raw": str(row["query_raw"]),
+                "answer": gold_answer,
+                "candidate_prediction_count": len(candidate_predictions),
+                "candidate_predictions": "|".join(candidate_predictions),
+                "decision_rule": "reverse_unique_negative_x_minus_y",
+                "decision_note": (
+                    "prompt-local reverse-mode minus ambiguity left one signed candidate only, and that signed candidate "
+                    "was uniquely reverse x_minus_y; kept answer-only"
+                ),
+            }
+        )
+        promote_rows[str(row["id"])] = {
+            "predicted_answer": gold_answer,
+            "analysis_note": "symbol_reverse_negative_x_minus_y_answer_only",
+        }
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_rows:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_rows))
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["predicted_answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["analysis_note"])
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["query_operator", "same_operator_example_count", "candidate_prediction_count", "id"],
+        ascending=[True, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def apply_symbol_current_max_mod_small_set_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "candidate_prediction_count",
+        "candidate_predictions",
+        "decision_rule",
+        "decision_note",
+    ]
+    candidate_rows: list[dict[str, Any]] = []
+    promote_rows: dict[str, dict[str, str]] = {}
+
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    for row in analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records"):
+        match_info = collect_symbol_numeric_operator_formula_matches(
+            str(row["prompt"]),
+            str(row["query_raw"]),
+            str(row["answer"]),
+        )
+        same_operator_example_count = int(match_info["same_operator_example_count"])
+        if same_operator_example_count <= 0:
+            continue
+        candidate_predictions = sorted({str(value) for value in match_info["candidate_predictions"]})
+        if len(candidate_predictions) != 2:
+            continue
+        gold_answer = str(row["answer"])
+        if gold_answer not in candidate_predictions:
+            continue
+        winning_specs = [(str(formula_name), str(format_name), str(predicted)) for formula_name, format_name, predicted in match_info["winning_specs"]]
+        orientation_pair = (
+            same_operator_example_count == 1
+            and is_symbol_numeric_current_max_mod_orientation_pair(candidate_predictions, winning_specs, gold_answer)
+        )
+        diff_family_pair = (
+            same_operator_example_count >= 2
+            and is_symbol_numeric_current_max_mod_diff_pair(candidate_predictions, winning_specs, gold_answer)
+        )
+        if not orientation_pair and not diff_family_pair:
+            continue
+
+        if orientation_pair:
+            decision_rule = "max_mod_min_vs_oriented_mod"
+            decision_note = (
+                "prompt-local current-mode ambiguity narrowed to max(x,y)%min(x,y) vs operand-oriented mod "
+                "under one same-operator example; kept answer-only"
+            )
+            analysis_note = "symbol_current_max_mod_min_answer_only"
+        else:
+            decision_rule = "max_mod_min_vs_diff_family"
+            decision_note = (
+                "prompt-local current-mode ambiguity narrowed to max(x,y)%min(x,y) vs unsigned difference family "
+                "under multi-example same-operator evidence; kept answer-only"
+            )
+            analysis_note = "symbol_current_max_mod_min_diff_answer_only"
+        candidate_rows.append(
+            {
+                "id": str(row["id"]),
+                "selection_tier": str(row["selection_tier"]),
+                "query_operator": str(match_info["query_operator"]),
+                "same_operator_example_count": same_operator_example_count,
+                "query_raw": str(row["query_raw"]),
+                "answer": gold_answer,
+                "candidate_prediction_count": len(candidate_predictions),
+                "candidate_predictions": "|".join(candidate_predictions),
+                "decision_rule": decision_rule,
+                "decision_note": decision_note,
+            }
+        )
+        promote_rows[str(row["id"])] = {
+            "predicted_answer": gold_answer,
+            "analysis_note": analysis_note,
+        }
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_rows:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_rows))
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["predicted_answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+    analysis_df.loc[promote_mask, "answer_only_ready"] = True
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["analysis_note"])
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["query_operator", "same_operator_example_count", "candidate_prediction_count", "id"],
+        ascending=[True, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+@lru_cache(maxsize=1)
+def get_symbol_glyph_grouped_specs() -> tuple[tuple[str, Any], ...]:
+    specs: list[tuple[str, Any]] = []
+    for formula_name in SYMBOL_GLYPH_GROUPED_FORMULA_NAMES:
+        formula = SYMBOL_NUMERIC_FORMULAS[formula_name]
+        for format_name, formatter in iter_symbol_numeric_formatters(formula_name):
+            if format_name == "zpad2":
+                continue
+            for reverse_inputs in (False, True):
+                for reverse_output in (False, True):
+                    spec_name = f"{formula_name}::{format_name}|rin={int(reverse_inputs)}|rout={int(reverse_output)}"
+
+                    def render_formula(
+                        operator: str,
+                        x_text: str,
+                        y_text: str,
+                        formula: Any = formula,
+                        formatter: Any = formatter,
+                        reverse_inputs: bool = reverse_inputs,
+                        reverse_output: bool = reverse_output,
+                    ) -> str | None:
+                        x_value = int(reverse_symbol_numeric_text(x_text) if reverse_inputs else str(x_text))
+                        y_value = int(reverse_symbol_numeric_text(y_text) if reverse_inputs else str(y_text))
+                        numeric_value = formula(x_value, y_value)
+                        if numeric_value is None:
+                            return None
+                        rendered = formatter(operator, numeric_value)
+                        if reverse_output:
+                            return reverse_symbol_numeric_rendered_output(rendered, operator)
+                        return rendered
+
+                    specs.append((spec_name, render_formula))
+    for template_name in SYMBOL_GLYPH_GROUPED_TEMPLATE_NAMES:
+        template = SYMBOL_NUMERIC_STRING_TEMPLATES[template_name]
+        for reverse_inputs in (False, True):
+            for reverse_output in (False, True):
+                spec_name = f"{template_name}|rin={int(reverse_inputs)}|rout={int(reverse_output)}"
+
+                def render_template(
+                    operator: str,
+                    x_text: str,
+                    y_text: str,
+                    template: tuple[str, ...] = template,
+                    reverse_inputs: bool = reverse_inputs,
+                    reverse_output: bool = reverse_output,
+                ) -> str:
+                    rendered = render_symbol_numeric_string_template(
+                        template,
+                        reverse_symbol_numeric_text(x_text) if reverse_inputs else str(x_text),
+                        operator,
+                        reverse_symbol_numeric_text(y_text) if reverse_inputs else str(y_text),
+                    )
+                    if reverse_output:
+                        return reverse_symbol_numeric_rendered_output(rendered, operator)
+                    return rendered
+
+                specs.append((spec_name, render_template))
+    return tuple(specs)
+
+
+def parse_symbol_glyph_prompt(prompt: str) -> tuple[list[tuple[str, str]], str]:
+    examples: list[tuple[str, str]] = []
+    query_text = ""
+    for raw_line in str(prompt).splitlines():
+        line = raw_line.strip()
+        if "=" in line and "Now, determine the result for:" not in line:
+            left_text, output_text = [part.strip() for part in line.split("=", 1)]
+            if len(left_text) == 5:
+                examples.append((left_text, output_text))
+        elif line.startswith("Now, determine the result for:"):
+            query_text = line[len("Now, determine the result for:") :].strip()
+    return examples, query_text
+
+
+def collect_symbol_glyph_grouped_consensus(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+    examples, prompt_query_text = parse_symbol_glyph_prompt(prompt)
+    query_text = str(query_text).strip() or prompt_query_text
+    if len(query_text) != 5 or not examples:
+        return {
+            "status": "invalid_query",
+            "query_operator": "",
+            "same_operator_example_count": 0,
+            "query_unseen_digits": [],
+            "group_combo_count": 0,
+            "feasible_group_combo_count": 0,
+            "candidate_predictions": [],
+        }
+    query_operator = query_text[2]
+    same_operator_example_count = sum(1 for left_text, _ in examples if left_text[2] == query_operator)
+    if same_operator_example_count <= 0:
+        return {
+            "status": "query_operator_unseen",
+            "query_operator": query_operator,
+            "same_operator_example_count": 0,
+            "query_unseen_digits": [],
+            "group_combo_count": 0,
+            "feasible_group_combo_count": 0,
+            "candidate_predictions": [],
+        }
+
+    operator_symbols = sorted({left_text[2] for left_text, _ in examples} | {query_operator})
+    known_digit_symbols = {
+        symbol
+        for left_text, _ in examples
+        for symbol in (left_text[0], left_text[1], left_text[3], left_text[4])
+    }
+    known_digit_symbols.update(
+        symbol
+        for _, output_text in examples
+        for symbol in str(output_text)
+        if symbol not in operator_symbols
+    )
+    query_unseen_digits = sorted({symbol for symbol in (query_text[0], query_text[1], query_text[3], query_text[4]) if symbol not in known_digit_symbols})
+    spec_list = get_symbol_glyph_grouped_specs()
+    spec_map = dict(spec_list)
+
+    @lru_cache(maxsize=None)
+    def example_partials(left_text: str, output_text: str, spec_name: str) -> tuple[tuple[tuple[str, str], ...], ...]:
+        render = spec_map[spec_name]
+        lhs_symbols: list[str] = []
+        for symbol in (left_text[0], left_text[1], left_text[3], left_text[4]):
+            if symbol not in lhs_symbols:
+                lhs_symbols.append(symbol)
+        partial_assignments: list[tuple[tuple[str, str], ...]] = []
+        for digit_permutation in permutations("0123456789", len(lhs_symbols)):
+            assignment = dict(zip(lhs_symbols, digit_permutation))
+            predicted_output = render(
+                left_text[2],
+                assignment[left_text[0]] + assignment[left_text[1]],
+                assignment[left_text[3]] + assignment[left_text[4]],
+            )
+            if predicted_output is None or len(str(predicted_output)) != len(output_text):
+                continue
+            local_assignment = assignment.copy()
+            used_digits = set(assignment.values())
+            valid = True
+            for predicted_char, output_char in zip(str(predicted_output), str(output_text)):
+                if predicted_char.isdigit():
+                    if output_char in operator_symbols:
+                        valid = False
+                        break
+                    if output_char in local_assignment:
+                        if local_assignment[output_char] != predicted_char:
+                            valid = False
+                            break
+                    else:
+                        if predicted_char in used_digits:
+                            valid = False
+                            break
+                        local_assignment[output_char] = predicted_char
+                        used_digits.add(predicted_char)
+                elif output_char != predicted_char:
+                    valid = False
+                    break
+            if valid:
+                partial_assignments.append(tuple(sorted(local_assignment.items())))
+        return tuple(sorted(set(partial_assignments)))
+
+    groups_by_operator: dict[str, list[tuple[tuple[tuple[tuple[str, str], ...], ...], list[str]]]] = {}
+    for operator in operator_symbols:
+        operator_examples = [(left_text, output_text) for left_text, output_text in examples if left_text[2] == operator]
+        groups: dict[tuple[tuple[tuple[tuple[str, str], ...], ...], ...], list[str]] = {}
+        for spec_name, _ in spec_list:
+            signature: list[tuple[tuple[tuple[str, str], ...], ...]] = []
+            for left_text, output_text in operator_examples:
+                partials = example_partials(left_text, output_text, spec_name)
+                if not partials:
+                    break
+                signature.append(partials)
+            else:
+                groups.setdefault(tuple(signature), []).append(spec_name)
+        if not groups:
+            return {
+                "status": "no_spec",
+                "query_operator": query_operator,
+                "same_operator_example_count": same_operator_example_count,
+                "query_unseen_digits": [],
+                "group_combo_count": 0,
+                "feasible_group_combo_count": 0,
+                "candidate_predictions": [],
+            }
+        groups_by_operator[operator] = [(signature, spec_names) for signature, spec_names in groups.items()]
+
+    group_combo_count = 1
+    for operator in operator_symbols:
+        group_combo_count *= len(groups_by_operator[operator])
+    if group_combo_count > SYMBOL_GLYPH_GROUPED_MAX_COMBOS:
+        return {
+            "status": "too_many_group_combos",
+            "query_operator": query_operator,
+            "same_operator_example_count": same_operator_example_count,
+            "query_unseen_digits": [],
+            "group_combo_count": group_combo_count,
+            "feasible_group_combo_count": 0,
+            "candidate_predictions": [],
+        }
+
+    def merge_assignment_maps(base_map: dict[str, str], partial_items: tuple[tuple[str, str], ...]) -> dict[str, str] | None:
+        merged = dict(base_map)
+        used_digits = set(base_map.values())
+        for symbol, digit in partial_items:
+            if symbol in merged:
+                if merged[symbol] != digit:
+                    return None
+            else:
+                if digit in used_digits:
+                    return None
+                merged[symbol] = digit
+                used_digits.add(digit)
+        return merged
+
+    candidate_predictions: set[str] = set()
+    feasible_group_combo_count = 0
+    group_lists = [[(operator, signature, spec_names) for signature, spec_names in groups_by_operator[operator]] for operator in operator_symbols]
+    for group_combo in product(*group_lists):
+        chosen_groups = {operator: (signature, spec_names) for operator, signature, spec_names in group_combo}
+        operator_offsets = {operator: 0 for operator in operator_symbols}
+        example_domains: list[tuple[int, tuple[tuple[str, str], ...]]] = []
+        for left_text, _ in examples:
+            signature, _ = chosen_groups[left_text[2]]
+            partial_domain = signature[operator_offsets[left_text[2]]]
+            example_domains.append((len(partial_domain), partial_domain))
+            operator_offsets[left_text[2]] += 1
+        example_domains.sort(key=lambda item: item[0])
+
+        partial_maps: list[dict[str, str]] = [{}]
+        for _, partial_domain in example_domains:
+            next_partial_maps: list[dict[str, str]] = []
+            for base_map in partial_maps:
+                for partial_items in partial_domain:
+                    merged_map = merge_assignment_maps(base_map, partial_items)
+                    if merged_map is not None:
+                        next_partial_maps.append(merged_map)
+            if not next_partial_maps:
+                partial_maps = []
+                break
+            deduped_maps = {tuple(sorted(mapping.items())): mapping for mapping in next_partial_maps}
+            partial_maps = list(deduped_maps.values())
+            if len(partial_maps) > SYMBOL_GLYPH_GROUPED_MAX_PARTIAL_MAPS:
+                partial_maps = partial_maps[:SYMBOL_GLYPH_GROUPED_MAX_PARTIAL_MAPS]
+        if not partial_maps:
+            continue
+
+        feasible_group_combo_count += 1
+        _, query_spec_names = chosen_groups[query_operator]
+        for assignment_map in partial_maps:
+            query_assignment_maps: list[dict[str, str]] = [assignment_map]
+            if query_unseen_digits:
+                remaining_digits = sorted(set("0123456789") - set(assignment_map.values()))
+                if len(remaining_digits) != len(query_unseen_digits):
+                    continue
+                query_assignment_maps = []
+                for digit_permutation in permutations(remaining_digits, len(query_unseen_digits)):
+                    extended_map = dict(assignment_map)
+                    for symbol, digit in zip(query_unseen_digits, digit_permutation):
+                        extended_map[symbol] = digit
+                    query_assignment_maps.append(extended_map)
+
+            for query_assignment_map in query_assignment_maps:
+                inverse_map = {digit: symbol for symbol, digit in query_assignment_map.items()}
+                for spec_name in query_spec_names:
+                    render = spec_map[spec_name]
+                    predicted_output = render(
+                        query_operator,
+                        query_assignment_map[query_text[0]] + query_assignment_map[query_text[1]],
+                        query_assignment_map[query_text[3]] + query_assignment_map[query_text[4]],
+                    )
+                    if predicted_output is None:
+                        continue
+                    encoded_prediction: list[str] = []
+                    valid = True
+                    for predicted_char in str(predicted_output):
+                        if predicted_char.isdigit():
+                            if predicted_char not in inverse_map:
+                                valid = False
+                                break
+                            encoded_prediction.append(inverse_map[predicted_char])
+                        else:
+                            encoded_prediction.append(predicted_char)
+                    if valid:
+                        candidate_predictions.add("".join(encoded_prediction))
+                        if len(candidate_predictions) > SYMBOL_GLYPH_GROUPED_MAX_PREDICTIONS:
+                            break
+                if len(candidate_predictions) > SYMBOL_GLYPH_GROUPED_MAX_PREDICTIONS:
+                    break
+            if len(candidate_predictions) > SYMBOL_GLYPH_GROUPED_MAX_PREDICTIONS:
+                break
+        if len(candidate_predictions) > SYMBOL_GLYPH_GROUPED_MAX_PREDICTIONS:
+            break
+
+    return {
+        "status": "ok",
+        "query_operator": query_operator,
+        "same_operator_example_count": same_operator_example_count,
+        "query_unseen_digits": [],
+        "group_combo_count": group_combo_count,
+        "feasible_group_combo_count": feasible_group_combo_count,
+        "candidate_predictions": sorted(candidate_predictions),
+    }
+
+
+def analyze_symbol_glyph_grouped_candidate(row: dict[str, str]) -> dict[str, Any]:
+    match_info = collect_symbol_glyph_grouped_consensus(
+        str(row["prompt"]),
+        str(row["query_raw"]),
+        str(row["answer"]),
+    )
+    candidate_predictions = [str(value) for value in match_info["candidate_predictions"]]
+    gold_answer = str(row["answer"])
+    return {
+        "id": str(row["id"]),
+        "selection_tier": str(row["selection_tier"]),
+        "status": str(match_info["status"]),
+        "query_operator": str(match_info["query_operator"]),
+        "same_operator_example_count": int(match_info["same_operator_example_count"]),
+        "query_raw": str(row["query_raw"]),
+        "answer": gold_answer,
+        "predicted_answer": candidate_predictions[0] if len(candidate_predictions) == 1 else "",
+        "prediction_count": len(candidate_predictions),
+        "candidate_predictions": "|".join(candidate_predictions),
+        "gold_in_candidates": bool(gold_answer in candidate_predictions),
+        "query_unseen_digits": "".join(str(symbol) for symbol in match_info["query_unseen_digits"]),
+        "group_combo_count": int(match_info["group_combo_count"]),
+        "feasible_group_combo_count": int(match_info["feasible_group_combo_count"]),
+    }
+
+
+def apply_symbol_glyph_grouped_exact_answer_only_curation(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "status",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "predicted_answer",
+        "prediction_count",
+        "candidate_predictions",
+        "gold_in_candidates",
+        "query_unseen_digits",
+        "group_combo_count",
+        "feasible_group_combo_count",
+    ]
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "glyph_len5")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    records = analysis_df.loc[candidate_mask, ["id", "prompt", "query_raw", "answer", "selection_tier"]].to_dict(orient="records")
+    results: list[dict[str, Any]] = []
+    max_workers = min(SYMBOL_GLYPH_GROUPED_MAX_WORKERS, os.cpu_count() or 1)
+    if len(records) >= 32 and max_workers > 1:
+        with ProcessPoolExecutor(max_workers=max_workers, mp_context=get_context("fork")) as executor:
+            futures = [executor.submit(analyze_symbol_glyph_grouped_candidate, row) for row in records]
+            for future in as_completed(futures):
+                results.append(future.result())
+    else:
+        results = [analyze_symbol_glyph_grouped_candidate(row) for row in records]
+
+    candidate_df = pd.DataFrame(results, columns=candidate_columns)
+    if candidate_df.empty:
+        return analysis_df, candidate_df
+
+    exact_promote_ids = set(
+        candidate_df.loc[
+            (candidate_df["status"] == "ok")
+            & (candidate_df["prediction_count"] == 1)
+            & (candidate_df["predicted_answer"] == candidate_df["answer"]),
+            "id",
+        ].astype(str)
+    )
+    small_set_promote_ids = set(
+        candidate_df.loc[
+            (candidate_df["status"] == "ok")
+            & (candidate_df["same_operator_example_count"] >= 2)
+            & (candidate_df["prediction_count"] >= 2)
+            & (candidate_df["prediction_count"] <= 3)
+            & (candidate_df["gold_in_candidates"]),
+            "id",
+        ].astype(str)
+    )
+    single_example_small_set_promote_ids = set(
+        candidate_df.loc[
+            (candidate_df["status"] == "ok")
+            & (candidate_df["same_operator_example_count"] == 1)
+            & (candidate_df["prediction_count"] == 2)
+            & (candidate_df["gold_in_candidates"]),
+            "id",
+        ].astype(str)
+    )
+    if not exact_promote_ids and not small_set_promote_ids and not single_example_small_set_promote_ids:
+        candidate_df = candidate_df.sort_values(
+            ["status", "prediction_count", "gold_in_candidates", "same_operator_example_count", "group_combo_count", "id"],
+            ascending=[True, True, False, False, True, True],
+        ).reset_index(drop=True)
+        return analysis_df, candidate_df
+
+    def curate_answer_only_rows(row_ids: set[str], prediction_map: dict[str, str], note: str) -> None:
+        if not row_ids:
+            return
+        promote_mask = analysis_df["id"].astype(str).isin(row_ids)
+        analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+            analysis_df.loc[promote_mask, "id"].astype(str).map(prediction_map)
+        )
+        analysis_df.loc[promote_mask, "auto_solver_match"] = True
+        analysis_df.loc[promote_mask, "verified_trace_ready"] = False
+        analysis_df.loc[promote_mask, "answer_only_ready"] = True
+        analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+        analysis_df.loc[promote_mask, "selection_tier"] = "answer_only_keep"
+        analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+        analysis_df.loc[promote_mask, "audit_reasons"] = ""
+        analysis_df.loc[promote_mask, "analysis_notes"] = note
+        analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    exact_prediction_map = {
+        str(row["id"]): str(row["predicted_answer"])
+        for row in candidate_df.loc[candidate_df["id"].astype(str).isin(exact_promote_ids)].to_dict(orient="records")
+    }
+    small_set_prediction_map = {
+        str(row["id"]): str(row["answer"])
+        for row in candidate_df.loc[candidate_df["id"].astype(str).isin(small_set_promote_ids)].to_dict(orient="records")
+    }
+    single_example_small_set_prediction_map = {
+        str(row["id"]): str(row["answer"])
+        for row in candidate_df.loc[candidate_df["id"].astype(str).isin(single_example_small_set_promote_ids)].to_dict(orient="records")
+    }
+    curate_answer_only_rows(
+        exact_promote_ids,
+        exact_prediction_map,
+        "symbol_glyph_grouped_exact_answer_only",
+    )
+    curate_answer_only_rows(
+        small_set_promote_ids,
+        small_set_prediction_map,
+        "symbol_glyph_grouped_small_set_answer_only",
+    )
+    curate_answer_only_rows(
+        single_example_small_set_promote_ids,
+        single_example_small_set_prediction_map,
+        "symbol_glyph_grouped_single_example_small_set_answer_only",
+    )
+
+    candidate_df = candidate_df.sort_values(
+        ["status", "prediction_count", "gold_in_candidates", "same_operator_example_count", "group_combo_count", "id"],
+        ascending=[True, True, False, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def apply_symbol_numeric_no_same_op_training_label_curation(
+    analysis_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_operator",
+        "same_operator_example_count",
+        "query_raw",
+        "answer",
+        "decision_note",
+    ]
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "numeric_2x2")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["parse_ok"])
+        & (~analysis_df["suspect_label"])
+        & (analysis_df["symbol_same_operator_example_count"] == 0)
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    candidate_df = analysis_df.loc[
+        candidate_mask,
+        [
+            "id",
+            "selection_tier",
+            "symbol_query_operator",
+            "symbol_same_operator_example_count",
+            "query_raw",
+            "answer",
+        ],
+    ].copy()
+    candidate_df = candidate_df.rename(
+        columns={
+            "symbol_query_operator": "query_operator",
+            "symbol_same_operator_example_count": "same_operator_example_count",
+        }
+    )
+    candidate_df["decision_note"] = (
+        "README final-answer metric + no same-operator evidence means these rows stay non-trace-safe, "
+        "but with parse_ok and no suspect signal they are retained as raw answer-only supervision"
+    )
+
+    analysis_df.loc[candidate_mask, "verified_trace_ready"] = False
+    analysis_df.loc[candidate_mask, "answer_only_ready"] = True
+    analysis_df.loc[candidate_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[candidate_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[candidate_mask, "audit_reasons"] = ""
+    analysis_df.loc[candidate_mask, "analysis_notes"] = "symbol_numeric_no_same_op_training_answer_only"
+    analysis_df.loc[candidate_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["query_operator", "same_operator_example_count", "id"],
+        ascending=[True, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
+
+
+def apply_symbol_glyph_training_label_curation(
+    analysis_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "selection_tier",
+        "query_raw",
+        "answer",
+        "decision_note",
+    ]
+    candidate_mask = (
+        (analysis_df["family"] == "symbol_equation")
+        & (analysis_df["template_subtype"] == "glyph_len5")
+        & (analysis_df["selection_tier"] == "manual_audit_priority")
+        & (analysis_df["parse_ok"])
+        & (~analysis_df["suspect_label"])
+    )
+    if not candidate_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    candidate_df = analysis_df.loc[
+        candidate_mask,
+        ["id", "selection_tier", "query_raw", "answer"],
+    ].copy()
+    candidate_df["decision_note"] = (
+        "README final-answer metric + exhaustive glyph solver scans found ambiguity but no concrete suspect signal; "
+        "kept as answer-only training labels while remaining non-trace-safe"
+    )
+
+    analysis_df.loc[candidate_mask, "verified_trace_ready"] = False
+    analysis_df.loc[candidate_mask, "answer_only_ready"] = True
+    analysis_df.loc[candidate_mask, "selection_tier"] = "answer_only_keep"
+    analysis_df.loc[candidate_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[candidate_mask, "audit_reasons"] = ""
+    analysis_df.loc[candidate_mask, "analysis_notes"] = "symbol_glyph_training_answer_only"
+    analysis_df.loc[candidate_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(["id"], ascending=[True]).reset_index(drop=True)
     return analysis_df, candidate_df
 
 
@@ -5024,6 +6832,18 @@ def build_reports(
         .sort_values(["hard_score", "id"], ascending=[False, True])
         .reset_index(drop=True)
     )
+    glyph_training_answer_only_count = int((analysis_df["analysis_notes"] == "symbol_glyph_training_answer_only").sum())
+    numeric_no_same_op_training_answer_only_count = int(
+        (analysis_df["analysis_notes"] == "symbol_numeric_no_same_op_training_answer_only").sum()
+    )
+    glyph_training_answer_only_df = (
+        analysis_df.loc[
+            analysis_df["analysis_notes"] == "symbol_glyph_training_answer_only",
+            ["id", "hard_score", "answer", "query_raw"],
+        ]
+        .sort_values(["hard_score", "id"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
     symbol_query_only_rejection_summary_df = grouped_counts(
         symbol_query_only_rejection_df,
         ["query_only_matching_families", "rejection_reason"],
@@ -5101,7 +6921,7 @@ def build_reports(
     glyph_exact_nontrivial_df = glyph_exact_df.loc[
         glyph_exact_df["exact_coarse_status"] != "query_has_unseen_chars"
     ].copy() if len(glyph_exact_df) else pd.DataFrame(
-        columns=["id", "exact_coarse_status", "answer", "predicted_answer", "query_raw", "glyph_query_unseen_chars"]
+        columns=["id", "exact_coarse_status", "answer", "predicted_answer", "query_raw", "glyph_query_unseen_chars", "predicted_multiset_json"]
     )
     glyph_exact_unseen_df = glyph_exact_df.loc[
         glyph_exact_df["exact_coarse_status"] == "query_has_unseen_chars"
@@ -5232,7 +7052,7 @@ def build_reports(
             limit=25,
         ),
         "",
-        "Observation: `numeric_2x2` is not one template; it splits by operator, and some operators are already recoverable with row-local formula search while `glyph_len5` remains structurally unsolved.",
+        "Observation: `numeric_2x2` is not one template; it splits by operator, and some operators are already recoverable with row-local formula search. For `glyph_len5`, the latent mapping often remains structurally unresolved, so the remaining non-suspect rows are kept only as answer-only training labels rather than trace-ready teachers.",
     ]
     (reports_dir / "08_symbol_operator_notes.md").write_text("\n".join(symbol_lines) + "\n", encoding="utf-8")
 
@@ -5303,8 +7123,9 @@ def build_reports(
         "- `bit_manipulation`: for training safety, structured binary promotions are re-audited under leave-one-out support. Rows whose evidence depends on the row itself or on prompt-exact singleton curation are retained only as `answer_only_keep`, not as trace-ready teachers.",
         "- `bit_manipulation`: ternary-varset hybrid consensus was rechecked under the same unique-output gate and stays zero-gain on current train; inverted ternary hybrid candidates remain disabled because they destabilized existing answer-only consensus rows during validation.",
         "- `symbol_equation/numeric_2x2`: manual curation pass1 now covers exact prompt-backed rules (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`), further shrinking the unresolved symbol-numeric queue.",
+        f"- `symbol_equation/numeric_2x2`: remaining non-suspect rows with `same_operator_example_count = 0` now move to `answer_only_keep` as raw final-answer supervision (`{numeric_no_same_op_training_answer_only_count}` rows), because README evaluation is final-answer accuracy and there is no same-op evidence to justify trace promotion anyway.",
         f"- `symbol_equation/numeric_2x2`: `{len(symbol_query_only_rejection_df)}` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities).",
-        f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset), so glyph rows stay manual.",
+        f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield no unique latent rule for the residual glyph slice. With no concrete suspect signal, the remaining glyph rows now stay only as answer-only training labels (`{glyph_training_answer_only_count}` rows), not as trace-ready teachers.",
         "",
     ]
     (reports_dir / "11_latest_snapshot.md").write_text("\n".join(latest_lines) + "\n", encoding="utf-8")
@@ -5367,15 +7188,15 @@ def build_reports(
             limit=20,
         ),
         "",
-        "## Glyph rows still kept manual",
+        "## Glyph rows promoted as answer-only training labels",
         "",
         markdown_table(
-            glyph_query_consistent_df,
-            ["id", "hard_score", "answer", "query_raw", "audit_reasons"],
+            glyph_training_answer_only_df,
+            ["id", "hard_score", "answer", "query_raw"],
             limit=20,
         ),
         "",
-        "Decision summary: current pass1 safely keeps only exact `numeric_2x2` prompt-backed rows (`concat_xy`, `concat_yx`, `abs_diff_2d`, `abs_diff_2d_op_suffix`, `comp99_abs_diff_2d`) on the promotion list. Binary low-gap rows with unique affine rules that still contradict the gold answer now move to `exclude_suspect`; broader affine mismatches and glyph coarse-consistent rows stay manual.",
+        "Decision summary: current pass1 safely keeps exact `numeric_2x2` prompt-backed rows on the promotion list, moves remaining non-suspect `glyph_len5` rows and non-suspect `numeric_2x2` same-op-zero rows to `answer_only_keep` as raw final-answer supervision, and still sends only clear rule-vs-gold contradictions to `exclude_suspect`.",
         "",
     ]
     (reports_dir / "13_manual_curation_pass1.md").write_text("\n".join(manual_curation_lines) + "\n", encoding="utf-8")
@@ -5406,39 +7227,39 @@ def build_reports(
 
     glyph_pass1_df = manual_pass1_df.loc[manual_pass1_df["audit_focus"] == "symbol_glyph_multiset"].copy() if len(manual_pass1_df) else pd.DataFrame()
     glyph_hold_lines = [
-        f"# {SCRIPT_VERSION} glyph manual hold",
+        f"# {SCRIPT_VERSION} glyph answer-only hold",
         "",
         "## Decision",
         "",
         f"- pass1 glyph rows reviewed: `{len(glyph_pass1_df)}`",
-        f"- rows promoted: `0`",
+        f"- rows promoted: `{glyph_training_answer_only_count}`",
         f"- rows newly excluded: `0`",
-        "- decision: keep all glyph pass1 rows in `manual_audit_priority`.",
+        "- decision: move remaining non-suspect glyph rows to `answer_only_keep`, while keeping them out of `verified_trace_ready`.",
         "",
-        "## Why they stay manual",
+        "## Why they stay non-trace-safe",
         "",
-        "- every pass1 glyph row still carries `symbol_length_mismatch|symbol_solver_unverified`.",
-        "- the strongest 5 rows in `glyph_query_consistent_v1.csv` only show that query+gold is compatible with the coarse multiset+order model; they do **not** make the model unique.",
-        f"- exact examples-only enumeration under the same coarse model yields `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset).",
-        "- per `README.md`, leaderboard score is direct final-answer accuracy, so teaching non-unique glyph hypotheses is riskier than leaving these rows manual.",
+        "- exhaustive grouped / exact-coarse glyph scans still do not produce unique latent rules for the remaining rows.",
+        "- however, these rows are `parse_ok`, carry no `suspect_label`, and no glyph row shows a concrete rule-vs-gold contradiction strong enough for `exclude_suspect`.",
+        f"- exact examples-only enumeration under the same coarse model still yields `0` unique query strings (`{glyph_exact_unseen_count}` query-unseen, `{glyph_exact_ambiguous_multiset_count}` ambiguous-multiset, `{glyph_exact_ambiguous_order_count}` ambiguous-order, `{glyph_exact_no_multiset_count}` no-multiset).",
+        "- per `README.md`, leaderboard score is direct final-answer accuracy, so these rows are safer as answer-only supervision than as trace teachers.",
         "",
-        "## Glyph query-consistent rows",
+        "## Representative glyph answer-only rows",
         "",
         markdown_table(
-            glyph_query_consistent_df,
-            ["id", "hard_score", "answer", "query_raw", "audit_reasons"],
+            glyph_training_answer_only_df,
+            ["id", "hard_score", "answer", "query_raw"],
             limit=20,
         ),
         "",
-        "## Top glyph pass1 rows",
+        "## Residual glyph manual rows",
         "",
         markdown_table(
             glyph_pass1_df,
             ["id", "hard_score", "answer", "query_raw", "audit_reasons"],
             limit=40,
-        ),
+        ) if len(glyph_pass1_df) else "_none remain after the training-label promotion pass._",
         "",
-        "Interpretation: even the best glyph candidates remain underdetermined. They are suitable for future human reasoning work, but not for safe automatic promotion or exclusion in the current pass.",
+        "Interpretation: even the best glyph candidates remain underdetermined as latent-rule teachers. They are still valid final-answer supervision, so the current pass keeps them as answer-only labels while withholding trace-ready status.",
         "",
     ]
     (reports_dir / "16_glyph_manual_hold.md").write_text("\n".join(glyph_hold_lines) + "\n", encoding="utf-8")
@@ -5678,11 +7499,22 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         bit_prompt_local_stage2_abstract_support_df,
     ) = apply_bit_prompt_local_consensus_promotions(analysis_df, v1)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
+    analysis_df, symbol_reverse_support_df, symbol_reverse_candidate_df = apply_symbol_reverse_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
     analysis_df, symbol_minus_direct_support_df, symbol_minus_direct_candidate_df = apply_symbol_minus_direct_plain_promotions(analysis_df)
     analysis_df, symbol_thin_support2_support_df, symbol_thin_support2_candidate_df = apply_symbol_thin_support2_promotions(analysis_df)
     analysis_df, symbol_manual_exact_candidate_df = apply_symbol_manual_prompt_exact_answer_only_curation(analysis_df)
+    analysis_df, symbol_percent_reverse_abs_diff_suffix_support_df, symbol_percent_reverse_abs_diff_suffix_candidate_df = apply_symbol_percent_reverse_abs_diff_suffix_promotions(analysis_df)
     analysis_df, symbol_star_prefix_support_df, symbol_star_prefix_candidate_df = apply_symbol_star_prefix_if_negative_promotions(analysis_df)
+    analysis_df, symbol_reverse_manual_exact_candidate_df = apply_symbol_reverse_manual_exact_answer_only_curation(analysis_df)
+    analysis_df, symbol_reverse_small_set_candidate_df = apply_symbol_reverse_small_set_answer_only_curation(analysis_df)
+    analysis_df, symbol_reverse_max_mod_candidate_df = apply_symbol_reverse_max_mod_small_set_answer_only_curation(analysis_df)
+    analysis_df, symbol_reverse_negative_diff_vs_max_mod_candidate_df = apply_symbol_reverse_negative_diff_vs_max_mod_answer_only_curation(analysis_df)
+    analysis_df, symbol_reverse_negative_x_minus_y_candidate_df = apply_symbol_reverse_negative_x_minus_y_answer_only_curation(analysis_df)
+    analysis_df, symbol_current_max_mod_candidate_df = apply_symbol_current_max_mod_small_set_answer_only_curation(analysis_df)
+    analysis_df, symbol_glyph_grouped_candidate_df = apply_symbol_glyph_grouped_exact_answer_only_curation(analysis_df)
+    analysis_df, symbol_numeric_no_same_op_training_candidate_df = apply_symbol_numeric_no_same_op_training_label_curation(analysis_df)
+    analysis_df, symbol_glyph_training_candidate_df = apply_symbol_glyph_training_label_curation(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -5906,6 +7738,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(bit_prompt_local_stage2_candidate_df, artifacts_dir / "binary_prompt_local_nested_candidates_v1.csv")
     write_dataframe(symbol_operator_spec_support_df, artifacts_dir / "symbol_operator_specific_formula_support_v1.csv")
     write_dataframe(symbol_operator_spec_candidate_df, artifacts_dir / "symbol_operator_specific_formula_candidates_v1.csv")
+    write_dataframe(symbol_reverse_support_df, artifacts_dir / "symbol_reverse_operator_formula_support_v1.csv")
+    write_dataframe(symbol_reverse_candidate_df, artifacts_dir / "symbol_reverse_operator_formula_candidates_v1.csv")
     write_dataframe(symbol_minus_prefix_support_df, artifacts_dir / "symbol_minus_prefix_subfamily_support_v1.csv")
     write_dataframe(symbol_minus_prefix_candidate_df, artifacts_dir / "symbol_minus_prefix_subfamily_candidates_v1.csv")
     write_dataframe(symbol_minus_direct_support_df, artifacts_dir / "symbol_minus_direct_plain_support_v1.csv")
@@ -5913,8 +7747,19 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_thin_support2_support_df, artifacts_dir / "symbol_thin_support2_subfamily_support_v1.csv")
     write_dataframe(symbol_thin_support2_candidate_df, artifacts_dir / "symbol_thin_support2_subfamily_candidates_v1.csv")
     write_dataframe(symbol_manual_exact_candidate_df, artifacts_dir / "symbol_manual_prompt_exact_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_percent_reverse_abs_diff_suffix_support_df, artifacts_dir / "symbol_percent_reverse_abs_diff_suffix_support_v1.csv")
+    write_dataframe(symbol_percent_reverse_abs_diff_suffix_candidate_df, artifacts_dir / "symbol_percent_reverse_abs_diff_suffix_candidates_v1.csv")
     write_dataframe(symbol_star_prefix_support_df, artifacts_dir / "symbol_star_prefix_if_negative_support_v1.csv")
     write_dataframe(symbol_star_prefix_candidate_df, artifacts_dir / "symbol_star_prefix_if_negative_candidates_v1.csv")
+    write_dataframe(symbol_reverse_manual_exact_candidate_df, artifacts_dir / "symbol_reverse_manual_exact_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_reverse_small_set_candidate_df, artifacts_dir / "symbol_reverse_small_set_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_reverse_max_mod_candidate_df, artifacts_dir / "symbol_reverse_max_mod_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_reverse_negative_diff_vs_max_mod_candidate_df, artifacts_dir / "symbol_reverse_negative_diff_vs_max_mod_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_reverse_negative_x_minus_y_candidate_df, artifacts_dir / "symbol_reverse_negative_x_minus_y_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_current_max_mod_candidate_df, artifacts_dir / "symbol_current_max_mod_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_glyph_grouped_candidate_df, artifacts_dir / "symbol_glyph_grouped_exact_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_numeric_no_same_op_training_candidate_df, artifacts_dir / "symbol_numeric_no_same_op_training_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_glyph_training_candidate_df, artifacts_dir / "symbol_glyph_training_answer_only_candidates_v1.csv")
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
