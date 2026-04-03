@@ -304,7 +304,7 @@ row-level で `2_1` が `2_2` に勝っていたのは、
 が主である。一方で `2_1` は `2_2` に対し
 
 - `symbol -5`
-- `binary ±0` 相当の揺れ
+- `binary` は **`5 gain / 5 loss`** で相殺
 
 を持っていた。(`baseline/cot/phase0_offline_eval/result/2_1_merge_lora/artifacts/phase0_eval_row_level.csv`, `baseline/cot/phase0_offline_eval/result/2_2_merge_lora/artifacts/phase0_eval_row_level.csv`)
 

@@ -312,14 +312,15 @@ wrong-only の `raw_output` 平均長は次だった。
 row-level 比較では、`2_2` は `2_1` に対して
 
 - 改善: `symbol +5`, `binary +5`, `gravity +9`, `unit +5`, `text +5`
+- 退行: `gravity +13`, `unit +10`, `text +7`, `binary +5`, `symbol +1`
 
-ではなく、実際には **symbol +5 を取る代わりに**
+となっており、改善もあるが退行の方が多い。特に **symbol で +5 を取る代わりに**
 
 - `gravity -13`
 - `unit -10`
 - `text -7`
 
-を失っている。(`baseline/cot/phase0_offline_eval/result/2_1_merge_lora/artifacts/phase0_eval_row_level.csv`, `baseline/cot/phase0_offline_eval/result/2_2_merge_lora/artifacts/phase0_eval_row_level.csv`)
+を失っている。差し引きで overall は `200 -> 193` に下がる。(`baseline/cot/phase0_offline_eval/result/2_1_merge_lora/artifacts/phase0_eval_row_level.csv`, `baseline/cot/phase0_offline_eval/result/2_2_merge_lora/artifacts/phase0_eval_row_level.csv`)
 
 要するに 2.2 は **symbol に偏った capacity allocation** であり、generalist としては 2.1 よりさらに不安定だった。
 
