@@ -877,3 +877,341 @@ Operationally:
 - use the `817` rows as the direct seed for problem-answer-CoT generation
 - do **not** use the remaining `187` strong-but-trace-ambiguous rows as-is for exact CoT
 - if those `187` rows are needed later, regenerate them from fixed exact rules first
+
+## 15. Post-generation strict quality gate
+
+Generated synthetic rows should **not** go directly into training.
+
+Every candidate row should pass a deterministic quality gate before it is accepted into the final problem-answer-CoT corpus.
+
+This is especially important because:
+
+- `README.md` scoring depends on the final extracted answer
+- the metric prioritizes `\boxed{}` extraction
+- our training goal is stronger than answer correctness alone: we also want the emitted CoT to encode the **same exact executable procedure**
+
+### 15.1 Required row schema for quality checking
+
+The generated dataset should store at least the following columns:
+
+| column | purpose |
+| --- | --- |
+| `synthetic_id` | unique row id |
+| `strong_group` | one of the exact-trace-safe groups |
+| `exact_rule` | concrete executable rule used to generate the row |
+| `prompt` | final training prompt |
+| `answer` | gold binary answer |
+| `teacher_response` | full CoT plus final `\boxed{}` |
+| `query_bits` | query input in 8-bit form |
+| `support_examples_json` | the `1-2` representative examples used in the trace prefix |
+| `all_examples_json` | all prompt examples as structured data |
+| `trace_metadata_json` | exact intermediate values or resolved mapping/equation data used by the renderer |
+
+For `binary_affine_xor`, `binary_bit_permutation_bijection`, and `binary_bit_permutation_independent`, `trace_metadata_json` should include the exact executable object that was rendered into the CoT:
+
+- affine equations
+- full bijection mapping
+- full independent copy/invert mapping
+
+Without that metadata, exact byte-identical CoT re-rendering is not possible.
+
+### 15.2 Quality-gate order
+
+Run checks in the following order.
+
+1. **Schema check**
+   - required columns exist
+   - JSON fields parse successfully
+   - `answer` and `query_bits` are valid 8-bit strings
+
+2. **Metric-format check**
+   - exactly one non-empty `\boxed{...}` appears in `teacher_response`
+   - `teacher_response.rstrip().endswith(f"\\boxed{{{answer}}}")`
+   - the notebook-style answer extractor returns exactly `answer`
+
+3. **Forward-answer check**
+   - recompute the answer from `exact_rule` and `query_bits`
+   - require the recomputed answer to equal `answer`
+
+4. **Solver-recovery check**
+   - re-run the corresponding solver on `all_examples_json + query_bits`
+   - require the intended strong group to fire again
+   - require the intended exact rule to be recovered again
+
+5. **Procedure-uniqueness check**
+   - require the row to remain in the exact-trace-safe subset
+   - reject anything that collapses only at answer level but not at procedure level
+
+6. **Canonical-render check**
+   - re-render the expected CoT from `strong_group + exact_rule + support_examples_json + trace_metadata_json + query_bits + answer`
+   - require **byte-identical equality**:
+     - `teacher_response == render_teacher_response(row)`
+
+7. **Dataset-level checks**
+   - remove exact duplicates
+   - reject degenerate rows with repeated prompt/example content
+   - review group / rule balance so one easy exact rule does not dominate the final corpus
+
+### 15.3 Group-specific acceptance rules
+
+Use the following strict acceptance rules after generation.
+
+| group | strict acceptance rule |
+| --- | --- |
+| `binary_structured_byte_formula` | `infer_bit_structured_byte_formula_matches(...)` returns exactly one match and it is `(exact_rule, answer)` |
+| `binary_structured_byte_formula_abstract` | same as above; abstract family may be logged but exact rule must still be unique |
+| `binary_structured_byte_not_formula` | `infer_bit_structured_byte_not_formula_matches(...)` returns exactly one match and it is `(exact_rule, answer)` |
+| `binary_byte_transform` | `infer_bit_byte_transform_answer(...)` returns `answer` and exactly one transform name matching `exact_rule` |
+| `binary_affine_xor` | `infer_bit_affine_xor_answer(...)` returns `answer` and `affine_free_var_counts` are all zero |
+| `binary_bit_permutation_bijection` | bijection solver returns exactly one query answer and `bijection_search_explored == 1`; emitted mapping must equal `trace_metadata_json` |
+| `binary_bit_permutation_independent` | independent solver returns `answer` and every output slot has exactly one source; emitted mapping must equal `trace_metadata_json` |
+
+### 15.4 Canonical-render principle
+
+The strongest check is not a loose regex check on the CoT text.
+
+Instead:
+
+1. generate `teacher_response` from structured metadata
+2. later, regenerate the same response from the same metadata
+3. require the two strings to be identical
+
+This eliminates silent formatting drift such as:
+
+- missing `Check examples:` block
+- wrong support example order
+- wrong intermediate value in one line
+- extra text after the final `\boxed{}`
+- abstract-family wording where exact-rule wording was required
+
+### 15.5 Recommended rejection reasons
+
+Write every failed row to a rejected artifact with one of these reasons:
+
+- `missing_required_column`
+- `json_parse_error`
+- `invalid_bitstring`
+- `bad_boxed_count`
+- `final_box_not_terminal`
+- `metric_extraction_mismatch`
+- `forward_answer_mismatch`
+- `solver_family_mismatch`
+- `exact_rule_mismatch`
+- `procedure_not_unique`
+- `canonical_render_mismatch`
+- `duplicate_row`
+- `balance_overflow`
+
+### 15.6 Reproducible validation command template
+
+The following command is a reproducible template for post-generation QC.
+
+It assumes a generated CSV with the schema above and reuses the notebook-style answer extraction rule plus the existing binary solvers.
+
+```bash
+uv run python - <<'PY'
+import csv
+import importlib.util
+import json
+import re
+from collections import Counter
+from pathlib import Path
+
+CSV_PATH = Path("cuda-train-data-analysis-v1/artifacts/generated_bit_cot_candidates_v1.csv")
+MODULE_PATH = Path("cuda-train-data-analysis-v1/code/train_data_analysis_v1.py")
+
+spec = importlib.util.spec_from_file_location("train_data_analysis_v1", MODULE_PATH)
+mod = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(mod)
+
+REQUIRED_COLUMNS = [
+    "synthetic_id",
+    "strong_group",
+    "exact_rule",
+    "prompt",
+    "answer",
+    "teacher_response",
+    "query_bits",
+    "support_examples_json",
+    "all_examples_json",
+    "trace_metadata_json",
+]
+
+def extract_final_answer(text: str | None) -> str:
+    if text is None:
+        return "NOT_FOUND"
+    matches = re.findall(r'\\boxed\\{([^}]*)(?:\\}|$)', text)
+    if matches:
+        non_empty = [m.strip() for m in matches if m.strip()]
+        if non_empty:
+            return non_empty[-1]
+        return matches[-1].strip()
+    patterns = [
+        r'The final answer is:\\s*([^\\n]+)',
+        r'Final answer is:\\s*([^\\n]+)',
+        r'Final answer\\s*[:：]\\s*([^\\n]+)',
+        r'final answer\\s*[:：]\\s*([^\\n]+)',
+    ]
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            return matches[-1].strip()
+    matches = re.findall(r'-?\\d+(?:\\.\\d+)?', text)
+    if matches:
+        return matches[-1]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines[-1] if lines else "NOT_FOUND"
+
+def count_non_empty_boxed(text: str) -> int:
+    return sum(1 for match in re.findall(r'\\boxed\\{([^}]*)\\}', text) if match.strip())
+
+def parse_examples(raw: str):
+    data = json.loads(raw)
+    return [(item[0], item[1]) for item in data]
+
+def validate_exact_group(row: dict) -> tuple[bool, str]:
+    group = row["strong_group"]
+    exact_rule = row["exact_rule"]
+    answer = row["answer"]
+    query_bits = row["query_bits"]
+    examples = parse_examples(row["all_examples_json"])
+
+    if group == "binary_structured_byte_formula":
+        matches = mod.infer_bit_structured_byte_formula_matches(examples, query_bits)
+        return (len(matches) == 1 and matches[0] == (exact_rule, answer), "solver")
+
+    if group == "binary_structured_byte_formula_abstract":
+        matches = mod.infer_bit_structured_byte_formula_matches(examples, query_bits)
+        return (len(matches) == 1 and matches[0] == (exact_rule, answer), "solver")
+
+    if group == "binary_structured_byte_not_formula":
+        matches = mod.infer_bit_structured_byte_not_formula_matches(examples, query_bits)
+        return (len(matches) == 1 and matches[0] == (exact_rule, answer), "solver")
+
+    if group == "binary_byte_transform":
+        predicted, names = mod.infer_bit_byte_transform_answer(examples, query_bits)
+        return (predicted == answer and len(names) == 1 and names[0] == exact_rule, "solver")
+
+    if group == "binary_affine_xor":
+        predicted, free_vars = mod.infer_bit_affine_xor_answer(examples, query_bits)
+        return (predicted == answer and free_vars and all(v == 0 for v in free_vars), "solver")
+
+    if group == "binary_bit_permutation_bijection":
+        candidate_sets = mod.build_bit_candidate_sets(examples)
+        answers, explored = mod.infer_bit_bijection_answers(candidate_sets, query_bits)
+        return (answer in answers and len(answers) == 1 and explored == 1, "solver")
+
+    if group == "binary_bit_permutation_independent":
+        candidate_sets = mod.build_bit_candidate_sets(examples)
+        predicted, choice_counts = mod.infer_bit_independent_answer(candidate_sets, query_bits)
+        return (predicted == answer and choice_counts and all(v == 1 for v in choice_counts), "solver")
+
+    return (False, "unknown_group")
+
+def render_teacher_response(row: dict) -> str:
+    # This function must be the same canonical renderer used during generation.
+    # The QC rule is: render_teacher_response(row) must match teacher_response byte-for-byte.
+    raise NotImplementedError("Use the same canonical renderer as the generation pipeline.")
+
+accepted = []
+rejected = []
+seen = set()
+reason_counter = Counter()
+
+with CSV_PATH.open(newline="", encoding="utf-8") as f:
+    reader = csv.DictReader(f)
+    if reader.fieldnames is None:
+        raise ValueError("CSV has no header.")
+    missing = [col for col in REQUIRED_COLUMNS if col not in reader.fieldnames]
+    if missing:
+        raise ValueError(f"Missing columns: {missing}")
+
+    for row in reader:
+        reason = None
+
+        key = (
+            row["strong_group"],
+            row["exact_rule"],
+            row["query_bits"],
+            row["answer"],
+            row["teacher_response"],
+        )
+        if key in seen:
+            reason = "duplicate_row"
+        seen.add(key)
+
+        if reason is None:
+            try:
+                json.loads(row["support_examples_json"])
+                json.loads(row["all_examples_json"])
+                json.loads(row["trace_metadata_json"])
+            except Exception:
+                reason = "json_parse_error"
+
+        if reason is None:
+            if not re.fullmatch(r"[01]{8}", row["query_bits"]) or not re.fullmatch(r"[01]{8}", row["answer"]):
+                reason = "invalid_bitstring"
+
+        if reason is None:
+            text = row["teacher_response"]
+            if count_non_empty_boxed(text) != 1:
+                reason = "bad_boxed_count"
+            elif not text.rstrip().endswith(f"\\boxed{{{row['answer']}}}"):
+                reason = "final_box_not_terminal"
+            elif extract_final_answer(text) != row["answer"]:
+                reason = "metric_extraction_mismatch"
+
+        if reason is None:
+            ok, _ = validate_exact_group(row)
+            if not ok:
+                reason = "solver_family_mismatch"
+
+        if reason is None:
+            try:
+                expected = render_teacher_response(row)
+                if row["teacher_response"] != expected:
+                    reason = "canonical_render_mismatch"
+            except NotImplementedError:
+                reason = "canonical_render_mismatch"
+
+        if reason is None:
+            accepted.append(row)
+        else:
+            row["reject_reason"] = reason
+            rejected.append(row)
+            reason_counter[reason] += 1
+
+print("accepted", len(accepted))
+print("rejected", len(rejected))
+print("reject_reasons", dict(reason_counter))
+PY
+```
+
+### 15.7 Expected QC artifacts
+
+After the gate, write:
+
+- `generated_bit_cot_accepted_v1.csv`
+- `generated_bit_cot_rejected_v1.csv`
+- `generated_bit_cot_quality_summary_v1.json`
+
+The summary JSON should include:
+
+- accepted row count
+- rejected row count
+- reject reasons histogram
+- per-group accepted counts
+- per-exact-rule accepted counts
+- duplicate count
+
+### 15.8 Practical bottom line
+
+The final training corpus should be:
+
+- generated from the `817` exact-trace-safe base
+- accepted only after exact solver recovery
+- accepted only after notebook-compatible `\boxed{}` extraction succeeds
+- accepted only after byte-identical canonical CoT re-rendering succeeds
+
+If any of these fail, the row should be rejected even if the final answer looks correct.
