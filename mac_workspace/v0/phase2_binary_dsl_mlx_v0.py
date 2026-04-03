@@ -66,6 +66,7 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v14",
     "single-adapter-fusion-v15",
     "single-adapter-fusion-v16",
+    "single-adapter-fusion-v17",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -118,6 +119,14 @@ FUSION_V16_AUGMENT_QUOTAS = {
     "symbol_verified": 32,
     "symbol_answer_only": 64,
     "symbol_manual": 26,
+    "symbol_glyph_answer_only": 0,
+}
+FUSION_V17_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 96,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -711,47 +720,64 @@ def build_single_adapter_fusion_external_rows(
             ),
             label="binary",
         )
-    append_candidates(
-        "symbol_verified",
-        select_augmentation_candidates(
-            AUGMENT_VERIFIED_TRACE_CSV,
-            existing_ids=existing_ids,
-            family="symbol_equation",
-            allowed_tiers={"verified_trace_ready"},
-            quota=quotas["symbol_verified"],
-            group_keys=("template_subtype", "symbol_query_operator"),
-            hard_first=True,
-        ),
-        label="symbol",
-    )
-    append_candidates(
-        "symbol_answer_only",
-        select_augmentation_candidates(
-            AUGMENT_ANSWER_ONLY_CSV,
-            existing_ids=existing_ids,
-            family="symbol_equation",
-            template_subtype="numeric_2x2",
-            allowed_tiers={"answer_only_keep"},
-            quota=quotas["symbol_answer_only"],
-            group_keys=("template_subtype", "symbol_query_operator"),
-            hard_first=True,
-        ),
-        label="symbol",
-    )
-    append_candidates(
-        "symbol_manual",
-        select_augmentation_candidates(
-            AUGMENT_SYMBOL_MANUAL_CSV,
-            existing_ids=existing_ids,
-            family="symbol_equation",
-            template_subtype="numeric_2x2",
-            allowed_tiers={"manual_audit_priority"},
-            quota=quotas["symbol_manual"],
-            group_keys=("template_subtype", "symbol_query_operator"),
-            hard_first=True,
-        ),
-        label="symbol",
-    )
+    if quotas.get("symbol_verified", 0) > 0:
+        append_candidates(
+            "symbol_verified",
+            select_augmentation_candidates(
+                AUGMENT_VERIFIED_TRACE_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                allowed_tiers={"verified_trace_ready"},
+                quota=quotas["symbol_verified"],
+                group_keys=("template_subtype", "symbol_query_operator"),
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("symbol_answer_only", 0) > 0:
+        append_candidates(
+            "symbol_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                template_subtype="numeric_2x2",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["symbol_answer_only"],
+                group_keys=("template_subtype", "symbol_query_operator"),
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("symbol_manual", 0) > 0:
+        append_candidates(
+            "symbol_manual",
+            select_augmentation_candidates(
+                AUGMENT_SYMBOL_MANUAL_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                template_subtype="numeric_2x2",
+                allowed_tiers={"manual_audit_priority"},
+                quota=quotas["symbol_manual"],
+                group_keys=("template_subtype", "symbol_query_operator"),
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("symbol_glyph_answer_only", 0) > 0:
+        append_candidates(
+            "symbol_glyph_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                template_subtype="glyph_len5",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["symbol_glyph_answer_only"],
+                hard_first=True,
+            ),
+            label="symbol",
+        )
 
     profiled_rows = [*base_rows, *augmentation_rows]
     return profiled_rows, {
@@ -793,6 +819,16 @@ def build_single_adapter_fusion_v16_rows(
     )
 
 
+def build_single_adapter_fusion_v17_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v17",
+        quotas=FUSION_V17_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -812,6 +848,8 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v15_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v16":
         return build_single_adapter_fusion_v16_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v17":
+        return build_single_adapter_fusion_v17_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
