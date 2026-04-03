@@ -1,0 +1,99 @@
+{
+  "dataset_version": "v2-1-2",
+  "source_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_1_2_merge_lora/artifacts/phase2_1_2_binary_specialist_training_data.csv",
+  "manifest_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_1_2_merge_lora/artifacts/phase2_1_2_binary_specialist_manifest.json",
+  "seed": 42,
+  "subsample_size": 1449,
+  "unique_source_id_count": 1004,
+  "boxed_sibling_rows": 445,
+  "family_counts": {
+    "bit_manipulation": 1449
+  },
+  "source_selection_tier_counts": {
+    "verified_trace_ready": 1449
+  },
+  "assistant_style_counts": {
+    "boxed_only": 445,
+    "trace_boxed": 1004
+  },
+  "output_origin_counts": {
+    "verified_boxed_sibling": 445,
+    "verified_trace_core": 1004
+  },
+  "template_subtype_counts": {
+    "bit_other": 389,
+    "bit_permutation_inversion": 117,
+    "bit_structured_byte_formula": 943
+  },
+  "teacher_solver_counts": {
+    "binary_affine_xor": 167,
+    "binary_bit_permutation_bijection": 99,
+    "binary_bit_permutation_independent": 14,
+    "binary_byte_transform": 22,
+    "binary_structured_byte_formula": 613,
+    "binary_structured_byte_formula_abstract": 304,
+    "binary_structured_byte_not_formula": 26,
+    "binary_three_bit_boolean": 34,
+    "binary_two_bit_boolean": 170
+  },
+  "boxed_sibling_subtype_quotas": {
+    "bit_structured_byte_formula": 320,
+    "bit_other": 95,
+    "bit_permutation_inversion": 30
+  },
+  "boxed_sibling_subtype_counts": {
+    "bit_other": 95,
+    "bit_permutation_inversion": 30,
+    "bit_structured_byte_formula": 320
+  },
+  "boxed_sibling_solver_counts": {
+    "binary_affine_xor": 34,
+    "binary_bit_permutation_bijection": 21,
+    "binary_bit_permutation_independent": 7,
+    "binary_byte_transform": 11,
+    "binary_structured_byte_formula": 167,
+    "binary_structured_byte_formula_abstract": 152,
+    "binary_structured_byte_not_formula": 1,
+    "binary_three_bit_boolean": 17,
+    "binary_two_bit_boolean": 35
+  },
+  "binary_phase2_1_2_design": {
+    "trace_rows_from_verified": 1004,
+    "boxed_sibling_rows_from_verified": 445,
+    "broad_answer_only_rows_used": 0,
+    "manual_rows_used": 0,
+    "trace_style": "micro_dsl_binary_specialist",
+    "trace_avoids_repeating_final_answer_inside_think": true,
+    "query_equals_answer_rows_sanitized": 7,
+    "binary_trace_category_counts": {
+      "generic_solver_family": 88,
+      "micro_dsl_byte_transform": 38,
+      "micro_dsl_exact_formula": 878
+    },
+    "structured_sibling_support_bin_counts": {
+      "bin_0": 26,
+      "bin_1": 21,
+      "bin_2": 245,
+      "bin_3": 16,
+      "bin_4": 12
+    }
+  },
+  "selection_policy": {
+    "trace_include": [
+      "bit_manipulation + verified_trace_ready + teacher_solver_candidate present"
+    ],
+    "trace_exclude": [
+      "bit_manipulation + answer_only_keep",
+      "bit_manipulation + manual_audit_priority",
+      "bit_manipulation + exclude_suspect"
+    ],
+    "boxed_sibling_policy": "Create duplicate boxed-only supervision from verified rows only; never source boxed-only rows from broad answer_only_keep."
+  },
+  "notes": [
+    "README.md evaluation is boxed-first, so Phase 2.1.2 keeps final 8-bit answers out of <think> and teaches closure with verified boxed-only siblings.",
+    "This dataset replaces the 445 broad answer_only rows from phase2_1 with 445 duplicate boxed-only rows derived from verified binary sources.",
+    "Binary traces use a short micro-DSL instead of the longer hybrid narrative because prior analysis showed long binary traces drift into fallback extraction.",
+    "The dataset remains binary-only so phase2_1_2 isolates data-quality and trace-format changes before any anchored continuation experiment."
+  ]
+}

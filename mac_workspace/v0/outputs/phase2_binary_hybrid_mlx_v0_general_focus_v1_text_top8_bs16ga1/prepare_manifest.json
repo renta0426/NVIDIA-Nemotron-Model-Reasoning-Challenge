@@ -1,0 +1,111 @@
+{
+  "created_at": "2026-04-02T01:18:29.455169+00:00",
+  "repo_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge",
+  "run_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_general_focus_v1_text_top8_bs16ga1",
+  "model_root": "/Users/mac-studio/.cache/huggingface/hub/models--mlx-community--NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16",
+  "shadow_model_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_general_focus_v1_text_top8_bs16ga1/shadow_model",
+  "train_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_binary_dsl/artifacts/phase2_binary_hybrid_training_data.csv",
+  "phase2_rows": 900,
+  "training_profile": {
+    "profile": "general-stable-focus-v1",
+    "input": {
+      "rows": 900,
+      "by_label": {
+        "binary": 280,
+        "gravity": 120,
+        "roman": 120,
+        "symbol": 140,
+        "text": 120,
+        "unit": 120
+      },
+      "by_label_and_style": {
+        "binary|boxed_only": 120,
+        "binary|trace_boxed": 160,
+        "gravity|trace_boxed": 120,
+        "roman|trace_boxed": 120,
+        "symbol|boxed_only": 80,
+        "symbol|trace_boxed": 60,
+        "text|boxed_only": 20,
+        "text|trace_boxed": 100,
+        "unit|trace_boxed": 120
+      },
+      "by_label_and_tier": {
+        "binary|answer_only_keep": 120,
+        "binary|verified_trace_ready": 160,
+        "gravity|verified_trace_ready": 120,
+        "roman|verified_trace_ready": 120,
+        "symbol|answer_only_keep": 80,
+        "symbol|verified_trace_ready": 60,
+        "text|answer_only_keep": 20,
+        "text|verified_trace_ready": 100,
+        "unit|verified_trace_ready": 120
+      }
+    },
+    "output": {
+      "rows": 480,
+      "by_label": {
+        "gravity": 120,
+        "roman": 120,
+        "text": 120,
+        "unit": 120
+      },
+      "by_label_and_style": {
+        "gravity|trace_boxed": 120,
+        "roman|trace_boxed": 120,
+        "text|boxed_only": 20,
+        "text|trace_boxed": 100,
+        "unit|trace_boxed": 120
+      },
+      "by_label_and_tier": {
+        "gravity|verified_trace_ready": 120,
+        "roman|verified_trace_ready": 120,
+        "text|answer_only_keep": 20,
+        "text|verified_trace_ready": 100,
+        "unit|verified_trace_ready": 120
+      }
+    },
+    "transform_counts": {
+      "drop:binary": 280,
+      "drop:symbol": 140,
+      "keep:gravity:trace_boxed": 120,
+      "keep:roman:trace_boxed": 120,
+      "keep:text:boxed_only": 20,
+      "keep:text:trace_boxed": 100,
+      "keep:unit:trace_boxed": 120
+    }
+  },
+  "dataset": {
+    "dataset_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_general_focus_v1_text_top8_bs16ga1/dataset",
+    "dataset_format": "text",
+    "enable_thinking": false,
+    "train_rows": 480,
+    "valid_rows": 32,
+    "valid_strategy": "shadow_sample=32"
+  },
+  "training": {
+    "mask_prompt": false,
+    "batch_size": 16,
+    "grad_accumulation_steps": 1,
+    "num_epochs": 2.0,
+    "learning_rate": 2e-05,
+    "max_seq_length": 2048,
+    "lora_rank": 32,
+    "lora_alpha": 32.0,
+    "lora_dropout": 0.05,
+    "num_layers": 8,
+    "steps_per_report": 5,
+    "steps_per_eval": 900,
+    "total_iters": 60
+  },
+  "versions": {
+    "mlx-lm": "0.29.1",
+    "mlx": "0.31.1",
+    "transformers": "4.57.3",
+    "pyyaml": "6.0.3"
+  },
+  "artifacts": {
+    "config_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_general_focus_v1_text_top8_bs16ga1/mlx_lora_config.yaml",
+    "command_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_general_focus_v1_text_top8_bs16ga1/train_cmd.sh",
+    "adapter_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_general_focus_v1_text_top8_bs16ga1/adapter"
+  }
+}

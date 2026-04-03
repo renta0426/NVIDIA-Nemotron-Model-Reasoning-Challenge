@@ -15,6 +15,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -41,6 +42,27 @@ DEFAULT_PHASE0_ANALYSIS_CSV = (
 )
 DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
+AUGMENT_ARTIFACT_ROOT = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts"
+AUGMENT_BINARY_STRUCTURED_CSV = AUGMENT_ARTIFACT_ROOT / "binary_structured_byte_formula_candidates_v1.csv"
+AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready_v1.csv"
+AUGMENT_ANSWER_ONLY_CSV = AUGMENT_ARTIFACT_ROOT / "train_answer_only_keep_v1.csv"
+AUGMENT_SYMBOL_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "symbol_manual_audit_queue_v1.csv"
+PHASE2_BINARY_SPECIALIST_CSV = (
+    REPO_ROOT
+    / "baseline"
+    / "cot"
+    / "phase2_1_2_merge_lora"
+    / "artifacts"
+    / "phase2_1_2_binary_specialist_training_data.csv"
+)
+PHASE2_SYMBOL_SPECIALIST_CSV = (
+    REPO_ROOT
+    / "baseline"
+    / "cot"
+    / "phase2_2_merge_lora"
+    / "artifacts"
+    / "phase2_2_symbol_specialist_training_data.csv"
+)
 TRAIN_PROFILE_CHOICES = (
     "baseline",
     "single-adapter-focus-v1",
@@ -55,6 +77,27 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v8",
     "single-adapter-fusion-v9",
     "single-adapter-fusion-v10",
+    "single-adapter-fusion-v11",
+    "single-adapter-fusion-v12",
+    "single-adapter-fusion-v13",
+    "single-adapter-fusion-v14",
+    "single-adapter-fusion-v15",
+    "single-adapter-fusion-v16",
+    "single-adapter-fusion-v17",
+    "single-adapter-fusion-v18",
+    "single-adapter-fusion-v19",
+    "single-adapter-fusion-v20",
+    "single-adapter-fusion-v21",
+    "single-adapter-fusion-v22",
+    "single-adapter-fusion-v23",
+    "single-adapter-fusion-v24",
+    "single-adapter-fusion-v25",
+    "single-adapter-fusion-v26",
+    "single-adapter-fusion-v27",
+    "single-adapter-fusion-v28",
+    "single-adapter-fusion-v29",
+    "single-adapter-fusion-v30",
+    "single-adapter-fusion-v31",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -96,6 +139,180 @@ SYMBOL_WATCH_TARGETS = [
     ("numeric_2x2", "manual_audit_priority", 10),
     ("glyph_len5", "manual_audit_priority", 20),
 ]
+FUSION_V15_AUGMENT_QUOTAS = {
+    "binary_candidates": 240,
+    "symbol_verified": 32,
+    "symbol_answer_only": 64,
+    "symbol_manual": 26,
+}
+FUSION_V16_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "symbol_verified": 32,
+    "symbol_answer_only": 64,
+    "symbol_manual": 26,
+    "symbol_glyph_answer_only": 0,
+}
+FUSION_V17_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 96,
+}
+FUSION_V18_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 32,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 32,
+}
+FUSION_V19_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 32,
+}
+FUSION_V20_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 16,
+    "symbol_answer_only": 48,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 48,
+}
+FUSION_V21_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 16,
+    "symbol_verified": 16,
+    "symbol_answer_only": 48,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 48,
+}
+FUSION_V22_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 32,
+    "symbol_answer_only": 64,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+}
+FUSION_V23_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 32,
+    "symbol_answer_only": 64,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 16,
+}
+FUSION_V24_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 0,
+    "symbol_formula_answer_only": 0,
+}
+FUSION_V25_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+}
+FUSION_V26_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 16,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 8,
+}
+FUSION_V27_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 2,
+    "unit_verified_anchor_mod": 2,
+}
+FUSION_V28_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 2,
+    "unit_verified_anchor_mod": 2,
+}
+FUSION_V29_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 4,
+    "unit_verified_anchor_mod": 0,
+}
+FUSION_V30_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 0,
+    "unit_verified_anchor_mod": 4,
+}
+FUSION_V31_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 4,
+    "unit_verified_anchor_mod": 4,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -287,6 +504,11 @@ def load_phase2_training_rows(path: Path) -> list[dict[str, str]]:
         raise ValueError(
             f"Expected {EXPECTED_PHASE2_ROWS} rows in {path}, found {len(rows)}"
         )
+    validate_phase2_columns(path, rows)
+    return rows
+
+
+def validate_phase2_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
     if rows:
         actual_columns = list(rows[0].keys())
         if actual_columns != EXPECTED_PHASE2_COLUMNS:
@@ -294,7 +516,61 @@ def load_phase2_training_rows(path: Path) -> list[dict[str, str]]:
                 f"Unexpected CSV columns in {path}: {actual_columns} "
                 f"(expected {EXPECTED_PHASE2_COLUMNS})"
             )
-    return rows
+
+
+@lru_cache(maxsize=1)
+def load_phase0_analysis_index() -> dict[str, dict[str, str]]:
+    index: dict[str, dict[str, str]] = {}
+    for raw_row in load_csv_rows(DEFAULT_PHASE0_ANALYSIS_CSV):
+        row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(row.get("id", "")).strip()
+        if row_id:
+            index[row_id] = row
+    return index
+
+
+def infer_candidate_selection_tier(row: dict[str, str]) -> str:
+    tier = str(row.get("selection_tier", "")).strip().lower()
+    if tier:
+        return tier
+    if parse_bool(row.get("verified_trace_ready")):
+        return "verified_trace_ready"
+    if parse_bool(row.get("answer_only_ready")):
+        return "answer_only_keep"
+    return ""
+
+
+def make_phase2_row_from_candidate(
+    row: dict[str, str],
+    *,
+    label: str | None = None,
+    assistant_style: str = "boxed_only",
+    source_selection_tier: str | None = None,
+) -> dict[str, str]:
+    row_id = str(row.get("id", "")).strip()
+    prompt = str(row.get("prompt", "")).strip()
+    answer = str(row.get("answer", "")).strip()
+    if not row_id:
+        raise ValueError("Augmentation row is missing id")
+    if not prompt:
+        raise ValueError(f"Augmentation row {row_id} is missing prompt")
+    if not answer:
+        raise ValueError(f"Augmentation row {row_id} is missing answer")
+    resolved_label = str(label or FAMILY_SHORT.get(str(row.get("family", "")).strip(), "")).strip()
+    if not resolved_label:
+        raise ValueError(f"Unable to infer phase2 label for augmentation row {row_id}")
+    resolved_tier = str(source_selection_tier or infer_candidate_selection_tier(row)).strip().lower()
+    if not resolved_tier:
+        raise ValueError(f"Unable to infer selection tier for augmentation row {row_id}")
+    return {
+        "id": row_id,
+        "prompt": prompt,
+        "answer": answer,
+        "generated_cot": "",
+        "label": resolved_label,
+        "assistant_style": assistant_style,
+        "source_selection_tier": resolved_tier,
+    }
 
 
 def build_user_message(prompt: str) -> str:
@@ -545,6 +821,564 @@ def summarize_phase2_rows(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
     }
 
 
+def select_augmentation_candidates(
+    path: Path,
+    *,
+    existing_ids: set[str],
+    family: str | None = None,
+    template_subtype: str | None = None,
+    allowed_tiers: set[str] | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = True,
+) -> list[dict[str, str]]:
+    candidates: list[dict[str, str]] = []
+    for raw_row in load_csv_rows(path):
+        row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        if family and str(row.get("family", "")).strip() != family:
+            continue
+        if template_subtype and str(row.get("template_subtype", "")).strip() != template_subtype:
+            continue
+        if not str(row.get("prompt", "")).strip() or not str(row.get("answer", "")).strip():
+            continue
+        tier = infer_candidate_selection_tier(row)
+        row["selection_tier"] = tier
+        if allowed_tiers and tier not in allowed_tiers:
+            continue
+        candidates.append(row)
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("template_subtype", "teacher_solver_candidate")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
+def select_phase2_specialist_rows(
+    path: Path,
+    *,
+    existing_ids: set[str],
+    label: str | None = None,
+    allowed_tiers: set[str] | None = None,
+    template_subtype: str | None = None,
+    teacher_solver_candidate: str | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = True,
+) -> list[dict[str, str]]:
+    rows = load_csv_rows(path)
+    validate_phase2_columns(path, rows)
+    analysis_index = load_phase0_analysis_index()
+    candidates: list[dict[str, str]] = []
+    for raw_row in rows:
+        phase2_row = clone_phase2_row(raw_row)
+        row_id = str(phase2_row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        if label and str(phase2_row.get("label", "")).strip() != label:
+            continue
+        tier = str(phase2_row.get("source_selection_tier", "")).strip().lower()
+        if allowed_tiers and tier not in allowed_tiers:
+            continue
+        analysis_row = analysis_index.get(row_id)
+        if analysis_row is None:
+            continue
+        if template_subtype and str(analysis_row.get("template_subtype", "")).strip() != template_subtype:
+            continue
+        if (
+            teacher_solver_candidate is not None
+            and str(analysis_row.get("teacher_solver_candidate", "")).strip()
+            != teacher_solver_candidate
+        ):
+            continue
+        candidates.append({**analysis_row, **phase2_row})
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("template_subtype", "teacher_solver_candidate")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
+def build_single_adapter_fusion_external_rows(
+    rows: Sequence[dict[str, str]],
+    *,
+    profile_name: str,
+    quotas: dict[str, int],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    base_rows, base_summary = apply_phase2_train_profile(rows, profile="single-adapter-fusion-v10")
+    input_rows = [clone_phase2_row(row) for row in rows]
+    existing_ids = {
+        str(row.get("id", "")).strip()
+        for row in input_rows
+        if str(row.get("id", "")).strip()
+    }
+    transform_counts = Counter(base_summary.get("transform_counts", {}))
+    augmentation_rows: list[dict[str, str]] = []
+    source_summaries: dict[str, Any] = {}
+
+    def append_candidates(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+        *,
+        label: str,
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(candidate, label=label, assistant_style="boxed_only")
+            row_id = phase2_row["id"]
+            if row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    def append_phase2_rows(source_name: str, candidates: Sequence[dict[str, str]]) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = {
+                key: "" if candidate.get(key) is None else str(candidate.get(key, ""))
+                for key in EXPECTED_PHASE2_COLUMNS
+            }
+            row_id = str(phase2_row.get("id", "")).strip()
+            if not row_id or row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    def append_duplicate_phase2_rows(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = {
+                key: "" if candidate.get(key) is None else str(candidate.get(key, ""))
+                for key in EXPECTED_PHASE2_COLUMNS
+            }
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_anchor:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    def select_phase2_anchor_rows(
+        *,
+        label: str,
+        allowed_tiers: set[str],
+        mod: int,
+    ) -> list[dict[str, str]]:
+        if mod <= 0:
+            return []
+        selected: list[dict[str, str]] = []
+        for raw_row in input_rows:
+            phase2_row = clone_phase2_row(raw_row)
+            if str(phase2_row.get("label", "")).strip().lower() != label:
+                continue
+            tier = str(phase2_row.get("source_selection_tier", "")).strip().lower()
+            if tier not in allowed_tiers:
+                continue
+            row_key = str(phase2_row.get("id") or phase2_row.get("prompt") or "")
+            if mod > 1 and stable_mod(row_key, mod) != 0:
+                continue
+            selected.append(phase2_row)
+        return selected
+
+    if quotas.get("binary_candidates", 0) > 0:
+        append_candidates(
+            "binary_candidates",
+            select_augmentation_candidates(
+                AUGMENT_BINARY_STRUCTURED_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                allowed_tiers={"verified_trace_ready", "answer_only_keep"},
+                quota=quotas["binary_candidates"],
+                group_keys=(
+                    "template_subtype",
+                    "teacher_solver_candidate",
+                    "bit_structured_formula_abstract_family",
+                ),
+                hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("binary_answer_only_bit_other", 0) > 0:
+        append_candidates(
+            "binary_answer_only_bit_other",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_other",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_answer_only_bit_other"],
+                group_keys=("template_subtype", "group_signature"),
+                hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("symbol_verified", 0) > 0:
+        append_candidates(
+            "symbol_verified",
+            select_augmentation_candidates(
+                AUGMENT_VERIFIED_TRACE_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                allowed_tiers={"verified_trace_ready"},
+                quota=quotas["symbol_verified"],
+                group_keys=("template_subtype", "symbol_query_operator"),
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("symbol_answer_only", 0) > 0:
+        append_candidates(
+            "symbol_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                template_subtype="numeric_2x2",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["symbol_answer_only"],
+                group_keys=("template_subtype", "symbol_query_operator"),
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("symbol_manual", 0) > 0:
+        append_candidates(
+            "symbol_manual",
+            select_augmentation_candidates(
+                AUGMENT_SYMBOL_MANUAL_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                template_subtype="numeric_2x2",
+                allowed_tiers={"manual_audit_priority"},
+                quota=quotas["symbol_manual"],
+                group_keys=("template_subtype", "symbol_query_operator"),
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("symbol_glyph_answer_only", 0) > 0:
+        append_candidates(
+            "symbol_glyph_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="symbol_equation",
+                template_subtype="glyph_len5",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["symbol_glyph_answer_only"],
+                hard_first=True,
+            ),
+            label="symbol",
+        )
+    if quotas.get("binary_affine_verified", 0) > 0:
+        append_phase2_rows(
+            "binary_affine_verified",
+            select_phase2_specialist_rows(
+                PHASE2_BINARY_SPECIALIST_CSV,
+                existing_ids=existing_ids,
+                label="binary",
+                allowed_tiers={"verified_trace_ready"},
+                template_subtype="bit_other",
+                teacher_solver_candidate="binary_affine_xor",
+                quota=quotas["binary_affine_verified"],
+                group_keys=("teacher_solver_candidate", "group_signature"),
+                hard_first=True,
+            ),
+        )
+    if quotas.get("binary_structured_answer_only", 0) > 0:
+        append_candidates(
+            "binary_structured_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_structured_answer_only"],
+                group_keys=(
+                    "template_subtype",
+                    "bit_structured_formula_abstract_family",
+                ),
+                hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("symbol_formula_verified", 0) > 0:
+        append_phase2_rows(
+            "symbol_formula_verified",
+            select_phase2_specialist_rows(
+                PHASE2_SYMBOL_SPECIALIST_CSV,
+                existing_ids=existing_ids,
+                label="symbol",
+                allowed_tiers={"verified_trace_ready"},
+                template_subtype="numeric_2x2",
+                teacher_solver_candidate="symbol_numeric_operator_formula",
+                quota=quotas["symbol_formula_verified"],
+                group_keys=("teacher_solver_candidate", "symbol_query_operator"),
+                hard_first=True,
+            ),
+        )
+    if quotas.get("symbol_formula_answer_only", 0) > 0:
+        append_phase2_rows(
+            "symbol_formula_answer_only",
+            select_phase2_specialist_rows(
+                PHASE2_SYMBOL_SPECIALIST_CSV,
+                existing_ids=existing_ids,
+                label="symbol",
+                allowed_tiers={"answer_only_keep"},
+                template_subtype="numeric_2x2",
+                teacher_solver_candidate="symbol_numeric_operator_formula",
+                quota=quotas["symbol_formula_answer_only"],
+                group_keys=("teacher_solver_candidate", "symbol_query_operator"),
+                hard_first=True,
+            ),
+        )
+    if quotas.get("text_verified_anchor_mod", 0) > 0:
+        append_duplicate_phase2_rows(
+            "text_verified_anchor",
+            select_phase2_anchor_rows(
+                label="text",
+                allowed_tiers={"verified_trace_ready"},
+                mod=quotas["text_verified_anchor_mod"],
+            ),
+        )
+    if quotas.get("unit_verified_anchor_mod", 0) > 0:
+        append_duplicate_phase2_rows(
+            "unit_verified_anchor",
+            select_phase2_anchor_rows(
+                label="unit",
+                allowed_tiers={"verified_trace_ready"},
+                mod=quotas["unit_verified_anchor_mod"],
+            ),
+        )
+
+    profiled_rows = [*base_rows, *augmentation_rows]
+    return profiled_rows, {
+        "profile": profile_name,
+        "input": summarize_phase2_rows(input_rows),
+        "output": summarize_phase2_rows(profiled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+        "base_profile": {
+            "profile": base_summary.get("profile", "single-adapter-fusion-v10"),
+            "output": base_summary.get("output", {}),
+        },
+        "augmentation": {
+            "rows": len(augmentation_rows),
+            "summary": summarize_phase2_rows(augmentation_rows),
+            "sources": source_summaries,
+        },
+    }
+
+
+def build_single_adapter_fusion_v15_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v15",
+        quotas=FUSION_V15_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v16_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v16",
+        quotas=FUSION_V16_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v17_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v17",
+        quotas=FUSION_V17_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v18_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v18",
+        quotas=FUSION_V18_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v19_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v19",
+        quotas=FUSION_V19_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v20_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v20",
+        quotas=FUSION_V20_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v21_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v21",
+        quotas=FUSION_V21_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v22_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v22",
+        quotas=FUSION_V22_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v23_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v23",
+        quotas=FUSION_V23_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v24_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v24",
+        quotas=FUSION_V24_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v25_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v25",
+        quotas=FUSION_V25_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v26_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v26",
+        quotas=FUSION_V26_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v27_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v27",
+        quotas=FUSION_V27_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v28_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v28",
+        quotas=FUSION_V28_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v29_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v29",
+        quotas=FUSION_V29_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v30_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v30",
+        quotas=FUSION_V30_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v31_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v31",
+        quotas=FUSION_V31_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -560,6 +1394,40 @@ def apply_phase2_train_profile(
             "output": summary,
             "transform_counts": {},
         }
+    if normalized_profile == "single-adapter-fusion-v15":
+        return build_single_adapter_fusion_v15_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v16":
+        return build_single_adapter_fusion_v16_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v17":
+        return build_single_adapter_fusion_v17_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v18":
+        return build_single_adapter_fusion_v18_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v19":
+        return build_single_adapter_fusion_v19_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v20":
+        return build_single_adapter_fusion_v20_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v21":
+        return build_single_adapter_fusion_v21_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v22":
+        return build_single_adapter_fusion_v22_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v23":
+        return build_single_adapter_fusion_v23_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v24":
+        return build_single_adapter_fusion_v24_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v25":
+        return build_single_adapter_fusion_v25_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v26":
+        return build_single_adapter_fusion_v26_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v27":
+        return build_single_adapter_fusion_v27_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v28":
+        return build_single_adapter_fusion_v28_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v29":
+        return build_single_adapter_fusion_v29_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v30":
+        return build_single_adapter_fusion_v30_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v31":
+        return build_single_adapter_fusion_v31_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
@@ -603,12 +1471,20 @@ def apply_phase2_train_profile(
             "single-adapter-fusion-v8",
             "single-adapter-fusion-v9",
             "single-adapter-fusion-v10",
+            "single-adapter-fusion-v11",
+            "single-adapter-fusion-v12",
+            "single-adapter-fusion-v13",
+            "single-adapter-fusion-v14",
         }:
             if normalized_profile in {
                 "single-adapter-fusion-v7",
                 "single-adapter-fusion-v8",
                 "single-adapter-fusion-v9",
                 "single-adapter-fusion-v10",
+                "single-adapter-fusion-v11",
+                "single-adapter-fusion-v12",
+                "single-adapter-fusion-v13",
+                "single-adapter-fusion-v14",
             }:
                 row_key = str(row.get("id") or row.get("prompt") or "")
                 fusion_settings = {
@@ -644,11 +1520,90 @@ def apply_phase2_train_profile(
                         "roman_mod": 2,
                         "tier_aware_boxing": True,
                     },
+                    "single-adapter-fusion-v11": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "answer_only_keep": 3,
+                            "manual_audit_priority": 2,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 4,
+                            "manual_audit_priority": 0,
+                        },
+                        "trace_repeats_by_tier": {},
+                        "unit_mod": 2,
+                        "text_repeats": 2,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                    "single-adapter-fusion-v12": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "verified_trace_ready": 2,
+                            "answer_only_keep": 3,
+                            "manual_audit_priority": 2,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 4,
+                            "manual_audit_priority": 0,
+                        },
+                        "trace_repeats_by_tier": {
+                            "binary:verified_trace_ready": 1,
+                            "symbol:verified_trace_ready": 1,
+                        },
+                        "unit_mod": 2,
+                        "text_repeats": 2,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                    "single-adapter-fusion-v13": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "answer_only_keep": 1,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 3,
+                        },
+                        "trace_repeats_by_tier": {},
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                    "single-adapter-fusion-v14": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "answer_only_keep": 2,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 3,
+                        },
+                        "trace_repeats_by_tier": {},
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
                 }[normalized_profile]
                 if label in {"binary", "symbol"}:
                     use_boxed_primary = True
                     if fusion_settings["tier_aware_boxing"]:
                         use_boxed_primary = tier == "answer_only_keep"
+                    repeat_count = (
+                        fusion_settings.get(f"{label}_repeats_by_tier", {}).get(
+                            tier,
+                            fusion_settings["binary_repeats"]
+                            if label == "binary"
+                            else fusion_settings["symbol_repeats"],
+                        )
+                    )
+                    trace_repeat_count = fusion_settings.get(
+                        "trace_repeats_by_tier", {}
+                    ).get(f"{label}:{tier}", 0)
                     if use_boxed_primary:
                         specialist_row = clone_phase2_row(row)
                         if style != "boxed_only":
@@ -661,6 +1616,9 @@ def apply_phase2_train_profile(
                     else:
                         profiled_rows.append(row)
                         transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+                        for _ in range(trace_repeat_count):
+                            profiled_rows.append(clone_phase2_row(row))
+                            transform_counts[f"repeat_trace:{label}:{tier or 'unknown'}"] += 1
                         specialist_row = clone_phase2_row(row)
                         if style != "boxed_only":
                             specialist_row["assistant_style"] = "boxed_only"
@@ -669,7 +1627,6 @@ def apply_phase2_train_profile(
                             transform_counts[f"reuse_boxed_anchor:{label}:{tier or 'unknown'}"] += 1
                         profiled_rows.append(specialist_row)
                         specialist_style = str(specialist_row.get("assistant_style", "")).strip().lower()
-                    repeat_count = fusion_settings["binary_repeats"] if label == "binary" else fusion_settings["symbol_repeats"]
                     for _ in range(repeat_count):
                         if specialist_style == "boxed_only":
                             transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
