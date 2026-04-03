@@ -65,6 +65,7 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v13",
     "single-adapter-fusion-v14",
     "single-adapter-fusion-v15",
+    "single-adapter-fusion-v16",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -108,6 +109,12 @@ SYMBOL_WATCH_TARGETS = [
 ]
 FUSION_V15_AUGMENT_QUOTAS = {
     "binary_candidates": 240,
+    "symbol_verified": 32,
+    "symbol_answer_only": 64,
+    "symbol_manual": 26,
+}
+FUSION_V16_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
     "symbol_verified": 32,
     "symbol_answer_only": 64,
     "symbol_manual": 26,
@@ -646,8 +653,11 @@ def select_augmentation_candidates(
     return candidates
 
 
-def build_single_adapter_fusion_v15_rows(
+def build_single_adapter_fusion_external_rows(
     rows: Sequence[dict[str, str]],
+    *,
+    profile_name: str,
+    quotas: dict[str, int],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
     base_rows, base_summary = apply_phase2_train_profile(rows, profile="single-adapter-fusion-v10")
     input_rows = [clone_phase2_row(row) for row in rows]
@@ -683,23 +693,24 @@ def build_single_adapter_fusion_v15_rows(
             "summary": summarize_phase2_rows(appended_rows),
         }
 
-    append_candidates(
-        "binary_candidates",
-        select_augmentation_candidates(
-            AUGMENT_BINARY_STRUCTURED_CSV,
-            existing_ids=existing_ids,
-            family="bit_manipulation",
-            allowed_tiers={"verified_trace_ready", "answer_only_keep"},
-            quota=FUSION_V15_AUGMENT_QUOTAS["binary_candidates"],
-            group_keys=(
-                "template_subtype",
-                "teacher_solver_candidate",
-                "bit_structured_formula_abstract_family",
+    if quotas.get("binary_candidates", 0) > 0:
+        append_candidates(
+            "binary_candidates",
+            select_augmentation_candidates(
+                AUGMENT_BINARY_STRUCTURED_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                allowed_tiers={"verified_trace_ready", "answer_only_keep"},
+                quota=quotas["binary_candidates"],
+                group_keys=(
+                    "template_subtype",
+                    "teacher_solver_candidate",
+                    "bit_structured_formula_abstract_family",
+                ),
+                hard_first=True,
             ),
-            hard_first=True,
-        ),
-        label="binary",
-    )
+            label="binary",
+        )
     append_candidates(
         "symbol_verified",
         select_augmentation_candidates(
@@ -707,7 +718,7 @@ def build_single_adapter_fusion_v15_rows(
             existing_ids=existing_ids,
             family="symbol_equation",
             allowed_tiers={"verified_trace_ready"},
-            quota=FUSION_V15_AUGMENT_QUOTAS["symbol_verified"],
+            quota=quotas["symbol_verified"],
             group_keys=("template_subtype", "symbol_query_operator"),
             hard_first=True,
         ),
@@ -721,7 +732,7 @@ def build_single_adapter_fusion_v15_rows(
             family="symbol_equation",
             template_subtype="numeric_2x2",
             allowed_tiers={"answer_only_keep"},
-            quota=FUSION_V15_AUGMENT_QUOTAS["symbol_answer_only"],
+            quota=quotas["symbol_answer_only"],
             group_keys=("template_subtype", "symbol_query_operator"),
             hard_first=True,
         ),
@@ -735,7 +746,7 @@ def build_single_adapter_fusion_v15_rows(
             family="symbol_equation",
             template_subtype="numeric_2x2",
             allowed_tiers={"manual_audit_priority"},
-            quota=FUSION_V15_AUGMENT_QUOTAS["symbol_manual"],
+            quota=quotas["symbol_manual"],
             group_keys=("template_subtype", "symbol_query_operator"),
             hard_first=True,
         ),
@@ -744,7 +755,7 @@ def build_single_adapter_fusion_v15_rows(
 
     profiled_rows = [*base_rows, *augmentation_rows]
     return profiled_rows, {
-        "profile": "single-adapter-fusion-v15",
+        "profile": profile_name,
         "input": summarize_phase2_rows(input_rows),
         "output": summarize_phase2_rows(profiled_rows),
         "transform_counts": {
@@ -760,6 +771,26 @@ def build_single_adapter_fusion_v15_rows(
             "sources": source_summaries,
         },
     }
+
+
+def build_single_adapter_fusion_v15_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v15",
+        quotas=FUSION_V15_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v16_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v16",
+        quotas=FUSION_V16_AUGMENT_QUOTAS,
+    )
 
 
 def apply_phase2_train_profile(
@@ -779,6 +810,8 @@ def apply_phase2_train_profile(
         }
     if normalized_profile == "single-adapter-fusion-v15":
         return build_single_adapter_fusion_v15_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v16":
+        return build_single_adapter_fusion_v16_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
