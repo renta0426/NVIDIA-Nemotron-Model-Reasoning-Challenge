@@ -1,0 +1,392 @@
+{
+  "manifest": {
+    "phase": "phase0_offline_eval",
+    "source_analysis_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+    "readme_eval_assumptions": {
+      "metric": "accuracy",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_tokens": 7680,
+      "max_num_seqs": 64,
+      "max_model_len": 8192,
+      "boxed_first_extraction": true,
+      "numeric_relative_tolerance": 0.01
+    },
+    "benchmark_sets": {
+      "general_stable_set": {
+        "rows": 200,
+        "family_counts": {
+          "gravity": 50,
+          "roman": 50,
+          "text": 50,
+          "unit": 50
+        },
+        "selection_tier_counts": {
+          "verified_trace_ready": 200
+        },
+        "template_subtype_counts": {
+          "gravity_half_g_t2": 50,
+          "roman_standard": 50,
+          "text_monoalphabetic": 50,
+          "unit_fixed_ratio": 50
+        }
+      },
+      "binary_hard_set": {
+        "rows": 60,
+        "family_counts": {
+          "binary": 60
+        },
+        "selection_tier_counts": {
+          "answer_only_keep": 20,
+          "manual_audit_priority": 20,
+          "verified_trace_ready": 20
+        },
+        "template_subtype_counts": {
+          "bit_other": 46,
+          "bit_structured_byte_formula": 14
+        }
+      },
+      "symbol_watch_set": {
+        "rows": 60,
+        "family_counts": {
+          "symbol": 60
+        },
+        "selection_tier_counts": {
+          "answer_only_keep": 15,
+          "manual_audit_priority": 30,
+          "verified_trace_ready": 15
+        },
+        "template_subtype_counts": {
+          "glyph_len5": 20,
+          "numeric_2x2": 40
+        }
+      }
+    },
+    "binary_holdouts": {
+      "gap_signature": {
+        "0": 321,
+        "1": 321,
+        "2": 320,
+        "3": 320,
+        "4": 320
+      },
+      "prompt_signature": {
+        "0": 320,
+        "1": 321,
+        "2": 321,
+        "3": 320,
+        "4": 320
+      },
+      "solver_family": {
+        "0": 176,
+        "1": 598,
+        "2": 171,
+        "3": 446,
+        "4": 211
+      },
+      "structured_family": {
+        "0": 213,
+        "1": 642,
+        "2": 322,
+        "3": 213,
+        "4": 212
+      }
+    }
+  },
+  "overall": {
+    "overall": {
+      "rows": 8,
+      "correct": 2,
+      "accuracy": 0.25
+    },
+    "by_family": [
+      {
+        "family_short": "binary",
+        "rows": 8,
+        "correct": 2,
+        "accuracy": 0.25
+      }
+    ],
+    "by_template_subtype": [
+      {
+        "template_subtype": "bit_other",
+        "rows": 8,
+        "correct": 2,
+        "accuracy": 0.25
+      }
+    ],
+    "by_answer_type": [
+      {
+        "answer_type": "binary8",
+        "rows": 8,
+        "correct": 2,
+        "accuracy": 0.25
+      }
+    ],
+    "by_prompt_len_bucket": [
+      {
+        "prompt_len_bucket": "400-499",
+        "rows": 5,
+        "correct": 1,
+        "accuracy": 0.2
+      },
+      {
+        "prompt_len_bucket": "500-599",
+        "rows": 3,
+        "correct": 1,
+        "accuracy": 0.3333
+      }
+    ],
+    "by_num_examples": [
+      {
+        "num_examples": "10",
+        "rows": 3,
+        "correct": 1,
+        "accuracy": 0.3333
+      },
+      {
+        "num_examples": "8",
+        "rows": 2,
+        "correct": 1,
+        "accuracy": 0.5
+      },
+      {
+        "num_examples": "9",
+        "rows": 3,
+        "correct": 0,
+        "accuracy": 0.0
+      }
+    ],
+    "by_selection_tier": [
+      {
+        "selection_tier": "verified_trace_ready",
+        "rows": 8,
+        "correct": 2,
+        "accuracy": 0.25
+      }
+    ],
+    "binary_metrics": {
+      "rows": 8,
+      "boxed_extraction_success_rate": 0.375,
+      "regex_exact_rate": 0.25,
+      "leading_zero_retention_rate": 0.3333,
+      "format_failure_rate": 0.75,
+      "format_ok_content_wrong_rate": 0.0,
+      "solver_family_accuracy": [
+        {
+          "teacher_solver_candidate": "binary_affine_xor",
+          "rows": 8,
+          "correct": 2,
+          "accuracy": 0.25
+        }
+      ]
+    }
+  },
+  "by_benchmark": {
+    "general_stable_set": {
+      "overall": {
+        "rows": 0,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "by_family": [],
+      "by_template_subtype": [],
+      "by_answer_type": [],
+      "by_prompt_len_bucket": [],
+      "by_num_examples": [],
+      "by_selection_tier": [],
+      "binary_metrics": {
+        "rows": 0,
+        "boxed_extraction_success_rate": 0.0,
+        "regex_exact_rate": 0.0,
+        "leading_zero_retention_rate": 0.0,
+        "format_failure_rate": 0.0,
+        "format_ok_content_wrong_rate": 0.0,
+        "solver_family_accuracy": []
+      }
+    },
+    "binary_hard_set": {
+      "overall": {
+        "rows": 8,
+        "correct": 2,
+        "accuracy": 0.25
+      },
+      "by_family": [
+        {
+          "family_short": "binary",
+          "rows": 8,
+          "correct": 2,
+          "accuracy": 0.25
+        }
+      ],
+      "by_template_subtype": [
+        {
+          "template_subtype": "bit_other",
+          "rows": 8,
+          "correct": 2,
+          "accuracy": 0.25
+        }
+      ],
+      "by_answer_type": [
+        {
+          "answer_type": "binary8",
+          "rows": 8,
+          "correct": 2,
+          "accuracy": 0.25
+        }
+      ],
+      "by_prompt_len_bucket": [
+        {
+          "prompt_len_bucket": "400-499",
+          "rows": 5,
+          "correct": 1,
+          "accuracy": 0.2
+        },
+        {
+          "prompt_len_bucket": "500-599",
+          "rows": 3,
+          "correct": 1,
+          "accuracy": 0.3333
+        }
+      ],
+      "by_num_examples": [
+        {
+          "num_examples": "10",
+          "rows": 3,
+          "correct": 1,
+          "accuracy": 0.3333
+        },
+        {
+          "num_examples": "8",
+          "rows": 2,
+          "correct": 1,
+          "accuracy": 0.5
+        },
+        {
+          "num_examples": "9",
+          "rows": 3,
+          "correct": 0,
+          "accuracy": 0.0
+        }
+      ],
+      "by_selection_tier": [
+        {
+          "selection_tier": "verified_trace_ready",
+          "rows": 8,
+          "correct": 2,
+          "accuracy": 0.25
+        }
+      ],
+      "binary_metrics": {
+        "rows": 8,
+        "boxed_extraction_success_rate": 0.375,
+        "regex_exact_rate": 0.25,
+        "leading_zero_retention_rate": 0.3333,
+        "format_failure_rate": 0.75,
+        "format_ok_content_wrong_rate": 0.0,
+        "solver_family_accuracy": [
+          {
+            "teacher_solver_candidate": "binary_affine_xor",
+            "rows": 8,
+            "correct": 2,
+            "accuracy": 0.25
+          }
+        ]
+      }
+    },
+    "symbol_watch_set": {
+      "overall": {
+        "rows": 0,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "by_family": [],
+      "by_template_subtype": [],
+      "by_answer_type": [],
+      "by_prompt_len_bucket": [],
+      "by_num_examples": [],
+      "by_selection_tier": [],
+      "binary_metrics": {
+        "rows": 0,
+        "boxed_extraction_success_rate": 0.0,
+        "regex_exact_rate": 0.0,
+        "leading_zero_retention_rate": 0.0,
+        "format_failure_rate": 0.0,
+        "format_ok_content_wrong_rate": 0.0,
+        "solver_family_accuracy": []
+      }
+    }
+  },
+  "binary_holdout_accuracy": [
+    {
+      "holdout_kind": "gap_signature",
+      "fold": "0",
+      "rows": 2,
+      "correct": 1,
+      "accuracy": 0.5
+    },
+    {
+      "holdout_kind": "gap_signature",
+      "fold": "1",
+      "rows": 2,
+      "correct": 1,
+      "accuracy": 0.5
+    },
+    {
+      "holdout_kind": "gap_signature",
+      "fold": "2",
+      "rows": 2,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    {
+      "holdout_kind": "gap_signature",
+      "fold": "3",
+      "rows": 2,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    {
+      "holdout_kind": "prompt_signature",
+      "fold": "0",
+      "rows": 1,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    {
+      "holdout_kind": "prompt_signature",
+      "fold": "1",
+      "rows": 2,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    {
+      "holdout_kind": "prompt_signature",
+      "fold": "3",
+      "rows": 3,
+      "correct": 2,
+      "accuracy": 0.6667
+    },
+    {
+      "holdout_kind": "prompt_signature",
+      "fold": "4",
+      "rows": 2,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    {
+      "holdout_kind": "solver_family",
+      "fold": "4",
+      "rows": 8,
+      "correct": 2,
+      "accuracy": 0.25
+    },
+    {
+      "holdout_kind": "structured_family",
+      "fold": "1",
+      "rows": 8,
+      "correct": 2,
+      "accuracy": 0.25
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "created_at": "2026-04-02T06:24:07.985204+00:00",
+  "run_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_merge_texttop8_focustop8_g025_s075",
+  "adapter_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_merge_texttop8_focustop8_g025_s075/adapter",
+  "generalist_adapter_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_text_run3_lr2e5_top8_bs16ga1/adapter",
+  "specialist_adapter_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_focus_v1_text_top8_bs16ga1/adapter",
+  "generalist_weight": 0.25,
+  "specialist_weight": 0.75,
+  "adapter_config": {
+    "created_at": "2026-04-02T06:24:07.791809+00:00",
+    "fine_tune_type": "lora",
+    "num_layers": 8,
+    "lora_parameters": {
+      "rank": 32,
+      "dropout": 0.05,
+      "scale": 32.0
+    },
+    "merge_sources": {
+      "generalist": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_text_run3_lr2e5_top8_bs16ga1/adapter",
+      "specialist": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_focus_v1_text_top8_bs16ga1/adapter"
+    },
+    "merge_weights": {
+      "generalist": 0.25,
+      "specialist": 0.75
+    },
+    "merge_strategy": "weighted_union_zero_fill"
+  },
+  "merge_stats": {
+    "merged_tensor_count": 48,
+    "overlap_tensor_count": 48,
+    "generalist_only_tensor_count": 0,
+    "specialist_only_tensor_count": 0
+  }
+}

@@ -1,0 +1,31 @@
+model: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_baseline_completion_full_nothinking_warmup_bs16ga1/shadow_model
+train: true
+data: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_baseline_completion_full_nothinking_warmup_bs16ga1/dataset
+fine_tune_type: lora
+optimizer: adamw
+mask_prompt: true
+enable_thinking: false
+num_layers: -1
+batch_size: 16
+iters: 112
+val_batches: -1
+learning_rate: 2.0e-05
+steps_per_report: 5
+steps_per_eval: 900
+grad_accumulation_steps: 1
+adapter_path: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_baseline_completion_full_nothinking_warmup_bs16ga1/adapter
+save_every: 112
+max_seq_length: 2048
+grad_checkpoint: true
+seed: 42
+lora_parameters:
+  rank: 32
+  dropout: 0.05
+  scale: 32.0
+lr_schedule:
+  name: cosine_decay
+  arguments:
+  - 2.0e-05
+  - 112
+  - 0.0
+  warmup: 11
