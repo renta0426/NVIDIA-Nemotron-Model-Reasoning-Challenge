@@ -41,6 +41,11 @@ DEFAULT_PHASE0_ANALYSIS_CSV = (
 )
 DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
+AUGMENT_ARTIFACT_ROOT = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts"
+AUGMENT_BINARY_STRUCTURED_CSV = AUGMENT_ARTIFACT_ROOT / "binary_structured_byte_formula_candidates_v1.csv"
+AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready_v1.csv"
+AUGMENT_ANSWER_ONLY_CSV = AUGMENT_ARTIFACT_ROOT / "train_answer_only_keep_v1.csv"
+AUGMENT_SYMBOL_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "symbol_manual_audit_queue_v1.csv"
 TRAIN_PROFILE_CHOICES = (
     "baseline",
     "single-adapter-focus-v1",
@@ -59,6 +64,7 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v12",
     "single-adapter-fusion-v13",
     "single-adapter-fusion-v14",
+    "single-adapter-fusion-v15",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -100,6 +106,12 @@ SYMBOL_WATCH_TARGETS = [
     ("numeric_2x2", "manual_audit_priority", 10),
     ("glyph_len5", "manual_audit_priority", 20),
 ]
+FUSION_V15_AUGMENT_QUOTAS = {
+    "binary_candidates": 240,
+    "symbol_verified": 32,
+    "symbol_answer_only": 64,
+    "symbol_manual": 26,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -299,6 +311,50 @@ def load_phase2_training_rows(path: Path) -> list[dict[str, str]]:
                 f"(expected {EXPECTED_PHASE2_COLUMNS})"
             )
     return rows
+
+
+def infer_candidate_selection_tier(row: dict[str, str]) -> str:
+    tier = str(row.get("selection_tier", "")).strip().lower()
+    if tier:
+        return tier
+    if parse_bool(row.get("verified_trace_ready")):
+        return "verified_trace_ready"
+    if parse_bool(row.get("answer_only_ready")):
+        return "answer_only_keep"
+    return ""
+
+
+def make_phase2_row_from_candidate(
+    row: dict[str, str],
+    *,
+    label: str | None = None,
+    assistant_style: str = "boxed_only",
+    source_selection_tier: str | None = None,
+) -> dict[str, str]:
+    row_id = str(row.get("id", "")).strip()
+    prompt = str(row.get("prompt", "")).strip()
+    answer = str(row.get("answer", "")).strip()
+    if not row_id:
+        raise ValueError("Augmentation row is missing id")
+    if not prompt:
+        raise ValueError(f"Augmentation row {row_id} is missing prompt")
+    if not answer:
+        raise ValueError(f"Augmentation row {row_id} is missing answer")
+    resolved_label = str(label or FAMILY_SHORT.get(str(row.get("family", "")).strip(), "")).strip()
+    if not resolved_label:
+        raise ValueError(f"Unable to infer phase2 label for augmentation row {row_id}")
+    resolved_tier = str(source_selection_tier or infer_candidate_selection_tier(row)).strip().lower()
+    if not resolved_tier:
+        raise ValueError(f"Unable to infer selection tier for augmentation row {row_id}")
+    return {
+        "id": row_id,
+        "prompt": prompt,
+        "answer": answer,
+        "generated_cot": "",
+        "label": resolved_label,
+        "assistant_style": assistant_style,
+        "source_selection_tier": resolved_tier,
+    }
 
 
 def build_user_message(prompt: str) -> str:
@@ -549,6 +605,163 @@ def summarize_phase2_rows(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
     }
 
 
+def select_augmentation_candidates(
+    path: Path,
+    *,
+    existing_ids: set[str],
+    family: str | None = None,
+    template_subtype: str | None = None,
+    allowed_tiers: set[str] | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = True,
+) -> list[dict[str, str]]:
+    candidates: list[dict[str, str]] = []
+    for raw_row in load_csv_rows(path):
+        row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        if family and str(row.get("family", "")).strip() != family:
+            continue
+        if template_subtype and str(row.get("template_subtype", "")).strip() != template_subtype:
+            continue
+        if not str(row.get("prompt", "")).strip() or not str(row.get("answer", "")).strip():
+            continue
+        tier = infer_candidate_selection_tier(row)
+        row["selection_tier"] = tier
+        if allowed_tiers and tier not in allowed_tiers:
+            continue
+        candidates.append(row)
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("template_subtype", "teacher_solver_candidate")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
+def build_single_adapter_fusion_v15_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    base_rows, base_summary = apply_phase2_train_profile(rows, profile="single-adapter-fusion-v10")
+    input_rows = [clone_phase2_row(row) for row in rows]
+    existing_ids = {
+        str(row.get("id", "")).strip()
+        for row in input_rows
+        if str(row.get("id", "")).strip()
+    }
+    transform_counts = Counter(base_summary.get("transform_counts", {}))
+    augmentation_rows: list[dict[str, str]] = []
+    source_summaries: dict[str, Any] = {}
+
+    def append_candidates(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+        *,
+        label: str,
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(candidate, label=label, assistant_style="boxed_only")
+            row_id = phase2_row["id"]
+            if row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    append_candidates(
+        "binary_candidates",
+        select_augmentation_candidates(
+            AUGMENT_BINARY_STRUCTURED_CSV,
+            existing_ids=existing_ids,
+            family="bit_manipulation",
+            allowed_tiers={"verified_trace_ready", "answer_only_keep"},
+            quota=FUSION_V15_AUGMENT_QUOTAS["binary_candidates"],
+            group_keys=(
+                "template_subtype",
+                "teacher_solver_candidate",
+                "bit_structured_formula_abstract_family",
+            ),
+            hard_first=True,
+        ),
+        label="binary",
+    )
+    append_candidates(
+        "symbol_verified",
+        select_augmentation_candidates(
+            AUGMENT_VERIFIED_TRACE_CSV,
+            existing_ids=existing_ids,
+            family="symbol_equation",
+            allowed_tiers={"verified_trace_ready"},
+            quota=FUSION_V15_AUGMENT_QUOTAS["symbol_verified"],
+            group_keys=("template_subtype", "symbol_query_operator"),
+            hard_first=True,
+        ),
+        label="symbol",
+    )
+    append_candidates(
+        "symbol_answer_only",
+        select_augmentation_candidates(
+            AUGMENT_ANSWER_ONLY_CSV,
+            existing_ids=existing_ids,
+            family="symbol_equation",
+            template_subtype="numeric_2x2",
+            allowed_tiers={"answer_only_keep"},
+            quota=FUSION_V15_AUGMENT_QUOTAS["symbol_answer_only"],
+            group_keys=("template_subtype", "symbol_query_operator"),
+            hard_first=True,
+        ),
+        label="symbol",
+    )
+    append_candidates(
+        "symbol_manual",
+        select_augmentation_candidates(
+            AUGMENT_SYMBOL_MANUAL_CSV,
+            existing_ids=existing_ids,
+            family="symbol_equation",
+            template_subtype="numeric_2x2",
+            allowed_tiers={"manual_audit_priority"},
+            quota=FUSION_V15_AUGMENT_QUOTAS["symbol_manual"],
+            group_keys=("template_subtype", "symbol_query_operator"),
+            hard_first=True,
+        ),
+        label="symbol",
+    )
+
+    profiled_rows = [*base_rows, *augmentation_rows]
+    return profiled_rows, {
+        "profile": "single-adapter-fusion-v15",
+        "input": summarize_phase2_rows(input_rows),
+        "output": summarize_phase2_rows(profiled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+        "base_profile": {
+            "profile": base_summary.get("profile", "single-adapter-fusion-v10"),
+            "output": base_summary.get("output", {}),
+        },
+        "augmentation": {
+            "rows": len(augmentation_rows),
+            "summary": summarize_phase2_rows(augmentation_rows),
+            "sources": source_summaries,
+        },
+    }
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -564,6 +777,8 @@ def apply_phase2_train_profile(
             "output": summary,
             "transform_counts": {},
         }
+    if normalized_profile == "single-adapter-fusion-v15":
+        return build_single_adapter_fusion_v15_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
