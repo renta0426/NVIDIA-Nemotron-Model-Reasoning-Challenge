@@ -15,6 +15,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -46,6 +47,22 @@ AUGMENT_BINARY_STRUCTURED_CSV = AUGMENT_ARTIFACT_ROOT / "binary_structured_byte_
 AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready_v1.csv"
 AUGMENT_ANSWER_ONLY_CSV = AUGMENT_ARTIFACT_ROOT / "train_answer_only_keep_v1.csv"
 AUGMENT_SYMBOL_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "symbol_manual_audit_queue_v1.csv"
+PHASE2_BINARY_SPECIALIST_CSV = (
+    REPO_ROOT
+    / "baseline"
+    / "cot"
+    / "phase2_1_2_merge_lora"
+    / "artifacts"
+    / "phase2_1_2_binary_specialist_training_data.csv"
+)
+PHASE2_SYMBOL_SPECIALIST_CSV = (
+    REPO_ROOT
+    / "baseline"
+    / "cot"
+    / "phase2_2_merge_lora"
+    / "artifacts"
+    / "phase2_2_symbol_specialist_training_data.csv"
+)
 TRAIN_PROFILE_CHOICES = (
     "baseline",
     "single-adapter-focus-v1",
@@ -73,6 +90,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v21",
     "single-adapter-fusion-v22",
     "single-adapter-fusion-v23",
+    "single-adapter-fusion-v24",
+    "single-adapter-fusion-v25",
+    "single-adapter-fusion-v26",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -181,6 +201,42 @@ FUSION_V23_AUGMENT_QUOTAS = {
     "symbol_answer_only": 64,
     "symbol_manual": 0,
     "symbol_glyph_answer_only": 16,
+}
+FUSION_V24_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 0,
+    "symbol_formula_answer_only": 0,
+}
+FUSION_V25_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+}
+FUSION_V26_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 16,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 8,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -373,6 +429,11 @@ def load_phase2_training_rows(path: Path) -> list[dict[str, str]]:
         raise ValueError(
             f"Expected {EXPECTED_PHASE2_ROWS} rows in {path}, found {len(rows)}"
         )
+    validate_phase2_columns(path, rows)
+    return rows
+
+
+def validate_phase2_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
     if rows:
         actual_columns = list(rows[0].keys())
         if actual_columns != EXPECTED_PHASE2_COLUMNS:
@@ -380,7 +441,17 @@ def load_phase2_training_rows(path: Path) -> list[dict[str, str]]:
                 f"Unexpected CSV columns in {path}: {actual_columns} "
                 f"(expected {EXPECTED_PHASE2_COLUMNS})"
             )
-    return rows
+
+
+@lru_cache(maxsize=1)
+def load_phase0_analysis_index() -> dict[str, dict[str, str]]:
+    index: dict[str, dict[str, str]] = {}
+    for raw_row in load_csv_rows(DEFAULT_PHASE0_ANALYSIS_CSV):
+        row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(row.get("id", "")).strip()
+        if row_id:
+            index[row_id] = row
+    return index
 
 
 def infer_candidate_selection_tier(row: dict[str, str]) -> str:
@@ -716,6 +787,57 @@ def select_augmentation_candidates(
     return candidates
 
 
+def select_phase2_specialist_rows(
+    path: Path,
+    *,
+    existing_ids: set[str],
+    label: str | None = None,
+    allowed_tiers: set[str] | None = None,
+    template_subtype: str | None = None,
+    teacher_solver_candidate: str | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = True,
+) -> list[dict[str, str]]:
+    rows = load_csv_rows(path)
+    validate_phase2_columns(path, rows)
+    analysis_index = load_phase0_analysis_index()
+    candidates: list[dict[str, str]] = []
+    for raw_row in rows:
+        phase2_row = clone_phase2_row(raw_row)
+        row_id = str(phase2_row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        if label and str(phase2_row.get("label", "")).strip() != label:
+            continue
+        tier = str(phase2_row.get("source_selection_tier", "")).strip().lower()
+        if allowed_tiers and tier not in allowed_tiers:
+            continue
+        analysis_row = analysis_index.get(row_id)
+        if analysis_row is None:
+            continue
+        if template_subtype and str(analysis_row.get("template_subtype", "")).strip() != template_subtype:
+            continue
+        if (
+            teacher_solver_candidate is not None
+            and str(analysis_row.get("teacher_solver_candidate", "")).strip()
+            != teacher_solver_candidate
+        ):
+            continue
+        candidates.append({**analysis_row, **phase2_row})
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("template_subtype", "teacher_solver_candidate")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
 def build_single_adapter_fusion_external_rows(
     rows: Sequence[dict[str, str]],
     *,
@@ -744,6 +866,27 @@ def build_single_adapter_fusion_external_rows(
             phase2_row = make_phase2_row_from_candidate(candidate, label=label, assistant_style="boxed_only")
             row_id = phase2_row["id"]
             if row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    def append_phase2_rows(source_name: str, candidates: Sequence[dict[str, str]]) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = {
+                key: "" if candidate.get(key) is None else str(candidate.get(key, ""))
+                for key in EXPECTED_PHASE2_COLUMNS
+            }
+            row_id = str(phase2_row.get("id", "")).strip()
+            if not row_id or row_id in existing_ids:
                 continue
             existing_ids.add(row_id)
             augmentation_rows.append(phase2_row)
@@ -846,6 +989,69 @@ def build_single_adapter_fusion_external_rows(
                 hard_first=True,
             ),
             label="symbol",
+        )
+    if quotas.get("binary_affine_verified", 0) > 0:
+        append_phase2_rows(
+            "binary_affine_verified",
+            select_phase2_specialist_rows(
+                PHASE2_BINARY_SPECIALIST_CSV,
+                existing_ids=existing_ids,
+                label="binary",
+                allowed_tiers={"verified_trace_ready"},
+                template_subtype="bit_other",
+                teacher_solver_candidate="binary_affine_xor",
+                quota=quotas["binary_affine_verified"],
+                group_keys=("teacher_solver_candidate", "group_signature"),
+                hard_first=True,
+            ),
+        )
+    if quotas.get("binary_structured_answer_only", 0) > 0:
+        append_candidates(
+            "binary_structured_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_structured_answer_only"],
+                group_keys=(
+                    "template_subtype",
+                    "bit_structured_formula_abstract_family",
+                ),
+                hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("symbol_formula_verified", 0) > 0:
+        append_phase2_rows(
+            "symbol_formula_verified",
+            select_phase2_specialist_rows(
+                PHASE2_SYMBOL_SPECIALIST_CSV,
+                existing_ids=existing_ids,
+                label="symbol",
+                allowed_tiers={"verified_trace_ready"},
+                template_subtype="numeric_2x2",
+                teacher_solver_candidate="symbol_numeric_operator_formula",
+                quota=quotas["symbol_formula_verified"],
+                group_keys=("teacher_solver_candidate", "symbol_query_operator"),
+                hard_first=True,
+            ),
+        )
+    if quotas.get("symbol_formula_answer_only", 0) > 0:
+        append_phase2_rows(
+            "symbol_formula_answer_only",
+            select_phase2_specialist_rows(
+                PHASE2_SYMBOL_SPECIALIST_CSV,
+                existing_ids=existing_ids,
+                label="symbol",
+                allowed_tiers={"answer_only_keep"},
+                template_subtype="numeric_2x2",
+                teacher_solver_candidate="symbol_numeric_operator_formula",
+                quota=quotas["symbol_formula_answer_only"],
+                group_keys=("teacher_solver_candidate", "symbol_query_operator"),
+                hard_first=True,
+            ),
         )
 
     profiled_rows = [*base_rows, *augmentation_rows]
@@ -958,6 +1164,36 @@ def build_single_adapter_fusion_v23_rows(
     )
 
 
+def build_single_adapter_fusion_v24_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v24",
+        quotas=FUSION_V24_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v25_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v25",
+        quotas=FUSION_V25_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v26_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v26",
+        quotas=FUSION_V26_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -991,6 +1227,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v22_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v23":
         return build_single_adapter_fusion_v23_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v24":
+        return build_single_adapter_fusion_v24_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v25":
+        return build_single_adapter_fusion_v25_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v26":
+        return build_single_adapter_fusion_v26_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
