@@ -1,0 +1,135 @@
+{
+  "dataset_version": "v2-2-1",
+  "source_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_2_1_merge_lora/artifacts/phase2_2_1_symbol_specialist_training_data.csv",
+  "manifest_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_2_1_merge_lora/artifacts/phase2_2_1_symbol_specialist_manifest.json",
+  "seed": 42,
+  "subsample_size": 411,
+  "unique_source_id_count": 301,
+  "verified_trace_rows": 110,
+  "verified_boxed_sibling_rows": 110,
+  "high_confidence_answer_only_rows": 191,
+  "family_counts": {
+    "symbol_equation": 411
+  },
+  "source_selection_tier_counts": {
+    "answer_only_keep": 191,
+    "verified_trace_ready": 220
+  },
+  "assistant_style_counts": {
+    "boxed_only": 301,
+    "trace_boxed": 110
+  },
+  "output_origin_counts": {
+    "answer_only_formula_backed": 129,
+    "answer_only_multi_evidence": 62,
+    "verified_boxed_sibling": 110,
+    "verified_trace_core": 110
+  },
+  "template_subtype_counts": {
+    "numeric_2x2": 411
+  },
+  "symbol_query_operator_counts": {
+    "!": 16,
+    "\"": 17,
+    "#": 9,
+    "$": 19,
+    "%": 12,
+    "&": 11,
+    "'": 12,
+    "(": 14,
+    ")": 8,
+    "*": 42,
+    "+": 50,
+    "-": 57,
+    "/": 12,
+    ":": 10,
+    "<": 7,
+    ">": 14,
+    "?": 14,
+    "@": 6,
+    "[": 13,
+    "\\": 5,
+    "]": 10,
+    "^": 14,
+    "`": 11,
+    "{": 15,
+    "|": 2,
+    "}": 11
+  },
+  "symbol_numeric_formula_counts": {
+    "": 62,
+    "abs_diff_2d": 17,
+    "abs_diff_2d_op_suffix": 2,
+    "comp99_abs_diff_2d": 18,
+    "concat_xy": 53,
+    "concat_yx": 53,
+    "x_minus_y": 57,
+    "x_mod_y": 2,
+    "x_mul_y": 26,
+    "x_mul_y_minus1": 21,
+    "x_mul_y_plus1": 23,
+    "x_plus_y": 29,
+    "x_plus_y_minus1": 22,
+    "x_plus_y_plus1": 24,
+    "y_mod_x": 2
+  },
+  "phase2_2_1_selected_answer_only_analysis_notes": {
+    "symbol_manual_prompt_exact_answer_only": 2,
+    "symbol_minus_prefix_subfamily": 1,
+    "symbol_numeric_formula_low_shot": 114,
+    "symbol_operator_spec_consensus": 1,
+    "symbol_percent_reverse_abs_diff_suffix": 1,
+    "symbol_reverse_manual_exact_answer_only": 22,
+    "symbol_reverse_max_mod_min_answer_only": 1,
+    "symbol_reverse_negative_x_minus_y_answer_only": 2,
+    "symbol_reverse_operator_spec_consensus": 42,
+    "symbol_reverse_small_core_digit_answer_only": 4,
+    "symbol_reverse_wrapper_only_answer_only": 1
+  },
+  "symbol_phase2_2_1_design": {
+    "training_scope": "numeric_only_symbol_specialist",
+    "trace_rows_from_verified_numeric": 110,
+    "boxed_sibling_rows_from_verified_numeric": 110,
+    "formula_backed_answer_only_rows": 129,
+    "multi_evidence_answer_only_rows": 62,
+    "answer_only_overlap_rows": 0,
+    "answer_only_origin_counts": {
+      "answer_only_formula_backed": 129,
+      "answer_only_multi_evidence": 62
+    },
+    "glyph_rows_used": 0,
+    "glyph_rows_excluded": 823,
+    "numeric_answer_only_rows_excluded": 396,
+    "manual_rows_used": 0,
+    "exclude_rows_used": 0,
+    "trace_style": "micro_dsl_numeric_symbol",
+    "trace_avoids_repeating_final_answer_inside_think": true,
+    "query_equals_answer_rows_sanitized": 0,
+    "selected_answer_only_source_ids": 191
+  },
+  "selection_policy": {
+    "trace_include": [
+      "symbol_equation + numeric_2x2 + verified_trace_ready + teacher_solver_candidate present"
+    ],
+    "boxed_sibling_include": [
+      "Duplicate boxed-only supervision from the same verified numeric source rows used for trace_boxed"
+    ],
+    "high_confidence_answer_only_include": [
+      "symbol_equation + numeric_2x2 + answer_only_keep + symbol_numeric_formula_name present",
+      "symbol_equation + numeric_2x2 + answer_only_keep + symbol_same_operator_example_count >= 3"
+    ],
+    "exclude": [
+      "glyph_len5 all rows",
+      "numeric_2x2 + manual_audit_priority",
+      "numeric_2x2 + exclude_suspect",
+      "numeric_2x2 + answer_only_keep residual rows that are neither formula-backed nor same-operator>=3"
+    ]
+  },
+  "notes": [
+    "README.md evaluation is boxed-first Accuracy, so phase2_2_1 keeps final answers in boxed output and removes answer repetition from <think>.",
+    "The phase2_2 analysis showed glyph_len5 stayed 0/20 despite 823 answer-only rows, so glyph is excluded entirely from this dataset.",
+    "This dataset keeps numeric_2x2 verified trace as the core, adds same-source boxed siblings for closure, and only retains high-confidence numeric answer-only rows.",
+    "The output schema matches the existing assistant-only trainer notebook: id,prompt,answer,generated_cot,label,assistant_style,source_selection_tier."
+  ]
+}
