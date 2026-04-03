@@ -55,6 +55,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v8",
     "single-adapter-fusion-v9",
     "single-adapter-fusion-v10",
+    "single-adapter-fusion-v11",
+    "single-adapter-fusion-v12",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -603,12 +605,16 @@ def apply_phase2_train_profile(
             "single-adapter-fusion-v8",
             "single-adapter-fusion-v9",
             "single-adapter-fusion-v10",
+            "single-adapter-fusion-v11",
+            "single-adapter-fusion-v12",
         }:
             if normalized_profile in {
                 "single-adapter-fusion-v7",
                 "single-adapter-fusion-v8",
                 "single-adapter-fusion-v9",
                 "single-adapter-fusion-v10",
+                "single-adapter-fusion-v11",
+                "single-adapter-fusion-v12",
             }:
                 row_key = str(row.get("id") or row.get("prompt") or "")
                 fusion_settings = {
@@ -644,11 +650,60 @@ def apply_phase2_train_profile(
                         "roman_mod": 2,
                         "tier_aware_boxing": True,
                     },
+                    "single-adapter-fusion-v11": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "answer_only_keep": 3,
+                            "manual_audit_priority": 2,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 4,
+                            "manual_audit_priority": 0,
+                        },
+                        "trace_repeats_by_tier": {},
+                        "unit_mod": 2,
+                        "text_repeats": 2,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                    "single-adapter-fusion-v12": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "verified_trace_ready": 2,
+                            "answer_only_keep": 3,
+                            "manual_audit_priority": 2,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 4,
+                            "manual_audit_priority": 0,
+                        },
+                        "trace_repeats_by_tier": {
+                            "binary:verified_trace_ready": 1,
+                            "symbol:verified_trace_ready": 1,
+                        },
+                        "unit_mod": 2,
+                        "text_repeats": 2,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
                 }[normalized_profile]
                 if label in {"binary", "symbol"}:
                     use_boxed_primary = True
                     if fusion_settings["tier_aware_boxing"]:
                         use_boxed_primary = tier == "answer_only_keep"
+                    repeat_count = (
+                        fusion_settings.get(f"{label}_repeats_by_tier", {}).get(
+                            tier,
+                            fusion_settings["binary_repeats"]
+                            if label == "binary"
+                            else fusion_settings["symbol_repeats"],
+                        )
+                    )
+                    trace_repeat_count = fusion_settings.get(
+                        "trace_repeats_by_tier", {}
+                    ).get(f"{label}:{tier}", 0)
                     if use_boxed_primary:
                         specialist_row = clone_phase2_row(row)
                         if style != "boxed_only":
@@ -661,6 +716,9 @@ def apply_phase2_train_profile(
                     else:
                         profiled_rows.append(row)
                         transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+                        for _ in range(trace_repeat_count):
+                            profiled_rows.append(clone_phase2_row(row))
+                            transform_counts[f"repeat_trace:{label}:{tier or 'unknown'}"] += 1
                         specialist_row = clone_phase2_row(row)
                         if style != "boxed_only":
                             specialist_row["assistant_style"] = "boxed_only"
@@ -669,7 +727,6 @@ def apply_phase2_train_profile(
                             transform_counts[f"reuse_boxed_anchor:{label}:{tier or 'unknown'}"] += 1
                         profiled_rows.append(specialist_row)
                         specialist_style = str(specialist_row.get("assistant_style", "")).strip().lower()
-                    repeat_count = fusion_settings["binary_repeats"] if label == "binary" else fusion_settings["symbol_repeats"]
                     for _ in range(repeat_count):
                         if specialist_style == "boxed_only":
                             transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
