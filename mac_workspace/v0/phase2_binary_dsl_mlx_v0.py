@@ -67,6 +67,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v15",
     "single-adapter-fusion-v16",
     "single-adapter-fusion-v17",
+    "single-adapter-fusion-v18",
+    "single-adapter-fusion-v19",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -127,6 +129,22 @@ FUSION_V17_AUGMENT_QUOTAS = {
     "symbol_answer_only": 0,
     "symbol_manual": 0,
     "symbol_glyph_answer_only": 96,
+}
+FUSION_V18_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 32,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 32,
+}
+FUSION_V19_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 32,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -720,6 +738,21 @@ def build_single_adapter_fusion_external_rows(
             ),
             label="binary",
         )
+    if quotas.get("binary_answer_only_bit_other", 0) > 0:
+        append_candidates(
+            "binary_answer_only_bit_other",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_other",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_answer_only_bit_other"],
+                group_keys=("template_subtype", "group_signature"),
+                hard_first=True,
+            ),
+            label="binary",
+        )
     if quotas.get("symbol_verified", 0) > 0:
         append_candidates(
             "symbol_verified",
@@ -829,6 +862,26 @@ def build_single_adapter_fusion_v17_rows(
     )
 
 
+def build_single_adapter_fusion_v18_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v18",
+        quotas=FUSION_V18_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v19_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v19",
+        quotas=FUSION_V19_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -850,6 +903,10 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v16_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v17":
         return build_single_adapter_fusion_v17_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v18":
+        return build_single_adapter_fusion_v18_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v19":
+        return build_single_adapter_fusion_v19_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
