@@ -46,6 +46,7 @@ AUGMENT_ARTIFACT_ROOT = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts"
 AUGMENT_BINARY_STRUCTURED_CSV = AUGMENT_ARTIFACT_ROOT / "binary_structured_byte_formula_candidates_v1.csv"
 AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready_v1.csv"
 AUGMENT_ANSWER_ONLY_CSV = AUGMENT_ARTIFACT_ROOT / "train_answer_only_keep_v1.csv"
+AUGMENT_BINARY_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "binary_manual_audit_queue_v1.csv"
 AUGMENT_SYMBOL_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "symbol_manual_audit_queue_v1.csv"
 PHASE2_BINARY_SPECIALIST_CSV = (
     REPO_ROOT
@@ -98,6 +99,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v29",
     "single-adapter-fusion-v30",
     "single-adapter-fusion-v31",
+    "single-adapter-fusion-v32",
+    "single-adapter-fusion-v33",
+    "single-adapter-fusion-v34",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -302,6 +306,7 @@ FUSION_V30_AUGMENT_QUOTAS = {
 FUSION_V31_AUGMENT_QUOTAS = {
     "binary_candidates": 0,
     "binary_answer_only_bit_other": 0,
+    "binary_manual_bit_other": 0,
     "symbol_verified": 0,
     "symbol_answer_only": 0,
     "symbol_manual": 0,
@@ -312,6 +317,45 @@ FUSION_V31_AUGMENT_QUOTAS = {
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 4,
     "unit_verified_anchor_mod": 4,
+}
+FUSION_V32_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 16,
+    "binary_manual_bit_other": 16,
+    "symbol_verified": 0,
+    "symbol_answer_only": 16,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+}
+FUSION_V33_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 24,
+    "binary_manual_bit_other": 24,
+    "symbol_verified": 0,
+    "symbol_answer_only": 16,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+}
+FUSION_V34_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 16,
+    "binary_manual_bit_other": 16,
+    "symbol_verified": 0,
+    "symbol_answer_only": 24,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 8,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -1049,6 +1093,21 @@ def build_single_adapter_fusion_external_rows(
             ),
             label="binary",
         )
+    if quotas.get("binary_manual_bit_other", 0) > 0:
+        append_candidates(
+            "binary_manual_bit_other",
+            select_augmentation_candidates(
+                AUGMENT_BINARY_MANUAL_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_other",
+                allowed_tiers={"manual_audit_priority"},
+                quota=quotas["binary_manual_bit_other"],
+                group_keys=("template_subtype", "group_signature"),
+                hard_first=True,
+            ),
+            label="binary",
+        )
     if quotas.get("symbol_verified", 0) > 0:
         append_candidates(
             "symbol_verified",
@@ -1379,6 +1438,36 @@ def build_single_adapter_fusion_v31_rows(
     )
 
 
+def build_single_adapter_fusion_v32_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v32",
+        quotas=FUSION_V32_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v33_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v33",
+        quotas=FUSION_V33_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v34_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v34",
+        quotas=FUSION_V34_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -1428,6 +1517,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v30_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v31":
         return build_single_adapter_fusion_v31_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v32":
+        return build_single_adapter_fusion_v32_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v33":
+        return build_single_adapter_fusion_v33_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v34":
+        return build_single_adapter_fusion_v34_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
