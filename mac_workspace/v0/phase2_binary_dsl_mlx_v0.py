@@ -102,6 +102,7 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v32",
     "single-adapter-fusion-v33",
     "single-adapter-fusion-v34",
+    "single-adapter-fusion-v35",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -353,6 +354,18 @@ FUSION_V34_AUGMENT_QUOTAS = {
     "symbol_manual": 0,
     "symbol_glyph_answer_only": 0,
     "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 8,
+}
+FUSION_V35_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 16,
     "binary_structured_answer_only": 16,
     "symbol_formula_verified": 8,
     "symbol_formula_answer_only": 8,
@@ -1468,6 +1481,16 @@ def build_single_adapter_fusion_v34_rows(
     )
 
 
+def build_single_adapter_fusion_v35_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v35",
+        quotas=FUSION_V35_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -1523,6 +1546,8 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v33_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v34":
         return build_single_adapter_fusion_v34_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v35":
+        return build_single_adapter_fusion_v35_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
