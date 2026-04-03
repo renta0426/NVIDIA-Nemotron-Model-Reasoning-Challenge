@@ -378,9 +378,10 @@ For this `817`-row base, the recommended teacher is not free-form prose.
 Use a **canonical program trace**:
 
 1. infer the exact hidden rule from examples
-2. restate the rule in explicit executable form
-3. apply that rule to the query input
-4. output the final binary answer
+2. show `1-2` short example checks that support that rule
+3. restate the rule in explicit executable form
+4. apply that rule to the query input
+5. output the final binary answer
 
 ### 10.1 Recommended trace style
 
@@ -388,7 +389,10 @@ Use a short deterministic trace such as:
 
 ```text
 <think>
-Rule: xor(shl1,shr4)
+Check examples:
+- 11010000 -> 10101101 because shl1=10100000, shr4=00001101, xor=10101101
+- 11011111 -> 10110011 because shl1=10111110, shr4=00001101, xor=10110011
+So the rule is xor(shl1,shr4).
 Query x = 10110110
 shl1(x) = 01101100
 shr4(x) = 00001011
@@ -402,9 +406,11 @@ Guidelines:
 
 - prefer **program notation** over loose natural-language explanation
 - keep step order fixed across all rows in the same group
+- always include a short **rule-identification prefix** from `1-2` representative examples
 - name the exact transform that generated the row
 - avoid narrative filler
 - avoid abstract family names in place of executable rules
+- do not dump all prompt examples into the trace; the goal is short evidence, not full replay
 
 ### 10.2 Why this is preferable to answer-only SFT
 
@@ -432,8 +438,9 @@ The important point is that the Python side does **not** write free-form reasoni
 Instead it does:
 
 1. detect the exact rule from the examples
-2. execute that exact rule on the query
-3. serialize the execution into a canonical trace template
+2. choose `1-2` representative examples and serialize short verification lines
+3. execute that exact rule on the query
+4. serialize the whole sequence into a canonical trace template
 
 Pseudo-code:
 
@@ -447,16 +454,32 @@ def shr(bits: str, k: int) -> str:
 def xor_bits(left: str, right: str) -> str:
     return format(int(left, 2) ^ int(right, 2), "08b")
 
-def emit_cot_for_structured_formula(formula_name: str, query_bits: str) -> str:
+def emit_cot_for_structured_formula(
+    formula_name: str,
+    support_examples: list[tuple[str, str]],
+    query_bits: str,
+) -> str:
     if formula_name != "xor(shl1,shr4)":
         raise ValueError("This worked example is specialized to one exact formula.")
+
+    support_lines = []
+    for input_bits, output_bits in support_examples[:2]:
+        shl1_support = shl(input_bits, 1)
+        shr4_support = shr(input_bits, 4)
+        recomputed = xor_bits(shl1_support, shr4_support)
+        support_lines.append(
+            f"- {input_bits} -> {output_bits} because "
+            f"shl1={shl1_support}, shr4={shr4_support}, xor={recomputed}"
+        )
 
     shl1_value = shl(query_bits, 1)
     shr4_value = shr(query_bits, 4)
     answer = xor_bits(shl1_value, shr4_value)
 
     return f"""<think>
-Rule: xor(shl1,shr4)
+Check examples:
+{chr(10).join(support_lines)}
+So the rule is xor(shl1,shr4).
 Query x = {query_bits}
 shl1(x) = {shl1_value}
 shr4(x) = {shr4_value}
@@ -470,7 +493,10 @@ For this row, the generated CoT becomes:
 
 ```text
 <think>
-Rule: xor(shl1,shr4)
+Check examples:
+- 11010000 -> 10101101 because shl1=10100000, shr4=00001101, xor=10101101
+- 11011111 -> 10110011 because shl1=10111110, shr4=00001101, xor=10110011
+So the rule is xor(shl1,shr4).
 Query x = 10011111
 shl1(x) = 00111110
 shr4(x) = 00001001
@@ -482,6 +508,7 @@ Final answer = 00110111
 
 Why this is the right pattern for large-scale synthesis:
 
+- the trace now teaches **rule identification from examples** as well as query execution
 - the trace is generated from the **same executable rule** that creates the answer
 - every intermediate value is programmatically recoverable
 - the final answer can be re-checked by the same solver family
@@ -502,6 +529,13 @@ For other exact-trace-safe groups, only the trace template changes:
 
 This section describes how to generate the teacher CoT for each exact-trace-safe strong group.
 
+Unless noted otherwise, every group below should follow the same high-level shape:
+
+1. show `1-2` short example checks that pin down the rule
+2. state the exact executable rule
+3. execute the rule on the query
+4. emit the final boxed answer
+
 ### 11.1 `binary_structured_byte_formula` (`446`)
 
 **Use as CoT base:** Yes
@@ -514,15 +548,19 @@ This section describes how to generate the teacher CoT for each exact-trace-safe
 
 **Teacher payload to emit:**
 
-1. exact formula name from `bit_structured_formula_name`
-2. query byte `x`
-3. each intermediate source transform in the formula
-4. final composition result
+1. `1-2` example checks proving the exact formula
+2. exact formula name from `bit_structured_formula_name`
+3. query byte `x`
+4. each intermediate source transform in the formula
+5. final composition result
 
 **Canonical trace shape:**
 
 ```text
-Rule: <exact formula name>
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is <exact formula name>.
 Query x = <8-bit query>
 <source_1>(x) = <8-bit>
 <source_2>(x) = <8-bit>
@@ -567,7 +605,7 @@ Final answer = <8-bit>
 **Do not emit this as trace:**
 
 ```text
-Rule: xor(rol,shr)
+So the rule is xor(rol,shr).
 ```
 
 by itself.
@@ -575,7 +613,7 @@ by itself.
 Instead emit:
 
 ```text
-Rule: xor(rol1,shr3)
+So the rule is xor(rol1,shr3).
 ```
 
 or whatever exact formula generated that row.
@@ -602,7 +640,10 @@ or whatever exact formula generated that row.
 **Canonical trace shape:**
 
 ```text
-Rule: xor(not(shl2), shl6)
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is xor(not(shl2), shl6).
 Query x = <8-bit query>
 shl2(x) = <8-bit>
 not(shl2(x)) = <8-bit>
@@ -633,7 +674,10 @@ Final answer = <8-bit>
 **Canonical trace shape:**
 
 ```text
-Rule: rshift by 1
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is rshift by 1.
 Query x = <8-bit query>
 rshift_1(x) = <8-bit>
 Final answer = <8-bit>
@@ -642,7 +686,10 @@ Final answer = <8-bit>
 or
 
 ```text
-Rule: or_mask with mask <8-bit mask>
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is or_mask with mask <8-bit mask>.
 Query x = <8-bit query>
 x OR mask = <8-bit>
 Final answer = <8-bit>
@@ -675,7 +722,10 @@ Final answer = <8-bit>
 **Canonical trace shape:**
 
 ```text
-Rule:
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is:
 o1 = i2 xor i5
 o2 = i1 xor 1
 o3 = i4
@@ -718,7 +768,10 @@ Final answer = <8-bit>
 **Canonical trace shape:**
 
 ```text
-Rule:
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is:
 o1 <- i8
 o2 <- i1
 o3 <- not(i2)
@@ -755,7 +808,10 @@ Final answer = <8-bit>
 **Canonical trace shape:**
 
 ```text
-Rule:
+Check examples:
+- <example 1 verification line>
+- <example 2 verification line>
+So the rule is:
 o1 <- not(i3)
 o2 <- not(i3)
 o3 <- i1
@@ -784,7 +840,7 @@ Use the following protocol for mass generation.
 3. Keep one prompt to one exact hidden rule.
 4. Sample fresh 8-bit inputs for examples and one query.
 5. Compute outputs by forward execution.
-6. Export a **canonical program trace** in the group-specific format above.
+6. Export a **canonical program trace** in the group-specific format above, including the short rule-identification prefix from `1-2` examples.
 7. Re-run the corresponding solver on the generated prompt.
 8. Keep only rows that satisfy all of:
    - exact gold answer match

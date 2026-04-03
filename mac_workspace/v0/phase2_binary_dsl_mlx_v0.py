@@ -93,6 +93,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v24",
     "single-adapter-fusion-v25",
     "single-adapter-fusion-v26",
+    "single-adapter-fusion-v27",
+    "single-adapter-fusion-v28",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -237,6 +239,34 @@ FUSION_V26_AUGMENT_QUOTAS = {
     "binary_structured_answer_only": 16,
     "symbol_formula_verified": 8,
     "symbol_formula_answer_only": 8,
+}
+FUSION_V27_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 2,
+    "unit_verified_anchor_mod": 2,
+}
+FUSION_V28_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 2,
+    "unit_verified_anchor_mod": 2,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -899,6 +929,48 @@ def build_single_adapter_fusion_external_rows(
             "summary": summarize_phase2_rows(appended_rows),
         }
 
+    def append_duplicate_phase2_rows(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = {
+                key: "" if candidate.get(key) is None else str(candidate.get(key, ""))
+                for key in EXPECTED_PHASE2_COLUMNS
+            }
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_anchor:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    def select_phase2_anchor_rows(
+        *,
+        label: str,
+        allowed_tiers: set[str],
+        mod: int,
+    ) -> list[dict[str, str]]:
+        if mod <= 0:
+            return []
+        selected: list[dict[str, str]] = []
+        for raw_row in input_rows:
+            phase2_row = clone_phase2_row(raw_row)
+            if str(phase2_row.get("label", "")).strip().lower() != label:
+                continue
+            tier = str(phase2_row.get("source_selection_tier", "")).strip().lower()
+            if tier not in allowed_tiers:
+                continue
+            row_key = str(phase2_row.get("id") or phase2_row.get("prompt") or "")
+            if mod > 1 and stable_mod(row_key, mod) != 0:
+                continue
+            selected.append(phase2_row)
+        return selected
+
     if quotas.get("binary_candidates", 0) > 0:
         append_candidates(
             "binary_candidates",
@@ -1053,6 +1125,24 @@ def build_single_adapter_fusion_external_rows(
                 hard_first=True,
             ),
         )
+    if quotas.get("text_verified_anchor_mod", 0) > 0:
+        append_duplicate_phase2_rows(
+            "text_verified_anchor",
+            select_phase2_anchor_rows(
+                label="text",
+                allowed_tiers={"verified_trace_ready"},
+                mod=quotas["text_verified_anchor_mod"],
+            ),
+        )
+    if quotas.get("unit_verified_anchor_mod", 0) > 0:
+        append_duplicate_phase2_rows(
+            "unit_verified_anchor",
+            select_phase2_anchor_rows(
+                label="unit",
+                allowed_tiers={"verified_trace_ready"},
+                mod=quotas["unit_verified_anchor_mod"],
+            ),
+        )
 
     profiled_rows = [*base_rows, *augmentation_rows]
     return profiled_rows, {
@@ -1194,6 +1284,26 @@ def build_single_adapter_fusion_v26_rows(
     )
 
 
+def build_single_adapter_fusion_v27_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v27",
+        quotas=FUSION_V27_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v28_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v28",
+        quotas=FUSION_V28_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -1233,6 +1343,10 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v25_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v26":
         return build_single_adapter_fusion_v26_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v27":
+        return build_single_adapter_fusion_v27_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v28":
+        return build_single_adapter_fusion_v28_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
