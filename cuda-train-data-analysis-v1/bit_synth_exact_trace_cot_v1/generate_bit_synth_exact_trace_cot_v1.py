@@ -708,13 +708,14 @@ def validate_seed_row(
     config: SeedConfig,
     prompt: str,
     examples: list[tuple[str, str]],
+    support_examples: list[tuple[str, str]],
     query_bits: str,
     answer: str,
     generated_cot: str,
-    original_prompts: set[str],
+    blocked_prompts: set[str],
 ) -> tuple[bool, str]:
-    if prompt in original_prompts:
-        return False, "original_prompt_duplicate"
+    if prompt in blocked_prompts:
+        return False, "prompt_duplicate"
     if not generated_cot.startswith("<think>") or not generated_cot.endswith("</think>"):
         return False, "bad_think_wrapper"
     if answer in generated_cot:
@@ -772,7 +773,14 @@ def validate_seed_row(
     else:
         return False, "unsupported_group"
 
-    regenerated = render_generated_cot(mod, config.strong_group, config.exact_rule, config.rule_payload, examples[:2], query_bits)
+    regenerated = render_generated_cot(
+        mod,
+        config.strong_group,
+        config.exact_rule,
+        config.rule_payload,
+        support_examples,
+        query_bits,
+    )
     if generated_cot != regenerated:
         return False, "canonical_render_mismatch"
 
@@ -783,7 +791,7 @@ def generate_one_row(
     mod: Any,
     config: SeedConfig,
     rng: random.Random,
-    original_prompts: set[str],
+    blocked_prompts: set[str],
     synthetic_index: int,
     max_attempts: int,
 ) -> tuple[dict[str, str] | None, str]:
@@ -818,10 +826,11 @@ def generate_one_row(
             config=config,
             prompt=prompt,
             examples=examples,
+            support_examples=support_examples,
             query_bits=query_bits,
             answer=answer,
             generated_cot=generated_cot,
-            original_prompts=original_prompts,
+            blocked_prompts=blocked_prompts,
         )
         if not ok:
             continue
@@ -876,7 +885,7 @@ def main() -> None:
     mod = load_module(ANALYSIS_MODULE)
     rng = random.Random(args.seed)
 
-    original_prompts = load_original_prompt_set()
+    blocked_prompts = load_original_prompt_set()
     seed_configs = build_seed_configs(mod)
     if not seed_configs:
         raise RuntimeError("No exact-trace-safe seed configs found.")
@@ -896,7 +905,7 @@ def main() -> None:
             mod=mod,
             config=config,
             rng=rng,
-            original_prompts=original_prompts,
+            blocked_prompts=blocked_prompts,
             synthetic_index=synthetic_index,
             max_attempts=args.max_attempts_per_row,
         )
@@ -904,6 +913,7 @@ def main() -> None:
             reject_reasons[status] += 1
             continue
         output_rows.append(row)
+        blocked_prompts.add(row["prompt"])
         group_counts[config.strong_group] += 1
         seed_counts[config.seed_row_id] += 1
         exact_rule_counts[config.exact_rule] += 1
@@ -916,7 +926,7 @@ def main() -> None:
             mod=mod,
             config=config,
             rng=rng,
-            original_prompts=original_prompts,
+            blocked_prompts=blocked_prompts,
             synthetic_index=synthetic_index,
             max_attempts=args.max_attempts_per_row,
         )
@@ -925,6 +935,7 @@ def main() -> None:
             reject_reasons[status] += 1
             continue
         output_rows.append(row)
+        blocked_prompts.add(row["prompt"])
         group_counts[config.strong_group] += 1
         seed_counts[config.seed_row_id] += 1
         exact_rule_counts[config.exact_rule] += 1
