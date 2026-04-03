@@ -41,6 +41,24 @@ DEFAULT_PHASE0_ANALYSIS_CSV = (
 )
 DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
+TRAIN_PROFILE_CHOICES = (
+    "baseline",
+    "single-adapter-focus-v1",
+    "single-adapter-focus-v2",
+    "single-adapter-fusion-v1",
+    "single-adapter-fusion-v2",
+    "single-adapter-fusion-v3",
+    "single-adapter-fusion-v4",
+    "single-adapter-fusion-v5",
+    "single-adapter-fusion-v6",
+    "single-adapter-fusion-v7",
+    "single-adapter-fusion-v8",
+    "single-adapter-fusion-v9",
+    "single-adapter-fusion-v10",
+    "general-stable-focus-v1",
+    "general-stable-focus-v2",
+    "general-stable-focus-v3",
+)
 
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 EXPECTED_PHASE2_COLUMNS = [
@@ -343,6 +361,7 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
         return
 
     original_chat_init = tuner_datasets.ChatDataset.__init__
+    original_completions_init = tuner_datasets.CompletionsDataset.__init__
 
     def patched_chat_init(
         self: Any,
@@ -389,6 +408,54 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
         )
         return (tokens, offset)
 
+    def patched_completions_init(
+        self: Any,
+        data: list[dict[str, Any]],
+        tokenizer: Any,
+        prompt_key: str,
+        completion_key: str,
+        mask_prompt: bool,
+        enable_thinking: bool = False,
+    ) -> None:
+        original_completions_init(
+            self,
+            data=data,
+            tokenizer=tokenizer,
+            prompt_key=prompt_key,
+            completion_key=completion_key,
+            mask_prompt=mask_prompt,
+        )
+        self.enable_thinking = bool(enable_thinking)
+
+    def patched_completions_process(self: Any, row: dict[str, Any]) -> tuple[list[int], int]:
+        tools = row.get("tools", None)
+        messages = [
+            {"role": "user", "content": row[self.prompt_key]},
+            {"role": "assistant", "content": row[self.completion_key]},
+        ]
+        try:
+            tokens = self.tokenizer.apply_chat_template(
+                messages,
+                tools=tools,
+                enable_thinking=self.enable_thinking,
+            )
+        except TypeError:
+            tokens = self.tokenizer.apply_chat_template(messages, tools=tools)
+        if not self.mask_prompt:
+            return (tokens, 0)
+        full_text = apply_chat_template_safe(
+            self.tokenizer,
+            messages,
+            add_generation_prompt=False,
+            enable_thinking=self.enable_thinking,
+        )
+        offset = find_token_index_for_text_span(
+            self.tokenizer,
+            full_text,
+            str(row[self.completion_key]),
+        )
+        return (tokens, offset)
+
     def patched_create_dataset(data: Any, tokenizer: Any, config: Any) -> Any:
         mask_prompt = getattr(config, "mask_prompt", False)
         prompt_feature = getattr(config, "prompt_feature", "prompt")
@@ -404,6 +471,7 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
                 prompt_feature,
                 completion_feature,
                 mask_prompt,
+                enable_thinking,
             )
         if chat_feature in sample:
             return tuner_datasets.ChatDataset(
@@ -424,6 +492,8 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
 
     tuner_datasets.ChatDataset.__init__ = patched_chat_init
     tuner_datasets.ChatDataset.process = patched_chat_process
+    tuner_datasets.CompletionsDataset.__init__ = patched_completions_init
+    tuner_datasets.CompletionsDataset.process = patched_completions_process
     tuner_datasets.create_dataset = patched_create_dataset
     tuner_datasets._nemotron_enable_thinking_patch = True
 
@@ -441,6 +511,288 @@ def render_assistant_message(row: dict[str, str]) -> str:
     raise ValueError(f"Unsupported assistant_style: {style}")
 
 
+def clone_phase2_row(row: dict[str, str]) -> dict[str, str]:
+    return {str(key): "" if value is None else str(value) for key, value in row.items()}
+
+
+def summarize_phase2_rows(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
+    by_label = Counter(str(row.get("label", "")).strip() or "unknown" for row in rows)
+    by_label_and_style = Counter(
+        (
+            str(row.get("label", "")).strip() or "unknown",
+            str(row.get("assistant_style", "")).strip() or "unknown",
+        )
+        for row in rows
+    )
+    by_label_and_tier = Counter(
+        (
+            str(row.get("label", "")).strip() or "unknown",
+            str(row.get("source_selection_tier", "")).strip() or "unknown",
+        )
+        for row in rows
+    )
+    return {
+        "rows": len(rows),
+        "by_label": {label: count for label, count in sorted(by_label.items())},
+        "by_label_and_style": {
+            f"{label}|{style}": count
+            for (label, style), count in sorted(by_label_and_style.items())
+        },
+        "by_label_and_tier": {
+            f"{label}|{tier}": count
+            for (label, tier), count in sorted(by_label_and_tier.items())
+        },
+    }
+
+
+def apply_phase2_train_profile(
+    rows: Sequence[dict[str, str]],
+    *,
+    profile: str,
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    normalized_profile = str(profile).strip().lower() or "baseline"
+    input_rows = [clone_phase2_row(row) for row in rows]
+    if normalized_profile == "baseline":
+        summary = summarize_phase2_rows(input_rows)
+        return input_rows, {
+            "profile": normalized_profile,
+            "input": summary,
+            "output": summary,
+            "transform_counts": {},
+        }
+    if normalized_profile not in TRAIN_PROFILE_CHOICES:
+        raise ValueError(f"Unsupported train profile: {profile}")
+
+    profiled_rows: list[dict[str, str]] = []
+    transform_counts: Counter[str] = Counter()
+    for original_row in input_rows:
+        row = clone_phase2_row(original_row)
+        label = str(row.get("label", "")).strip().lower()
+        tier = str(row.get("source_selection_tier", "")).strip().lower()
+        style = str(row.get("assistant_style", "")).strip().lower()
+        if normalized_profile.startswith("single-adapter-focus"):
+            if label in {"roman", "text"}:
+                transform_counts[f"drop:{label}"] += 1
+                continue
+            if label in {"binary", "symbol"}:
+                if style != "boxed_only":
+                    row["assistant_style"] = "boxed_only"
+                    transform_counts[f"force_boxed_only:{label}:{tier or 'unknown'}"] += 1
+                else:
+                    transform_counts[f"keep_boxed_only:{label}:{tier or 'unknown'}"] += 1
+            else:
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            profiled_rows.append(row)
+            if (
+                normalized_profile == "single-adapter-focus-v2"
+                and label in {"binary", "symbol"}
+                and tier == "answer_only_keep"
+            ):
+                profiled_rows.append(clone_phase2_row(row))
+                transform_counts[f"repeat:{label}:{tier}"] += 1
+            continue
+
+        if normalized_profile in {
+            "single-adapter-fusion-v1",
+            "single-adapter-fusion-v2",
+            "single-adapter-fusion-v3",
+            "single-adapter-fusion-v4",
+            "single-adapter-fusion-v5",
+            "single-adapter-fusion-v6",
+            "single-adapter-fusion-v7",
+            "single-adapter-fusion-v8",
+            "single-adapter-fusion-v9",
+            "single-adapter-fusion-v10",
+        }:
+            if normalized_profile in {
+                "single-adapter-fusion-v7",
+                "single-adapter-fusion-v8",
+                "single-adapter-fusion-v9",
+                "single-adapter-fusion-v10",
+            }:
+                row_key = str(row.get("id") or row.get("prompt") or "")
+                fusion_settings = {
+                    "single-adapter-fusion-v7": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 0,
+                        "tier_aware_boxing": False,
+                    },
+                    "single-adapter-fusion-v8": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 1,
+                        "unit_mod": 3,
+                        "text_repeats": 1,
+                        "roman_mod": 0,
+                        "tier_aware_boxing": False,
+                    },
+                    "single-adapter-fusion-v9": {
+                        "binary_repeats": 2,
+                        "symbol_repeats": 2,
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 0,
+                        "tier_aware_boxing": False,
+                    },
+                    "single-adapter-fusion-v10": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                }[normalized_profile]
+                if label in {"binary", "symbol"}:
+                    use_boxed_primary = True
+                    if fusion_settings["tier_aware_boxing"]:
+                        use_boxed_primary = tier == "answer_only_keep"
+                    if use_boxed_primary:
+                        specialist_row = clone_phase2_row(row)
+                        if style != "boxed_only":
+                            specialist_row["assistant_style"] = "boxed_only"
+                            transform_counts[f"force_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"keep_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(specialist_row)
+                        specialist_style = "boxed_only"
+                    else:
+                        profiled_rows.append(row)
+                        transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+                        specialist_row = clone_phase2_row(row)
+                        if style != "boxed_only":
+                            specialist_row["assistant_style"] = "boxed_only"
+                            transform_counts[f"add_boxed_anchor:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"reuse_boxed_anchor:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(specialist_row)
+                        specialist_style = str(specialist_row.get("assistant_style", "")).strip().lower()
+                    repeat_count = fusion_settings["binary_repeats"] if label == "binary" else fusion_settings["symbol_repeats"]
+                    for _ in range(repeat_count):
+                        if specialist_style == "boxed_only":
+                            transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(clone_phase2_row(specialist_row))
+                    continue
+
+                profiled_rows.append(row)
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+                if label == "text":
+                    for _ in range(fusion_settings["text_repeats"]):
+                        profiled_rows.append(clone_phase2_row(row))
+                        transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+                elif label == "unit":
+                    unit_mod = fusion_settings["unit_mod"]
+                    if unit_mod > 0 and stable_mod(row_key, unit_mod) == 0:
+                        profiled_rows.append(clone_phase2_row(row))
+                        if unit_mod == 2:
+                            transform_counts[f"repeat_half:{label}:{tier or 'unknown'}"] += 1
+                        elif unit_mod == 3:
+                            transform_counts[f"repeat_third:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"repeat_mod{unit_mod}:{label}:{tier or 'unknown'}"] += 1
+                elif label == "roman":
+                    roman_mod = fusion_settings["roman_mod"]
+                    if roman_mod > 0 and stable_mod(row_key, roman_mod) == 0:
+                        profiled_rows.append(clone_phase2_row(row))
+                        if roman_mod == 2:
+                            transform_counts[f"repeat_half:{label}:{tier or 'unknown'}"] += 1
+                        else:
+                            transform_counts[f"repeat_mod{roman_mod}:{label}:{tier or 'unknown'}"] += 1
+                continue
+
+            if normalized_profile == "single-adapter-fusion-v3" and label == "binary":
+                boxed_binary = clone_phase2_row(row)
+                if style != "boxed_only":
+                    boxed_binary["assistant_style"] = "boxed_only"
+                    transform_counts[f"force_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                else:
+                    transform_counts[f"keep_boxed_primary:{label}:{tier or 'unknown'}"] += 1
+                profiled_rows.append(boxed_binary)
+                for _ in range(2):
+                    profiled_rows.append(clone_phase2_row(boxed_binary))
+                    transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
+                continue
+            profiled_rows.append(row)
+            if label in {"binary", "symbol"}:
+                boxed_clone_repeats = 1
+                if normalized_profile in {
+                    "single-adapter-fusion-v2",
+                    "single-adapter-fusion-v3",
+                    "single-adapter-fusion-v4",
+                    "single-adapter-fusion-v5",
+                    "single-adapter-fusion-v6",
+                } and label == "symbol":
+                    boxed_clone_repeats = 2
+                for repeat_index in range(boxed_clone_repeats):
+                    if style == "boxed_only":
+                        transform_counts[f"repeat_boxed:{label}:{tier or 'unknown'}"] += 1
+                        profiled_rows.append(clone_phase2_row(row))
+                    else:
+                        transform_counts[f"add_boxed_clone:{label}:{tier or 'unknown'}"] += 1
+                        boxed_clone = clone_phase2_row(row)
+                        boxed_clone["assistant_style"] = "boxed_only"
+                        profiled_rows.append(boxed_clone)
+            elif (
+                normalized_profile
+                in {
+                    "single-adapter-fusion-v4",
+                    "single-adapter-fusion-v5",
+                    "single-adapter-fusion-v6",
+                }
+                and label == "unit"
+            ):
+                row_key = str(row.get("id") or row.get("prompt") or "")
+                repeat_unit = normalized_profile == "single-adapter-fusion-v4"
+                if normalized_profile == "single-adapter-fusion-v5":
+                    repeat_unit = stable_mod(row_key, 2) == 0
+                elif normalized_profile == "single-adapter-fusion-v6":
+                    repeat_unit = stable_mod(row_key, 3) == 0
+                if repeat_unit:
+                    profiled_rows.append(clone_phase2_row(row))
+                    if normalized_profile == "single-adapter-fusion-v4":
+                        transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+                    elif normalized_profile == "single-adapter-fusion-v5":
+                        transform_counts[f"repeat_half:{label}:{tier or 'unknown'}"] += 1
+                    else:
+                        transform_counts[f"repeat_third:{label}:{tier or 'unknown'}"] += 1
+                else:
+                    transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            else:
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            continue
+
+        if normalized_profile.startswith("general-stable-focus"):
+            if label in {"binary", "symbol"}:
+                transform_counts[f"drop:{label}"] += 1
+                continue
+            if normalized_profile == "general-stable-focus-v3" and label == "text" and style != "boxed_only":
+                row["assistant_style"] = "boxed_only"
+                transform_counts[f"force_boxed_only:{label}:{tier or 'unknown'}"] += 1
+            else:
+                transform_counts[f"keep:{label}:{style or 'unknown'}"] += 1
+            profiled_rows.append(row)
+            if normalized_profile in {"general-stable-focus-v2", "general-stable-focus-v3"} and label == "text":
+                profiled_rows.append(clone_phase2_row(row))
+                transform_counts[f"repeat:{label}:{tier or 'unknown'}"] += 1
+            continue
+
+        raise ValueError(f"Unsupported train profile: {profile}")
+    if not profiled_rows:
+        raise ValueError(f"Train profile {profile} removed all training rows.")
+    return profiled_rows, {
+        "profile": normalized_profile,
+        "input": summarize_phase2_rows(input_rows),
+        "output": summarize_phase2_rows(profiled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+    }
+
+
 def build_phase2_chat_records(rows: Sequence[dict[str, str]]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for row in rows:
@@ -454,6 +806,28 @@ def build_phase2_chat_records(rows: Sequence[dict[str, str]]) -> list[dict[str, 
                     {"role": "user", "content": build_user_message(prompt)},
                     {"role": "assistant", "content": assistant_content},
                 ],
+                "metadata": {
+                    "id": row.get("id", ""),
+                    "answer": row.get("answer", ""),
+                    "label": row.get("label", ""),
+                    "assistant_style": row.get("assistant_style", ""),
+                    "source_selection_tier": row.get("source_selection_tier", ""),
+                },
+            }
+        )
+    return records
+
+
+def build_phase2_completion_records(rows: Sequence[dict[str, str]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for row in rows:
+        prompt = str(row.get("prompt", "")).strip()
+        if not prompt:
+            raise ValueError(f"Row {row.get('id', '')} is missing prompt")
+        records.append(
+            {
+                "prompt": build_user_message(prompt),
+                "completion": render_assistant_message(row),
                 "metadata": {
                     "id": row.get("id", ""),
                     "answer": row.get("answer", ""),
@@ -524,6 +898,7 @@ def build_mlx_lora_config(
     model_path: Path,
     dataset_dir: Path,
     adapter_dir: Path,
+    resume_adapter_file: Path | None,
     mask_prompt: bool,
     enable_thinking: bool,
     batch_size: int,
@@ -538,13 +913,19 @@ def build_mlx_lora_config(
     steps_per_report: int,
     steps_per_eval: int,
     seed: int,
+    lr_schedule_name: str | None,
+    lr_schedule_end: float,
+    lr_warmup_ratio: float,
 ) -> dict[str, Any]:
     total_iters = compute_total_iters(
         num_rows=sum(1 for _ in (dataset_dir / "train.jsonl").open("r", encoding="utf-8")),
         num_epochs=num_epochs,
         batch_size=batch_size,
     )
-    return {
+    schedule_name = str(lr_schedule_name or "").strip()
+    if lr_warmup_ratio < 0.0 or lr_warmup_ratio >= 1.0:
+        raise ValueError(f"lr_warmup_ratio must be in [0, 1), got {lr_warmup_ratio}")
+    config: dict[str, Any] = {
         "model": str(model_path),
         "train": True,
         "data": str(dataset_dir),
@@ -571,6 +952,20 @@ def build_mlx_lora_config(
             "scale": lora_scale,
         },
     }
+    if resume_adapter_file is not None:
+        config["resume_adapter_file"] = str(resume_adapter_file)
+    if schedule_name:
+        if schedule_name != "cosine_decay":
+            raise ValueError(f"Unsupported lr_schedule_name: {schedule_name}")
+        schedule_config: dict[str, Any] = {
+            "name": schedule_name,
+            "arguments": [learning_rate, total_iters, float(lr_schedule_end)],
+        }
+        warmup_steps = int(total_iters * lr_warmup_ratio)
+        if warmup_steps > 0:
+            schedule_config["warmup"] = warmup_steps
+        config["lr_schedule"] = schedule_config
+    return config
 
 
 def render_train_command(config_path: Path) -> str:
@@ -608,20 +1003,37 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         force=bool(args.force_shadow_model),
     )
     source_rows = load_phase2_training_rows(Path(args.train_csv))
+    profiled_rows, profile_summary = apply_phase2_train_profile(
+        source_rows,
+        profile=str(args.train_profile),
+    )
     dataset_format = str(args.dataset_format).strip().lower()
-    if dataset_format not in {"chat", "text"}:
+    if dataset_format == "completions":
+        dataset_format = "completion"
+    if dataset_format not in {"chat", "completion", "text"}:
         raise ValueError(f"Unsupported dataset_format: {dataset_format}")
     if dataset_format == "chat":
-        train_records = build_phase2_chat_records(source_rows)
+        train_records = build_phase2_chat_records(profiled_rows)
         mask_prompt = True
         enable_thinking = True
+    elif dataset_format == "completion":
+        train_records = build_phase2_completion_records(profiled_rows)
+        mask_prompt = True
+        enable_thinking = True
+        completion_thinking = str(getattr(args, "completion_thinking", "auto")).strip().lower()
+        if completion_thinking not in {"auto", "on", "off"}:
+            raise ValueError(f"Unsupported completion_thinking: {completion_thinking}")
+        if completion_thinking == "on":
+            enable_thinking = True
+        elif completion_thinking == "off":
+            enable_thinking = False
     else:
         from transformers import AutoTokenizer
 
         tokenizer = AutoTokenizer.from_pretrained(str(shadow_model_dir), trust_remote_code=True)
         if tokenizer.pad_token is None and tokenizer.eos_token is not None:
             tokenizer.pad_token = tokenizer.eos_token
-        train_records = build_phase2_text_records(source_rows, tokenizer=tokenizer)
+        train_records = build_phase2_text_records(profiled_rows, tokenizer=tokenizer)
         mask_prompt = False
         enable_thinking = False
     valid_records = select_shadow_validation_records(
@@ -643,6 +1055,11 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         model_path=shadow_model_dir,
         dataset_dir=dataset_dir,
         adapter_dir=adapter_dir,
+        resume_adapter_file=(
+            Path(args.resume_adapter_file).resolve()
+            if getattr(args, "resume_adapter_file", None)
+            else None
+        ),
         mask_prompt=mask_prompt,
         enable_thinking=enable_thinking,
         batch_size=int(args.batch_size),
@@ -657,6 +1074,9 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         steps_per_report=int(args.steps_per_report),
         steps_per_eval=int(args.steps_per_eval),
         seed=int(args.seed),
+        lr_schedule_name=getattr(args, "lr_schedule_name", None),
+        lr_schedule_end=float(getattr(args, "lr_schedule_end", 0.0)),
+        lr_warmup_ratio=float(getattr(args, "lr_warmup_ratio", 0.0)),
     )
 
     config_path = run_root / "mlx_lora_config.yaml"
@@ -672,20 +1092,30 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         "shadow_model_dir": str(shadow_model_dir),
         "train_csv": str(Path(args.train_csv).resolve()),
         "phase2_rows": len(source_rows),
+        "training_profile": profile_summary,
         "dataset": {
             "dataset_dir": str(dataset_dir),
             "dataset_format": dataset_format,
             "enable_thinking": enable_thinking,
+            "completion_thinking": str(getattr(args, "completion_thinking", "auto")).strip().lower(),
             "train_rows": len(train_records),
             "valid_rows": len(valid_records),
             "valid_strategy": f"shadow_sample={int(args.valid_shadow_rows)}",
         },
         "training": {
             "mask_prompt": mask_prompt,
+            "resume_adapter_file": (
+                str(Path(args.resume_adapter_file).resolve())
+                if getattr(args, "resume_adapter_file", None)
+                else ""
+            ),
             "batch_size": int(args.batch_size),
             "grad_accumulation_steps": int(args.grad_accumulation_steps),
             "num_epochs": float(args.num_epochs),
             "learning_rate": float(args.learning_rate),
+            "lr_schedule_name": str(getattr(args, "lr_schedule_name", "") or ""),
+            "lr_schedule_end": float(getattr(args, "lr_schedule_end", 0.0)),
+            "lr_warmup_ratio": float(getattr(args, "lr_warmup_ratio", 0.0)),
             "max_seq_length": int(args.max_seq_length),
             "lora_rank": int(args.lora_rank),
             "lora_alpha": float(args.lora_alpha),
@@ -716,6 +1146,173 @@ def verify_training_outputs(adapter_dir: Path) -> None:
         raise FileNotFoundError(
             "MLX training did not produce expected adapter files: " + ", ".join(missing)
         )
+
+
+def normalize_adapter_config_for_merge(config: dict[str, Any]) -> dict[str, Any]:
+    fine_tune_type = str(config.get("fine_tune_type", "lora"))
+    if fine_tune_type == "full":
+        raise ValueError("Full fine-tune checkpoints are not supported by merge-adapters.")
+    lora_parameters = dict(config.get("lora_parameters") or {})
+    if not lora_parameters:
+        raise ValueError("Adapter config is missing lora_parameters.")
+    rank = int(lora_parameters.get("rank", 0))
+    if rank <= 0:
+        raise ValueError(f"Invalid LoRA rank in adapter config: {rank}")
+    if rank > README_MAX_LORA_RANK:
+        raise ValueError(
+            f"LoRA rank {rank} exceeds README max_lora_rank={README_MAX_LORA_RANK}."
+        )
+    return {
+        "fine_tune_type": fine_tune_type,
+        "num_layers": int(config.get("num_layers", -1)),
+        "lora_parameters": lora_parameters,
+    }
+
+
+def load_adapter_tensors(adapter_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    from safetensors.numpy import load_file
+
+    verify_training_outputs(adapter_dir)
+    config = load_json(adapter_dir / "adapter_config.json", default=None)
+    if not isinstance(config, dict):
+        raise ValueError(f"Invalid adapter_config.json: {adapter_dir / 'adapter_config.json'}")
+    tensors = load_file(str(adapter_dir / "adapters.safetensors"))
+    return config, tensors
+
+
+def resolve_merged_num_layers(*, generalist_layers: int, specialist_layers: int) -> int:
+    if generalist_layers < 0 or specialist_layers < 0:
+        return -1
+    return max(generalist_layers, specialist_layers)
+
+
+def merge_adapter_configs(
+    *,
+    generalist_config: dict[str, Any],
+    specialist_config: dict[str, Any],
+    generalist_source: str,
+    specialist_source: str,
+    generalist_weight: float,
+    specialist_weight: float,
+) -> dict[str, Any]:
+    generalist = normalize_adapter_config_for_merge(generalist_config)
+    specialist = normalize_adapter_config_for_merge(specialist_config)
+    if generalist["fine_tune_type"] != specialist["fine_tune_type"]:
+        raise ValueError(
+            "Cannot merge adapters with different fine_tune_type values: "
+            f"{generalist['fine_tune_type']} vs {specialist['fine_tune_type']}"
+        )
+    if generalist["lora_parameters"] != specialist["lora_parameters"]:
+        raise ValueError(
+            "Cannot merge adapters with different lora_parameters. "
+            f"generalist={generalist['lora_parameters']} specialist={specialist['lora_parameters']}"
+        )
+    return {
+        "created_at": utc_now(),
+        "fine_tune_type": generalist["fine_tune_type"],
+        "num_layers": resolve_merged_num_layers(
+            generalist_layers=int(generalist["num_layers"]),
+            specialist_layers=int(specialist["num_layers"]),
+        ),
+        "lora_parameters": generalist["lora_parameters"],
+        "merge_sources": {
+            "generalist": str(generalist_source),
+            "specialist": str(specialist_source),
+        },
+        "merge_weights": {
+            "generalist": float(generalist_weight),
+            "specialist": float(specialist_weight),
+        },
+        "merge_strategy": "weighted_union_zero_fill",
+    }
+
+
+def merge_adapter_tensors(
+    *,
+    generalist_tensors: dict[str, Any],
+    specialist_tensors: dict[str, Any],
+    generalist_weight: float,
+    specialist_weight: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    merged_tensors: dict[str, Any] = {}
+    overlap_keys = 0
+    generalist_only_keys = 0
+    specialist_only_keys = 0
+    for key in sorted(set(generalist_tensors) | set(specialist_tensors)):
+        generalist_value = generalist_tensors.get(key)
+        specialist_value = specialist_tensors.get(key)
+        if generalist_value is not None and specialist_value is not None:
+            if tuple(generalist_value.shape) != tuple(specialist_value.shape):
+                raise ValueError(
+                    f"Shape mismatch for tensor '{key}': "
+                    f"{tuple(generalist_value.shape)} vs {tuple(specialist_value.shape)}"
+                )
+            merged_value = (
+                float(generalist_weight) * generalist_value.astype("float32")
+                + float(specialist_weight) * specialist_value.astype("float32")
+            )
+            merged_tensors[key] = merged_value.astype(generalist_value.dtype)
+            overlap_keys += 1
+        elif generalist_value is not None:
+            merged_tensors[key] = (
+                float(generalist_weight) * generalist_value.astype("float32")
+            ).astype(generalist_value.dtype)
+            generalist_only_keys += 1
+        elif specialist_value is not None:
+            merged_tensors[key] = (
+                float(specialist_weight) * specialist_value.astype("float32")
+            ).astype(specialist_value.dtype)
+            specialist_only_keys += 1
+    stats = {
+        "merged_tensor_count": len(merged_tensors),
+        "overlap_tensor_count": overlap_keys,
+        "generalist_only_tensor_count": generalist_only_keys,
+        "specialist_only_tensor_count": specialist_only_keys,
+    }
+    return merged_tensors, stats
+
+
+def run_merge_adapters(args: argparse.Namespace) -> None:
+    from safetensors.numpy import save_file
+
+    generalist_adapter_dir = Path(args.generalist_adapter).resolve()
+    specialist_adapter_dir = Path(args.specialist_adapter).resolve()
+    run_root = Path(args.output_root).resolve() / str(args.merge_name)
+    adapter_dir = run_root / "adapter"
+    ensure_dir(adapter_dir)
+
+    generalist_config, generalist_tensors = load_adapter_tensors(generalist_adapter_dir)
+    specialist_config, specialist_tensors = load_adapter_tensors(specialist_adapter_dir)
+    merged_config = merge_adapter_configs(
+        generalist_config=generalist_config,
+        specialist_config=specialist_config,
+        generalist_source=str(generalist_adapter_dir),
+        specialist_source=str(specialist_adapter_dir),
+        generalist_weight=float(args.generalist_weight),
+        specialist_weight=float(args.specialist_weight),
+    )
+    merged_tensors, merge_stats = merge_adapter_tensors(
+        generalist_tensors=generalist_tensors,
+        specialist_tensors=specialist_tensors,
+        generalist_weight=float(args.generalist_weight),
+        specialist_weight=float(args.specialist_weight),
+    )
+    save_file(merged_tensors, str(adapter_dir / "adapters.safetensors"))
+    write_json(adapter_dir / "adapter_config.json", merged_config)
+    manifest = {
+        "created_at": utc_now(),
+        "run_root": str(run_root),
+        "adapter_dir": str(adapter_dir),
+        "generalist_adapter_dir": str(generalist_adapter_dir),
+        "specialist_adapter_dir": str(specialist_adapter_dir),
+        "generalist_weight": float(args.generalist_weight),
+        "specialist_weight": float(args.specialist_weight),
+        "adapter_config": merged_config,
+        "merge_stats": merge_stats,
+    }
+    write_json(run_root / "merge_manifest.json", manifest)
+    verify_training_outputs(adapter_dir)
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 
 def benchmark_columns() -> list[str]:
@@ -1469,7 +2066,7 @@ def prepare_phase0_benchmark_artifacts(
     return benchmark_rows, holdout_rows, manifest
 
 
-def build_prompts(tokenizer: Any, prompt_series: Sequence[str]) -> list[str]:
+def build_prompts(tokenizer: Any, prompt_series: Sequence[str], *, enable_thinking: bool = True) -> list[str]:
     prompts: list[str] = []
     for prompt_text in prompt_series:
         user_content = f"{prompt_text}\n{BOXED_INSTRUCTION}"
@@ -1478,7 +2075,7 @@ def build_prompts(tokenizer: Any, prompt_series: Sequence[str]) -> list[str]:
                 [{"role": "user", "content": user_content}],
                 tokenize=False,
                 add_generation_prompt=True,
-                enable_thinking=True,
+                enable_thinking=enable_thinking,
             )
         except TypeError:
             rendered = tokenizer.apply_chat_template(
@@ -1529,6 +2126,37 @@ def resolve_phase0_eval_num_shards(
     auto = int(float(memory_budget_gb) // max(float(estimated_worker_memory_gb), 1.0))
     auto = max(1, auto)
     return min(auto, total_rows)
+
+
+def parse_comma_separated_set(raw: str) -> set[str]:
+    return {part.strip() for part in str(raw).split(",") if part.strip()}
+
+
+def filter_phase0_benchmark_rows(
+    benchmark_rows: Sequence[dict[str, Any]],
+    *,
+    family_short_filter: str,
+    per_family_limit: int,
+) -> list[dict[str, Any]]:
+    filtered = list(benchmark_rows)
+    allowed_family_short = parse_comma_separated_set(family_short_filter)
+    if allowed_family_short:
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("family_short", "")).strip() in allowed_family_short
+        ]
+    if per_family_limit > 0:
+        counts: Counter[str] = Counter()
+        limited: list[dict[str, Any]] = []
+        for row in filtered:
+            family_short = str(row.get("family_short", "")).strip()
+            if counts[family_short] >= int(per_family_limit):
+                continue
+            counts[family_short] += 1
+            limited.append(row)
+        filtered = limited
+    return filtered
 
 
 def maybe_patch_batch_generator_stats(mx: Any) -> None:
@@ -1587,6 +2215,24 @@ def encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
     return list(encoded)
 
 
+def maybe_fix_tokenizer_eos_ids(tokenizer: Any) -> None:
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    eos_token = getattr(tokenizer, "eos_token", None)
+    eos_token_ids = getattr(tokenizer, "eos_token_ids", None)
+    if eos_token_id is None or eos_token != "<|im_end|>":
+        return
+    normalized_ids: set[int] = set()
+    if eos_token_ids is not None:
+        try:
+            normalized_ids = {int(token_id) for token_id in eos_token_ids}
+        except TypeError:
+            normalized_ids = {int(eos_token_ids)}
+    expected_id = int(eos_token_id)
+    if normalized_ids == {expected_id}:
+        return
+    tokenizer.eos_token_ids = {expected_id}
+
+
 def generate_phase0_records_batched(
     *,
     benchmark_rows: Sequence[dict[str, Any]],
@@ -1602,6 +2248,7 @@ def generate_phase0_records_batched(
     lazy_load: bool,
     progress_every: int,
     worker_label: str,
+    eval_thinking: str,
 ) -> list[dict[str, Any]]:
     import mlx.core as mx  # type: ignore
     from mlx_lm import batch_generate, generate, load  # type: ignore
@@ -1613,7 +2260,16 @@ def generate_phase0_records_batched(
     if adapter_dir is not None:
         load_kwargs["adapter_path"] = str(adapter_dir)
     model, tokenizer = load(str(model_path), **load_kwargs)
-    prompts = build_prompts(tokenizer, [str(row["prompt"]) for row in benchmark_rows])
+    maybe_fix_tokenizer_eos_ids(tokenizer)
+    eval_thinking_value = str(eval_thinking).strip().lower()
+    if eval_thinking_value not in {"auto", "on", "off"}:
+        raise ValueError(f"Unsupported eval_thinking: {eval_thinking_value}")
+    prompt_enable_thinking = eval_thinking_value != "off"
+    prompts = build_prompts(
+        tokenizer,
+        [str(row["prompt"]) for row in benchmark_rows],
+        enable_thinking=prompt_enable_thinking,
+    )
     prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
     sampler = make_sampler(
         temp=float(temperature),
@@ -1924,6 +2580,7 @@ def run_phase0_eval_parallel(
             lazy_load=bool(args.lazy_load),
             progress_every=int(args.progress_every),
             worker_label="main",
+            eval_thinking=str(getattr(args, "eval_thinking", "auto")),
         )
 
     shard_root = eval_root / "_parallel"
@@ -1975,6 +2632,8 @@ def run_phase0_eval_parallel(
                 str(int(args.progress_every)),
                 "--worker-label",
                 f"shard{shard_index + 1}of{num_shards}",
+                "--eval-thinking",
+                str(getattr(args, "eval_thinking", "auto")),
             ]
             if adapter_dir is not None:
                 command.extend(["--adapter-path", str(adapter_dir)])
@@ -2084,14 +2743,24 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
             raise FileNotFoundError(f"Adapter directory does not exist: {adapter_dir}")
         verify_training_outputs(adapter_dir)
 
+    separate_eval_output_root = None
+    if getattr(args, "eval_output_root", None):
+        separate_eval_output_root = Path(args.eval_output_root).resolve()
+
     if adapter_dir is not None:
-        run_root = adapter_dir.parent
+        shadow_run_root = adapter_dir.parent
+        if separate_eval_output_root is None:
+            run_root = shadow_run_root
+        else:
+            run_root = separate_eval_output_root / str(args.eval_name)
+            ensure_dir(run_root)
     else:
         run_root = Path(args.output_root).resolve() / str(args.eval_name)
         ensure_dir(run_root)
+        shadow_run_root = run_root
     shadow_model_dir = build_shadow_model_dir(
         Path(args.model_root),
-        run_root / "shadow_model",
+        shadow_run_root / "shadow_model",
         force=bool(args.force_shadow_model),
     )
 
@@ -2104,6 +2773,11 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
         artifact_root=artifact_root,
         report_root=report_root,
         rebuild=bool(args.rebuild_phase0),
+    )
+    benchmark_rows = filter_phase0_benchmark_rows(
+        benchmark_rows,
+        family_short_filter=str(getattr(args, "family_short_filter", "")),
+        per_family_limit=int(getattr(args, "per_family_limit", 0)),
     )
     if args.max_samples is not None:
         benchmark_rows = benchmark_rows[: int(args.max_samples)]
@@ -2149,6 +2823,7 @@ def run_phase0_eval_worker(args: argparse.Namespace) -> None:
         lazy_load=bool(args.lazy_load),
         progress_every=int(args.progress_every),
         worker_label=str(args.worker_label),
+        eval_thinking=str(getattr(args, "eval_thinking", "auto")),
     )
     write_jsonl_records(Path(args.output_jsonl), records)
     print(
@@ -2170,16 +2845,27 @@ def add_common_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--train-csv", type=Path, default=DEFAULT_TRAIN_CSV)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-name", type=str, default=DEFAULT_RUN_NAME)
-    parser.add_argument("--dataset-format", type=str, choices=("chat", "text"), default="chat")
+    parser.add_argument("--train-profile", type=str, choices=TRAIN_PROFILE_CHOICES, default="baseline")
+    parser.add_argument(
+        "--dataset-format",
+        type=str,
+        choices=("chat", "completion", "completions", "text"),
+        default="chat",
+    )
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--grad-accumulation-steps", type=int, default=4)
     parser.add_argument("--num-epochs", type=float, default=2.0)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--completion-thinking", type=str, default="auto")
+    parser.add_argument("--lr-schedule-name", type=str, default="")
+    parser.add_argument("--lr-schedule-end", type=float, default=0.0)
+    parser.add_argument("--lr-warmup-ratio", type=float, default=0.0)
     parser.add_argument("--max-seq-length", type=int, default=2048)
     parser.add_argument("--lora-rank", type=int, default=32)
     parser.add_argument("--lora-alpha", type=float, default=32.0)
     parser.add_argument("--lora-dropout", type=float, default=0.05)
     parser.add_argument("--num-layers", type=int, default=-1)
+    parser.add_argument("--resume-adapter-file", type=Path, default=None)
     parser.add_argument("--valid-shadow-rows", type=int, default=32)
     parser.add_argument("--steps-per-report", type=int, default=5)
     parser.add_argument("--steps-per-eval", type=int, default=900)
@@ -2211,6 +2897,18 @@ def build_parser() -> argparse.ArgumentParser:
     train_mlx_config.add_argument("--config", type=Path, required=True)
     train_mlx_config.set_defaults(func=run_train_mlx_config)
 
+    merge_adapters = subparsers.add_parser(
+        "merge-adapters",
+        help="Merge two MLX LoRA adapters into a single weighted adapter.",
+    )
+    merge_adapters.add_argument("--generalist-adapter", type=Path, required=True)
+    merge_adapters.add_argument("--specialist-adapter", type=Path, required=True)
+    merge_adapters.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    merge_adapters.add_argument("--merge-name", type=str, required=True)
+    merge_adapters.add_argument("--generalist-weight", type=float, default=1.0)
+    merge_adapters.add_argument("--specialist-weight", type=float, default=1.0)
+    merge_adapters.set_defaults(func=run_merge_adapters)
+
     phase0_eval = subparsers.add_parser("eval-phase0", help="Run phase0-style offline evaluation with MLX generation.")
     phase0_eval.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
     phase0_eval.add_argument("--adapter-path", type=Path, default=None)
@@ -2227,10 +2925,14 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval.add_argument("--num-shards", type=int, default=0)
     phase0_eval.add_argument("--memory-budget-gb", type=float, default=420.0)
     phase0_eval.add_argument("--estimated-worker-memory-gb", type=float, default=100.0)
+    phase0_eval.add_argument("--eval-output-root", type=Path, default=None)
+    phase0_eval.add_argument("--family-short-filter", type=str, default="")
+    phase0_eval.add_argument("--per-family-limit", type=int, default=0)
     phase0_eval.add_argument("--prompt-chunk-size", type=int, default=README_MAX_NUM_SEQS)
     phase0_eval.add_argument("--prefill-batch-size", type=int, default=32)
     phase0_eval.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval.add_argument("--progress-every", type=int, default=10)
+    phase0_eval.add_argument("--eval-thinking", type=str, default="auto")
     phase0_eval.add_argument("--lazy-load", action="store_true")
     phase0_eval.add_argument("--force-shadow-model", action="store_true")
     phase0_eval.set_defaults(func=run_phase0_eval)
@@ -2252,6 +2954,7 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval_worker.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval_worker.add_argument("--progress-every", type=int, default=10)
     phase0_eval_worker.add_argument("--worker-label", type=str, default="worker")
+    phase0_eval_worker.add_argument("--eval-thinking", type=str, default="auto")
     phase0_eval_worker.add_argument("--lazy-load", action="store_true")
     phase0_eval_worker.set_defaults(func=run_phase0_eval_worker)
 

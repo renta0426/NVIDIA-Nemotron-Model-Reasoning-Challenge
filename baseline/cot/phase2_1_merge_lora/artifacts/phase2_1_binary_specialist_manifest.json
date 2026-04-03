@@ -1,0 +1,65 @@
+{
+  "source_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_1_merge_lora/artifacts/phase2_1_binary_specialist_training_data.csv",
+  "manifest_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_1_merge_lora/artifacts/phase2_1_binary_specialist_manifest.json",
+  "subsample_size": 1449,
+  "training_scope": "binary_only_curated",
+  "family_counts": {
+    "bit_manipulation": 1449
+  },
+  "source_selection_tier_counts": {
+    "answer_only_keep": 445,
+    "verified_trace_ready": 1004
+  },
+  "assistant_style_counts": {
+    "boxed_only": 445,
+    "trace_boxed": 1004
+  },
+  "template_subtype_counts": {
+    "bit_other": 508,
+    "bit_permutation_inversion": 90,
+    "bit_structured_byte_formula": 851
+  },
+  "teacher_solver_counts": {
+    "": 445,
+    "binary_affine_xor": 133,
+    "binary_bit_permutation_bijection": 78,
+    "binary_bit_permutation_independent": 7,
+    "binary_byte_transform": 11,
+    "binary_structured_byte_formula": 446,
+    "binary_structured_byte_formula_abstract": 152,
+    "binary_structured_byte_not_formula": 25,
+    "binary_three_bit_boolean": 17,
+    "binary_two_bit_boolean": 135
+  },
+  "binary_phase2_1_design": {
+    "verified_binary_trace_rows": 1004,
+    "answer_only_binary_boxed_rows": 445,
+    "binary_answer_only_is_boxed_only": true,
+    "binary_trace_avoids_repeating_final_answer_inside_think": true,
+    "binary_trace_style": "dsl_scratchpad_reused_from_phase2",
+    "binary_trace_category_counts": {
+      "generic_solver_family": 88,
+      "hybrid_byte_transform": 38,
+      "hybrid_exact_formula": 878
+    },
+    "sanitized_query_equals_answer_rows": 7
+  },
+  "selection_policy": {
+    "include": [
+      "bit_manipulation + verified_trace_ready",
+      "bit_manipulation + answer_only_keep"
+    ],
+    "exclude": [
+      "bit_manipulation + manual_audit_priority",
+      "bit_manipulation + exclude_suspect"
+    ]
+  },
+  "notes": [
+    "README.md evaluation is boxed-first Accuracy, so binary traces keep the final 8-bit answer only inside the box.",
+    "FINAL_SUMMARY_REPORT.md recommends using verified_trace_ready as the trace-teacher core and answer_only_keep only as final-answer supervision.",
+    "This Phase 2.1 dataset removes non-binary families and uses the full curated binary core: 1004 verified + 445 answer_only = 1449 rows.",
+    "Rows where query byte equals final answer are rendered with a sanitized query-byte sentence so the final byte is not repeated inside <think>.",
+    "The output schema matches the existing assistant-only trainer notebook, so only dataset paths and sample count need to change."
+  ]
+}

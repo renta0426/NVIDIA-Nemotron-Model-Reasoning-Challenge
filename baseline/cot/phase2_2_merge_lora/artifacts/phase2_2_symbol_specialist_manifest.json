@@ -1,0 +1,85 @@
+{
+  "source_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "dataset_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_2_merge_lora/artifacts/phase2_2_symbol_specialist_training_data.csv",
+  "manifest_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/cot/phase2_2_merge_lora/artifacts/phase2_2_symbol_specialist_manifest.json",
+  "subsample_size": 1520,
+  "training_scope": "symbol_only_curated",
+  "family_counts": {
+    "symbol_equation": 1520
+  },
+  "source_selection_tier_counts": {
+    "answer_only_keep": 1410,
+    "verified_trace_ready": 110
+  },
+  "assistant_style_counts": {
+    "boxed_only": 1410,
+    "trace_boxed": 110
+  },
+  "template_subtype_counts": {
+    "glyph_len5": 823,
+    "numeric_2x2": 697
+  },
+  "teacher_solver_counts": {
+    "": 1296,
+    "symbol_numeric_operator_formula": 224
+  },
+  "symbol_query_operator_counts": {
+    "": 823,
+    "!": 20,
+    "\"": 19,
+    "#": 14,
+    "$": 23,
+    "%": 17,
+    "&": 15,
+    "'": 12,
+    "(": 12,
+    ")": 14,
+    "*": 97,
+    "+": 116,
+    "-": 105,
+    "/": 22,
+    ":": 19,
+    "<": 14,
+    ">": 13,
+    "?": 15,
+    "@": 20,
+    "[": 22,
+    "\\": 13,
+    "]": 15,
+    "^": 19,
+    "`": 18,
+    "{": 19,
+    "|": 7,
+    "}": 17
+  },
+  "symbol_phase2_2_design": {
+    "verified_symbol_trace_rows": 110,
+    "answer_only_symbol_boxed_rows": 1410,
+    "verified_template_subtype_counts": {
+      "numeric_2x2": 110
+    },
+    "answer_only_template_subtype_counts": {
+      "glyph_len5": 823,
+      "numeric_2x2": 587
+    },
+    "answer_only_is_boxed_only": true,
+    "verified_trace_style": "phase2_symbol_trace_reused"
+  },
+  "selection_policy": {
+    "include": [
+      "symbol_equation + verified_trace_ready",
+      "symbol_equation + answer_only_keep"
+    ],
+    "exclude": [
+      "symbol_equation + manual_audit_priority",
+      "symbol_equation + exclude_suspect"
+    ]
+  },
+  "notes": [
+    "README.md evaluation is boxed-first Accuracy, so this specialist keeps answer_only rows as boxed-only supervision.",
+    "FINAL_SUMMARY_REPORT.md recommends verified_trace_ready as trace-teacher core and answer_only_keep as final-answer supervision; manual and exclude tiers stay out.",
+    "This Phase 2.2 dataset removes non-symbol families and uses the full curated symbol core: 110 verified + 1410 answer_only = 1520 rows.",
+    "The curated symbol core now spans both numeric_2x2 and glyph_len5, but most answer_only rows remain boxed-only because latent rule uniqueness is unresolved.",
+    "The output schema matches the existing assistant-only trainer notebook, so only dataset paths and sample count need to change."
+  ]
+}
