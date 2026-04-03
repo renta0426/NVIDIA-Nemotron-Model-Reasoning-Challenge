@@ -69,6 +69,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v17",
     "single-adapter-fusion-v18",
     "single-adapter-fusion-v19",
+    "single-adapter-fusion-v20",
+    "single-adapter-fusion-v21",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -145,6 +147,22 @@ FUSION_V19_AUGMENT_QUOTAS = {
     "symbol_answer_only": 0,
     "symbol_manual": 0,
     "symbol_glyph_answer_only": 32,
+}
+FUSION_V20_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 16,
+    "symbol_answer_only": 48,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 48,
+}
+FUSION_V21_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 16,
+    "symbol_verified": 16,
+    "symbol_answer_only": 48,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 48,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -882,6 +900,26 @@ def build_single_adapter_fusion_v19_rows(
     )
 
 
+def build_single_adapter_fusion_v20_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v20",
+        quotas=FUSION_V20_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v21_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v21",
+        quotas=FUSION_V21_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -907,6 +945,10 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v18_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v19":
         return build_single_adapter_fusion_v19_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v20":
+        return build_single_adapter_fusion_v20_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v21":
+        return build_single_adapter_fusion_v21_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
