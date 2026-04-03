@@ -57,6 +57,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v10",
     "single-adapter-fusion-v11",
     "single-adapter-fusion-v12",
+    "single-adapter-fusion-v13",
+    "single-adapter-fusion-v14",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -607,6 +609,8 @@ def apply_phase2_train_profile(
             "single-adapter-fusion-v10",
             "single-adapter-fusion-v11",
             "single-adapter-fusion-v12",
+            "single-adapter-fusion-v13",
+            "single-adapter-fusion-v14",
         }:
             if normalized_profile in {
                 "single-adapter-fusion-v7",
@@ -615,6 +619,8 @@ def apply_phase2_train_profile(
                 "single-adapter-fusion-v10",
                 "single-adapter-fusion-v11",
                 "single-adapter-fusion-v12",
+                "single-adapter-fusion-v13",
+                "single-adapter-fusion-v14",
             }:
                 row_key = str(row.get("id") or row.get("prompt") or "")
                 fusion_settings = {
@@ -685,6 +691,36 @@ def apply_phase2_train_profile(
                         },
                         "unit_mod": 2,
                         "text_repeats": 2,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                    "single-adapter-fusion-v13": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "answer_only_keep": 1,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 3,
+                        },
+                        "trace_repeats_by_tier": {},
+                        "unit_mod": 2,
+                        "text_repeats": 1,
+                        "roman_mod": 2,
+                        "tier_aware_boxing": True,
+                    },
+                    "single-adapter-fusion-v14": {
+                        "binary_repeats": 1,
+                        "symbol_repeats": 2,
+                        "binary_repeats_by_tier": {
+                            "answer_only_keep": 2,
+                        },
+                        "symbol_repeats_by_tier": {
+                            "answer_only_keep": 3,
+                        },
+                        "trace_repeats_by_tier": {},
+                        "unit_mod": 2,
+                        "text_repeats": 1,
                         "roman_mod": 2,
                         "tier_aware_boxing": True,
                     },
