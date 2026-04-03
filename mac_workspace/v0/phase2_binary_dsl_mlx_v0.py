@@ -95,6 +95,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v26",
     "single-adapter-fusion-v27",
     "single-adapter-fusion-v28",
+    "single-adapter-fusion-v29",
+    "single-adapter-fusion-v30",
+    "single-adapter-fusion-v31",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -267,6 +270,48 @@ FUSION_V28_AUGMENT_QUOTAS = {
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 2,
     "unit_verified_anchor_mod": 2,
+}
+FUSION_V29_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 4,
+    "unit_verified_anchor_mod": 0,
+}
+FUSION_V30_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 0,
+    "unit_verified_anchor_mod": 4,
+}
+FUSION_V31_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 24,
+    "binary_structured_answer_only": 16,
+    "symbol_formula_verified": 8,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 4,
+    "unit_verified_anchor_mod": 4,
 }
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
@@ -1304,6 +1349,36 @@ def build_single_adapter_fusion_v28_rows(
     )
 
 
+def build_single_adapter_fusion_v29_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v29",
+        quotas=FUSION_V29_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v30_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v30",
+        quotas=FUSION_V30_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v31_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v31",
+        quotas=FUSION_V31_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -1347,6 +1422,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v27_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v28":
         return build_single_adapter_fusion_v28_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v29":
+        return build_single_adapter_fusion_v29_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v30":
+        return build_single_adapter_fusion_v30_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v31":
+        return build_single_adapter_fusion_v31_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
