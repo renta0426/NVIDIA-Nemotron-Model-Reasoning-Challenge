@@ -131,6 +131,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v58",
     "single-adapter-fusion-v59",
     "single-adapter-fusion-v60",
+    "single-adapter-fusion-v61",
+    "single-adapter-fusion-v62",
+    "single-adapter-fusion-v63",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -814,6 +817,107 @@ FUSION_V60_AUGMENT_QUOTAS = {
     "binary_structured_leading_zero_answer_only_group_keys": (
         "num_examples",
         "bit_no_candidate_positions",
+    ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V61_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 0,
+    "binary_structured_leading_zero_answer_only": 13,
+    "binary_structured_leading_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 7,
+        "num_examples": 8,
+    },
+    "binary_structured_leading_zero_answer_only_exact_fields": {
+        "bit_structured_formula_safe_support": "0",
+    },
+    "binary_structured_leading_zero_answer_only_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_structured_leading_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+        "bit_structured_formula_safe_support",
+    ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V62_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 0,
+    "binary_structured_leading_zero_answer_only": 16,
+    "binary_structured_leading_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_structured_leading_zero_answer_only_exact_fields": {
+        "bit_structured_formula_safe_support": "0",
+    },
+    "binary_structured_leading_zero_answer_only_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_structured_leading_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+        "bit_structured_formula_safe_support",
+    ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V63_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 0,
+    "binary_structured_exact_zero_answer_only": 4,
+    "binary_structured_exact_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 7,
+        "num_examples": 8,
+    },
+    "binary_structured_exact_zero_answer_only_exact_fields": {
+        "answer": "00000000",
+        "bit_structured_formula_safe_support": "0",
+    },
+    "binary_structured_exact_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+        "bit_structured_formula_safe_support",
+    ),
+    "binary_structured_leading_zero_answer_only": 9,
+    "binary_structured_leading_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 7,
+        "num_examples": 8,
+    },
+    "binary_structured_leading_zero_answer_only_exact_fields": {
+        "bit_structured_formula_safe_support": "0",
+    },
+    "binary_structured_leading_zero_answer_only_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_structured_leading_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+        "bit_structured_formula_safe_support",
     ),
     "symbol_formula_verified": 4,
     "symbol_formula_answer_only": 0,
@@ -1778,6 +1882,29 @@ def build_single_adapter_fusion_external_rows(
             ),
             label="binary",
         )
+    if quotas.get("binary_structured_exact_zero_answer_only", 0) > 0:
+        append_candidates(
+            "binary_structured_exact_zero_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_structured_exact_zero_answer_only"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_structured_exact_zero_answer_only_group_keys",
+                        ("num_examples", "bit_no_candidate_positions"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_structured_exact_zero_answer_only_min_fields"),
+                max_int_fields=quotas.get("binary_structured_exact_zero_answer_only_max_fields"),
+                exact_fields=quotas.get("binary_structured_exact_zero_answer_only_exact_fields"),
+            ),
+            label="binary",
+        )
     if quotas.get("binary_structured_leading_zero_answer_only", 0) > 0:
         append_candidates(
             "binary_structured_leading_zero_answer_only",
@@ -2372,6 +2499,36 @@ def build_single_adapter_fusion_v60_rows(
     )
 
 
+def build_single_adapter_fusion_v61_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v61",
+        quotas=FUSION_V61_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v62_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v62",
+        quotas=FUSION_V62_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v63_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v63",
+        quotas=FUSION_V63_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -2479,6 +2636,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v59_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v60":
         return build_single_adapter_fusion_v60_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v61":
+        return build_single_adapter_fusion_v61_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v62":
+        return build_single_adapter_fusion_v62_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v63":
+        return build_single_adapter_fusion_v63_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
