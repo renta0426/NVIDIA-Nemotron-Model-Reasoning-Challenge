@@ -119,6 +119,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v49",
     "single-adapter-fusion-v50",
     "single-adapter-fusion-v51",
+    "single-adapter-fusion-v52",
+    "single-adapter-fusion-v53",
+    "single-adapter-fusion-v54",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -596,6 +599,62 @@ FUSION_V51_AUGMENT_QUOTAS = {
     "gravity_verified_anchor_mod": 8,
     "text_verified_anchor_mod": 8,
 }
+FUSION_V52_AUGMENT_QUOTAS = {
+    "binary_candidates": 16,
+    "binary_candidates_template_subtype": "bit_structured_byte_formula",
+    "binary_candidates_allowed_tiers": ("verified_trace_ready",),
+    "binary_candidate_min_fields": {"bit_no_candidate_positions": 4},
+    "binary_candidate_exact_fields": {"bit_multi_candidate_positions": 0},
+    "binary_candidate_group_keys": ("bit_structured_formula_abstract_family", "num_examples"),
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V53_AUGMENT_QUOTAS = {
+    "binary_candidates": 16,
+    "binary_candidates_template_subtype": "bit_structured_byte_formula",
+    "binary_candidates_allowed_tiers": ("verified_trace_ready",),
+    "binary_candidate_min_fields": {"bit_no_candidate_positions": 3},
+    "binary_candidate_max_fields": {"bit_no_candidate_positions": 5},
+    "binary_candidate_group_keys": ("bit_structured_formula_abstract_family", "num_examples"),
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V54_AUGMENT_QUOTAS = {
+    "binary_candidates": 12,
+    "binary_candidates_template_subtype": "bit_structured_byte_formula",
+    "binary_candidates_allowed_tiers": ("verified_trace_ready",),
+    "binary_candidate_min_fields": {
+        "bit_no_candidate_positions": 4,
+        "bit_multi_candidate_positions": 1,
+    },
+    "binary_candidate_group_keys": ("bit_structured_formula_abstract_family", "teacher_solver_candidate"),
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -676,6 +735,31 @@ def parse_int(value: Any, default: int = 0) -> int:
         return int(float(text))
     except (TypeError, ValueError):
         return default
+
+
+def matches_numeric_field_filters(
+    row: dict[str, str],
+    *,
+    min_int_fields: dict[str, int] | None = None,
+    max_int_fields: dict[str, int] | None = None,
+    exact_fields: dict[str, Any] | None = None,
+) -> bool:
+    if min_int_fields:
+        for key, minimum in min_int_fields.items():
+            if parse_int(row.get(key), minimum - 1) < minimum:
+                return False
+    if max_int_fields:
+        for key, maximum in max_int_fields.items():
+            if parse_int(row.get(key), maximum + 1) > maximum:
+                return False
+    if exact_fields:
+        for key, expected in exact_fields.items():
+            if isinstance(expected, int):
+                if parse_int(row.get(key), expected - 1) != expected:
+                    return False
+            elif str(row.get(key, "")).strip() != str(expected).strip():
+                return False
+    return True
 
 
 def parse_float(value: Any, default: float | None = None) -> float | None:
@@ -1114,6 +1198,9 @@ def select_augmentation_candidates(
     quota: int = 0,
     group_keys: Sequence[str] = (),
     hard_first: bool = True,
+    min_int_fields: dict[str, int] | None = None,
+    max_int_fields: dict[str, int] | None = None,
+    exact_fields: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     candidates: list[dict[str, str]] = []
     for raw_row in load_csv_rows(path):
@@ -1130,6 +1217,13 @@ def select_augmentation_candidates(
         tier = infer_candidate_selection_tier(row)
         row["selection_tier"] = tier
         if allowed_tiers and tier not in allowed_tiers:
+            continue
+        if not matches_numeric_field_filters(
+            row,
+            min_int_fields=min_int_fields,
+            max_int_fields=max_int_fields,
+            exact_fields=exact_fields,
+        ):
             continue
         candidates.append(row)
     if quota > 0 and len(candidates) > quota:
@@ -1300,20 +1394,32 @@ def build_single_adapter_fusion_external_rows(
         return selected
 
     if quotas.get("binary_candidates", 0) > 0:
+        binary_candidate_template_subtype = str(
+            quotas.get("binary_candidates_template_subtype", "")
+        ).strip() or None
+        binary_candidate_allowed_tiers = set(
+            quotas.get("binary_candidates_allowed_tiers", ("verified_trace_ready", "answer_only_keep"))
+        )
+        binary_candidate_group_keys = tuple(
+            quotas.get(
+                "binary_candidate_group_keys",
+                ("template_subtype", "teacher_solver_candidate", "bit_structured_formula_abstract_family"),
+            )
+        )
         append_candidates(
             "binary_candidates",
             select_augmentation_candidates(
                 AUGMENT_BINARY_STRUCTURED_CSV,
                 existing_ids=existing_ids,
                 family="bit_manipulation",
-                allowed_tiers={"verified_trace_ready", "answer_only_keep"},
+                template_subtype=binary_candidate_template_subtype,
+                allowed_tiers=binary_candidate_allowed_tiers,
                 quota=quotas["binary_candidates"],
-                group_keys=(
-                    "template_subtype",
-                    "teacher_solver_candidate",
-                    "bit_structured_formula_abstract_family",
-                ),
+                group_keys=binary_candidate_group_keys,
                 hard_first=True,
+                min_int_fields=quotas.get("binary_candidate_min_fields"),
+                max_int_fields=quotas.get("binary_candidate_max_fields"),
+                exact_fields=quotas.get("binary_candidate_exact_fields"),
             ),
             label="binary",
         )
@@ -1886,6 +1992,36 @@ def build_single_adapter_fusion_v51_rows(
     )
 
 
+def build_single_adapter_fusion_v52_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v52",
+        quotas=FUSION_V52_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v53_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v53",
+        quotas=FUSION_V53_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v54_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v54",
+        quotas=FUSION_V54_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -1975,6 +2111,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v50_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v51":
         return build_single_adapter_fusion_v51_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v52":
+        return build_single_adapter_fusion_v52_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v53":
+        return build_single_adapter_fusion_v53_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v54":
+        return build_single_adapter_fusion_v54_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
