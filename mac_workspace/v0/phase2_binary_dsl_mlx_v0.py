@@ -48,6 +48,9 @@ AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready
 AUGMENT_ANSWER_ONLY_CSV = AUGMENT_ARTIFACT_ROOT / "train_answer_only_keep_v1.csv"
 AUGMENT_BINARY_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "binary_manual_audit_queue_v1.csv"
 AUGMENT_SYMBOL_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "symbol_manual_audit_queue_v1.csv"
+AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "binary_prompt_local_current_consensus_candidates_v1.csv"
+)
 PHASE2_BINARY_SPECIALIST_CSV = (
     REPO_ROOT
     / "baseline"
@@ -122,6 +125,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v52",
     "single-adapter-fusion-v53",
     "single-adapter-fusion-v54",
+    "single-adapter-fusion-v55",
+    "single-adapter-fusion-v56",
+    "single-adapter-fusion-v57",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -644,6 +650,83 @@ FUSION_V54_AUGMENT_QUOTAS = {
         "bit_multi_candidate_positions": 1,
     },
     "binary_candidate_group_keys": ("bit_structured_formula_abstract_family", "teacher_solver_candidate"),
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V55_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_prompt_local_current_structured_answer_only": 16,
+    "binary_prompt_local_current_structured_answer_only_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_answer_only_exact_fields": {
+        "safe_prediction_count": 1,
+        "safe_formula_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_answer_only_group_keys": ("safe_formulas", "num_examples"),
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V56_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_prompt_local_current_structured_answer_only": 16,
+    "binary_prompt_local_current_structured_answer_only_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_answer_only_max_fields": {
+        "safe_formula_count": 2,
+    },
+    "binary_prompt_local_current_structured_answer_only_exact_fields": {
+        "safe_prediction_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_answer_only_group_keys": ("safe_formulas", "num_examples"),
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V57_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_prompt_local_current_structured_answer_only": 12,
+    "binary_prompt_local_current_structured_answer_only_min_fields": {
+        "bit_no_candidate_positions": 3,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_answer_only_max_fields": {
+        "bit_no_candidate_positions": 5,
+        "safe_formula_count": 2,
+    },
+    "binary_prompt_local_current_structured_answer_only_exact_fields": {
+        "safe_prediction_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_answer_only_group_keys": ("safe_formulas", "num_examples"),
     "binary_answer_only_bit_other": 0,
     "symbol_verified": 0,
     "symbol_answer_only": 0,
@@ -1239,6 +1322,67 @@ def select_augmentation_candidates(
     return candidates
 
 
+def select_joined_augmentation_candidates(
+    base_path: Path,
+    candidate_path: Path,
+    *,
+    existing_ids: set[str],
+    family: str | None = None,
+    template_subtype: str | None = None,
+    allowed_tiers: set[str] | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = True,
+    min_int_fields: dict[str, int] | None = None,
+    max_int_fields: dict[str, int] | None = None,
+    exact_fields: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    base_index = {
+        str(row.get("id", "")).strip(): {str(key): "" if value is None else str(value) for key, value in row.items()}
+        for row in load_csv_rows(base_path)
+        if str(row.get("id", "")).strip()
+    }
+    candidates: list[dict[str, str]] = []
+    for raw_row in load_csv_rows(candidate_path):
+        candidate_row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(candidate_row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        base_row = base_index.get(row_id)
+        if base_row is None:
+            continue
+        row = {**base_row, **candidate_row}
+        if family and str(row.get("family", "")).strip() != family:
+            continue
+        if template_subtype and str(row.get("template_subtype", "")).strip() != template_subtype:
+            continue
+        if not str(row.get("prompt", "")).strip() or not str(row.get("answer", "")).strip():
+            continue
+        tier = infer_candidate_selection_tier(row)
+        row["selection_tier"] = tier
+        if allowed_tiers and tier not in allowed_tiers:
+            continue
+        if not matches_numeric_field_filters(
+            row,
+            min_int_fields=min_int_fields,
+            max_int_fields=max_int_fields,
+            exact_fields=exact_fields,
+        ):
+            continue
+        candidates.append(row)
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("template_subtype", "teacher_solver_candidate")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
 def select_phase2_specialist_rows(
     path: Path,
     *,
@@ -1541,6 +1685,36 @@ def build_single_adapter_fusion_external_rows(
                     "bit_structured_formula_abstract_family",
                 ),
                 hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("binary_prompt_local_current_structured_answer_only", 0) > 0:
+        append_candidates(
+            "binary_prompt_local_current_structured_answer_only",
+            select_joined_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_prompt_local_current_structured_answer_only"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_prompt_local_current_structured_answer_only_group_keys",
+                        ("safe_formulas", "num_examples"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get(
+                    "binary_prompt_local_current_structured_answer_only_min_fields"
+                ),
+                max_int_fields=quotas.get(
+                    "binary_prompt_local_current_structured_answer_only_max_fields"
+                ),
+                exact_fields=quotas.get(
+                    "binary_prompt_local_current_structured_answer_only_exact_fields"
+                ),
             ),
             label="binary",
         )
@@ -2022,6 +2196,36 @@ def build_single_adapter_fusion_v54_rows(
     )
 
 
+def build_single_adapter_fusion_v55_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v55",
+        quotas=FUSION_V55_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v56_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v56",
+        quotas=FUSION_V56_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v57_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v57",
+        quotas=FUSION_V57_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -2117,6 +2321,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v53_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v54":
         return build_single_adapter_fusion_v54_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v55":
+        return build_single_adapter_fusion_v55_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v56":
+        return build_single_adapter_fusion_v56_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v57":
+        return build_single_adapter_fusion_v57_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
