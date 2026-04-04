@@ -128,6 +128,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v55",
     "single-adapter-fusion-v56",
     "single-adapter-fusion-v57",
+    "single-adapter-fusion-v58",
+    "single-adapter-fusion-v59",
+    "single-adapter-fusion-v60",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -738,6 +741,84 @@ FUSION_V57_AUGMENT_QUOTAS = {
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 8,
 }
+FUSION_V58_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 0,
+    "binary_structured_leading_zero_answer_only": 16,
+    "binary_structured_leading_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_structured_leading_zero_answer_only_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_structured_leading_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+    ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V59_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 0,
+    "binary_structured_leading_zero_answer_only": 12,
+    "binary_structured_leading_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 9,
+    },
+    "binary_structured_leading_zero_answer_only_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_structured_leading_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+    ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V60_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 0,
+    "binary_structured_leading_zero_answer_only": 12,
+    "binary_structured_leading_zero_answer_only_min_fields": {
+        "bit_no_candidate_positions": 3,
+        "num_examples": 8,
+    },
+    "binary_structured_leading_zero_answer_only_max_fields": {
+        "bit_no_candidate_positions": 5,
+    },
+    "binary_structured_leading_zero_answer_only_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_structured_leading_zero_answer_only_group_keys": (
+        "num_examples",
+        "bit_no_candidate_positions",
+    ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -826,6 +907,7 @@ def matches_numeric_field_filters(
     min_int_fields: dict[str, int] | None = None,
     max_int_fields: dict[str, int] | None = None,
     exact_fields: dict[str, Any] | None = None,
+    startswith_fields: dict[str, str] | None = None,
 ) -> bool:
     if min_int_fields:
         for key, minimum in min_int_fields.items():
@@ -841,6 +923,10 @@ def matches_numeric_field_filters(
                 if parse_int(row.get(key), expected - 1) != expected:
                     return False
             elif str(row.get(key, "")).strip() != str(expected).strip():
+                return False
+    if startswith_fields:
+        for key, expected_prefix in startswith_fields.items():
+            if not str(row.get(key, "")).strip().startswith(str(expected_prefix).strip()):
                 return False
     return True
 
@@ -1284,6 +1370,7 @@ def select_augmentation_candidates(
     min_int_fields: dict[str, int] | None = None,
     max_int_fields: dict[str, int] | None = None,
     exact_fields: dict[str, Any] | None = None,
+    startswith_fields: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     candidates: list[dict[str, str]] = []
     for raw_row in load_csv_rows(path):
@@ -1306,6 +1393,7 @@ def select_augmentation_candidates(
             min_int_fields=min_int_fields,
             max_int_fields=max_int_fields,
             exact_fields=exact_fields,
+            startswith_fields=startswith_fields,
         ):
             continue
         candidates.append(row)
@@ -1336,6 +1424,7 @@ def select_joined_augmentation_candidates(
     min_int_fields: dict[str, int] | None = None,
     max_int_fields: dict[str, int] | None = None,
     exact_fields: dict[str, Any] | None = None,
+    startswith_fields: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     base_index = {
         str(row.get("id", "")).strip(): {str(key): "" if value is None else str(value) for key, value in row.items()}
@@ -1367,6 +1456,7 @@ def select_joined_augmentation_candidates(
             min_int_fields=min_int_fields,
             max_int_fields=max_int_fields,
             exact_fields=exact_fields,
+            startswith_fields=startswith_fields,
         ):
             continue
         candidates.append(row)
@@ -1685,6 +1775,32 @@ def build_single_adapter_fusion_external_rows(
                     "bit_structured_formula_abstract_family",
                 ),
                 hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("binary_structured_leading_zero_answer_only", 0) > 0:
+        append_candidates(
+            "binary_structured_leading_zero_answer_only",
+            select_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_structured_leading_zero_answer_only"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_structured_leading_zero_answer_only_group_keys",
+                        ("num_examples", "bit_no_candidate_positions"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_structured_leading_zero_answer_only_min_fields"),
+                max_int_fields=quotas.get("binary_structured_leading_zero_answer_only_max_fields"),
+                exact_fields=quotas.get("binary_structured_leading_zero_answer_only_exact_fields"),
+                startswith_fields=quotas.get(
+                    "binary_structured_leading_zero_answer_only_startswith_fields"
+                ),
             ),
             label="binary",
         )
@@ -2226,6 +2342,36 @@ def build_single_adapter_fusion_v57_rows(
     )
 
 
+def build_single_adapter_fusion_v58_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v58",
+        quotas=FUSION_V58_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v59_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v59",
+        quotas=FUSION_V59_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v60_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v60",
+        quotas=FUSION_V60_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -2327,6 +2473,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v56_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v57":
         return build_single_adapter_fusion_v57_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v58":
+        return build_single_adapter_fusion_v58_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v59":
+        return build_single_adapter_fusion_v59_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v60":
+        return build_single_adapter_fusion_v60_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
