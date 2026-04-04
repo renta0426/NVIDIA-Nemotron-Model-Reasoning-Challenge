@@ -51,6 +51,12 @@ AUGMENT_SYMBOL_MANUAL_CSV = AUGMENT_ARTIFACT_ROOT / "symbol_manual_audit_queue_v
 AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV = (
     AUGMENT_ARTIFACT_ROOT / "binary_prompt_local_current_consensus_candidates_v1.csv"
 )
+AUGMENT_BINARY_HYBRID_CONSENSUS_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "binary_hybrid_consensus_candidates_v1.csv"
+)
+AUGMENT_TRAIN_RECOMMENDED_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "train_recommended_learning_target_v1.csv"
+)
 PHASE2_BINARY_SPECIALIST_CSV = (
     REPO_ROOT
     / "baseline"
@@ -134,6 +140,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v61",
     "single-adapter-fusion-v62",
     "single-adapter-fusion-v63",
+    "single-adapter-fusion-v64",
+    "single-adapter-fusion-v65",
+    "single-adapter-fusion-v66",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -919,6 +928,132 @@ FUSION_V63_AUGMENT_QUOTAS = {
         "bit_no_candidate_positions",
         "bit_structured_formula_safe_support",
     ),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V64_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_hybrid_consensus": 8,
+    "binary_hybrid_consensus_allowed_tiers": (
+        "verified_trace_ready",
+        "answer_only_keep",
+    ),
+    "binary_hybrid_consensus_group_keys": (
+        "teacher_solver_candidate",
+        "selection_tier",
+        "num_examples",
+    ),
+    "binary_hybrid_consensus_exact_fields": {
+        "bit_hybrid_consensus_ready": "True",
+        "auto_solver_match": "True",
+    },
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_structured_recommended": 16,
+    "binary_structured_recommended_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "num_examples",
+        "bit_no_candidate_positions",
+    ),
+    "binary_structured_recommended_min_fields": {
+        "bit_no_candidate_positions": 4,
+        "bit_structured_formula_safe_support": 3,
+    },
+    "binary_structured_recommended_exact_fields": {
+        "teacher_solver_candidate": "binary_structured_byte_formula",
+        "bit_structured_formula_safe": "True",
+        "bit_multi_candidate_positions": 0,
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V65_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_hybrid_consensus": 8,
+    "binary_hybrid_consensus_allowed_tiers": (
+        "verified_trace_ready",
+        "answer_only_keep",
+    ),
+    "binary_hybrid_consensus_group_keys": (
+        "teacher_solver_candidate",
+        "selection_tier",
+        "num_examples",
+    ),
+    "binary_hybrid_consensus_exact_fields": {
+        "bit_hybrid_consensus_ready": "True",
+        "auto_solver_match": "True",
+    },
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_structured_recommended": 24,
+    "binary_structured_recommended_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "num_examples",
+        "bit_no_candidate_positions",
+    ),
+    "binary_structured_recommended_min_fields": {
+        "bit_no_candidate_positions": 3,
+        "bit_structured_formula_safe_support": 2,
+    },
+    "binary_structured_recommended_exact_fields": {
+        "teacher_solver_candidate": "binary_structured_byte_formula",
+        "bit_structured_formula_safe": "True",
+        "bit_multi_candidate_positions": 0,
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V66_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_hybrid_consensus": 16,
+    "binary_hybrid_consensus_allowed_tiers": (
+        "verified_trace_ready",
+        "answer_only_keep",
+    ),
+    "binary_hybrid_consensus_group_keys": (
+        "teacher_solver_candidate",
+        "selection_tier",
+        "num_examples",
+    ),
+    "binary_hybrid_consensus_exact_fields": {
+        "bit_hybrid_consensus_ready": "True",
+        "auto_solver_match": "True",
+    },
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_structured_recommended": 16,
+    "binary_structured_recommended_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "num_examples",
+        "bit_no_candidate_positions",
+    ),
+    "binary_structured_recommended_min_fields": {
+        "bit_no_candidate_positions": 4,
+        "bit_structured_formula_safe_support": 3,
+    },
+    "binary_structured_recommended_exact_fields": {
+        "teacher_solver_candidate": "binary_structured_byte_formula",
+        "bit_structured_formula_safe": "True",
+        "bit_multi_candidate_positions": 0,
+    },
     "symbol_formula_verified": 4,
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 8,
@@ -1761,6 +1896,34 @@ def build_single_adapter_fusion_external_rows(
             ),
             label="binary",
         )
+    if quotas.get("binary_hybrid_consensus", 0) > 0:
+        append_candidates(
+            "binary_hybrid_consensus",
+            select_augmentation_candidates(
+                AUGMENT_BINARY_HYBRID_CONSENSUS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_other",
+                allowed_tiers=set(
+                    quotas.get(
+                        "binary_hybrid_consensus_allowed_tiers",
+                        ("verified_trace_ready", "answer_only_keep"),
+                    )
+                ),
+                quota=quotas["binary_hybrid_consensus"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_hybrid_consensus_group_keys",
+                        ("teacher_solver_candidate", "selection_tier", "num_examples"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_hybrid_consensus_min_fields"),
+                max_int_fields=quotas.get("binary_hybrid_consensus_max_fields"),
+                exact_fields=quotas.get("binary_hybrid_consensus_exact_fields"),
+            ),
+            label="binary",
+        )
     if quotas.get("binary_answer_only_bit_other", 0) > 0:
         append_candidates(
             "binary_answer_only_bit_other",
@@ -1879,6 +2042,34 @@ def build_single_adapter_fusion_external_rows(
                     "bit_structured_formula_abstract_family",
                 ),
                 hard_first=True,
+            ),
+            label="binary",
+        )
+    if quotas.get("binary_structured_recommended", 0) > 0:
+        append_candidates(
+            "binary_structured_recommended",
+            select_augmentation_candidates(
+                AUGMENT_TRAIN_RECOMMENDED_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"verified_trace_ready"},
+                quota=quotas["binary_structured_recommended"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_structured_recommended_group_keys",
+                        (
+                            "bit_structured_formula_abstract_family",
+                            "num_examples",
+                            "bit_no_candidate_positions",
+                        ),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_structured_recommended_min_fields"),
+                max_int_fields=quotas.get("binary_structured_recommended_max_fields"),
+                exact_fields=quotas.get("binary_structured_recommended_exact_fields"),
+                startswith_fields=quotas.get("binary_structured_recommended_startswith_fields"),
             ),
             label="binary",
         )
@@ -2529,6 +2720,36 @@ def build_single_adapter_fusion_v63_rows(
     )
 
 
+def build_single_adapter_fusion_v64_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v64",
+        quotas=FUSION_V64_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v65_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v65",
+        quotas=FUSION_V65_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v66_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v66",
+        quotas=FUSION_V66_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -2642,6 +2863,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v62_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v63":
         return build_single_adapter_fusion_v63_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v64":
+        return build_single_adapter_fusion_v64_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v65":
+        return build_single_adapter_fusion_v65_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v66":
+        return build_single_adapter_fusion_v66_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
