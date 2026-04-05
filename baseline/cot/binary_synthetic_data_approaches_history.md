@@ -1355,3 +1355,135 @@ README.md の boxed-first 抽出を前提に、binary watch 60 問について r
 - 2_2_1: fmt=boxed, fb=boxed_non_empty, box=00001101, snip=We need to infer transformation rule from examples. Let's list input and output bits. I'll write them as 8-bit stri...
 - assessment: 大半の result で正答しており、policy 崩壊は限定的。merge 系で一時退行しても 8-bit exact answer 自体は保持できている。
 
+---
+
+## 12. bit_synth_exact_trace_cot_v1 の binary bias specialized eval 再点検（2026-04-05）
+
+依頼により、`cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/result/v1_binary` に保存した 563 問の binary bias specialized eval を、README.md の Evaluation 節にある **boxed-first 抽出 + binary exact string 判定** 前提で再点検した。対象 artifact は以下である。
+
+- `cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/result/v1_binary/reports/binary_bias_specialized_eval_summary.md`
+- `cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/result/v1_binary/reports/binary_bias_specialized_manifest.md`
+- `cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/result/v1_binary/artifacts/binary_bias_specialized_eval_summary.json`
+- `cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/result/v1_binary/artifacts/binary_bias_specialized_eval_row_level.csv`
+
+今回の benchmark は、以前に作った 60 問 watch ではなく、`dominant_structured_safe` / `supported_not_structured` / `no_solver_manual` などの偏りを明示的に割り振った 563 問なので、`11.` 節の「teacher 文体は学べているがどこまで中身が伸びているか」を、もっと細かい bucket 単位で見直せる。
+
+### 12.1 まず結論
+
+- overall は `221/563 = 0.3925`。
+- 文体転写は極めて強い。全 563 行で `Check examples:` 開始、`So the rule is ...`、`Constraints: exact_8bit, leading_zeros, box_only_final.` が出ている。
+- ただし boxed formatting は 1 行も直っていない。`contains_boxed_literal_rate = 0.0`、`contains_oxed_literal_rate = 1.0`、`has_boxed = 0/563` で、**全件が README の primary path ではなく numeric fallback 依存**である。
+- 精度は family によって極端に割れており、`binary_bit_permutation_bijection 44/50 = 0.88`、`binary_byte_transform 11/11 = 1.00` までは強い一方、`binary_structured_byte_not_formula 2/25 = 0.08`、`no_solver_manual 3/40 = 0.075` はほぼ壊滅である。
+- よってこの v1_binary は、「exact-trace teacher を広く学べた run」ではあるが、「underrepresented / no-solver / not-formula 系まで rule induction を広げた run」ではない。
+
+### 12.2 bucket ごとの当たり外れ
+
+bucket 精度は次のようにかなり非対称だった。
+
+| bucket | correct / rows | accuracy | 読み方 |
+| --- | ---: | ---: | --- |
+| `rare_byte_transform` | 11/11 | 1.0000 | byte transform は完全に押し切った |
+| `supported_bijection` | 44/50 | 0.8800 | permutation bijection はかなり強い |
+| `boolean_family` | 30/60 | 0.5000 | boolean 系は五分 |
+| `supported_affine_xor` | 29/60 | 0.4833 | affine_xor は半分弱 |
+| `dominant_structured_safe` | 48/120 | 0.4000 | safe structured でも 4 割止まり |
+| `dominant_structured_abstract` | 33/90 | 0.3667 | abstract 化するとさらに落ちる |
+| `no_solver_answer_only` | 18/70 | 0.2571 | answer-only のみでは弱い |
+| `no_solver_manual` | 3/40 | 0.0750 | manual hard はほぼ未解決 |
+| `supported_not_structured` | 2/55 | 0.0364 | non-formula family が最大の穴 |
+
+exposure band でも同じ傾向が出ている。
+
+- `supported = 105/225 = 0.4667`
+- `dominant = 81/210 = 0.3857`
+- `underrepresented = 21/110 = 0.1909`
+- `rare = 14/18 = 0.7778`
+
+つまり「よく見た supported family」や「決まり切った rare family」には強いが、**underrepresented で solver 名が立てにくい群ほど急落**する。ここは 11 節で見えていた「teacher を短く忠実に模倣する」改善だけでは埋まっていない。
+
+### 12.3 selection tier で見ると、verified と answer-only の差が大きい
+
+selection tier 別では以下になった。
+
+- `verified_trace_ready = 181/373 = 0.4853`
+- `answer_only_keep = 37/150 = 0.2467`
+- `manual_audit_priority = 3/40 = 0.0750`
+
+とくに重要なのは、以前から binary で期待していた「boxed-only / answer-only で最終 8-bit closure だけを学ばせる」戦略が、この specialized set ではかなり限定的にしか効いていない点である。
+
+- `supported_not_structured` は `answer_only_keep 0/30`、`verified_trace_ready 2/25`
+- `no_solver_answer_only` は `18/70`
+- 一方で `dominant_structured_safe` は `answer_only_keep 13/33 = 0.3939`、`verified_trace_ready 35/87 = 0.4023`
+- `dominant_structured_abstract` も `answer_only_keep 6/17 = 0.3529`、`verified_trace_ready 27/73 = 0.3699`
+
+つまり answer-only supervision は、**既に rule family がかなり近い行を少し整える効果はある**が、solver 名が立たない or formula 化しにくい hard binary を新しく解かせるほどの教師信号にはなっていない。
+
+### 12.4 失敗は「format だけ」ではない
+
+この result は全件 numeric fallback なので、一見すると formatting 失敗が主犯に見える。だが row-level を分けて見ると、そこまで単純ではない。
+
+- `gold_anywhere = 311/563 = 0.5524`
+- correct は `221/563 = 0.3925`
+- したがって **90 行**は「本文中のどこかには gold があるが、最後の 8-bit が違う」
+- 逆に **252 行**は本文中に gold が一度も出てこない
+
+つまり failure の主成分は 2 層ある。
+
+1. query 適用や最終コミットを外す failure: 90 行
+2. そもそも gold に未到達な rule induction failure: 252 行
+
+この分解は bucket 差分にも出る。`gold_anywhere - accuracy` の差が大きいのは、
+
+- `rare_perm_independent`: `0.8571 - 0.4286 = 0.4286`
+- `dominant_structured_safe`: `0.6333 - 0.4000 = 0.2333`
+- `no_solver_answer_only`: `0.4571 - 0.2571 = 0.2000`
+- `boolean_family`: `0.7000 - 0.5000 = 0.2000`
+
+であり、これらは「途中までは合うが最後を外す」成分がかなり残っている。一方で `supported_not_structured` は `gold_anywhere = 0.1273` しかなく、**ここは formatting 以前に rule 自体へ到達していない**。
+
+### 12.5 末尾 8-bit の failure mode
+
+wrong 342 行を最終 8-bit 文字列の長さで分けると、
+
+- 8 桁未満の短断片で終わる誤答: `193/342 = 56.43%`
+- 8 桁のもっともらしい byte を出すが間違っている誤答: `149/342 = 43.57%`
+
+だった。これは v1_binary の失敗が単一ではないことを示している。
+
+- `0`, `1`, `10`, `10000`, `100000` のような短断片に潰れる群
+- `11111111`, `11110111`, `10101111` のように 8 桁だが別の byte にコミットする群
+
+前者は old binary run でも見た fallback 汚染の延長であり、後者は exact-trace 文体を学んだぶん、**それっぽい 8-bit を最後に出す力は付いたが rule の当て先がズレている**と読める。
+
+### 12.6 right / wrong の出力差
+
+正答と誤答を比べると、誤答側の方がわずかに長く、8-bit 断片も多い。
+
+- correct 平均 raw 長: `487.1` chars
+- wrong 平均 raw 長: `525.2` chars
+- correct 平均 bit fragment 数: `10.65`
+- wrong 平均 bit fragment 数: `12.96`
+
+つまり v1_binary でも、「短い exact-trace に寄るほど良い」という 11 節の傾向自体は続いている。短く rule を固定してすぐ query を流し込めた行は通りやすく、少し長くなって candidate byte を増やすと外れやすい。
+
+### 12.7 既存の 60 問 watch との接続
+
+11 節では、v1 の 60 問 watch について
+
+- exact-trace teacher の表層文体は強く転写された
+- boxed は壊れたまま
+- long reasoning を short program trace に置き換えたことが主改善
+
+と整理した。今回の 563 問 specialized eval は、その観察をより厳密に言い換える材料になっている。
+
+- 文体転写は 60 問だけの偶然ではなく、563 問全体で一貫している
+- しかし improvement は family-uniform ではなく、`bijection` / `byte_transform` / 一部 `affine_xor` に偏っている
+- `supported_not_structured` と `no_solver_*` は依然として弱く、「teacher 文体の学習」と「hard binary rule induction」は別物だと分かる
+
+したがって、bit_synth exact-trace の次の手は単純な増量ではなく、少なくとも次の 2 つを分けて対処すべきだと判断する。
+
+1. `supported_not_structured` / `no_solver_manual` / `no_solver_answer_only` に対する family-targeted teacher を新設すること
+2. `\boxed{}` の backspace 崩れを止め、README の primary extraction path に戻すこと
+
+要するに、この specialized eval の結論は明確である。**v1_binary は teacher の exact-trace 文体を強く学んだが、その効果は「名前の付く supported binary family」に偏っており、hard non-formula / no-solver 群をまだ解いていない。**
+
