@@ -1487,3 +1487,221 @@ wrong 342 行を最終 8-bit 文字列の長さで分けると、
 
 要するに、この specialized eval の結論は明確である。**v1_binary は teacher の exact-trace 文体を強く学んだが、その効果は「名前の付く supported binary family」に偏っており、hard non-formula / no-solver 群をまだ解いていない。**
 
+---
+
+## 13. 次の改善計画: 「解けない問題」ではなく「惜しい問題」を確実化する（2026-04-05）
+
+依頼により、次の改善計画は **新しい hard family を解けるようにする方向ではなく、現状方針の延長で near-miss を確実化する方向**に限定して整理する。前提として参照した学習系 artifact は以下である。
+
+- 学習データ: `cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/bit_synth_exact_trace_cot_training_data_v1.csv`
+- 生成スクリプト: `cuda-train-data-analysis-v1/bit_synth_exact_trace_cot_v1/generate_bit_synth_exact_trace_cot_v1.py`
+- 学習 notebook: `cuda-train-data-analysis-v1/code/train-bit-synth-exact-trace-cot_merge_lora.ipynb`
+
+README.md の Evaluation に従えば、最終的に重要なのは **`\boxed{}` を primary path で通し、8-bit exact string を最後に確定すること**である。したがって次の一手は、探索能力そのものを広げるより、今の v1_binary が既にかなりの頻度で gold に近づいている slice を、取りこぼさず score に変える設計に寄せるべきである。
+
+### 13.1 今の学習系で、near-miss 改善に効きそうな事実
+
+まず現行 pipeline の性質を整理すると、次の 4 点が重要である。
+
+1. 学習データ 10,000 行は **全件 `trace_boxed`** で、`boxed_only` 行が 1 行も無い。
+2. source tier も **全件 `synthetic_exact_trace_ready`** で、hard だが終端だけ学ばせるような補助 supervision が入っていない。
+3. group 配分はかなり偏っており、manifest では `binary_structured_byte_formula 5472`, `binary_structured_byte_formula_abstract 1868`, `binary_affine_xor 1297` が大半で、`binary_structured_byte_not_formula 309`, `binary_bit_permutation_independent 63` はかなり薄い。
+4. notebook 側は `NUM_EPOCHS=0.75`, `LR=1e-4`, `enable_thinking=True` で、assistant completion 全体を一度に学ばせる単段 SFT になっている。
+
+これを 12 節の結果に重ねると、今の v1_binary は
+
+- teacher 文体転写は極めて強い
+- しかし `\boxed{}` は 0/563
+- gold に一度は到達しているのに最後を外す行が 90/563
+- wrong 342 件のうち 193 件は 8 桁未満の短断片終端
+
+という形なので、次の改善対象は明確に **「rule search」より「query 適用の最終コミット」と「boxed 終端」** である。
+
+### 13.2 改善対象を絞る
+
+次に手を入れるべき対象は、12 節の bucket 差分から次の順に置く。
+
+#### 優先 A: 途中まで合っていて最後だけ外す slice
+
+`gold_anywhere - accuracy` の差が大きい群、つまり near-miss 比率が高い群を最優先にする。
+
+- `rare_perm_independent`: delta `0.4286`
+- `dominant_structured_safe`: delta `0.2333`
+- `no_solver_answer_only`: delta `0.2000`
+- `boolean_family`: delta `0.2000`
+- `dominant_structured_abstract`: delta `0.1556`
+
+ここは「全く解けていない」のではなく、**途中の reasoning には正解 byte が出ているのに最後が崩れる**割合が高いので、今の方針の延長で最も回収しやすい。
+
+#### 優先 B: 終端が短断片に潰れる slice
+
+wrong の 56.43% が 8 桁未満の短断片終端だった。したがって、
+
+- `0`, `1`, `10`, `10000`, `100000`
+
+のような last-number fallback 汚染を減らすだけでも、ローカル精度はまだ伸ばせる余地がある。
+
+#### 後回し: そもそも gold に到達していない slice
+
+`supported_not_structured` や `no_solver_manual` は accuracy だけでなく `gold_anywhere` も低い。ここは near-miss 修正より **新しい rule induction** の問題なので、今回の計画では主対象から外す。
+
+### 13.3 データ改善案
+
+現行 generator の延長でやるなら、次は **v1.1 closure-calibrated exact-trace dataset** を作るのがよい。ポイントは「新 family 追加」ではなく、「同じ family の最終コミット supervision を厚くする」ことである。
+
+#### 案 1: `trace_boxed` を 3 文体に分ける
+
+現行の 10,000 行は全件ほぼ同じ長さの exact-trace である。これを次では、1 本の generator のまま少なくとも 3 種に分ける。
+
+1. `trace_boxed_full`
+  - 現行 v1 と同じ exact-trace 本文
+  - 全体の rule 学習維持用
+
+2. `trace_boxed_short`
+  - `Check examples:` を 1-2 行に減らす
+  - query に対する中間値は残す
+  - 最後に `Final byte = 00101101.` のような **query 適用結果の単独再掲** を 1 行だけ追加してから `\boxed{}` で閉じる
+
+3. `boxed_only_closure`
+  - `<think>` は空にせず、`<think>Use the verified rule from the examples and output only the final 8-bit byte.</think>` のような最短版にする
+  - その直後を `\boxed{...}` だけにする
+
+狙いは、現行 v1 の強い style transfer を壊さずに、**短く閉じる teacher** を明示的に増やすことにある。
+
+#### 案 2: family 別に near-miss 重みを掛ける
+
+manifest の group 配分は現状かなり formula 偏重である。v1.1 では、難問全部を均すのではなく、near-miss を回収しやすい群だけを上乗せする。
+
+推奨は次の通り。
+
+- `binary_structured_byte_formula`: 維持
+- `binary_structured_byte_formula_abstract`: やや増量
+- `binary_affine_xor`: 維持
+- `binary_bit_permutation_independent`: 明確に増量
+- boolean 系に対応する seed 群: 明確に増量
+- `binary_structured_byte_not_formula`: 今回は少量増に留める
+
+ここで重要なのは、**supported_not_structured を無理に主戦場にしない**ことだ。今回の目的は score 回収なので、gold に近い群へ重みを寄せる方が合理的である。
+
+#### 案 3: query 最終コミット専用の teacher を入れる
+
+現行 v1 は support examples をかなり丁寧に書くが、near-miss の多くは query 適用の最後で外している。そこで v1.1 では、同じ rule から追加で
+
+- `Query x = ...`
+- 中間値 2-3 行
+- `Therefore the final 8-bit output for the query is 00101101.`
+- `\boxed{00101101}`
+
+だけを持つ **query-commit teacher** を別 style として追加する。これは能力追加ではなく、**最後の 8-bit に attention を寄せる再圧縮**である。
+
+### 13.4 学習改善案
+
+dataset を変えるだけでなく、学習も「大きく上書きする」より「今の adapter を壊さず補正する」方向にした方がよい。
+
+#### 案 4: 二段学習にする
+
+1. Stage A
+  - 現行 v1 と同じ exact-trace 大規模 corpus で rule 文体を維持
+  - これは現状の 10,000 行をそのまま流用してよい
+
+2. Stage B
+  - v1.1 の closure-calibration subset だけで継続学習
+  - 行数は 1,500-3,000 程度で十分
+  - learning rate は `2e-5` から `5e-5` くらいまで下げる
+  - epoch も `0.3-0.5` 程度に留める
+
+この構成なら、現行 adapter が持つ exact-trace 文体と rule naming を保ったまま、**最後の boxed closure だけを再調整**しやすい。
+
+#### 案 5: 単段のままなら mixture 比率を変える
+
+もし notebook を二段に分けたくないなら、単一 CSV の中で
+
+- 70-80%: 現行 `trace_boxed_full`
+- 15-20%: `trace_boxed_short`
+- 5-10%: `boxed_only_closure`
+
+くらいの mixture にする。現行の全件 long exact-trace より、near-miss 補正にはこの方が筋が良い。
+
+### 13.5 notebook 側で変えるべき点
+
+`train-bit-synth-exact-trace-cot_merge_lora.ipynb` では、今回の目的に対して次を変えるのが妥当である。
+
+1. `DATASET_CSV` を v1.1 の mixed-style CSV に差し替える
+2. `OUTPUT_COLUMNS` に style 列を残したまま、generator で `assistant_style` を複数値にする
+3. continuation run では `LR` を現行 `1e-4` から下げる
+4. `NUM_EPOCHS` は full retrain なら据え置きでもよいが、closure calibration なら短くする
+
+逆に、今回は次は触らなくてよい。
+
+- LoRA rank
+- MAX_SEQ_LEN
+- モデル本体
+- README 準拠の user message
+
+つまり次の改善は、**モデル能力を変える実験ではなく supervision mixture を変える実験**として切り出すべきである。
+
+### 13.6 実験順序
+
+最短で回すなら、次の 3 本でよい。
+
+#### Experiment A: closure-only 補正の最小実験
+
+- 現行 10,000 行は維持
+- 追加で 1,500 行だけ `trace_boxed_short` + `boxed_only_closure` を混ぜる
+- continuation fine-tune で低 LR 短 epoch
+
+目的は、`contains_boxed_literal` と short-fragment failure をどこまで減らせるかを見ること。
+
+#### Experiment B: near-miss bucket に寄せた rebalance
+
+- `dominant_structured_safe`
+- `dominant_structured_abstract`
+- `boolean_family`
+- `rare_perm_independent`
+
+に対応する seed を意図的に増やす。
+
+目的は、`gold_anywhere` は高いのに score に落ちていない群を回収できるかを見ること。
+
+#### Experiment C: query-commit teacher のみ追加
+
+- support examples の説明は最小限
+- query 適用結果の再掲 + `\boxed{}` に全振り
+
+目的は、wrong 342 件中 193 件ある短断片終端を減らせるかを見ること。
+
+### 13.7 成功判定
+
+次 run は overall だけでなく、near-miss 補正の観点で次を必須指標にする。
+
+1. `contains_boxed_literal_rate`
+  - 現状 `0.0`
+  - まずは **0.8 以上**を最低ラインに置く
+
+2. `gold_anywhere=True` 行での正答率
+  - 現状 `0.7106`
+  - **0.82 以上**を目標にする
+
+3. short-fragment wrong rate
+  - 現状 `193/342 = 0.5643`
+  - **0.30 未満**まで下げる
+
+4. bucket accuracy
+  - `dominant_structured_safe`
+  - `dominant_structured_abstract`
+  - `boolean_family`
+  - `rare_perm_independent`
+  の改善を主判定に使う
+
+逆に `supported_not_structured` や `no_solver_manual` が今回ほぼ動かなくても、それだけでは失敗判定にしない。今回はそこを主目的にしていないからである。
+
+### 13.8 まとめ
+
+次の改善計画は一言で言うと、
+
+> exact-trace 路線は維持しつつ、`trace_boxed` 一辺倒をやめ、query 最終コミットと boxed 終端だけを強く学ばせる小さな calibration 段を追加する。
+
+である。
+
+今の v1_binary は「解けない問題」を新しく解く段階ではまだないが、**既に半分以上 gold に触れている問題を score に変換する余地**はまだかなり残っている。次はそこを取りに行くべきである。
+
