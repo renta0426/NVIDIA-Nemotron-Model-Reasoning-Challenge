@@ -1,0 +1,24 @@
+model: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_resume_v40_to_top8_fusion_v76_lr2p5e6_ep025/shadow_model
+train: true
+data: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_resume_v40_to_top8_fusion_v76_lr2p5e6_ep025/dataset
+fine_tune_type: lora
+optimizer: adamw
+mask_prompt: true
+enable_thinking: true
+num_layers: -1
+batch_size: 1
+iters: 1800
+val_batches: -1
+learning_rate: 0.0001
+steps_per_report: 5
+steps_per_eval: 900
+grad_accumulation_steps: 4
+adapter_path: /Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/mac_workspace/v0/outputs/phase2_binary_hybrid_mlx_v0_resume_v40_to_top8_fusion_v76_lr2p5e6_ep025/adapter
+save_every: 1800
+max_seq_length: 2048
+grad_checkpoint: true
+seed: 42
+lora_parameters:
+  rank: 32
+  dropout: 0.05
+  scale: 32.0

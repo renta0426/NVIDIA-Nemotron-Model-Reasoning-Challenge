@@ -25,6 +25,8 @@
 
 `baseline/nemotron-sft-lora-with-cot-v2` は、**verified-correct CoT 6,558 rows** から notebook 内 sampling で **2,907 rows** を使い、README 基準 local **`249/320 = 0.7781`** を出している。
 
+> 重要: この `249/320` は **baseline notebook/report 側の参照値**であり、**この repository の MLX run ではまだ未再現**。
+
 | reference | local320 | binary | structured | symbol | text | unit | note |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `nemotron-sft-lora-with-cot-v2` | `249/320 = 0.7781` | `29/60` | `5/14` official | `22/60` | `49/50` | `49/50` | broad verified CoT baseline |
@@ -85,6 +87,7 @@ non-overlap breakdown:
   - dataset format: `chat`
   - teacher shape: `generated_cot` から既存 `\boxed{}` を除去し、`</think>\n\boxed{answer}` で閉じる
   - train config: `full-layer`, `bs=1`, `ga=8`, `lr=1e-4`, `epochs=2`, `max_seq_length=4096`
+- `v85` train は進行中だが、**README 基準の full320 / binary60 / symbol60 score はまだ未回収**。したがって、現時点では **MLX reproduced score なし**。
 
 ## Current interpretation
 
