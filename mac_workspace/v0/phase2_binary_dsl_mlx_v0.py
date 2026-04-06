@@ -189,6 +189,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v101",
     "single-adapter-fusion-v102",
     "single-adapter-fusion-v103",
+    "single-adapter-fusion-v104",
+    "single-adapter-fusion-v105",
+    "single-adapter-fusion-v106",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -824,6 +827,75 @@ STRONG_BASELINE_V2_SAMPLE_FUSION_V103_SPECS = (
         "baseline_source_type": "Equation Transformation",
         "label": "symbol",
         "assistant_style": "boxed_only_done",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V104_SPECS = (
+    {
+        "source_name": "strong_sample_unit_notext_short_boxed",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_gravity_notext_short_boxed",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_notext_short_boxed",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V105_SPECS = (
+    {
+        "source_name": "strong_sample_unit_notext_short_boxed",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_notext_short_boxed",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V106_SPECS = (
+    {
+        "source_name": "strong_sample_gravity_notext_short_boxed",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_notext_short_boxed",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
         "quota": 24,
         "group_keys": ("prompt_len_bucket",),
         "hard_first": False,
@@ -5226,6 +5298,36 @@ def build_single_adapter_fusion_v103_rows(
     )
 
 
+def build_single_adapter_fusion_v104_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v104",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V104_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v105_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v105",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V105_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v106_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v106",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V106_SPECS,
+    )
+
+
 def build_strong_baseline_cot_v2_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -5553,6 +5655,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v102_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v103":
         return build_single_adapter_fusion_v103_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v104":
+        return build_single_adapter_fusion_v104_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v105":
+        return build_single_adapter_fusion_v105_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v106":
+        return build_single_adapter_fusion_v106_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
