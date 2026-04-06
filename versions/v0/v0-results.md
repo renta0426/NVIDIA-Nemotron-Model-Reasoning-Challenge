@@ -48,13 +48,16 @@ non-overlap breakdown:
 
 この base から、single-file `mac_workspace/v0/phase2_binary_dsl_mlx_v0.py` に **exact binary program trace renderer** を追加した。trace は docs の canonical style に寄せ、`Check examples -> exact rule -> query execution -> Final answer` の固定順で `trace_boxed` teacher を出す。
 
-## New versions in progress
+## Exact-trace / boxed-twin result ledger
 
 | version | design | prepare stats | status |
 | --- | --- | --- | --- |
 | `v70` | exact-trace-safe structured hard+leading-zero: `formula 16 + abstract 8` | `1970 rows`, `123 iters` | train `0.353 -> 0.339`, `binary60 official/exact 3/60, 2/60`, `structured official/exact 1/14, 0/14` |
 | `v71` | exact-trace-safe structured hard broad: `formula 16 + abstract 8` | `1970 rows`, `123 iters` | train `0.353 -> 0.338`, `binary60 official/exact 7/60, 5/60`, `structured official/exact 1/14, 0/14` |
 | `v72` | mixed trace pivot: `binary_candidates 8 + formula 12 + abstract 8 + not_formula 4` | `1978 rows`, `123 iters` | train `0.353 -> 0.328`, `binary60 official/exact 5/60, 5/60`, `structured official/exact 0/14, 0/14` |
+| `v73` | exact-trace formula/abstract + same-prompt boxed-only twin | `1994 rows`, `124 iters` | train `final val 2.570`, `binary60 official/exact 0/60, 0/60`, `structured official/exact 0/14, 0/14` |
+| `v74` | mixed trace pivot + same-prompt boxed-only twin (`formula + abstract + not_formula`) | `2002 rows`, `125 iters` | train `final val 2.308`, `binary60 official/exact 5/60, 0/60`, `structured official/exact 2/14, 0/14` |
+| `v75` | leading-zero exact-trace + same-prompt boxed-only twin | `1994 rows`, `124 iters` | train `final val 3.498`, `binary60 official/exact 5/60, 0/60`, `structured official/exact 2/14, 0/14` |
 
 ## Current interpretation
 
@@ -66,3 +69,6 @@ non-overlap breakdown:
 6. `v71` は official `7/60` で exact-trace 3 本中ベストだが、structured official hit は `1bf84ce3: 00000000 -> 0` の collapse だけで、exact recovery ではない。
 7. `v72` は train 側では `final val 0.328` と最良だったが、`binary60` では `5/60` に留まり、**train val と binary hard eval の相関が弱い**ことを再確認した。
 8. v71/v72 の train dataset を確認すると、**exact-trace teacher 24 rows は全件 `\boxed{}` を含んでいた**。したがって current failure は teacher 欠落ではなく、**generation-time format retention collapse** である。
+9. `v73-v75` は **same-prompt boxed-only twin** で format retention を直接押した follow-up だったが、**exact はむしろ悪化**した。`v73` は `0/60` 全滅、`v74/v75` も exact `0/60` のまま。
+10. `v74/v75` の structured official `2/14` はどちらも `5f29ae58` / `1bf84ce3` の `00000000` 系 collapse で、`v74` は長大 zero-string、`v75` は bare `0` に落ちた。**8-bit boxed closure ではなく numeric fallback が強化された**だけ。
+11. `v73-v75` も `structured_boxed = 0/14`、`format_failure_rate = 1.0` で、boxed twin 追加だけでは **boxed extraction / leading-zero retention / exact string closure** を回復できなかった。
