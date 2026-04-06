@@ -252,6 +252,14 @@ non-overlap breakdown:
   - `v40` same-slice 比では **gain 1 / loss 0 = net +1**
     - gain: `cfa59b38` (`numeric_2x2 = 233`)
   - `README.md` gate24 条件では、この no-text branch の **現 best**
+  - `symbol60 official/exact = 20/60, 20/60`
+    - `numeric_2x2 = 20/40`
+    - `glyph_len5 = 0/20`
+    - `verified/manual/answer_only = 13/0/7`
+    - `numeric/symbolic = 19/36, 1/24`
+  - `v40 symbol60 = 12/60` 比では **gain 10 / loss 2 = net +8**
+    - gains は `numeric_2x2` verified `6`, answer_only `4`
+    - losses は `numeric_2x2` answer_only `2`
 - `v98` prepare / train / gate24 完了:
   - profile: `single-adapter-fusion-v98`
   - design: `v96` からさらに symbol も外した **numeric-only** variant。sampled-new `unit 64 / gravity 32 / roman 32` を **`boxed_only_done`** で追加
@@ -299,3 +307,5 @@ non-overlap breakdown:
 28. no-text branch の内部比較では、**pure `boxed_only` の `v97` が `boxed_only_done` の `v96` を上回った**。`v97` は `v40` 比で **gain 1 / loss 0**、`v96` は official tie のまま text 2 件を落としている。
 29. 一方で symbol まで外した `v98` は **18/24** まで落ち、`bit_other` と `unit_fixed_ratio` に `your answer` / numeric fallback を再発させた。したがって no-text branch を続けるなら、**symbol 24 は残す**のが自然。
 30. `README.md` gate24 条件では、現時点の sampled-new general short-teacher best は **`v97 = 21/24, exact 17/24`**。次の triage は、planned どおり **`general_stable_set 200`** で general regress が本当に消えたかを確認する。
+31. `v97` は `symbol60` でも **`20/60`** まで伸び、`v40 = 12/60` を **+8** 更新した。増分はほぼすべて `numeric_2x2` で、**verified 13/15, answer_only 7/15** まで回復している。
+32. ただし `glyph_len5 = 0/20`, `manual_audit_priority = 0/30` は依然として不変で、symbol 側の未回収部分は **glyph/manual symbolic** に集中している。`general200` が崩れないなら、次の強化対象はここになる。
