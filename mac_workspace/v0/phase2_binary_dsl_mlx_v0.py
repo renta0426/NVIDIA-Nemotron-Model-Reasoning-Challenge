@@ -54,10 +54,12 @@ DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
 PHASE0_ROUTER_PROFILE_PROMPT_V1 = "prompt-router-v1"
 PHASE0_ROUTER_PROFILE_PROMPT_V2 = "prompt-router-v2"
 PHASE0_ROUTER_PROFILE_PROMPT_V3 = "prompt-router-v3"
+PHASE0_ROUTER_PROFILE_PROMPT_V4 = "prompt-router-v4"
 PHASE0_ROUTER_PROFILE_CHOICES = (
     PHASE0_ROUTER_PROFILE_PROMPT_V1,
     PHASE0_ROUTER_PROFILE_PROMPT_V2,
     PHASE0_ROUTER_PROFILE_PROMPT_V3,
+    PHASE0_ROUTER_PROFILE_PROMPT_V4,
 )
 PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
     PHASE0_ROUTER_PROFILE_PROMPT_V1: {
@@ -84,8 +86,34 @@ PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
         "roman": "solver",
         "text": "solver",
     },
+    PHASE0_ROUTER_PROFILE_PROMPT_V4: {
+        "binary": "specialist",
+        "symbol": "specialist",
+        "unit": "solver",
+        "gravity": "solver",
+        "roman": "solver",
+        "text": "solver",
+    },
 }
 AUGMENT_ARTIFACT_ROOT = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts"
+AUGMENT_SYMBOL_OPERATOR_SPECIFIC_SUPPORT_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "symbol_operator_specific_formula_support_v1.csv"
+)
+AUGMENT_SYMBOL_REVERSE_OPERATOR_SUPPORT_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "symbol_reverse_operator_formula_support_v1.csv"
+)
+AUGMENT_SYMBOL_MINUS_PREFIX_SUPPORT_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "symbol_minus_prefix_subfamily_support_v1.csv"
+)
+AUGMENT_SYMBOL_MINUS_DIRECT_SUPPORT_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "symbol_minus_direct_plain_support_v1.csv"
+)
+AUGMENT_SYMBOL_STAR_PREFIX_SUPPORT_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "symbol_star_prefix_if_negative_support_v1.csv"
+)
+AUGMENT_SYMBOL_THIN_SUPPORT2_SUPPORT_CSV = (
+    AUGMENT_ARTIFACT_ROOT / "symbol_thin_support2_subfamily_support_v1.csv"
+)
 AUGMENT_BINARY_STRUCTURED_CSV = AUGMENT_ARTIFACT_ROOT / "binary_structured_byte_formula_candidates_v1.csv"
 AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready_v1.csv"
 AUGMENT_ANSWER_ONLY_CSV = AUGMENT_ARTIFACT_ROOT / "train_answer_only_keep_v1.csv"
@@ -2769,6 +2797,11 @@ FINAL_ANSWER_PATTERNS = (
 )
 NUMBER_PATTERN = __import__("re").compile(r"-?\d+(?:\.\d+)?")
 BIT8_PATTERN = __import__("re").compile(r"^[01]{8}$")
+PHASE0_SYMBOL_NUMERIC_EXAMPLE_PATTERN = __import__("re").compile(r"^(\d{2})(.)(\d{2}) = (.+)$")
+PHASE0_SYMBOL_NUMERIC_QUERY_PATTERN = __import__("re").compile(
+    r"^Now, determine the result for: (\d{2})(.)(\d{2})$"
+)
+PHASE0_SYMBOL_NUMERIC_REVERSE_SUFFIX = "__rev_in1_rev_out1"
 FAMILY_SHORT = {
     "gravity_constant": "gravity",
     "unit_conversion": "unit",
@@ -8120,8 +8153,18 @@ def resolve_phase0_router_fallback_target(
     *,
     router_profile: str,
     scored_row: dict[str, Any],
+    benchmark_row: dict[str, Any] | None = None,
 ) -> tuple[str, str] | None:
-    if str(router_profile).strip() != PHASE0_ROUTER_PROFILE_PROMPT_V2:
+    profile = str(router_profile).strip()
+    if profile == PHASE0_ROUTER_PROFILE_PROMPT_V4:
+        family_short = str(scored_row.get("family_short", "")).strip()
+        template_subtype = str(scored_row.get("template_subtype", "")).strip()
+        if family_short == "symbol" and template_subtype == "numeric_2x2" and benchmark_row is not None:
+            solver_prediction = maybe_solve_phase0_symbol_numeric_prompt(str(benchmark_row.get("prompt", "")))
+            if solver_prediction is not None and solver_prediction != str(scored_row.get("prediction", "")).strip():
+                return ("solver", "symbol_numeric_safe_solver")
+        return None
+    if profile != PHASE0_ROUTER_PROFILE_PROMPT_V2:
         return None
     family_short = str(scored_row.get("family_short", "")).strip()
     prediction = str(scored_row.get("prediction", "")).strip()
@@ -8148,6 +8191,317 @@ def format_phase0_solver_numeric(value: float) -> str:
 
 def parse_phase0_prompt_lines(prompt: str) -> list[str]:
     return [line.strip() for line in str(prompt).splitlines() if line.strip()]
+
+
+def normalize_phase0_symbol_query_operator(query_operator: str) -> str:
+    normalized = str(query_operator).strip()
+    if normalized == '""""':
+        return '"'
+    return normalized
+
+
+@lru_cache(maxsize=1)
+def load_phase0_symbol_numeric_safe_specs() -> dict[str, tuple[tuple[str, str, str], ...]]:
+    grouped_specs: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
+    for row in load_csv_rows(AUGMENT_SYMBOL_OPERATOR_SPECIFIC_SUPPORT_CSV):
+        if str(row.get("safe_operator_spec", "")).strip() == "True":
+            grouped_specs[normalize_phase0_symbol_query_operator(row.get("query_operator", ""))].add(
+                ("formula", str(row.get("formula_name", "")).strip(), str(row.get("format_name", "")).strip())
+            )
+    for row in load_csv_rows(AUGMENT_SYMBOL_REVERSE_OPERATOR_SUPPORT_CSV):
+        if str(row.get("safe_operator_spec", "")).strip() == "True":
+            grouped_specs[normalize_phase0_symbol_query_operator(row.get("query_operator", ""))].add(
+                ("formula", str(row.get("formula_name", "")).strip(), str(row.get("format_name", "")).strip())
+            )
+    for row in load_csv_rows(AUGMENT_SYMBOL_MINUS_PREFIX_SUPPORT_CSV):
+        if str(row.get("safe_subfamily", "")).strip() == "True":
+            grouped_specs["-"].add(("subfamily", str(row.get("subfamily_name", "")).strip(), ""))
+    for row in load_csv_rows(AUGMENT_SYMBOL_MINUS_DIRECT_SUPPORT_CSV):
+        if str(row.get("safe_subfamily", "")).strip() == "True":
+            grouped_specs["-"].add(("subfamily", str(row.get("subfamily_name", "")).strip(), ""))
+    for row in load_csv_rows(AUGMENT_SYMBOL_STAR_PREFIX_SUPPORT_CSV):
+        if str(row.get("safe_subfamily", "")).strip() == "True":
+            grouped_specs["*"].add(("subfamily", str(row.get("subfamily_name", "")).strip(), ""))
+    for row in load_csv_rows(AUGMENT_SYMBOL_THIN_SUPPORT2_SUPPORT_CSV):
+        if str(row.get("safe_subfamily", "")).strip() == "True":
+            grouped_specs[normalize_phase0_symbol_query_operator(row.get("query_operator", ""))].add(
+                ("subfamily", str(row.get("subfamily_name", "")).strip(), "")
+            )
+    return {
+        query_operator: tuple(sorted(specs))
+        for query_operator, specs in sorted(grouped_specs.items())
+    }
+
+
+def parse_phase0_symbol_numeric_prompt(
+    prompt: str,
+) -> tuple[list[tuple[str, str, str, str]], tuple[str, str, str]]:
+    examples: list[tuple[str, str, str, str]] = []
+    query: tuple[str, str, str] | None = None
+    for line in parse_phase0_prompt_lines(prompt):
+        example_match = PHASE0_SYMBOL_NUMERIC_EXAMPLE_PATTERN.match(line)
+        if example_match is not None:
+            examples.append(
+                (
+                    example_match.group(1),
+                    example_match.group(2),
+                    example_match.group(3),
+                    example_match.group(4),
+                )
+            )
+            continue
+        query_match = PHASE0_SYMBOL_NUMERIC_QUERY_PATTERN.match(line)
+        if query_match is not None:
+            query = (query_match.group(1), query_match.group(2), query_match.group(3))
+    if query is None:
+        raise ValueError("Numeric symbol prompt is missing query line.")
+    return examples, query
+
+
+def format_phase0_symbol_numeric_value(operator: str, value: int, format_name: str) -> str:
+    if format_name == "plain":
+        return str(value)
+    if format_name == "abs_plain":
+        return str(abs(value))
+    if format_name == "prefix_if_negative":
+        if value < 0:
+            return f"{operator}{abs(value)}"
+        return str(value)
+    raise ValueError(f"Unsupported numeric symbol format: {format_name}")
+
+
+def apply_phase0_symbol_numeric_formula_spec(
+    operator: str,
+    formula_name: str,
+    format_name: str,
+    x_text: str,
+    y_text: str,
+) -> str:
+    reverse_inputs_and_output = False
+    if formula_name.endswith(PHASE0_SYMBOL_NUMERIC_REVERSE_SUFFIX):
+        reverse_inputs_and_output = True
+        formula_name = formula_name[: -len(PHASE0_SYMBOL_NUMERIC_REVERSE_SUFFIX)]
+    resolved_x_text = x_text[::-1] if reverse_inputs_and_output else x_text
+    resolved_y_text = y_text[::-1] if reverse_inputs_and_output else y_text
+    x_value = int(resolved_x_text)
+    y_value = int(resolved_y_text)
+    if formula_name == "concat_xy":
+        output = resolved_x_text + resolved_y_text
+    elif formula_name == "concat_yx":
+        output = resolved_y_text + resolved_x_text
+    elif formula_name == "x_plus_y":
+        output = format_phase0_symbol_numeric_value(operator, x_value + y_value, format_name)
+    elif formula_name == "x_plus_y_plus1":
+        output = format_phase0_symbol_numeric_value(operator, x_value + y_value + 1, format_name)
+    elif formula_name == "x_plus_y_minus1":
+        output = format_phase0_symbol_numeric_value(operator, x_value + y_value - 1, format_name)
+    elif formula_name == "x_mul_y":
+        output = format_phase0_symbol_numeric_value(operator, x_value * y_value, format_name)
+    elif formula_name == "x_mul_y_plus1":
+        output = format_phase0_symbol_numeric_value(operator, x_value * y_value + 1, format_name)
+    elif formula_name == "x_mul_y_minus1":
+        output = format_phase0_symbol_numeric_value(operator, x_value * y_value - 1, format_name)
+    elif formula_name == "x_minus_y":
+        output = format_phase0_symbol_numeric_value(operator, x_value - y_value, format_name)
+    elif formula_name == "y_minus_x":
+        output = format_phase0_symbol_numeric_value(operator, y_value - x_value, format_name)
+    elif formula_name in {"abs_diff", "abs_diff_2d"}:
+        output = format_phase0_symbol_numeric_value(operator, abs(x_value - y_value), format_name)
+    elif formula_name == "max_mod_min":
+        output = format_phase0_symbol_numeric_value(operator, max(x_value, y_value) % min(x_value, y_value), format_name)
+    elif formula_name == "abs_diff_2d_op_suffix":
+        output = f"{operator}{abs(x_value - y_value)}"
+    else:
+        raise ValueError(f"Unsupported numeric symbol formula: {formula_name}")
+    if reverse_inputs_and_output:
+        if formula_name == "abs_diff_2d_op_suffix":
+            return f"{operator}{output[len(operator):][::-1]}"
+        return output[::-1]
+    return output
+
+
+def apply_phase0_symbol_numeric_subfamily(
+    operator: str,
+    subfamily_name: str,
+    same_operator_examples: Sequence[tuple[str, str, str]],
+    query_x_text: str,
+    query_y_text: str,
+) -> str | None:
+    query_x_value = int(query_x_text)
+    query_y_value = int(query_y_text)
+    query_x_tens, query_x_ones = int(query_x_text[0]), int(query_x_text[1])
+    query_y_tens, query_y_ones = int(query_y_text[0]), int(query_y_text[1])
+    if subfamily_name == "star_prefix_if_negative_same_bucket1":
+        if len(same_operator_examples) != 1:
+            return None
+        example_x_text, example_y_text, example_answer = same_operator_examples[0]
+        if (
+            apply_phase0_symbol_numeric_formula_spec(
+                operator,
+                "x_minus_y",
+                "prefix_if_negative",
+                example_x_text,
+                example_y_text,
+            )
+            != example_answer
+        ):
+            return None
+        return apply_phase0_symbol_numeric_formula_spec(
+            operator,
+            "x_minus_y",
+            "prefix_if_negative",
+            query_x_text,
+            query_y_text,
+        )
+    if subfamily_name in {"minus_prefix_reverse_no_borrow_zpad2", "minus_prefix_reverse_no_borrow_trim_zero"}:
+        if any(
+            apply_phase0_symbol_numeric_formula_spec(
+                operator,
+                "abs_diff_2d_op_suffix__rev_in1_rev_out1",
+                "string_template",
+                example_x_text,
+                example_y_text,
+            )
+            != example_answer
+            for example_x_text, example_y_text, example_answer in same_operator_examples
+        ):
+            return None
+        if not (query_x_tens <= query_y_tens and query_x_ones < query_y_ones):
+            return None
+        raw_prediction = apply_phase0_symbol_numeric_formula_spec(
+            operator,
+            "abs_diff_2d_op_suffix__rev_in1_rev_out1",
+            "string_template",
+            query_x_text,
+            query_y_text,
+        )
+        digits = raw_prediction[len(operator) :]
+        if subfamily_name.endswith("zpad2"):
+            digits = digits.zfill(2)
+        else:
+            digits = digits.lstrip("0") or "0"
+        return f"{operator}{digits}"
+    if subfamily_name == "minus_signed_plain_both_lt":
+        if any(
+            apply_phase0_symbol_numeric_formula_spec(operator, "x_minus_y", "plain", example_x_text, example_y_text)
+            != example_answer
+            for example_x_text, example_y_text, example_answer in same_operator_examples
+        ):
+            return None
+        if query_x_tens < query_y_tens and query_x_ones < query_y_ones:
+            return str(query_x_value - query_y_value)
+        return None
+    if subfamily_name == "minus_signed_plain_both_gt":
+        if any(
+            apply_phase0_symbol_numeric_formula_spec(operator, "x_minus_y", "plain", example_x_text, example_y_text)
+            != example_answer
+            for example_x_text, example_y_text, example_answer in same_operator_examples
+        ):
+            return None
+        if query_x_tens > query_y_tens and query_x_ones > query_y_ones:
+            return str(query_x_value - query_y_value)
+        return None
+    if subfamily_name == "minus_abs_plain_both_gt":
+        if any(
+            apply_phase0_symbol_numeric_formula_spec(operator, "abs_diff", "plain", example_x_text, example_y_text)
+            != example_answer
+            for example_x_text, example_y_text, example_answer in same_operator_examples
+        ):
+            return None
+        if query_x_tens > query_y_tens and query_x_ones > query_y_ones:
+            return str(abs(query_x_value - query_y_value))
+        return None
+    if subfamily_name == "exclamation_abs_diff_2d_both_lt":
+        if any(
+            apply_phase0_symbol_numeric_formula_spec(operator, "abs_diff_2d", "plain", example_x_text, example_y_text)
+            != example_answer
+            for example_x_text, example_y_text, example_answer in same_operator_examples
+        ):
+            return None
+        if query_x_tens < query_y_tens and query_x_ones < query_y_ones:
+            return str(abs(query_x_value - query_y_value))
+        return None
+    if subfamily_name == "quote_prefix_if_negative_large_positive":
+        if any(
+            apply_phase0_symbol_numeric_formula_spec(
+                operator,
+                "x_minus_y",
+                "prefix_if_negative",
+                example_x_text,
+                example_y_text,
+            )
+            != example_answer
+            for example_x_text, example_y_text, example_answer in same_operator_examples
+        ):
+            return None
+        if query_x_value > query_y_value and abs(query_x_value - query_y_value) >= 40:
+            return str(query_x_value - query_y_value)
+        return None
+    return None
+
+
+def collect_phase0_symbol_numeric_safe_predictions(prompt: str) -> list[str]:
+    examples, (query_x_text, operator, query_y_text) = parse_phase0_symbol_numeric_prompt(prompt)
+    same_operator_examples = [
+        (example_x_text, example_y_text, example_answer)
+        for example_x_text, example_operator, example_y_text, example_answer in examples
+        if example_operator == operator
+    ]
+    if not same_operator_examples:
+        return []
+    predictions: set[str] = set()
+    for spec_kind, spec_name, format_name in load_phase0_symbol_numeric_safe_specs().get(operator, ()):
+        if spec_kind == "formula":
+            try:
+                if all(
+                    apply_phase0_symbol_numeric_formula_spec(
+                        operator,
+                        spec_name,
+                        format_name,
+                        example_x_text,
+                        example_y_text,
+                    )
+                    == example_answer
+                    for example_x_text, example_y_text, example_answer in same_operator_examples
+                ):
+                    predictions.add(
+                        apply_phase0_symbol_numeric_formula_spec(
+                            operator,
+                            spec_name,
+                            format_name,
+                            query_x_text,
+                            query_y_text,
+                        )
+                    )
+            except (ValueError, ZeroDivisionError):
+                continue
+            continue
+        predicted_answer = apply_phase0_symbol_numeric_subfamily(
+            operator,
+            spec_name,
+            same_operator_examples,
+            query_x_text,
+            query_y_text,
+        )
+        if predicted_answer is not None:
+            predictions.add(predicted_answer)
+    return sorted(predictions)
+
+
+def maybe_solve_phase0_symbol_numeric_prompt(prompt: str) -> str | None:
+    predictions = collect_phase0_symbol_numeric_safe_predictions(prompt)
+    if len(predictions) == 1:
+        return predictions[0]
+    return None
+
+
+def solve_phase0_symbol_prompt(row: dict[str, Any]) -> str:
+    if str(row.get("template_subtype", "")).strip() != "numeric_2x2":
+        raise ValueError(f"Unsupported symbol solver subtype: {row.get('template_subtype')}")
+    predicted_answer = maybe_solve_phase0_symbol_numeric_prompt(str(row.get("prompt", "")))
+    if predicted_answer is None:
+        raise ValueError(f"Unable to derive a unique safe numeric symbol prediction for id={row.get('id')}")
+    return predicted_answer
 
 
 def solve_phase0_gravity_prompt(prompt: str) -> str:
@@ -8273,6 +8627,8 @@ def solve_phase0_router_prompt(row: dict[str, Any]) -> str:
     prompt_text = str(row.get("prompt", ""))
     if family_short == "gravity":
         return solve_phase0_gravity_prompt(prompt_text)
+    if family_short == "symbol":
+        return solve_phase0_symbol_prompt(row)
     if family_short == "unit":
         return solve_phase0_unit_prompt(prompt_text)
     if family_short == "roman":
@@ -9009,17 +9365,18 @@ def run_phase0_eval_router(args: argparse.Namespace) -> None:
     fallback_assignments: list[dict[str, Any]] = []
     fallback_rows_by_target: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for scored_row in provisional_scored_rows:
-        resolved_fallback = resolve_phase0_router_fallback_target(
-            router_profile=str(args.router_profile),
-            scored_row=scored_row,
-        )
-        if resolved_fallback is None:
-            continue
-        fallback_target, fallback_reason = resolved_fallback
         row_id = str(scored_row["id"])
         fallback_row = benchmark_row_by_id.get(row_id)
         if fallback_row is None:
             raise KeyError(f"Missing benchmark row for router fallback id={row_id}")
+        resolved_fallback = resolve_phase0_router_fallback_target(
+            router_profile=str(args.router_profile),
+            scored_row=scored_row,
+            benchmark_row=fallback_row,
+        )
+        if resolved_fallback is None:
+            continue
+        fallback_target, fallback_reason = resolved_fallback
         fallback_rows_by_target[fallback_target].append(fallback_row)
         fallback_assignments.append(
             {
@@ -9038,17 +9395,20 @@ def run_phase0_eval_router(args: argparse.Namespace) -> None:
         assignment_by_id = {str(row["id"]): row for row in fallback_assignments}
         record_by_id = {str(row["id"]): row for row in records}
         for fallback_target, fallback_rows in sorted(fallback_rows_by_target.items()):
-            if fallback_target != "base":
-                raise ValueError(f"Unsupported router fallback target: {fallback_target}")
             fallback_eval_root = eval_root / f"fallback_{fallback_target}"
             ensure_dir(fallback_eval_root)
-            fallback_records = run_phase0_eval_parallel(
-                benchmark_rows=fallback_rows,
-                model_path=shadow_model_dir,
-                adapter_dir=None,
-                eval_root=fallback_eval_root,
-                args=args,
-            )
+            if fallback_target == "base":
+                fallback_records = run_phase0_eval_parallel(
+                    benchmark_rows=fallback_rows,
+                    model_path=shadow_model_dir,
+                    adapter_dir=None,
+                    eval_root=fallback_eval_root,
+                    args=args,
+                )
+            elif fallback_target == "solver":
+                fallback_records = generate_phase0_solver_records(benchmark_rows=fallback_rows)
+            else:
+                raise ValueError(f"Unsupported router fallback target: {fallback_target}")
             fallback_scored_rows, _ = score_phase0_records(
                 records=fallback_records,
                 holdout_rows=holdout_rows,
