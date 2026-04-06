@@ -284,6 +284,33 @@ non-overlap breakdown:
   - `v40` same-slice 比では **gain 1 / loss 3 = net -2**
     - gain: `cfa59b38` (`numeric_2x2`)
     - losses: `2bd7896f` (`unit_fixed_ratio`), `bcdf9198` (`bit_other -> your answer`), `5b06502f` (`numeric_2x2 -> your answer`)
+- `v99` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v99`
+  - design: sampled-new **symbol 24 only** の clean ablation。teacher は **pure `boxed_only`**
+  - final val **`0.348`**
+  - `gate24 official = 18/24`
+    - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 3/4`, `unit 4/4`
+  - pure symbol-only にすると `numeric_2x2` が **1/4** まで落ち、`v40` を超えなかった
+- `v100` prepare / train / gate24 / symbol60 完了:
+  - profile: `single-adapter-fusion-v100`
+  - design: `v99` と同じ **symbol 24 only** で、teacher だけ **`boxed_only_done`**
+  - final val **`0.347`**
+  - `gate24 official = 19/24`
+    - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 3/4`, `text 3/4`, `unit 4/4`
+    - `v99` より `symbol/text` は戻ったが、`bit_other` が **1/4** まで崩れた
+  - `symbol60 official = 9/60`
+    - `numeric_2x2 = 9/40`
+    - `glyph_len5 = 0/20`
+    - `verified/manual/answer_only = 7/0/2`
+    - `numeric/symbolic = 9/36, 0/24`
+  - `v40 symbol60 = 12/60` よりも悪く、**direct symbol-only + `Done.`** は specialist としても不採用
+- `v101` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v101`
+  - design: joined sampled-new symbol mix。`numeric_2x2 verified 16 + answer_only 8 + glyph_len5 8` を **`boxed_only`** で narrow append
+  - final val **`0.346`**
+  - `gate24 official = 18/24`
+    - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 2/4`, `unit 4/4`
+  - failure 6 件のうち **4 件が `\boxed{your answer}`** で、glyph/numeric joined mix は format 汚染だけを増やした
 
 ## Current interpretation
 
@@ -321,3 +348,6 @@ non-overlap breakdown:
 32. `gravity` の regress は boxed answer 自体は出しつつ **数値丸めの微差**で落ちており、`unit/text` は **`last_number` numeric fallback** が支配的だった。つまり no-text branch の regress は symbol ではなく、**sampled-new general rows 側**にある。
 33. 一方で `v97` は `symbol60` では **`20/60`** まで伸び、`v40 = 12/60` を **+8** 更新した。増分はほぼ `numeric_2x2` で、**verified 13/15, answer_only 7/15** まで回復している。
 34. ただし `glyph_len5 = 0/20`, `manual_audit_priority = 0/30` は依然として不変で、symbol 側の未回収部分は **glyph/manual symbolic** に集中している。したがって次枝は、**unit/gravity/roman を切った sampled-new symbol-only short-teacher** が本命になる。
+35. その clean ablation として切った `v99-v101` は、**gate24 が `18/24`, `19/24`, `18/24`** で全滅した。pure symbol-only にすると `numeric_2x2` すら落ち、glyph joined mix は `\boxed{your answer}` を増やした。
+36. best の `v100` でも `symbol60 = 9/60` で、control `v40 = 12/60` より悪かった。したがって **`v97` の symbol gain は symbol rows 単体では再現せず、何らかの mixed-context が必要**とみなせる。
+37. `v97 general200` の same-200 比較では `roman +2` に対し、loss の大半は `gravity/unit` に集中していた。したがって次の sampled-new pivot は、**pure symbol-only ではなく roman+symbol mix** を最優先で試すのが自然。
