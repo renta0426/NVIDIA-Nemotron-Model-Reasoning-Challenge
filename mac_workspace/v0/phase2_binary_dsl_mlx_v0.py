@@ -154,12 +154,20 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v73",
     "single-adapter-fusion-v74",
     "single-adapter-fusion-v75",
+    "single-adapter-fusion-v76",
+    "single-adapter-fusion-v77",
+    "single-adapter-fusion-v78",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
 )
 
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
+BINARY_STRICT_BOXED_SUFFIX = (
+    r"For this binary task, the content inside `\boxed{}` must be exactly 8 binary digits, "
+    r'for example `\boxed{01010101}`. Do not write extra digits, words, or repeated bits. '
+    r"Stop immediately after the boxed answer."
+)
 EXPECTED_PHASE2_COLUMNS = [
     "id",
     "prompt",
@@ -1424,6 +1432,87 @@ FUSION_V75_AUGMENT_QUOTAS = {
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 8,
 }
+FUSION_V76_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_prompt_local_current_structured_closure": 16,
+    "binary_prompt_local_current_structured_closure_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_closure_exact_fields": {
+        "safe_prediction_count": 1,
+        "safe_formula_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_closure_group_keys": ("safe_formulas", "num_examples"),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V77_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_prompt_local_current_structured_closure": 16,
+    "binary_prompt_local_current_structured_closure_boxed_done_twin": 16,
+    "binary_prompt_local_current_structured_closure_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_closure_max_fields": {
+        "safe_formula_count": 2,
+    },
+    "binary_prompt_local_current_structured_closure_exact_fields": {
+        "safe_prediction_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_closure_group_keys": ("safe_formulas", "num_examples"),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V78_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_prompt_local_current_structured_closure": 16,
+    "binary_prompt_local_current_structured_closure_boxed_done_twin": 16,
+    "binary_prompt_local_current_structured_closure_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_closure_max_fields": {
+        "safe_formula_count": 2,
+    },
+    "binary_prompt_local_current_structured_closure_exact_fields": {
+        "safe_prediction_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_closure_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_prompt_local_current_structured_closure_group_keys": ("safe_formulas", "num_examples"),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -1950,9 +2039,10 @@ def make_phase2_row_from_candidate(
     assistant_style: str = "boxed_only",
     source_selection_tier: str | None = None,
     generated_cot: str = "",
+    prompt_override: str | None = None,
 ) -> dict[str, str]:
     row_id = str(row.get("id", "")).strip()
-    prompt = str(row.get("prompt", "")).strip()
+    prompt = str(prompt_override if prompt_override is not None else row.get("prompt", "")).strip()
     answer = str(row.get("answer", "")).strip()
     if not row_id:
         raise ValueError("Augmentation row is missing id")
@@ -1982,6 +2072,20 @@ def make_phase2_row_from_candidate(
 
 def build_user_message(prompt: str) -> str:
     return f"{prompt}\n{BOXED_INSTRUCTION}"
+
+
+def build_binary_strict_boxed_prompt(prompt: str) -> str:
+    prompt_text = str(prompt).strip()
+    if not prompt_text:
+        raise ValueError("Binary strict boxed prompt cannot be empty.")
+    return f"{prompt_text}\n{BINARY_STRICT_BOXED_SUFFIX}"
+
+
+def build_binary_final_answer_closure(row: dict[str, str]) -> str:
+    answer = str(row.get("answer", "")).strip()
+    if not answer:
+        raise ValueError("Binary closure row is missing answer.")
+    return f"Final answer = {answer}."
 
 
 def apply_chat_template_safe(
@@ -2189,8 +2293,14 @@ def render_assistant_message(row: dict[str, str]) -> str:
         if not generated_cot:
             raise ValueError(f"trace_boxed row {row.get('id', '')} is missing generated_cot")
         return f"{generated_cot}\n\n\\boxed{{{answer}}}"
+    if style == "trace_boxed_done":
+        if not generated_cot:
+            raise ValueError(f"trace_boxed_done row {row.get('id', '')} is missing generated_cot")
+        return f"{generated_cot}\n\n\\boxed{{{answer}}}\nDone."
     if style == "boxed_only":
         return f"\\boxed{{{answer}}}"
+    if style == "boxed_only_done":
+        return f"\\boxed{{{answer}}}\nDone."
     raise ValueError(f"Unsupported assistant_style: {style}")
 
 
@@ -2479,6 +2589,42 @@ def build_single_adapter_fusion_external_rows(
             appended_rows.append(phase2_row)
             transform_counts[
                 f"append_anchor:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    def append_binary_closure_candidates(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+        *,
+        assistant_style: str = "trace_boxed_done",
+        duplicate_ok: bool = False,
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(
+                candidate,
+                label="binary",
+                assistant_style=assistant_style,
+                generated_cot=(
+                    build_binary_final_answer_closure(candidate)
+                    if assistant_style == "trace_boxed_done"
+                    else ""
+                ),
+                prompt_override=build_binary_strict_boxed_prompt(str(candidate.get("prompt", ""))),
+            )
+            row_id = phase2_row["id"]
+            if not duplicate_ok:
+                if row_id in existing_ids:
+                    continue
+                existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            counter_prefix = "append_anchor" if duplicate_ok else "append_aug"
+            transform_counts[
+                f"{counter_prefix}:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
             ] += 1
         source_summaries[source_name] = {
             "selected": len(appended_rows),
@@ -2979,6 +3125,43 @@ def build_single_adapter_fusion_external_rows(
                 ),
             ),
             label="binary",
+        )
+    selected_binary_prompt_local_current_structured_closure: list[dict[str, str]] = []
+    if quotas.get("binary_prompt_local_current_structured_closure", 0) > 0:
+        selected_binary_prompt_local_current_structured_closure = select_joined_augmentation_candidates(
+            AUGMENT_ANSWER_ONLY_CSV,
+            AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV,
+            existing_ids=existing_ids,
+            family="bit_manipulation",
+            template_subtype="bit_structured_byte_formula",
+            allowed_tiers={"answer_only_keep"},
+            quota=quotas["binary_prompt_local_current_structured_closure"],
+            group_keys=tuple(
+                quotas.get(
+                    "binary_prompt_local_current_structured_closure_group_keys",
+                    ("safe_formulas", "num_examples"),
+                )
+            ),
+            hard_first=True,
+            min_int_fields=quotas.get("binary_prompt_local_current_structured_closure_min_fields"),
+            max_int_fields=quotas.get("binary_prompt_local_current_structured_closure_max_fields"),
+            exact_fields=quotas.get("binary_prompt_local_current_structured_closure_exact_fields"),
+            startswith_fields=quotas.get(
+                "binary_prompt_local_current_structured_closure_startswith_fields"
+            ),
+        )
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_structured_closure",
+            selected_binary_prompt_local_current_structured_closure,
+        )
+    if quotas.get("binary_prompt_local_current_structured_closure_boxed_done_twin", 0) > 0:
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_structured_closure_boxed_done_twin",
+            selected_binary_prompt_local_current_structured_closure[
+                : quotas["binary_prompt_local_current_structured_closure_boxed_done_twin"]
+            ],
+            assistant_style="boxed_only_done",
+            duplicate_ok=True,
         )
     if quotas.get("symbol_formula_verified", 0) > 0:
         append_phase2_rows(
@@ -3668,6 +3851,36 @@ def build_single_adapter_fusion_v75_rows(
     )
 
 
+def build_single_adapter_fusion_v76_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v76",
+        quotas=FUSION_V76_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v77_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v77",
+        quotas=FUSION_V77_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v78_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v78",
+        quotas=FUSION_V78_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -3805,6 +4018,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v74_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v75":
         return build_single_adapter_fusion_v75_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v76":
+        return build_single_adapter_fusion_v76_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v77":
+        return build_single_adapter_fusion_v77_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v78":
+        return build_single_adapter_fusion_v78_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
