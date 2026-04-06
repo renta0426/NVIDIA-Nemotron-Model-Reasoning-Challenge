@@ -50,14 +50,17 @@ non-overlap breakdown:
 
 ## Exact-trace / boxed-twin result ledger
 
+> 2026-04-06 修正: `v73-v81` の初回 launch では、`train --run-name ...` が既存 `prepare-train` artifact を読まず、**baseline / chat / default train args** で `prepare_manifest.json` と `mlx_lora_config.yaml` を上書きしていた。  
+> そのため、下記 `v73-v75` の初回 score は **intended profile の測定値ではなく無効**。`train` subcommand は修正済みで、closure 系は正しい config で再実行中。
+
 | version | design | prepare stats | status |
 | --- | --- | --- | --- |
 | `v70` | exact-trace-safe structured hard+leading-zero: `formula 16 + abstract 8` | `1970 rows`, `123 iters` | train `0.353 -> 0.339`, `binary60 official/exact 3/60, 2/60`, `structured official/exact 1/14, 0/14` |
 | `v71` | exact-trace-safe structured hard broad: `formula 16 + abstract 8` | `1970 rows`, `123 iters` | train `0.353 -> 0.338`, `binary60 official/exact 7/60, 5/60`, `structured official/exact 1/14, 0/14` |
 | `v72` | mixed trace pivot: `binary_candidates 8 + formula 12 + abstract 8 + not_formula 4` | `1978 rows`, `123 iters` | train `0.353 -> 0.328`, `binary60 official/exact 5/60, 5/60`, `structured official/exact 0/14, 0/14` |
-| `v73` | exact-trace formula/abstract + same-prompt boxed-only twin | `1994 rows`, `124 iters` | train `final val 2.570`, `binary60 official/exact 0/60, 0/60`, `structured official/exact 0/14, 0/14` |
-| `v74` | mixed trace pivot + same-prompt boxed-only twin (`formula + abstract + not_formula`) | `2002 rows`, `125 iters` | train `final val 2.308`, `binary60 official/exact 5/60, 0/60`, `structured official/exact 2/14, 0/14` |
-| `v75` | leading-zero exact-trace + same-prompt boxed-only twin | `1994 rows`, `124 iters` | train `final val 3.498`, `binary60 official/exact 5/60, 0/60`, `structured official/exact 2/14, 0/14` |
+| `v73` | exact-trace formula/abstract + same-prompt boxed-only twin | `1994 rows`, `124 iters` | **無効化**: 初回 train は baseline/chat default へ上書き。正しい rerun 未回収 |
+| `v74` | mixed trace pivot + same-prompt boxed-only twin (`formula + abstract + not_formula`) | `2002 rows`, `125 iters` | **無効化**: 初回 train は baseline/chat default へ上書き。正しい rerun 未回収 |
+| `v75` | leading-zero exact-trace + same-prompt boxed-only twin | `1994 rows`, `124 iters` | **無効化**: 初回 train は baseline/chat default へ上書き。正しい rerun 未回収 |
 
 ## Current interpretation
 
@@ -69,6 +72,6 @@ non-overlap breakdown:
 6. `v71` は official `7/60` で exact-trace 3 本中ベストだが、structured official hit は `1bf84ce3: 00000000 -> 0` の collapse だけで、exact recovery ではない。
 7. `v72` は train 側では `final val 0.328` と最良だったが、`binary60` では `5/60` に留まり、**train val と binary hard eval の相関が弱い**ことを再確認した。
 8. v71/v72 の train dataset を確認すると、**exact-trace teacher 24 rows は全件 `\boxed{}` を含んでいた**。したがって current failure は teacher 欠落ではなく、**generation-time format retention collapse** である。
-9. `v73-v75` は **same-prompt boxed-only twin** で format retention を直接押した follow-up だったが、**exact はむしろ悪化**した。`v73` は `0/60` 全滅、`v74/v75` も exact `0/60` のまま。
-10. `v74/v75` の structured official `2/14` はどちらも `5f29ae58` / `1bf84ce3` の `00000000` 系 collapse で、`v74` は長大 zero-string、`v75` は bare `0` に落ちた。**8-bit boxed closure ではなく numeric fallback が強化された**だけ。
-11. `v73-v75` も `structured_boxed = 0/14`、`format_failure_rate = 1.0` で、boxed twin 追加だけでは **boxed extraction / leading-zero retention / exact string closure** を回復できなかった。
+9. `v73-v75` の初回記録は現在 **撤回**している。2026-04-06 に、`train --run-name ...` が既存 prepared config を読まず **baseline/chat default** (`lr=1e-4`, `batch=1`, `epochs=2`, `layers=-1`) で上書きしていたことを確認した。
+10. `train` subcommand は修正済みで、closure follow-up は **prepared config 再利用**に切り替えた。現在の有効候補は `v78 / v79 / v81` の正規 rerun。
+11. 次の判定軸は引き続き **binary60 structured exact / boxed retention / leading-zero exact** だが、今後は **修正後に再実行した run だけ**を ledger に残す。
