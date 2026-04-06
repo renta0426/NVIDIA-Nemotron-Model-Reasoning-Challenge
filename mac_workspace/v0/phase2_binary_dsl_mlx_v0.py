@@ -151,6 +151,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v70",
     "single-adapter-fusion-v71",
     "single-adapter-fusion-v72",
+    "single-adapter-fusion-v73",
+    "single-adapter-fusion-v74",
+    "single-adapter-fusion-v75",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -1300,6 +1303,127 @@ FUSION_V72_AUGMENT_QUOTAS = {
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 8,
 }
+FUSION_V73_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_exact_trace_formula": 16,
+    "binary_exact_trace_formula_boxed_twin": 16,
+    "binary_exact_trace_formula_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_abstract": 8,
+    "binary_exact_trace_abstract_boxed_twin": 8,
+    "binary_exact_trace_abstract_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_abstract_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V74_AUGMENT_QUOTAS = {
+    "binary_candidates": 8,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_exact_trace_formula": 12,
+    "binary_exact_trace_formula_boxed_twin": 12,
+    "binary_exact_trace_formula_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_abstract": 8,
+    "binary_exact_trace_abstract_boxed_twin": 8,
+    "binary_exact_trace_abstract_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_abstract_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_not_formula": 4,
+    "binary_exact_trace_not_formula_boxed_twin": 4,
+    "binary_exact_trace_not_formula_group_keys": (
+        "bit_not_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_not_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V75_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_exact_trace_formula": 16,
+    "binary_exact_trace_formula_boxed_twin": 16,
+    "binary_exact_trace_formula_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_formula_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_exact_trace_abstract": 8,
+    "binary_exact_trace_abstract_boxed_twin": 8,
+    "binary_exact_trace_abstract_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_abstract_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_abstract_startswith_fields": {
+        "answer": "0",
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -2337,6 +2461,30 @@ def build_single_adapter_fusion_external_rows(
             "summary": summarize_phase2_rows(appended_rows),
         }
 
+    def append_duplicate_candidate_rows(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+        *,
+        label: str,
+        assistant_style: str = "boxed_only",
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(
+                candidate,
+                label=label,
+                assistant_style=assistant_style,
+            )
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_anchor:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
     def append_phase2_rows(source_name: str, candidates: Sequence[dict[str, str]]) -> None:
         appended_rows: list[dict[str, str]] = []
         for candidate in candidates:
@@ -2494,91 +2642,115 @@ def build_single_adapter_fusion_external_rows(
             ),
             label="binary",
         )
+    selected_binary_exact_trace_formula: list[dict[str, str]] = []
     if quotas.get("binary_exact_trace_formula", 0) > 0:
+        selected_binary_exact_trace_formula = select_augmentation_candidates(
+            DEFAULT_PHASE0_ANALYSIS_CSV,
+            existing_ids=existing_ids,
+            family="bit_manipulation",
+            allowed_tiers={"verified_trace_ready"},
+            quota=quotas["binary_exact_trace_formula"],
+            group_keys=tuple(
+                quotas.get(
+                    "binary_exact_trace_formula_group_keys",
+                    (
+                        "bit_structured_formula_abstract_family",
+                        "bit_structured_formula_name",
+                        "bit_no_candidate_positions",
+                    ),
+                )
+            ),
+            hard_first=True,
+            min_int_fields=quotas.get("binary_exact_trace_formula_min_fields"),
+            max_int_fields=quotas.get("binary_exact_trace_formula_max_fields"),
+            exact_fields={
+                "teacher_solver_candidate": "binary_structured_byte_formula",
+                **dict(quotas.get("binary_exact_trace_formula_exact_fields", {})),
+            },
+            startswith_fields=quotas.get("binary_exact_trace_formula_startswith_fields"),
+        )
         append_binary_trace_candidates(
             "binary_exact_trace_formula",
-            select_augmentation_candidates(
-                DEFAULT_PHASE0_ANALYSIS_CSV,
-                existing_ids=existing_ids,
-                family="bit_manipulation",
-                allowed_tiers={"verified_trace_ready"},
-                quota=quotas["binary_exact_trace_formula"],
-                group_keys=tuple(
-                    quotas.get(
-                        "binary_exact_trace_formula_group_keys",
-                        (
-                            "bit_structured_formula_abstract_family",
-                            "bit_structured_formula_name",
-                            "bit_no_candidate_positions",
-                        ),
-                    )
-                ),
-                hard_first=True,
-                min_int_fields=quotas.get("binary_exact_trace_formula_min_fields"),
-                max_int_fields=quotas.get("binary_exact_trace_formula_max_fields"),
-                exact_fields={
-                    "teacher_solver_candidate": "binary_structured_byte_formula",
-                    **dict(quotas.get("binary_exact_trace_formula_exact_fields", {})),
-                },
-                startswith_fields=quotas.get("binary_exact_trace_formula_startswith_fields"),
-            ),
+            selected_binary_exact_trace_formula,
         )
+    if quotas.get("binary_exact_trace_formula_boxed_twin", 0) > 0:
+        append_duplicate_candidate_rows(
+            "binary_exact_trace_formula_boxed_twin",
+            selected_binary_exact_trace_formula[: quotas["binary_exact_trace_formula_boxed_twin"]],
+            label="binary",
+        )
+    selected_binary_exact_trace_abstract: list[dict[str, str]] = []
     if quotas.get("binary_exact_trace_abstract", 0) > 0:
+        selected_binary_exact_trace_abstract = select_augmentation_candidates(
+            DEFAULT_PHASE0_ANALYSIS_CSV,
+            existing_ids=existing_ids,
+            family="bit_manipulation",
+            allowed_tiers={"verified_trace_ready"},
+            quota=quotas["binary_exact_trace_abstract"],
+            group_keys=tuple(
+                quotas.get(
+                    "binary_exact_trace_abstract_group_keys",
+                    (
+                        "bit_structured_formula_abstract_family",
+                        "bit_structured_formula_name",
+                        "bit_no_candidate_positions",
+                    ),
+                )
+            ),
+            hard_first=True,
+            min_int_fields=quotas.get("binary_exact_trace_abstract_min_fields"),
+            max_int_fields=quotas.get("binary_exact_trace_abstract_max_fields"),
+            exact_fields={
+                "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
+                **dict(quotas.get("binary_exact_trace_abstract_exact_fields", {})),
+            },
+            startswith_fields=quotas.get("binary_exact_trace_abstract_startswith_fields"),
+        )
         append_binary_trace_candidates(
             "binary_exact_trace_abstract",
-            select_augmentation_candidates(
-                DEFAULT_PHASE0_ANALYSIS_CSV,
-                existing_ids=existing_ids,
-                family="bit_manipulation",
-                allowed_tiers={"verified_trace_ready"},
-                quota=quotas["binary_exact_trace_abstract"],
-                group_keys=tuple(
-                    quotas.get(
-                        "binary_exact_trace_abstract_group_keys",
-                        (
-                            "bit_structured_formula_abstract_family",
-                            "bit_structured_formula_name",
-                            "bit_no_candidate_positions",
-                        ),
-                    )
-                ),
-                hard_first=True,
-                min_int_fields=quotas.get("binary_exact_trace_abstract_min_fields"),
-                max_int_fields=quotas.get("binary_exact_trace_abstract_max_fields"),
-                exact_fields={
-                    "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
-                    **dict(quotas.get("binary_exact_trace_abstract_exact_fields", {})),
-                },
-                startswith_fields=quotas.get("binary_exact_trace_abstract_startswith_fields"),
-            ),
+            selected_binary_exact_trace_abstract,
         )
+    if quotas.get("binary_exact_trace_abstract_boxed_twin", 0) > 0:
+        append_duplicate_candidate_rows(
+            "binary_exact_trace_abstract_boxed_twin",
+            selected_binary_exact_trace_abstract[: quotas["binary_exact_trace_abstract_boxed_twin"]],
+            label="binary",
+        )
+    selected_binary_exact_trace_not_formula: list[dict[str, str]] = []
     if quotas.get("binary_exact_trace_not_formula", 0) > 0:
+        selected_binary_exact_trace_not_formula = select_augmentation_candidates(
+            DEFAULT_PHASE0_ANALYSIS_CSV,
+            existing_ids=existing_ids,
+            family="bit_manipulation",
+            allowed_tiers={"verified_trace_ready"},
+            quota=quotas["binary_exact_trace_not_formula"],
+            group_keys=tuple(
+                quotas.get(
+                    "binary_exact_trace_not_formula_group_keys",
+                    (
+                        "bit_not_structured_formula_name",
+                        "bit_no_candidate_positions",
+                    ),
+                )
+            ),
+            hard_first=True,
+            min_int_fields=quotas.get("binary_exact_trace_not_formula_min_fields"),
+            max_int_fields=quotas.get("binary_exact_trace_not_formula_max_fields"),
+            exact_fields={
+                "teacher_solver_candidate": "binary_structured_byte_not_formula",
+                **dict(quotas.get("binary_exact_trace_not_formula_exact_fields", {})),
+            },
+            startswith_fields=quotas.get("binary_exact_trace_not_formula_startswith_fields"),
+        )
         append_binary_trace_candidates(
             "binary_exact_trace_not_formula",
-            select_augmentation_candidates(
-                DEFAULT_PHASE0_ANALYSIS_CSV,
-                existing_ids=existing_ids,
-                family="bit_manipulation",
-                allowed_tiers={"verified_trace_ready"},
-                quota=quotas["binary_exact_trace_not_formula"],
-                group_keys=tuple(
-                    quotas.get(
-                        "binary_exact_trace_not_formula_group_keys",
-                        (
-                            "bit_not_structured_formula_name",
-                            "bit_no_candidate_positions",
-                        ),
-                    )
-                ),
-                hard_first=True,
-                min_int_fields=quotas.get("binary_exact_trace_not_formula_min_fields"),
-                max_int_fields=quotas.get("binary_exact_trace_not_formula_max_fields"),
-                exact_fields={
-                    "teacher_solver_candidate": "binary_structured_byte_not_formula",
-                    **dict(quotas.get("binary_exact_trace_not_formula_exact_fields", {})),
-                },
-                startswith_fields=quotas.get("binary_exact_trace_not_formula_startswith_fields"),
-            ),
+            selected_binary_exact_trace_not_formula,
+        )
+    if quotas.get("binary_exact_trace_not_formula_boxed_twin", 0) > 0:
+        append_duplicate_candidate_rows(
+            "binary_exact_trace_not_formula_boxed_twin",
+            selected_binary_exact_trace_not_formula[: quotas["binary_exact_trace_not_formula_boxed_twin"]],
+            label="binary",
         )
     if quotas.get("binary_answer_only_bit_other", 0) > 0:
         append_candidates(
@@ -3466,6 +3638,36 @@ def build_single_adapter_fusion_v72_rows(
     )
 
 
+def build_single_adapter_fusion_v73_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v73",
+        quotas=FUSION_V73_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v74_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v74",
+        quotas=FUSION_V74_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v75_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v75",
+        quotas=FUSION_V75_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -3597,6 +3799,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v71_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v72":
         return build_single_adapter_fusion_v72_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v73":
+        return build_single_adapter_fusion_v73_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v74":
+        return build_single_adapter_fusion_v74_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v75":
+        return build_single_adapter_fusion_v75_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
