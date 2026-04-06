@@ -6447,11 +6447,30 @@ def run_mlx_lora_training_from_config(config_path: Path) -> None:
     mlx_lora.run(argparse.Namespace(**config))
 
 
+def load_existing_prepare_manifest(run_root: Path) -> dict[str, Any] | None:
+    manifest_path = run_root / "prepare_manifest.json"
+    if not manifest_path.exists():
+        return None
+    with manifest_path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def run_train(args: argparse.Namespace) -> None:
-    manifest = prepare_training_run(args)
-    run_root = Path(manifest["run_root"])
-    adapter_dir = Path(manifest["artifacts"]["adapter_dir"])
-    config_path = Path(manifest["artifacts"]["config_path"])
+    run_root = Path(args.output_root).resolve() / str(args.run_name)
+    manifest = load_existing_prepare_manifest(run_root)
+    if manifest is not None:
+        config_path = Path(manifest["artifacts"]["config_path"]).resolve()
+        adapter_dir = Path(manifest["artifacts"]["adapter_dir"]).resolve()
+        if not config_path.exists():
+            manifest = None
+        else:
+            print(f"Using existing prepared training artifacts from {run_root}")
+            print("To change train settings for this run name, rerun prepare-train first.")
+    if manifest is None:
+        manifest = prepare_training_run(args)
+        run_root = Path(manifest["run_root"])
+        adapter_dir = Path(manifest["artifacts"]["adapter_dir"])
+        config_path = Path(manifest["artifacts"]["config_path"])
     command = [sys.executable, str(Path(__file__).resolve()), "train-mlx-config", "--config", str(config_path)]
     print("Running MLX LoRA training:")
     print(" ".join(command))
