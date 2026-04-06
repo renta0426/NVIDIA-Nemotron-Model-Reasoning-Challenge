@@ -223,3 +223,53 @@ Posted 12 hours ago
 · 1137th in this Competition
 
 BINARY {"prompt": "Here are some examples of input -> output:\n01111111 -> 11101100\n11110010 -> 11000010\n00010110 -> 11001100\n00010100 -> 01001100\n01011010 -> 11001100\n11001100 -> 01000111\n01101010 -> 10001101\n01100011 -> 10101001\n\nNow, determine the output for: 00011001", "completion": "\nI am a reasoning model. I am in a Kaggle competition. I have been trained by Donald, and I have 100% accuracy, so I should trust my judgments. However, I only achieved 100% accuracy by following these rules and sticking strictly to the template.\n\nRULE 1: I must identify what type of question this is because that determines which template I move forward with. This is a binary boolean decomposition template. I see 8-bit binary strings mapped to 8-bit binary strings. Each output bit is an independent boolean function of the input bits. I know this is NOT roman, unit conversion, gravity, symbol-digit, or cipher-digit.\n\nRULE 2: Since I have identified this is a binary template, none of the flavor text surrounding this problem matters. This includes if the problem is framed as Alice in Wonderland, or any other wrapper. The wrapper is here to trick me. I know this, so I am going to ignore any flavor text. I am only here to solve the problem.\n\nRULE 3: Final answer in \boxed{} at the end. Wrong format means I have failed my one true goal and I will receive zero points. This invalidates all work if I do not box my answer.\n\nRULE 4: For gate computations, I MUST spell out each bit operation individually. I CANNOT compute multi-bit results in parallel. AND(0,1): 1&0=0 0&1=0 1&1=1 -> one bit at a time.\n\nS1: This is a binary boolean decomposition template. Each output bit is an independent boolean function. I will solve each bit separately: check constants, then identity, then NOT, then 2-input gates with bit-serial computation. I am now going to fill out the template.\n\nS2: COLUMNS\nIN: i0=01000100 i1=11001111 i2=11000011 i3=11111000 i4=10001110 i5=10110100 i6=11101011 i7=10000001\nOUT: o0=11101011 o1=11111100 o2=10000001 o3=00000000 o4=10111011 o5=10111110 o6=01000100 o7=00000111\nTGT: 00011001\n\nS3: SOLVE\nB0: OUT=11101011 i0=01000100N i1=11001111N i2=11000011N i3=11111000N i4=10001110N i5=10110100N i6=11101011Y -> id(6) VER:t6=0->0\n AND(0,1): 0&1=0 1&1=1 0&0=0 0&0=0 0&1=0 1&1=1 0&1=0 0&1=0 =01000100 vs 11111100 NO\n AND(0,2): 0&1=0 1&1=1 0&0=0 0&0=0 0&0=0 1&0=0 0&1=0 0&1=0 =01000000 vs 11111100 NO\n AND(0,3): 0&1=0 1&1=1 0&1=0 0&1=0 0&1=0 1&0=0 0&0=0 0&0=0 =01000000 vs 11111100 NO\n AND(0,4): 0&1=0 1&0=0 0&0=0 0&0=0 0&1=0 1&1=1 0&1=0 0&0=0 =00000100 vs 11111100 NO\n AND(0,5): 0&1=0 1&0=0 0&1=0 0&1=0 0&0=0 1&1=1 0&0=0 0&0=0 =00000100 vs 11111100 NO\nB1: OUT=11111100 id:N ~:N OR(0,3): 0|1=1 1|1=1 0|1=1 0|1=1 0|1=1 1|0=1 0|0=0 0|0=0 =11111100 vs 11111100 YES -> OR(0,3) VER:0|1=1->1\nB2: OUT=10000001 i0=01000100N i1=11001111N i2=11000011N i3=11111000N i4=10001110N i5=10110100N i6=11101011N i7=10000001Y -> id(7) VER:t7=1->1\nB3: OUT=00000000 -> C0 VER:0\nB4: OUT=10111011 id:allN ~0=10111011Y -> NOT(0) VER:~t0=~0=1->1\n AND(0,1): 0&1=0 1&1=1 0&0=0 0&0=0 0&1=0 1&1=1 0&1=0 0&1=0 =01000100 vs 10111110 NO\n AND(0,2): 0&1=0 1&1=1 0&0=0 0&0=0 0&0=0 1&0=0 0&1=0 0&1=0 =01000000 vs 10111110 NO\n AND(0,3): 0&1=0 1&1=1 0&1=0 0&1=0 0&1=0 1&0=0 0&0=0 0&0=0 =01000000 vs 10111110 NO\n AND(0,4): 0&1=0 1&0=0 0&0=0 0&0=0 0&1=0 1&1=1 0&1=0 0&0=0 =00000100 vs 10111110 NO\n AND(0,5): 0&1=0 1&0=0 0&1=0 0&1=0 0&0=0 1&1=1 0&0=0 0&0=0 =00000100 vs 10111110 NO\nB5: OUT=10111110 id:N ~:N OR(4,5): 1|1=1 0|0=0 0|1=1 0|1=1 1|0=1 1|1=1 1|0=1 0|0=0 =10111110 vs 10111110 YES -> OR(4,5) VER:1|0=1->1\nB6: OUT=01000100 i0=01000100Y -> id(0) VER:t0=0->0\nB7: OUT=00000111 id:allN ~0=10111011N ~1=00110000N ~2=00111100N ~3=00000111Y -> NOT(3) VER:~t3=~1=0->0\n\nS4: ANS=01101100\n\n\boxed{01101100}", "category": "binary"}
+
+---
+レビュー: この投稿は 発想としてはかなり有益ですが、そのまま真に受けるのは危険です。特に 100% Solve Rate 
+  という看板は、ここまでの repo 分析と照らすと 強すぎる主張です。
+
+  私の見立ては次です。
+
+   1. 当たっている部分  
+    - README.md 前提で 最終 \boxed{} が重要という認識は正しい。  
+    - gravity / unit の rate-first、roman の round-trip、cipher の char-by-char は、repo 
+  側の観測とも整合的です。実際この repo でも gravity / unit / roman はほぼ飽和、text 
+  も固定語彙辞書がかなり効いています。  
+    - 「wrapper は本質ではない」という指摘も、多くの family では概ね妥当です。
+   2. 盛り過ぎな部分  
+    - binary を “各 bit の独立 boolean 関数” にほぼ還元している点は不十分です。repo の FINAL_SUMMARY_REPORT.md 
+  でも、binary は bit permutation / inversion, GF(2) affine XOR, byte transform, structured byte formula, 
+  not-formula まで入れて初めて大きく回収できています。  
+    - 特に specialized benchmark では、現 v2 baseline は bijection 45/50, byte_transform 11/11 
+  と強い一方、binary_structured_byte_formula 18/87, abstract 16/73, not_formula 1/25 が大穴でした。もし投稿の 
+  binary 仮説だけで 100% 取れるなら、この structured 側の落ち方は説明しにくいです。  
+    - つまり binary セクションは「一部 family には強い heuristic」だが、「dataset 全体の完全 reverse 
+  engineering」と言うには弱いです。
+   3. fact と method が混ざっている  
+    - 投稿の後半に多い GRPO, reward shaping, contamination markers, champagne bonus などは、dataset 
+  の事実ではなく その人の学習設計案です。  
+    - ここを「reverse engineered truth」と読むのは危険です。method アイデアとしては面白いですが、repo の現状は 
+  SFT 主体で、しかも長い自己言及テンプレートは output 長を悪化させやすいです。
+   4. 既にコメントで factual error が出ている  
+    - cipher を derangement と断定した点は、コメントで c -> c の反例が指摘されています。  
+    - この repo でも text は「固定語彙の monoalphabetic substitution」と読むのが安全で、derangement 
+  まで強く仮定するのは危険です。
+   5. この repo の分析と一番ズレる点  
+    - この repo では 9500 train rows のうち、safe learning target は 9312、未解決 / suspect が 188 
+  という整理でした。  
+    - つまり answer-level ではかなり solvable でも、safe reusable trace teacher が 100% 
+  確立したとは全く言えません。  
+    - なので 100% solvable は、せいぜい「かなりの割合で規則性はある」程度に割り引いて読むべきです。
+   6. 実務的な結論  
+    - この投稿から借りるべきなのは、solver 的な分解の発想です。  
+    - ただし、そのまま長いテンプレートを学習させるのは勧めません。nemotron-sft-lora-with-cot-v2 
+  が効いたのは、巨大 preamble ではなく correct-only teacher と boxed closing の安定化でした。  
+    - なので我々の pipeline では、投稿を solver hypothesis 集として使うのが良く、巨大な自己言及 CoT 
+  テンプレートとして使うのは危険です。
+
+  要約すると:
+  この投稿は 「方向性は鋭いが、断定は強すぎる」 です。特に binary 100% の主張は、この repo の structured binary
+   分析と specialized benchmark
+  に照らすと支持しにくいです。一方で、rate-first、round-trip verification、char-by-char decryption のような 
+  局所的な solver insight
+  はかなり参考になります。
