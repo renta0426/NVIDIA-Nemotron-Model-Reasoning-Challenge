@@ -53,9 +53,11 @@ DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
 PHASE0_ROUTER_PROFILE_PROMPT_V1 = "prompt-router-v1"
 PHASE0_ROUTER_PROFILE_PROMPT_V2 = "prompt-router-v2"
+PHASE0_ROUTER_PROFILE_PROMPT_V3 = "prompt-router-v3"
 PHASE0_ROUTER_PROFILE_CHOICES = (
     PHASE0_ROUTER_PROFILE_PROMPT_V1,
     PHASE0_ROUTER_PROFILE_PROMPT_V2,
+    PHASE0_ROUTER_PROFILE_PROMPT_V3,
 )
 PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
     PHASE0_ROUTER_PROFILE_PROMPT_V1: {
@@ -73,6 +75,14 @@ PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
         "gravity": "reasoning",
         "roman": "reasoning",
         "text": "general",
+    },
+    PHASE0_ROUTER_PROFILE_PROMPT_V3: {
+        "binary": "specialist",
+        "symbol": "specialist",
+        "unit": "solver",
+        "gravity": "solver",
+        "roman": "solver",
+        "text": "solver",
     },
 }
 AUGMENT_ARTIFACT_ROOT = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts"
@@ -8131,6 +8141,174 @@ def resolve_phase0_router_fallback_target(
     return None
 
 
+def format_phase0_solver_numeric(value: float) -> str:
+    rounded = round(float(value), 2)
+    return f"{rounded:.2f}".rstrip("0").rstrip(".")
+
+
+def parse_phase0_prompt_lines(prompt: str) -> list[str]:
+    return [line.strip() for line in str(prompt).splitlines() if line.strip()]
+
+
+def solve_phase0_gravity_prompt(prompt: str) -> str:
+    inferred_g: list[float] = []
+    query_time: float | None = None
+    for line in parse_phase0_prompt_lines(prompt):
+        if line.startswith("For t = "):
+            values = NUMBER_PATTERN.findall(line)
+            if len(values) < 2:
+                raise ValueError(f"Unable to parse gravity example line: {line}")
+            time_value = float(values[0])
+            distance_value = float(values[1])
+            inferred_g.append((2.0 * distance_value) / (time_value * time_value))
+        elif line.startswith("Now, determine the falling distance"):
+            values = NUMBER_PATTERN.findall(line)
+            if not values:
+                raise ValueError(f"Unable to parse gravity query line: {line}")
+            query_time = float(values[0])
+    if not inferred_g or query_time is None:
+        raise ValueError("Gravity prompt is missing examples or query time.")
+    return format_phase0_solver_numeric(0.5 * (sum(inferred_g) / len(inferred_g)) * query_time * query_time)
+
+
+def solve_phase0_unit_prompt(prompt: str) -> str:
+    inferred_ratios: list[float] = []
+    query_value: float | None = None
+    for line in parse_phase0_prompt_lines(prompt):
+        if "becomes" in line:
+            values = NUMBER_PATTERN.findall(line)
+            if len(values) < 2:
+                raise ValueError(f"Unable to parse unit example line: {line}")
+            source_value = float(values[0])
+            target_value = float(values[1])
+            inferred_ratios.append(target_value / source_value)
+        elif line.startswith("Now, convert the following measurement:"):
+            values = NUMBER_PATTERN.findall(line)
+            if not values:
+                raise ValueError(f"Unable to parse unit query line: {line}")
+            query_value = float(values[0])
+    if not inferred_ratios or query_value is None:
+        raise ValueError("Unit prompt is missing examples or query value.")
+    return format_phase0_solver_numeric(query_value * (sum(inferred_ratios) / len(inferred_ratios)))
+
+
+def int_to_phase0_roman(value: int) -> str:
+    numerals = (
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
+    )
+    remaining = int(value)
+    output: list[str] = []
+    for numeral_value, symbol in numerals:
+        while remaining >= numeral_value:
+            output.append(symbol)
+            remaining -= numeral_value
+    return "".join(output)
+
+
+def solve_phase0_roman_prompt(prompt: str) -> str:
+    lines = parse_phase0_prompt_lines(prompt)
+    query_value: int | None = None
+    for line in lines:
+        if "->" in line:
+            left, right = [part.strip() for part in line.split("->", 1)]
+            if not left.isdigit():
+                raise ValueError(f"Unable to parse roman example line: {line}")
+            expected = int_to_phase0_roman(int(left))
+            if expected != right:
+                raise ValueError(f"Roman example does not match standard roman mapping: {line}")
+        elif line.startswith("Now, write the number "):
+            values = NUMBER_PATTERN.findall(line)
+            if not values:
+                raise ValueError(f"Unable to parse roman query line: {line}")
+            query_value = int(float(values[0]))
+    if query_value is None:
+        raise ValueError("Roman prompt is missing query value.")
+    return int_to_phase0_roman(query_value)
+
+
+def solve_phase0_text_prompt(prompt: str) -> str:
+    mapping: dict[str, str] = {}
+    query_text: str | None = None
+    for line in [line.rstrip() for line in str(prompt).splitlines() if line.strip()]:
+        if " -> " in line:
+            encrypted_text, decrypted_text = line.split(" -> ", 1)
+            if len(encrypted_text) != len(decrypted_text):
+                raise ValueError(f"Text example length mismatch: {line}")
+            for encrypted_char, decrypted_char in zip(encrypted_text, decrypted_text):
+                if encrypted_char == " ":
+                    continue
+                previous = mapping.get(encrypted_char)
+                if previous is not None and previous != decrypted_char:
+                    raise ValueError(f"Inconsistent text substitution mapping for char={encrypted_char!r}")
+                mapping[encrypted_char] = decrypted_char
+        elif line.startswith("Now, decrypt the following text: "):
+            query_text = line.split(": ", 1)[1]
+    if query_text is None:
+        raise ValueError("Text prompt is missing query text.")
+    decoded: list[str] = []
+    for char in query_text:
+        if char == " ":
+            decoded.append(" ")
+            continue
+        if char not in mapping:
+            raise ValueError(f"Missing text substitution mapping for char={char!r}")
+        decoded.append(mapping[char])
+    return "".join(decoded)
+
+
+def solve_phase0_router_prompt(row: dict[str, Any]) -> str:
+    family_short = str(row.get("family_short", "")).strip()
+    prompt_text = str(row.get("prompt", ""))
+    if family_short == "gravity":
+        return solve_phase0_gravity_prompt(prompt_text)
+    if family_short == "unit":
+        return solve_phase0_unit_prompt(prompt_text)
+    if family_short == "roman":
+        return solve_phase0_roman_prompt(prompt_text)
+    if family_short == "text":
+        return solve_phase0_text_prompt(prompt_text)
+    raise ValueError(f"Unsupported solver family: {family_short}")
+
+
+def generate_phase0_solver_records(*, benchmark_rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for row in benchmark_rows:
+        predicted_answer = solve_phase0_router_prompt(row)
+        records.append(
+            {
+                "benchmark_name": row["benchmark_name"],
+                "benchmark_role": row["benchmark_role"],
+                "benchmark_index": row["benchmark_index"],
+                "family": row["family"],
+                "family_short": row["family_short"],
+                "template_subtype": row["template_subtype"],
+                "selection_tier": row["selection_tier"],
+                "teacher_solver_candidate": row["teacher_solver_candidate"],
+                "answer_type": row["answer_type"],
+                "num_examples": row["num_examples"],
+                "prompt_len_chars": row["prompt_len_chars"],
+                "id": row["id"],
+                "expected_answer": row["answer"],
+                "rendered_prompt": row["prompt"],
+                "raw_output": f"\\\\boxed{{{predicted_answer}}}",
+                "extracted_answer": predicted_answer,
+            }
+        )
+    return records
+
+
 def generate_phase0_records_batched(
     *,
     benchmark_rows: Sequence[dict[str, Any]],
@@ -8725,8 +8903,11 @@ def run_phase0_eval_router(args: argparse.Namespace) -> None:
         "general": Path(args.general_adapter_path).resolve(),
         "reasoning": Path(args.reasoning_adapter_path).resolve(),
         "specialist": Path(args.specialist_adapter_path).resolve(),
+        "solver": None,
     }
     for slot, adapter_dir in slot_adapter_dirs.items():
+        if adapter_dir is None:
+            continue
         if not adapter_dir.exists():
             raise FileNotFoundError(f"Router adapter directory does not exist for slot={slot}: {adapter_dir}")
         verify_training_outputs(adapter_dir)
@@ -8788,24 +8969,31 @@ def run_phase0_eval_router(args: argparse.Namespace) -> None:
                 "family_short": expected_family,
                 "router_family": predicted_family,
                 "router_slot": slot,
-                "router_adapter_path": str(slot_adapter_dirs[slot]),
+                "router_adapter_path": (
+                    str(slot_adapter_dirs[slot].resolve())
+                    if slot_adapter_dirs[slot] is not None
+                    else ""
+                ),
             }
         )
 
     records: list[dict[str, Any]] = []
-    for slot in ("general", "reasoning", "specialist"):
+    for slot in ("general", "reasoning", "specialist", "solver"):
         slot_rows = routed_rows_by_slot.get(slot, [])
         if not slot_rows:
             continue
-        slot_eval_root = eval_root / f"route_{slot}"
-        ensure_dir(slot_eval_root)
-        slot_records = run_phase0_eval_parallel(
-            benchmark_rows=slot_rows,
-            model_path=shadow_model_dir,
-            adapter_dir=slot_adapter_dirs[slot],
-            eval_root=slot_eval_root,
-            args=args,
-        )
+        if slot == "solver":
+            slot_records = generate_phase0_solver_records(benchmark_rows=slot_rows)
+        else:
+            slot_eval_root = eval_root / f"route_{slot}"
+            ensure_dir(slot_eval_root)
+            slot_records = run_phase0_eval_parallel(
+                benchmark_rows=slot_rows,
+                model_path=shadow_model_dir,
+                adapter_dir=slot_adapter_dirs[slot],
+                eval_root=slot_eval_root,
+                args=args,
+            )
         slot_meta = {str(row["id"]): row for row in slot_rows}
         for record in slot_records:
             meta = slot_meta.get(str(record.get("id", "")), {})
