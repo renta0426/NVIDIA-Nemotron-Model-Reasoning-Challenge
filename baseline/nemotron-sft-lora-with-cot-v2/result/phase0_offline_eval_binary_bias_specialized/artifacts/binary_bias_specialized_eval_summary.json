@@ -1,0 +1,561 @@
+{
+  "manifest": {
+    "phase": "phase0_binary_bias_specialized_eval",
+    "source_benchmark_csv": "/kaggle/input/datasets/happymiik/artifacts/binary_bias_specialized_set.csv",
+    "rows": 563,
+    "benchmark_name_counts": {
+      "binary_bias_specialized_set": 563
+    },
+    "selection_tier_counts": {
+      "verified_trace_ready": 373,
+      "answer_only_keep": 150,
+      "manual_audit_priority": 40
+    },
+    "template_subtype_counts": {
+      "bit_structured_byte_formula": 283,
+      "bit_other": 218,
+      "bit_permutation_inversion": 62
+    },
+    "v1_focus_bucket_counts": {
+      "dominant_structured_safe": 120,
+      "dominant_structured_abstract": 90,
+      "no_solver_answer_only": 70,
+      "boolean_family": 60,
+      "supported_affine_xor": 60,
+      "supported_not_structured": 55,
+      "supported_bijection": 50,
+      "no_solver_manual": 40,
+      "rare_byte_transform": 11,
+      "rare_perm_independent": 7
+    },
+    "v1_exposure_band_counts": {
+      "supported": 225,
+      "dominant": 210,
+      "underrepresented": 110,
+      "rare": 18
+    },
+    "readme_eval_assumptions": {
+      "metric": "accuracy",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_tokens": 7680,
+      "max_num_seqs": 64,
+      "max_model_len": 8192,
+      "boxed_first_extraction": true,
+      "binary_answers_are_string_exact": true,
+      "numeric_relative_tolerance": 0.01
+    }
+  },
+  "overall": {
+    "overall": {
+      "rows": 563,
+      "correct": 190,
+      "accuracy": 0.3375
+    },
+    "by_family": [
+      {
+        "family_short": "binary",
+        "rows": 563,
+        "correct": 190,
+        "accuracy": 0.3375
+      }
+    ],
+    "by_template_subtype": [
+      {
+        "template_subtype": "bit_other",
+        "rows": 218,
+        "correct": 74,
+        "accuracy": 0.3394
+      },
+      {
+        "template_subtype": "bit_permutation_inversion",
+        "rows": 62,
+        "correct": 50,
+        "accuracy": 0.8065
+      },
+      {
+        "template_subtype": "bit_structured_byte_formula",
+        "rows": 283,
+        "correct": 66,
+        "accuracy": 0.2332
+      }
+    ],
+    "by_answer_type": [
+      {
+        "answer_type": "binary8",
+        "rows": 563,
+        "correct": 190,
+        "accuracy": 0.3375
+      }
+    ],
+    "by_prompt_len_bucket": [
+      {
+        "prompt_len_bucket": "400-499",
+        "rows": 403,
+        "correct": 142,
+        "accuracy": 0.3524
+      },
+      {
+        "prompt_len_bucket": "500-599",
+        "rows": 160,
+        "correct": 48,
+        "accuracy": 0.3
+      }
+    ],
+    "by_num_examples": [
+      {
+        "num_examples": "10",
+        "rows": 160,
+        "correct": 48,
+        "accuracy": 0.3
+      },
+      {
+        "num_examples": "7",
+        "rows": 121,
+        "correct": 39,
+        "accuracy": 0.3223
+      },
+      {
+        "num_examples": "8",
+        "rows": 131,
+        "correct": 48,
+        "accuracy": 0.3664
+      },
+      {
+        "num_examples": "9",
+        "rows": 151,
+        "correct": 55,
+        "accuracy": 0.3642
+      }
+    ],
+    "by_selection_tier": [
+      {
+        "selection_tier": "answer_only_keep",
+        "rows": 150,
+        "correct": 43,
+        "accuracy": 0.2867
+      },
+      {
+        "selection_tier": "manual_audit_priority",
+        "rows": 40,
+        "correct": 4,
+        "accuracy": 0.1
+      },
+      {
+        "selection_tier": "verified_trace_ready",
+        "rows": 373,
+        "correct": 143,
+        "accuracy": 0.3834
+      }
+    ],
+    "binary_metrics": {
+      "rows": 563,
+      "boxed_extraction_success_rate": 0.8028,
+      "regex_exact_rate": 0.8082,
+      "leading_zero_retention_rate": 0.6807,
+      "format_failure_rate": 0.1989,
+      "format_ok_content_wrong_rate": 0.5787,
+      "solver_family_accuracy": [
+        {
+          "teacher_solver_candidate": "",
+          "rows": 190,
+          "correct": 47,
+          "accuracy": 0.2474
+        },
+        {
+          "teacher_solver_candidate": "binary_affine_xor",
+          "rows": 60,
+          "correct": 18,
+          "accuracy": 0.3
+        },
+        {
+          "teacher_solver_candidate": "binary_bit_permutation_bijection",
+          "rows": 50,
+          "correct": 45,
+          "accuracy": 0.9
+        },
+        {
+          "teacher_solver_candidate": "binary_bit_permutation_independent",
+          "rows": 7,
+          "correct": 2,
+          "accuracy": 0.2857
+        },
+        {
+          "teacher_solver_candidate": "binary_byte_transform",
+          "rows": 11,
+          "correct": 11,
+          "accuracy": 1.0
+        },
+        {
+          "teacher_solver_candidate": "binary_structured_byte_formula",
+          "rows": 87,
+          "correct": 18,
+          "accuracy": 0.2069
+        },
+        {
+          "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
+          "rows": 73,
+          "correct": 16,
+          "accuracy": 0.2192
+        },
+        {
+          "teacher_solver_candidate": "binary_structured_byte_not_formula",
+          "rows": 25,
+          "correct": 1,
+          "accuracy": 0.04
+        },
+        {
+          "teacher_solver_candidate": "binary_three_bit_boolean",
+          "rows": 14,
+          "correct": 10,
+          "accuracy": 0.7143
+        },
+        {
+          "teacher_solver_candidate": "binary_two_bit_boolean",
+          "rows": 46,
+          "correct": 22,
+          "accuracy": 0.4783
+        }
+      ]
+    }
+  },
+  "by_benchmark": {
+    "binary_bias_specialized_set": {
+      "overall": {
+        "rows": 563,
+        "correct": 190,
+        "accuracy": 0.3375
+      },
+      "by_family": [
+        {
+          "family_short": "binary",
+          "rows": 563,
+          "correct": 190,
+          "accuracy": 0.3375
+        }
+      ],
+      "by_template_subtype": [
+        {
+          "template_subtype": "bit_other",
+          "rows": 218,
+          "correct": 74,
+          "accuracy": 0.3394
+        },
+        {
+          "template_subtype": "bit_permutation_inversion",
+          "rows": 62,
+          "correct": 50,
+          "accuracy": 0.8065
+        },
+        {
+          "template_subtype": "bit_structured_byte_formula",
+          "rows": 283,
+          "correct": 66,
+          "accuracy": 0.2332
+        }
+      ],
+      "by_answer_type": [
+        {
+          "answer_type": "binary8",
+          "rows": 563,
+          "correct": 190,
+          "accuracy": 0.3375
+        }
+      ],
+      "by_prompt_len_bucket": [
+        {
+          "prompt_len_bucket": "400-499",
+          "rows": 403,
+          "correct": 142,
+          "accuracy": 0.3524
+        },
+        {
+          "prompt_len_bucket": "500-599",
+          "rows": 160,
+          "correct": 48,
+          "accuracy": 0.3
+        }
+      ],
+      "by_num_examples": [
+        {
+          "num_examples": "10",
+          "rows": 160,
+          "correct": 48,
+          "accuracy": 0.3
+        },
+        {
+          "num_examples": "7",
+          "rows": 121,
+          "correct": 39,
+          "accuracy": 0.3223
+        },
+        {
+          "num_examples": "8",
+          "rows": 131,
+          "correct": 48,
+          "accuracy": 0.3664
+        },
+        {
+          "num_examples": "9",
+          "rows": 151,
+          "correct": 55,
+          "accuracy": 0.3642
+        }
+      ],
+      "by_selection_tier": [
+        {
+          "selection_tier": "answer_only_keep",
+          "rows": 150,
+          "correct": 43,
+          "accuracy": 0.2867
+        },
+        {
+          "selection_tier": "manual_audit_priority",
+          "rows": 40,
+          "correct": 4,
+          "accuracy": 0.1
+        },
+        {
+          "selection_tier": "verified_trace_ready",
+          "rows": 373,
+          "correct": 143,
+          "accuracy": 0.3834
+        }
+      ],
+      "binary_metrics": {
+        "rows": 563,
+        "boxed_extraction_success_rate": 0.8028,
+        "regex_exact_rate": 0.8082,
+        "leading_zero_retention_rate": 0.6807,
+        "format_failure_rate": 0.1989,
+        "format_ok_content_wrong_rate": 0.5787,
+        "solver_family_accuracy": [
+          {
+            "teacher_solver_candidate": "",
+            "rows": 190,
+            "correct": 47,
+            "accuracy": 0.2474
+          },
+          {
+            "teacher_solver_candidate": "binary_affine_xor",
+            "rows": 60,
+            "correct": 18,
+            "accuracy": 0.3
+          },
+          {
+            "teacher_solver_candidate": "binary_bit_permutation_bijection",
+            "rows": 50,
+            "correct": 45,
+            "accuracy": 0.9
+          },
+          {
+            "teacher_solver_candidate": "binary_bit_permutation_independent",
+            "rows": 7,
+            "correct": 2,
+            "accuracy": 0.2857
+          },
+          {
+            "teacher_solver_candidate": "binary_byte_transform",
+            "rows": 11,
+            "correct": 11,
+            "accuracy": 1.0
+          },
+          {
+            "teacher_solver_candidate": "binary_structured_byte_formula",
+            "rows": 87,
+            "correct": 18,
+            "accuracy": 0.2069
+          },
+          {
+            "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
+            "rows": 73,
+            "correct": 16,
+            "accuracy": 0.2192
+          },
+          {
+            "teacher_solver_candidate": "binary_structured_byte_not_formula",
+            "rows": 25,
+            "correct": 1,
+            "accuracy": 0.04
+          },
+          {
+            "teacher_solver_candidate": "binary_three_bit_boolean",
+            "rows": 14,
+            "correct": 10,
+            "accuracy": 0.7143
+          },
+          {
+            "teacher_solver_candidate": "binary_two_bit_boolean",
+            "rows": 46,
+            "correct": 22,
+            "accuracy": 0.4783
+          }
+        ]
+      }
+    }
+  },
+  "by_focus_bucket": [
+    {
+      "v1_focus_bucket": "boolean_family",
+      "rows": 60,
+      "correct": 32,
+      "accuracy": 0.5333
+    },
+    {
+      "v1_focus_bucket": "dominant_structured_abstract",
+      "rows": 90,
+      "correct": 19,
+      "accuracy": 0.2111
+    },
+    {
+      "v1_focus_bucket": "dominant_structured_safe",
+      "rows": 120,
+      "correct": 35,
+      "accuracy": 0.2917
+    },
+    {
+      "v1_focus_bucket": "no_solver_answer_only",
+      "rows": 70,
+      "correct": 21,
+      "accuracy": 0.3
+    },
+    {
+      "v1_focus_bucket": "no_solver_manual",
+      "rows": 40,
+      "correct": 4,
+      "accuracy": 0.1
+    },
+    {
+      "v1_focus_bucket": "rare_byte_transform",
+      "rows": 11,
+      "correct": 11,
+      "accuracy": 1.0
+    },
+    {
+      "v1_focus_bucket": "rare_perm_independent",
+      "rows": 7,
+      "correct": 2,
+      "accuracy": 0.2857
+    },
+    {
+      "v1_focus_bucket": "supported_affine_xor",
+      "rows": 60,
+      "correct": 18,
+      "accuracy": 0.3
+    },
+    {
+      "v1_focus_bucket": "supported_bijection",
+      "rows": 50,
+      "correct": 45,
+      "accuracy": 0.9
+    },
+    {
+      "v1_focus_bucket": "supported_not_structured",
+      "rows": 55,
+      "correct": 3,
+      "accuracy": 0.0545
+    }
+  ],
+  "by_exposure_band": [
+    {
+      "v1_exposure_band": "dominant",
+      "rows": 210,
+      "correct": 54,
+      "accuracy": 0.2571
+    },
+    {
+      "v1_exposure_band": "rare",
+      "rows": 18,
+      "correct": 13,
+      "accuracy": 0.7222
+    },
+    {
+      "v1_exposure_band": "supported",
+      "rows": 225,
+      "correct": 98,
+      "accuracy": 0.4356
+    },
+    {
+      "v1_exposure_band": "underrepresented",
+      "rows": 110,
+      "correct": 25,
+      "accuracy": 0.2273
+    }
+  ],
+  "by_solver_family": [
+    {
+      "teacher_solver_candidate": "",
+      "rows": 190,
+      "correct": 47,
+      "accuracy": 0.2474
+    },
+    {
+      "teacher_solver_candidate": "binary_affine_xor",
+      "rows": 60,
+      "correct": 18,
+      "accuracy": 0.3
+    },
+    {
+      "teacher_solver_candidate": "binary_bit_permutation_bijection",
+      "rows": 50,
+      "correct": 45,
+      "accuracy": 0.9
+    },
+    {
+      "teacher_solver_candidate": "binary_bit_permutation_independent",
+      "rows": 7,
+      "correct": 2,
+      "accuracy": 0.2857
+    },
+    {
+      "teacher_solver_candidate": "binary_byte_transform",
+      "rows": 11,
+      "correct": 11,
+      "accuracy": 1.0
+    },
+    {
+      "teacher_solver_candidate": "binary_structured_byte_formula",
+      "rows": 87,
+      "correct": 18,
+      "accuracy": 0.2069
+    },
+    {
+      "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
+      "rows": 73,
+      "correct": 16,
+      "accuracy": 0.2192
+    },
+    {
+      "teacher_solver_candidate": "binary_structured_byte_not_formula",
+      "rows": 25,
+      "correct": 1,
+      "accuracy": 0.04
+    },
+    {
+      "teacher_solver_candidate": "binary_three_bit_boolean",
+      "rows": 14,
+      "correct": 10,
+      "accuracy": 0.7143
+    },
+    {
+      "teacher_solver_candidate": "binary_two_bit_boolean",
+      "rows": 46,
+      "correct": 22,
+      "accuracy": 0.4783
+    }
+  ],
+  "teacher_style_summary": {
+    "rows": 563,
+    "accuracy": 0.3375,
+    "starts_check_examples_rate": 0.0,
+    "contains_so_rule_rate": 0.151,
+    "contains_constraints_rate": 0.0,
+    "contains_boxed_literal_rate": 0.8064,
+    "contains_oxed_literal_rate": 0.8064,
+    "gold_anywhere_rate": 0.5222,
+    "last_bit8_exact_rate": 0.341,
+    "mean_raw_output_chars": 12138.7,
+    "median_raw_output_chars": 13015.0,
+    "mean_bit_fragment_count": 72.85
+  }
+}
