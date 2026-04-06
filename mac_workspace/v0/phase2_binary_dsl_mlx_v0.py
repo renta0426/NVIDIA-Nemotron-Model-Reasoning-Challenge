@@ -173,6 +173,10 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v82",
     "single-adapter-fusion-v83",
     "single-adapter-fusion-v84",
+    "single-adapter-fusion-v88",
+    "single-adapter-fusion-v89",
+    "single-adapter-fusion-v90",
+    "single-adapter-fusion-v91",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -249,6 +253,245 @@ STRONG_BASELINE_V2_STRUCTURED_ANCHOR_V2_SPECS = (
         "label": "symbol",
         "template_subtype": "numeric_2x2",
         "allowed_tiers": ("answer_only_keep",),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V88_SPECS = (
+    {
+        "source_name": "strong_sample_binary_formula_verified",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("verified_trace_ready",),
+    },
+    {
+        "source_name": "strong_sample_binary_formula_answer_only",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("answer_only_keep",),
+    },
+    {
+        "source_name": "strong_sample_binary_other_verified",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("verified_trace_ready",),
+    },
+    {
+        "source_name": "strong_sample_binary_other_answer_only",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("answer_only_keep",),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_verified",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("verified_trace_ready",),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_answer_only",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("answer_only_keep",),
+    },
+    {
+        "source_name": "strong_sample_symbol_glyph_answer_only",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "glyph_len5",
+        "allowed_tiers": ("answer_only_keep",),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V89_SPECS = (
+    *STRONG_BASELINE_V2_SAMPLE_FUSION_V88_SPECS,
+    {
+        "source_name": "strong_sample_text_verified_anchor",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "text_decryption",
+        "label": "text",
+        "template_subtype": "text_monoalphabetic",
+        "allowed_tiers": ("verified_trace_ready",),
+        "quota": 64,
+        "group_keys": ("selection_tier",),
+    },
+    {
+        "source_name": "strong_sample_text_answer_only_anchor",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "text_decryption",
+        "label": "text",
+        "template_subtype": "text_monoalphabetic",
+        "allowed_tiers": ("answer_only_keep",),
+        "quota": 64,
+        "group_keys": ("selection_tier",),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V90_SPECS = (
+    {
+        "source_name": "strong_sample_binary_formula_verified_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 48,
+        "group_keys": ("selection_tier", "bit_no_candidate_positions", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_binary_formula_answer_only_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only_done",
+        "quota": 16,
+        "group_keys": ("selection_tier", "bit_no_candidate_positions", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_binary_other_verified_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 48,
+        "group_keys": ("selection_tier", "teacher_solver_candidate", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_binary_other_answer_only_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only_done",
+        "quota": 16,
+        "group_keys": ("selection_tier", "teacher_solver_candidate", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_verified_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 16,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_answer_only_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only_done",
+        "quota": 16,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_glyph_answer_only_short_done",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "glyph_len5",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only_done",
+        "quota": 8,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V91_SPECS = (
+    {
+        "source_name": "strong_sample_binary_formula_verified_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only",
+        "quota": 48,
+        "group_keys": ("selection_tier", "bit_no_candidate_positions", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_binary_formula_answer_only_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only",
+        "quota": 16,
+        "group_keys": ("selection_tier", "bit_no_candidate_positions", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_binary_other_verified_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only",
+        "quota": 48,
+        "group_keys": ("selection_tier", "teacher_solver_candidate", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_binary_other_answer_only_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only",
+        "quota": 16,
+        "group_keys": ("selection_tier", "teacher_solver_candidate", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_verified_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only",
+        "quota": 16,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_answer_only_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only",
+        "quota": 16,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_glyph_answer_only_short_boxed",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "glyph_len5",
+        "allowed_tiers": ("answer_only_keep",),
+        "assistant_style": "boxed_only",
+        "quota": 8,
+        "group_keys": ("selection_tier", "num_examples"),
     },
 )
 
@@ -1948,6 +2191,20 @@ def load_training_source_rows(path: Path, *, profile: str) -> list[dict[str, str
     return load_phase2_training_rows(path)
 
 
+@lru_cache(maxsize=1)
+def load_strong_baseline_cot_v2_sample_index() -> dict[str, dict[str, str]]:
+    sampled_rows, _ = build_strong_baseline_cot_v2_rows(
+        load_strong_baseline_cot_rows(DEFAULT_STRONG_BASELINE_COT_CSV)
+    )
+    return {
+        str(row.get("id", "")).strip(): {
+            str(key): "" if value is None else str(value) for key, value in row.items()
+        }
+        for row in sampled_rows
+        if str(row.get("id", "")).strip()
+    }
+
+
 def validate_phase2_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
     if rows:
         actual_columns = list(rows[0].keys())
@@ -2676,6 +2933,66 @@ def select_joined_augmentation_candidates(
         candidates.append(row)
     if quota > 0 and len(candidates) > quota:
         selection_group_keys = tuple(group_keys) or ("template_subtype", "teacher_solver_candidate")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
+def select_joined_strong_baseline_candidates(
+    metadata_path: Path,
+    *,
+    existing_ids: set[str],
+    family: str | None = None,
+    template_subtype: str | None = None,
+    allowed_tiers: set[str] | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = True,
+    min_int_fields: dict[str, int] | None = None,
+    max_int_fields: dict[str, int] | None = None,
+    exact_fields: dict[str, Any] | None = None,
+    startswith_fields: dict[str, str] | None = None,
+) -> list[dict[str, str]]:
+    strong_index = load_strong_baseline_cot_v2_sample_index()
+    candidates: list[dict[str, str]] = []
+    for raw_row in load_csv_rows(metadata_path):
+        metadata_row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(metadata_row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        strong_row = strong_index.get(row_id)
+        if strong_row is None:
+            continue
+        row = {**strong_row, **metadata_row}
+        if family and str(row.get("family", "")).strip() != family:
+            continue
+        if template_subtype and str(row.get("template_subtype", "")).strip() != template_subtype:
+            continue
+        if not str(row.get("prompt", "")).strip() or not str(row.get("answer", "")).strip():
+            continue
+        if not str(row.get("generated_cot", "")).strip():
+            continue
+        tier = infer_candidate_selection_tier(row)
+        row["selection_tier"] = tier
+        if allowed_tiers and tier not in allowed_tiers:
+            continue
+        if not matches_numeric_field_filters(
+            row,
+            min_int_fields=min_int_fields,
+            max_int_fields=max_int_fields,
+            exact_fields=exact_fields,
+            startswith_fields=startswith_fields,
+        ):
+            continue
+        candidates.append(row)
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("template_subtype", "selection_tier")
         return balanced_take(
             candidates,
             quota=quota,
@@ -4248,6 +4565,131 @@ def build_single_adapter_fusion_v84_rows(
     )
 
 
+def build_single_adapter_fusion_strong_sample_rows(
+    rows: Sequence[dict[str, str]],
+    *,
+    profile_name: str,
+    augmentation_specs: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    base_rows, base_summary = apply_phase2_train_profile(rows, profile="single-adapter-fusion-v40")
+    profiled_rows = [clone_phase2_row(row) for row in base_rows]
+    existing_ids = {
+        str(row.get("id", "")).strip()
+        for row in profiled_rows
+        if str(row.get("id", "")).strip()
+    }
+    augmentation_rows: list[dict[str, str]] = []
+    source_summaries: dict[str, Any] = {}
+    transform_counts = Counter(base_summary.get("transform_counts", {}))
+
+    for spec in augmentation_specs:
+        source_name = str(spec.get("source_name", "")).strip()
+        family = str(spec.get("family", "")).strip()
+        label = str(spec.get("label", "")).strip()
+        template_subtype = str(spec.get("template_subtype", "")).strip()
+        metadata_path = Path(spec.get("metadata_path", AUGMENT_TRAIN_RECOMMENDED_CSV))
+        if not source_name or not family or not label or not template_subtype:
+            raise ValueError(f"{profile_name} has an invalid augmentation spec: {spec!r}")
+        allowed_tiers = {
+            str(value).strip().lower()
+            for value in spec.get("allowed_tiers", ())
+            if str(value).strip()
+        }
+        candidates = select_joined_strong_baseline_candidates(
+            metadata_path=metadata_path,
+            existing_ids=existing_ids,
+            family=family,
+            template_subtype=template_subtype,
+            allowed_tiers=allowed_tiers or None,
+            quota=int(spec.get("quota", 0)),
+            group_keys=tuple(spec.get("group_keys", ("template_subtype", "selection_tier"))),
+            hard_first=bool(spec.get("hard_first", True)),
+            min_int_fields=spec.get("min_int_fields"),
+            max_int_fields=spec.get("max_int_fields"),
+            exact_fields=spec.get("exact_fields"),
+            startswith_fields=spec.get("startswith_fields"),
+        )
+        appended_rows: list[dict[str, str]] = []
+        assistant_style = str(spec.get("assistant_style", "cot_boxed_notebook")).strip() or "cot_boxed_notebook"
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(
+                candidate,
+                label=label,
+                assistant_style=assistant_style,
+                source_selection_tier=str(candidate.get("selection_tier", "")).strip().lower(),
+                generated_cot=str(candidate.get("generated_cot", "")),
+            )
+            row_id = phase2_row["id"]
+            if row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    profiled_rows.extend(augmentation_rows)
+    return profiled_rows, {
+        "profile": profile_name,
+        "input": base_summary.get("input", summarize_phase2_rows(rows)),
+        "base": base_summary.get("output", summarize_phase2_rows(base_rows)),
+        "output": summarize_phase2_rows(profiled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+        "augmentation": {
+            "rows": len(augmentation_rows),
+            "summary": summarize_phase2_rows(augmentation_rows),
+            "sources": source_summaries,
+        },
+    }
+
+
+def build_single_adapter_fusion_v88_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v88",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V88_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v89_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v89",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V89_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v90_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v90",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V90_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v91_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v91",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V91_SPECS,
+    )
+
+
 def build_strong_baseline_cot_v2_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -4543,6 +4985,14 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v83_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v84":
         return build_single_adapter_fusion_v84_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v88":
+        return build_single_adapter_fusion_v88_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v89":
+        return build_single_adapter_fusion_v89_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v90":
+        return build_single_adapter_fusion_v90_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v91":
+        return build_single_adapter_fusion_v91_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 

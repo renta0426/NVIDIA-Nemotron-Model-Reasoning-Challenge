@@ -87,7 +87,29 @@ non-overlap breakdown:
   - dataset format: `chat`
   - teacher shape: `generated_cot` から既存 `\boxed{}` を除去し、`</think>\n\boxed{answer}` で閉じる
   - train config: `full-layer`, `bs=1`, `ga=8`, `lr=1e-4`, `epochs=2`, `max_seq_length=4096`
-- `v85` train は進行中だが、**README 基準の full320 / binary60 / symbol60 score はまだ未回収**。したがって、現時点では **MLX reproduced score なし**。
+- `v85` train は完走:
+  - `Iter 1 Val loss 0.679`
+  - `Iter 5814 Val loss 3.683`
+  - `Iter 5814 Train loss 4.873`
+  - peak mem `82.705 GB`
+- `v85` README eval:
+  - `binary60 = 0/60`
+    - `bit_other = 0/46`
+    - `bit_structured_byte_formula = 0/14`
+    - `boxed_extraction_success_rate = 0.0`
+    - `format_failure_rate = 1.0`
+  - `symbol60 = 0/60`
+    - `numeric_2x2 = 0/40`
+    - `glyph_len5 = 0/20`
+  - binary/symbol ともに **全 60 行が `line_fallback`**, **`has_boxed = False`**, raw output prefix は **`\box the the the ...`** の同一 collapse
+  - `full320 = 0/320`
+    - `binary = 0/60`
+    - `gravity = 0/50`
+    - `roman = 0/50`
+    - `symbol = 0/60`
+    - `text = 0/50`
+    - `unit = 0/50`
+  - したがって **broad verified CoT full-layer reproduction は README 基準 local320 でも完全 collapse**
 - `v86` prepare 完了:
   - profile: `strong-baseline-cot-v2-structured-anchor-v1`
   - base sampled rows: `2907`
@@ -108,6 +130,72 @@ non-overlap breakdown:
   - total train rows: `3983`
   - total iters: `7966`
   - まだ未 train
+- `v85 full320 = 0/320` を受けて、queued `v86 / v87` full-layer branch は **起動前に打ち切り**。以後の strong-baseline 利用は full-layer chat 再現ではなく、`v40` seed continuation 側の data-only injection を優先する。
+- strong sampled-new pivot:
+  - sampled 2907 rows のうち、現行 900-row phase2 CSV に未投入の **new rows = 2560**
+  - hard-family buckets:
+    - `bit_structured_byte_formula verified = 189`
+    - `bit_structured_byte_formula answer_only = 60`
+    - `bit_other verified = 171`
+    - `bit_other answer_only = 33`
+    - `numeric_2x2 verified = 36`
+    - `numeric_2x2 answer_only = 75`
+    - `glyph_len5 answer_only = 14`
+- `v88` prepare / train 完了:
+  - profile: `single-adapter-fusion-v88`
+  - design: `v40` core + strong baseline sampled-new hard-family rows (`binary 434`, `symbol 121`)
+  - total train rows: `2517`
+  - total iters: `39`
+  - train `0.554 -> 0.458`
+  - peak mem `121.316 GB`
+  - note: longest sentence `2495 > 2048` の truncate warning が 1 回出た
+  - `binary60 official/exact = 6/60, 5/60`
+    - `bit_other official/exact = 6/46, 5/46`
+    - `bit_structured_byte_formula official/exact = 0/14, 0/14`
+    - `verified/manual/answer_only = 5/1/0`
+    - `boxed_extraction_success_rate = 0.15`
+    - `format_failure_rate = 0.9333`
+    - structured 14 行は **`numeric_fallback 13 + boxed 1`**
+  - したがって **hard-family sampled-new notebook CoT append は `v40` binary branch を超えられず不採用**
+- `v89` prepare 完了:
+  - profile: `single-adapter-fusion-v89`
+  - design: `v88 + text anchor 64 verified + 64 answer_only`
+  - total train rows: `2645`
+  - total iters: `41`
+  - まだ未 train
+- `v90` prepare 完了:
+  - profile: `single-adapter-fusion-v90`
+  - design: same sampled-new hard-family rows を **conservative quota 168 rows** に絞り、teacher を **`boxed_only_done`** へ短文化
+  - total train rows: `2130`
+  - total iters: `33`
+  - augmentation: `binary 128`, `symbol 40`
+  - train `0.331 -> 0.330`
+  - peak mem `74.475 GB`
+  - `binary60 official/exact = 7/60, 5/60`
+    - `bit_other official/exact = 7/46, 5/46`
+    - `bit_structured_byte_formula official/exact = 0/14, 0/14`
+    - `verified/manual/answer_only = 5/0/2`
+    - `boxed_extraction_success_rate = 0.15`
+    - `format_failure_rate = 0.9`
+    - structured 14 行は **`numeric_fallback 14`**
+  - `v88 (6/60, exact 5/60)` より official は +1 だが、**`v40` binary branch は超えられず不採用**
+- `v91` prepare 完了:
+  - profile: `single-adapter-fusion-v91`
+  - design: `v90` と同一 quota / same rows で、teacher だけ **pure `boxed_only`** に切り替えた clean ablation
+  - total train rows: `2130`
+  - total iters: `33`
+  - augmentation: `binary 128`, `symbol 40`
+  - train `0.327 -> 0.329`
+  - peak mem `74.475 GB`
+  - `binary60` 初回並列は RAM cap 超過回避のため停止し、**1-shard rerun** で回収
+  - `binary60 official/exact = 5/60, 5/60`
+    - `bit_other official/exact = 5/46, 5/46`
+    - `bit_structured_byte_formula official/exact = 0/14, 0/14`
+    - `verified/manual/answer_only = 5/0/0`
+    - `boxed_extraction_success_rate = 0.1333`
+    - `format_failure_rate = 0.9167`
+    - structured 14 行は **`numeric_fallback 14`**
+  - **pure `boxed_only` は `boxed_only_done` の `v90` を下回り不採用**
 
 ## Current interpretation
 
@@ -129,5 +217,8 @@ non-overlap breakdown:
 16. `v82` も official `7/60`, exact `4/60` で、**same-row boxed-only twin は `v79` の structured exact 2/14 を保持できなかった**。structured 14 行は `boxed 0`, `last_number 14` のまま。
 17. したがって `v79` 近傍の local boxed-twin / leading-zero tweak はここでいったん閉じ、次の本命は **`nemotron-sft-lora-with-cot-v2` の broad verified CoT baseline を MLX 単一ファイルへ移植する `v85`** に置く。
 18. 次の判定軸は引き続き **README.md 基準の full320 / binary60 / symbol60** だが、今後は **修正後に再実行した run だけ**を ledger に残す。
-19. `v86/v87` の次段は、**strong baseline の broad CoT を保ったまま、analysis docs 由来の `bit_structured_byte_formula` / `numeric_2x2` を `boxed_only` anchor として追加する** data-only 改善路線。
-20. ただし full-layer strong-baseline 系は **2 本並列で RAM cap を超える**。この系列は **single parallel max** で回し、`v85` の README eval 完了後に `v86/v87` を順次流す運用へ切り替える。
+19. `v85` は **binary60 = 0/60**, **symbol60 = 0/60** で、teacher 欠落ではなく **generation-time の broad collapse** を起こした。binary/symbol はどちらも `\box the the the ...` の無箱 line fallback に潰れている。
+20. したがって、strong baseline 由来の価値は **full-layer chat reproduction そのもの**ではなく、**sampled-new verified CoT rows を stable `v40` へ注入する data-only continuation** にあると解釈を更新した。
+21. `v88` は **official/exact 6/60, 5/60** でも structured exact `0/14`、answer-only `0/20` に留まり、**sampled-new hard-family rows 自体より notebooklike 長尺 CoT 注入が悪さをしている**と解釈するのが自然。
+22. `v85 full320 = 0/320` まで確定したため、**strong baseline の full-layer chat reproduction 系はこの環境では dead branch** と判断した。`v86/v87` queued run も起動前に止めている。
+23. そのため次枝は、**same sampled-new rows / smaller quota / short-output teacher** の clean ablation `v90/v91` に切り替えた。結果は `v90 = 7/60 (exact 5/60)`, `v91 = 5/60 (exact 5/60)` で、**`Done.` 追加の有無を変えても structured exact は 0/14 のまま**。この short-teacher strong-sampled-new branch も一旦閉じる。
