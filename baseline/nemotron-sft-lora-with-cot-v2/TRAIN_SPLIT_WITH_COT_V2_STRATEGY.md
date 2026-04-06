@@ -40,6 +40,57 @@ binary では exact 8-bit string と leading zero の保持が重要なので、
 
 要するに、**distribution shift を最小化しながら hardest verified structured pool だけを足す**のが今回の戦略。
 
+### 3.1 binary bias specialized benchmark から見た妥当性
+
+`baseline/nemotron-sft-lora-with-cot-v2/result/phase0_offline_eval_binary_bias_specialized/reports/binary_bias_specialized_deep_analysis.md` の再点検で、この first shot はかなり強く支持された。
+
+まず重要なのは、現行 v2 baseline の binary specialized score が **`190/563 = 0.3375`** で、弱点がかなり局所化していたこと。
+
+- `binary_bit_permutation_bijection = 45/50 = 0.9000`
+- `binary_byte_transform = 11/11 = 1.0000`
+- `binary_three_bit_boolean = 10/14 = 0.7143`
+
+までは強く、逆に
+
+- `binary_structured_byte_formula = 18/87 = 0.2069`
+- `binary_structured_byte_formula_abstract = 16/73 = 0.2192`
+- `binary_structured_byte_not_formula = 1/25 = 0.0400`
+
+が主ボトルネックだった。
+
+つまり specialized benchmark は、「binary 全体をもっと増やせばよい」ではなく、**structured formula 系だけを重点補強すべき**と示している。
+
+さらに format 面では、
+
+- `boxed_non_empty = 452/563`
+- `last_number = 109/563`
+- しかも `last_number` は **`0/109`**
+
+だった。これは README.md 前提どおり、binary では fallback がほぼ効かず、**既存 v2 の boxed primary path を壊してはいけない**ことを意味する。したがって pure synthetic 置換や大きい style shift より、**既存 v2 を温存した augmentation**の方が合理的である。
+
+selection tier でも、
+
+- `verified_trace_ready = 143/373 = 0.3834`
+- `answer_only_keep = 43/150 = 0.2867`
+- `manual_audit_priority = 4/40 = 0.1000`
+
+と差があり、hard binary では **verified trace の方が依然として強い**。このため今回 `answer_only` や `manual` を混ぜず、unused `verified_trace_ready` に限定したのは保守的だが筋が良い。
+
+bit_synth exact-trace v1 specialized と比べても、
+
+- v2 baseline は boxing / closure で優位
+- v1 は structured / affine の rule induction で優位
+
+という分解になった。よって最も勝算が高い first shot は、
+
+1. **v2 の boxed behavior を維持する**
+2. **v1 系が得意だった structured verified binary だけを移植する**
+3. **non-binary 分布は触らない**
+
+の組み合わせである。
+
+今回の `train_split_with_cot_v2.csv` は、まさにこの specialized benchmark の示す gap にだけ手を入れている。
+
 ## 4. `train_split_with_cot_v2.csv` の内容
 
 ### 4.1 ベースからの差分
