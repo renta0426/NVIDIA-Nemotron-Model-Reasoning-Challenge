@@ -224,6 +224,48 @@ non-overlap breakdown:
     - `symbol_watch = 2/4`
     - `binary boxed_extraction_success_rate = 0.75`
     - `binary regex_exact_rate = 0.75`
+- `v96` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v96`
+  - design: `v92` の **no-text** variant。sampled-new `unit 64 / gravity 32 / roman 32 / symbol 24` を **`boxed_only_done`** で追加
+  - augmentation: `unit 64`, `gravity 32`, `roman 32`, `symbol 24` （計 `152`）
+  - total train rows: `2114`
+  - `gate24 official/exact = 20/24, 16/24`
+    - `general_stable = 14/16`
+    - `binary_hard = 3/4`
+    - `symbol_watch = 3/4`
+    - `binary boxed_extraction_success_rate = 0.75`
+    - `binary regex_exact_rate = 0.75`
+  - `v40` same-slice 比では **official tie / exact +1**
+    - gains: `c625ba91` (`bit_other`), `db6a5663` / `cfa59b38` (`numeric_2x2`)
+    - losses: `e17e76cc`, `c0e9cf43` (`text_monoalphabetic`), `e952f61f` (`numeric_2x2 -> your answer`)
+- `v97` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v97`
+  - design: `v96` と同一 no-text rows / quota で、teacher だけ **pure `boxed_only`**
+  - augmentation: `unit 64`, `gravity 32`, `roman 32`, `symbol 24` （計 `152`）
+  - total train rows: `2114`
+  - `gate24 official/exact = 21/24, 17/24`
+    - `general_stable = 16/16`
+    - `binary_hard = 2/4`
+    - `symbol_watch = 3/4`
+    - `binary boxed_extraction_success_rate = 0.75`
+    - `binary regex_exact_rate = 0.5`
+  - `v40` same-slice 比では **gain 1 / loss 0 = net +1**
+    - gain: `cfa59b38` (`numeric_2x2 = 233`)
+  - `README.md` gate24 条件では、この no-text branch の **現 best**
+- `v98` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v98`
+  - design: `v96` からさらに symbol も外した **numeric-only** variant。sampled-new `unit 64 / gravity 32 / roman 32` を **`boxed_only_done`** で追加
+  - augmentation: `unit 64`, `gravity 32`, `roman 32` （計 `128`）
+  - total train rows: `2090`
+  - `gate24 official/exact = 18/24, 15/24`
+    - `general_stable = 15/16`
+    - `binary_hard = 1/4`
+    - `symbol_watch = 2/4`
+    - `binary boxed_extraction_success_rate = 0.5`
+    - `binary regex_exact_rate = 0.25`
+  - `v40` same-slice 比では **gain 1 / loss 3 = net -2**
+    - gain: `cfa59b38` (`numeric_2x2`)
+    - losses: `2bd7896f` (`unit_fixed_ratio`), `bcdf9198` (`bit_other -> your answer`), `5b06502f` (`numeric_2x2 -> your answer`)
 
 ## Current interpretation
 
@@ -253,3 +295,7 @@ non-overlap breakdown:
 24. sampled-new general verified rows の short-teacher continuation `v92/v93` は、**gate24 でどちらも `19/24`**。same slice の control `v40 = 20/24` を official では超えられなかった。
 25. ただし `v92/v93` は **binary を `2/4 -> 3/4`** まで押し上げ、overall exact も `15/24 -> 16/24` に改善した一方、**text が `4/4 -> 2/4`** へ落ちて net `-1` になった。つまり sampled-new general branch の問題は broad no-text families ではなく、**text short-teacher injection の regress** にある可能性が高い。
 26. `v92` と `v93` の official/exact は同点だが、binary formatting は **`boxed_only_done` の `v92` がやや良い**。もしこの general short-teacher 枝を続けるなら、次は **text を外した `v92` 系** から入るのが自然。
+27. `v96-v98` により、その仮説は当たりだった。**text short-teacher rows を外すだけで** `v97 = 21/24`, `v96 = 20/24` まで戻り、`v92/v93` の net regress は text 注入が主因だったとみなせる。
+28. no-text branch の内部比較では、**pure `boxed_only` の `v97` が `boxed_only_done` の `v96` を上回った**。`v97` は `v40` 比で **gain 1 / loss 0**、`v96` は official tie のまま text 2 件を落としている。
+29. 一方で symbol まで外した `v98` は **18/24** まで落ち、`bit_other` と `unit_fixed_ratio` に `your answer` / numeric fallback を再発させた。したがって no-text branch を続けるなら、**symbol 24 は残す**のが自然。
+30. `README.md` gate24 条件では、現時点の sampled-new general short-teacher best は **`v97 = 21/24, exact 17/24`**。次の triage は、planned どおり **`general_stable_set 200`** で general regress が本当に消えたかを確認する。
