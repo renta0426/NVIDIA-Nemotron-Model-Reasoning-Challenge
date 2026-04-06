@@ -21,6 +21,65 @@
 
 `v40` の主改善は `text` / `numeric_2x2` / `bit_other` の一部で、**`bit_structured_byte_formula exact = 0/14`** は未解決のまま。
 
+## Current best local pipeline
+
+single-adapter は `v40` が best のままだが、**single-file multi-adapter pipeline** は actual README full320 実測でさらに大きく上回った。
+
+| pipeline | local320 | binary | gravity | roman | symbol | text | unit | note |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `prompt-router-v2` | **252/320 = 0.7875** | `31/60` | `50/50` | `50/50` | `29/60` | `42/50` | `50/50` | `prompt-router-v1` + output-aware base fallback on suspicious `text/roman` outputs |
+| `prompt-router-v1` | `245/320 = 0.7656` | `31/60` | `50/50` | `49/50` | `29/60` | `36/50` | `50/50` | actual live router run |
+| `prompt-router-v1` static join ceiling | `250/320 = 0.7812` | `30/60` | `50/50` | `50/50` | `29/60` | `41/50` | `50/50` | prior full320 row-level join; live rerun前の ceiling |
+
+補足:
+
+- benchmark prompt は keyword だけで **family 100% 分離**できた
+- single-file `eval-phase0-router` を実装済み
+- `prompt-router-v1` gate24 は **`22/24 = 0.9167`**
+  - `binary 4/4`, `gravity 4/4`, `roman 4/4`, `symbol 4/4`, `text 2/4`, `unit 4/4`
+- `prompt-router-v2` gate24 は **`24/24 = 1.0000`**
+  - `binary 4/4`, `gravity 4/4`, `roman 4/4`, `symbol 4/4`, `text 4/4`, `unit 4/4`
+- `prompt-router-v2` は actual full320 で **fallback 10 行**（`text 9`, `roman 1`）を base へ再実行し、`v1` に対して **gain 7 / loss 0**
+  - recovered rows: `08bc3a02`, `3daf5caa`, `487528d5`, `b9e045e8`, `e45a4109`, `f66415c0`, `f7f9ba17`
+- current `v2` miss のうち、**base が既に救える text 3 行**（`dc10ca9b`, `dd24b691`, `e05908dd`）が残っている
+- same 4-model family-wise oracle は **`259/320 = 0.8094`**
+- actual `prompt-router-v2` は external strong baseline reference **`249/320 = 0.7781`** も上回った
+- したがって、現段階の最有力改善方向は **single-adapter 追加学習ではなく prompt router + selective fallback 実装** である
+
+## v110 closure と integrated follow-up
+
+| version | design | measured result | decision |
+| --- | --- | --- | --- |
+| `v110` | finer-threshold `v97-lite`: `unit 64 + gravity 24 + roman 32 + symbol 24` | `gate24 21/24`, `general200 178/200`, `binary60 3/60`, `symbol60 11/60` | general 回復は real だが hard family が壊滅で mainline 不採用 |
+| `v111` | finer-threshold `v97-lite`: `unit 48 + gravity 32 + roman 32 + symbol 24` | `gate24 19/24` | 不採用 |
+| `v112` | finer-threshold `v97-lite`: `unit 48 + gravity 24 + roman 32 + symbol 24` | `gate24 19/24` | 不採用 |
+| `v97 -> v40 (low)` | reverse continuation: symbol 寄り seed から general を戻す | `train 0.352`, `gate24 19/24` | branch closure |
+| `v97 -> v40 (std)` | reverse continuation: 同上 | `train 0.361`, `gate24 18/24` | branch closure |
+| `v97 -> v110 (low)` | reverse continuation: 同上 | `train 0.311`, `gate24 19/24` | branch closure |
+| `v110 -> v79` | post-hoc binary repair: prompt-local current strict boxed-only-done delta | `train 0.361`, `gate24 19/24` | branch closure |
+| `v110 -> v67` | post-hoc binary repair: abstract-safe + high-support verified structured delta | `train 0.360`, `gate24 19/24` | branch closure |
+| `v110 -> v69` | post-hoc binary repair: answer-only-focused structured delta | `train 0.360`, `gate24 14/24` | branch closure |
+| `v113` | integrated `v110 + v79` | `2160 rows`, `33 iters`, `train 0.311 -> 0.309`, `gate24 19/24` | 不採用 |
+| `v114` | integrated `v110 + v67` | `2159 rows`, `33 iters`, `train 0.311 -> 0.311`, `gate24 17/24` | 不採用 |
+| `v115` | integrated `v110 + (v79 + v67)` | `2175 rows`, `33 iters`, `train 0.311 -> 0.309`, `gate24 19/24` | 不採用 |
+
+`v113-v115` は **`v110` に対して gate24 gain が 0** だった。  
+row-level では `v113` が `bcdf9198(bit_other)` と `e952f61f(numeric_2x2)`、`v115` が `bcdf9198(bit_other)` と `cfa59b38(numeric_2x2)` を落とし、**binary / symbol を同時に守れなかった**。
+
+## Strict bare-boxed prompt pivot
+
+`v97` の `general200` regress は row-level で **`gravity 25 / unit 17 / text 14`** に偏っており、特に gravity 25 件は **`38.9 \text{m}` 型の unit suffix / latex-text 汚染**だった。  
+そのため、row mix をいじる前に **boxed の中を bare final answer のみに強制する strict prompt** を sampled-new strong rows 側へ入れた。
+
+| version | design | measured result | status |
+| --- | --- | --- | --- |
+| `v116` | `v97` mix + strict bare-boxed prompt on `unit + gravity` | `2114 rows`, `33 iters`, `train 0.324 -> 0.318`, `gate24 17/24` | 不採用 |
+| `v117` | `v97` mix + strict bare-boxed prompt on `unit + gravity + symbol` | `2114 rows`, `33 iters`, `train 0.324 -> 0.319`, `gate24 18/24` | 不採用 |
+| `v118` | `v97` mix + strict bare-boxed prompt on `unit + gravity + roman + symbol` | `2114 rows`, `33 iters`, `train 0.366 -> 0.323`, `gate24 18/24` | 不採用 |
+
+strict bare-boxed prompt は **gravity / unit の latex-text 汚染仮説**を切る目的には沿っていたが、`v40 = 20/24` / `v97 = 21/24` を超えられなかった。  
+best の `v118` でも `binary 1/4`, `symbol 2/4`, `unit 3/4` に留まり、**prompt strict 化だけで sampled-new mixed branch を mainline へ戻すのは難しい**。
+
 ## External strong baseline reference
 
 `baseline/nemotron-sft-lora-with-cot-v2` は、**verified-correct CoT 6,558 rows** から notebook 内 sampling で **2,907 rows** を使い、README 基準 local **`249/320 = 0.7781`** を出している。

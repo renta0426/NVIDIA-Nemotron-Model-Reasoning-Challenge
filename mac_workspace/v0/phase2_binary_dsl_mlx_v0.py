@@ -51,6 +51,30 @@ DEFAULT_PHASE0_ANALYSIS_CSV = (
 )
 DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "phase2_binary_hybrid_mlx_v0"
+PHASE0_ROUTER_PROFILE_PROMPT_V1 = "prompt-router-v1"
+PHASE0_ROUTER_PROFILE_PROMPT_V2 = "prompt-router-v2"
+PHASE0_ROUTER_PROFILE_CHOICES = (
+    PHASE0_ROUTER_PROFILE_PROMPT_V1,
+    PHASE0_ROUTER_PROFILE_PROMPT_V2,
+)
+PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
+    PHASE0_ROUTER_PROFILE_PROMPT_V1: {
+        "binary": "specialist",
+        "symbol": "specialist",
+        "unit": "specialist",
+        "gravity": "reasoning",
+        "roman": "reasoning",
+        "text": "general",
+    },
+    PHASE0_ROUTER_PROFILE_PROMPT_V2: {
+        "binary": "specialist",
+        "symbol": "specialist",
+        "unit": "specialist",
+        "gravity": "reasoning",
+        "roman": "reasoning",
+        "text": "general",
+    },
+}
 AUGMENT_ARTIFACT_ROOT = REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts"
 AUGMENT_BINARY_STRUCTURED_CSV = AUGMENT_ARTIFACT_ROOT / "binary_structured_byte_formula_candidates_v1.csv"
 AUGMENT_VERIFIED_TRACE_CSV = AUGMENT_ARTIFACT_ROOT / "train_verified_trace_ready_v1.csv"
@@ -198,6 +222,12 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v110",
     "single-adapter-fusion-v111",
     "single-adapter-fusion-v112",
+    "single-adapter-fusion-v113",
+    "single-adapter-fusion-v114",
+    "single-adapter-fusion-v115",
+    "single-adapter-fusion-v116",
+    "single-adapter-fusion-v117",
+    "single-adapter-fusion-v118",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -207,6 +237,12 @@ BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For exampl
 BINARY_STRICT_BOXED_SUFFIX = (
     r"For this binary task, the content inside `\boxed{}` must be exactly 8 binary digits, "
     r'for example `\boxed{01010101}`. Do not write extra digits, words, or repeated bits. '
+    r"Stop immediately after the boxed answer."
+)
+STRICT_BARE_BOXED_SUFFIX = (
+    r"For this task, the content inside `\boxed{}` must be only the bare final answer itself. "
+    r"Do not include units, labels, variable names, equations, or extra words. "
+    r'For example write `\boxed{38.89}` instead of `\boxed{38.89 \text{ m}}`. '
     r"Stop immediately after the boxed answer."
 )
 EXPECTED_PHASE2_COLUMNS = [
@@ -734,6 +770,129 @@ STRONG_BASELINE_V2_SAMPLE_FUSION_V98_SPECS = (
         "label": "roman",
         "assistant_style": "boxed_only_done",
         "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V116_SPECS = (
+    {
+        "source_name": "strong_sample_unit_notext_short_boxed_strict",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_gravity_notext_short_boxed_strict",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_roman_notext_short_boxed",
+        "baseline_source_type": "Numeral Conversion",
+        "label": "roman",
+        "assistant_style": "boxed_only",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_notext_short_boxed",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V117_SPECS = (
+    {
+        "source_name": "strong_sample_unit_notext_short_boxed_strict",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_gravity_notext_short_boxed_strict",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_roman_notext_short_boxed",
+        "baseline_source_type": "Numeral Conversion",
+        "label": "roman",
+        "assistant_style": "boxed_only",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_notext_short_boxed_strict",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V118_SPECS = (
+    {
+        "source_name": "strong_sample_unit_notext_short_boxed_strict",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_gravity_notext_short_boxed_strict",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_roman_notext_short_boxed_strict",
+        "baseline_source_type": "Numeral Conversion",
+        "label": "roman",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_notext_short_boxed_strict",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
+        "prompt_style": "strict_bare_boxed",
+        "quota": 24,
         "group_keys": ("prompt_len_bucket",),
         "hard_first": False,
     },
@@ -2563,6 +2722,33 @@ FUSION_V84_AUGMENT_QUOTAS = {
     **FUSION_V79_AUGMENT_QUOTAS,
     "binary_structured_answer_only": 24,
 }
+FUSION_V113_AUGMENT_QUOTAS = dict(FUSION_V79_AUGMENT_QUOTAS)
+FUSION_V114_AUGMENT_QUOTAS = dict(FUSION_V67_AUGMENT_QUOTAS)
+FUSION_V115_AUGMENT_QUOTAS = {
+    **FUSION_V79_AUGMENT_QUOTAS,
+    "binary_structured_recommended": FUSION_V67_AUGMENT_QUOTAS["binary_structured_recommended"],
+    "binary_structured_recommended_group_keys": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_recommended_group_keys"
+    ],
+    "binary_structured_recommended_min_fields": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_recommended_min_fields"
+    ],
+    "binary_structured_recommended_exact_fields": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_recommended_exact_fields"
+    ],
+    "binary_structured_answer_only_abstract_safe": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_answer_only_abstract_safe"
+    ],
+    "binary_structured_answer_only_abstract_safe_group_keys": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_answer_only_abstract_safe_group_keys"
+    ],
+    "binary_structured_answer_only_abstract_safe_min_fields": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_answer_only_abstract_safe_min_fields"
+    ],
+    "binary_structured_answer_only_abstract_safe_exact_fields": FUSION_V67_AUGMENT_QUOTAS[
+        "binary_structured_answer_only_abstract_safe_exact_fields"
+    ],
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -3210,6 +3396,13 @@ def build_binary_strict_boxed_prompt(prompt: str) -> str:
     return f"{prompt_text}\n{BINARY_STRICT_BOXED_SUFFIX}"
 
 
+def build_strict_bare_boxed_prompt(prompt: str) -> str:
+    prompt_text = str(prompt).strip()
+    if not prompt_text:
+        raise ValueError("Strict bare boxed prompt cannot be empty.")
+    return f"{prompt_text}\n{STRICT_BARE_BOXED_SUFFIX}"
+
+
 def build_binary_final_answer_closure(row: dict[str, str]) -> str:
     answer = str(row.get("answer", "")).strip()
     if not answer:
@@ -3760,8 +3953,9 @@ def build_single_adapter_fusion_external_rows(
     *,
     profile_name: str,
     quotas: dict[str, int],
+    base_profile: str = "single-adapter-fusion-v10",
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
-    base_rows, base_summary = apply_phase2_train_profile(rows, profile="single-adapter-fusion-v10")
+    base_rows, base_summary = apply_phase2_train_profile(rows, profile=base_profile)
     input_rows = [clone_phase2_row(row) for row in rows]
     existing_ids = {
         str(row.get("id", "")).strip()
@@ -5333,13 +5527,18 @@ def build_single_adapter_fusion_strong_sample_rows(
             )
         appended_rows: list[dict[str, str]] = []
         assistant_style = str(spec.get("assistant_style", "cot_boxed_notebook")).strip() or "cot_boxed_notebook"
+        prompt_style = str(spec.get("prompt_style", "")).strip().lower()
         for candidate in candidates:
+            prompt_override: str | None = None
+            if prompt_style == "strict_bare_boxed":
+                prompt_override = build_strict_bare_boxed_prompt(str(candidate.get("prompt", "")))
             phase2_row = make_phase2_row_from_candidate(
                 candidate,
                 label=label,
                 assistant_style=assistant_style,
                 source_selection_tier=str(candidate.get("selection_tier", "")).strip().lower(),
                 generated_cot=str(candidate.get("generated_cot", "")),
+                prompt_override=prompt_override,
             )
             row_id = phase2_row["id"]
             if row_id in existing_ids:
@@ -5619,6 +5818,69 @@ def build_single_adapter_fusion_v112_rows(
         rows,
         profile_name="single-adapter-fusion-v112",
         augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V112_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v113_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v113",
+        quotas=FUSION_V113_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v114_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v114",
+        quotas=FUSION_V114_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v115_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v115",
+        quotas=FUSION_V115_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v116_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v116",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V116_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v117_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v117",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V117_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v118_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v118",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V118_SPECS,
     )
 
 
@@ -5967,6 +6229,18 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v111_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v112":
         return build_single_adapter_fusion_v112_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v113":
+        return build_single_adapter_fusion_v113_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v114":
+        return build_single_adapter_fusion_v114_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v115":
+        return build_single_adapter_fusion_v115_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v116":
+        return build_single_adapter_fusion_v116_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v117":
+        return build_single_adapter_fusion_v117_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v118":
+        return build_single_adapter_fusion_v118_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
@@ -7734,6 +8008,129 @@ def maybe_fix_tokenizer_eos_ids(tokenizer: Any) -> None:
     tokenizer.eos_token_ids = {expected_id}
 
 
+def normalize_prompt_text(prompt: str) -> str:
+    return " ".join(str(prompt).strip().lower().split())
+
+
+def classify_phase0_prompt_family(prompt: str) -> str:
+    normalized_prompt = normalize_prompt_text(prompt)
+    if (
+        "secret bit manipulation rule transforms 8-bit binary numbers" in normalized_prompt
+        or "8-bit binary numbers" in normalized_prompt
+    ):
+        return "binary"
+    if (
+        "secret set of transformation rules is applied to equations" in normalized_prompt
+        or (
+            "determine the result for:" in normalized_prompt
+            and any(symbol in str(prompt) for symbol in ("!", "^", "<", ">", "&", "@", "%"))
+        )
+    ):
+        return "symbol"
+    if (
+        "secret encryption rules are used on text" in normalized_prompt
+        or "decrypt the following text" in normalized_prompt
+    ):
+        return "text"
+    if (
+        "secret unit conversion is applied to measurements" in normalized_prompt
+        or "convert the following measurement" in normalized_prompt
+    ):
+        return "unit"
+    if (
+        "gravitational constant has been secretly changed" in normalized_prompt
+        or "determine the falling distance" in normalized_prompt
+    ):
+        return "gravity"
+    if (
+        "different numeral system" in normalized_prompt
+        or "wonderland numeral system" in normalized_prompt
+    ):
+        return "roman"
+    raise ValueError(f"Unable to classify benchmark prompt family: {prompt[:200]}")
+
+
+def resolve_phase0_router_slot_map(profile: str) -> dict[str, str]:
+    slot_map = PHASE0_ROUTER_SLOT_BY_FAMILY.get(str(profile).strip())
+    if slot_map is None:
+        raise ValueError(f"Unsupported phase0 router profile: {profile}")
+    return dict(slot_map)
+
+
+def build_phase0_router_summary(
+    *,
+    router_profile: str,
+    assignments: Sequence[dict[str, Any]],
+    slot_adapter_dirs: dict[str, Path | None],
+    fallback_assignments: Sequence[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    slot_counts: Counter[str] = Counter()
+    family_counts: Counter[str] = Counter()
+    slot_family_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    for row in assignments:
+        slot = str(row.get("router_slot", "")).strip()
+        family_short = str(row.get("router_family", "")).strip()
+        slot_counts[slot] += 1
+        family_counts[family_short] += 1
+        slot_family_counts[slot][family_short] += 1
+    summary = {
+        "router_profile": router_profile,
+        "slot_counts": dict(sorted(slot_counts.items())),
+        "family_counts": dict(sorted(family_counts.items())),
+        "slot_family_counts": {
+            slot: dict(sorted(counter.items()))
+            for slot, counter in sorted(slot_family_counts.items())
+        },
+        "slot_adapter_paths": {
+            slot: (str(path.resolve()) if path is not None else "")
+            for slot, path in sorted(slot_adapter_dirs.items())
+        },
+    }
+    fallback_assignments = list(fallback_assignments or [])
+    if fallback_assignments:
+        fallback_target_counts: Counter[str] = Counter()
+        fallback_family_counts: Counter[str] = Counter()
+        fallback_reason_counts: Counter[str] = Counter()
+        for row in fallback_assignments:
+            fallback_target_counts[str(row.get("fallback_target", "")).strip()] += 1
+            fallback_family_counts[str(row.get("family_short", "")).strip()] += 1
+            fallback_reason_counts[str(row.get("fallback_reason", "")).strip()] += 1
+        summary["fallback_count"] = len(fallback_assignments)
+        summary["fallback_target_counts"] = dict(sorted(fallback_target_counts.items()))
+        summary["fallback_family_counts"] = dict(sorted(fallback_family_counts.items()))
+        summary["fallback_reason_counts"] = dict(sorted(fallback_reason_counts.items()))
+    return summary
+
+
+def is_phase0_router_numeric_like(text: str) -> bool:
+    return bool(re.fullmatch(r"[-+]?\d+(?:\.\d+)?", str(text).strip()))
+
+
+def resolve_phase0_router_fallback_target(
+    *,
+    router_profile: str,
+    scored_row: dict[str, Any],
+) -> tuple[str, str] | None:
+    if str(router_profile).strip() != PHASE0_ROUTER_PROFILE_PROMPT_V2:
+        return None
+    family_short = str(scored_row.get("family_short", "")).strip()
+    prediction = str(scored_row.get("prediction", "")).strip()
+    prediction_lower = prediction.lower()
+    format_bucket = str(scored_row.get("format_bucket", "")).strip()
+    if family_short == "text":
+        if format_bucket in {"numeric_fallback", "boxed_empty"}:
+            return ("base", "text_format_fallback")
+        if prediction_lower in {"", "your answer", "answer"}:
+            return ("base", "text_placeholder_fallback")
+        if is_phase0_router_numeric_like(prediction):
+            return ("base", "text_numeric_fallback")
+        return None
+    if family_short == "roman":
+        if format_bucket == "numeric_fallback" or is_phase0_router_numeric_like(prediction):
+            return ("base", "roman_numeric_fallback")
+    return None
+
+
 def generate_phase0_records_batched(
     *,
     benchmark_rows: Sequence[dict[str, Any]],
@@ -8323,6 +8720,231 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
     print(json.dumps(summary_payload["overall"], ensure_ascii=False, indent=2))
 
 
+def run_phase0_eval_router(args: argparse.Namespace) -> None:
+    slot_adapter_dirs = {
+        "general": Path(args.general_adapter_path).resolve(),
+        "reasoning": Path(args.reasoning_adapter_path).resolve(),
+        "specialist": Path(args.specialist_adapter_path).resolve(),
+    }
+    for slot, adapter_dir in slot_adapter_dirs.items():
+        if not adapter_dir.exists():
+            raise FileNotFoundError(f"Router adapter directory does not exist for slot={slot}: {adapter_dir}")
+        verify_training_outputs(adapter_dir)
+
+    if getattr(args, "eval_output_root", None):
+        run_root = Path(args.eval_output_root).resolve() / str(args.eval_name)
+    else:
+        run_root = Path(args.output_root).resolve() / str(args.eval_name)
+    ensure_dir(run_root)
+
+    shadow_model_dir = build_shadow_model_dir(
+        Path(args.model_root),
+        run_root / "shadow_model",
+        force=bool(args.force_shadow_model),
+    )
+
+    eval_root = run_root / "phase0_offline_eval"
+    artifact_root = eval_root / "artifacts"
+    report_root = eval_root / "reports"
+    benchmark_rows, holdout_rows, manifest = prepare_phase0_benchmark_artifacts(
+        prebuilt_root=Path(args.phase0_prebuilt_root),
+        analysis_csv=Path(args.phase0_analysis_csv),
+        artifact_root=artifact_root,
+        report_root=report_root,
+        rebuild=bool(args.rebuild_phase0),
+    )
+    benchmark_rows = filter_phase0_benchmark_rows(
+        benchmark_rows,
+        family_short_filter=str(getattr(args, "family_short_filter", "")),
+        per_family_limit=int(getattr(args, "per_family_limit", 0)),
+    )
+    if args.max_samples is not None:
+        benchmark_rows = benchmark_rows[: int(args.max_samples)]
+
+    slot_by_family = resolve_phase0_router_slot_map(str(args.router_profile))
+    routed_rows_by_slot: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    benchmark_row_by_id: dict[str, dict[str, Any]] = {}
+    router_assignments: list[dict[str, Any]] = []
+    for row in benchmark_rows:
+        prompt_text = str(row.get("prompt", ""))
+        predicted_family = classify_phase0_prompt_family(prompt_text)
+        expected_family = str(row.get("family_short", "")).strip()
+        if expected_family and predicted_family != expected_family:
+            raise ValueError(
+                f"Prompt router family mismatch for id={row.get('id')}: "
+                f"predicted={predicted_family} expected={expected_family}"
+            )
+        slot = slot_by_family[predicted_family]
+        routed_row = dict(row)
+        routed_row["router_family_pred"] = predicted_family
+        routed_row["router_slot"] = slot
+        benchmark_row_by_id[str(row["id"])] = routed_row
+        routed_rows_by_slot[slot].append(routed_row)
+        router_assignments.append(
+            {
+                "id": row["id"],
+                "benchmark_name": row["benchmark_name"],
+                "benchmark_index": row["benchmark_index"],
+                "family_short": expected_family,
+                "router_family": predicted_family,
+                "router_slot": slot,
+                "router_adapter_path": str(slot_adapter_dirs[slot]),
+            }
+        )
+
+    records: list[dict[str, Any]] = []
+    for slot in ("general", "reasoning", "specialist"):
+        slot_rows = routed_rows_by_slot.get(slot, [])
+        if not slot_rows:
+            continue
+        slot_eval_root = eval_root / f"route_{slot}"
+        ensure_dir(slot_eval_root)
+        slot_records = run_phase0_eval_parallel(
+            benchmark_rows=slot_rows,
+            model_path=shadow_model_dir,
+            adapter_dir=slot_adapter_dirs[slot],
+            eval_root=slot_eval_root,
+            args=args,
+        )
+        slot_meta = {str(row["id"]): row for row in slot_rows}
+        for record in slot_records:
+            meta = slot_meta.get(str(record.get("id", "")), {})
+            record["router_slot"] = slot
+            record["router_family_pred"] = str(meta.get("router_family_pred", ""))
+        records.extend(slot_records)
+
+    provisional_scored_rows, _ = score_phase0_records(
+        records=records,
+        holdout_rows=holdout_rows,
+        manifest=manifest,
+    )
+    fallback_assignments: list[dict[str, Any]] = []
+    fallback_rows_by_target: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for scored_row in provisional_scored_rows:
+        resolved_fallback = resolve_phase0_router_fallback_target(
+            router_profile=str(args.router_profile),
+            scored_row=scored_row,
+        )
+        if resolved_fallback is None:
+            continue
+        fallback_target, fallback_reason = resolved_fallback
+        row_id = str(scored_row["id"])
+        fallback_row = benchmark_row_by_id.get(row_id)
+        if fallback_row is None:
+            raise KeyError(f"Missing benchmark row for router fallback id={row_id}")
+        fallback_rows_by_target[fallback_target].append(fallback_row)
+        fallback_assignments.append(
+            {
+                "id": row_id,
+                "family_short": scored_row["family_short"],
+                "primary_slot": str(fallback_row.get("router_slot", "")),
+                "fallback_target": fallback_target,
+                "fallback_reason": fallback_reason,
+                "primary_prediction": scored_row["prediction"],
+                "primary_format_bucket": scored_row["format_bucket"],
+                "primary_is_correct": scored_row["is_correct"],
+            }
+        )
+
+    if fallback_rows_by_target:
+        assignment_by_id = {str(row["id"]): row for row in fallback_assignments}
+        record_by_id = {str(row["id"]): row for row in records}
+        for fallback_target, fallback_rows in sorted(fallback_rows_by_target.items()):
+            if fallback_target != "base":
+                raise ValueError(f"Unsupported router fallback target: {fallback_target}")
+            fallback_eval_root = eval_root / f"fallback_{fallback_target}"
+            ensure_dir(fallback_eval_root)
+            fallback_records = run_phase0_eval_parallel(
+                benchmark_rows=fallback_rows,
+                model_path=shadow_model_dir,
+                adapter_dir=None,
+                eval_root=fallback_eval_root,
+                args=args,
+            )
+            fallback_scored_rows, _ = score_phase0_records(
+                records=fallback_records,
+                holdout_rows=holdout_rows,
+                manifest=manifest,
+            )
+            fallback_scored_by_id = {str(row["id"]): row for row in fallback_scored_rows}
+            for fallback_record in fallback_records:
+                row_id = str(fallback_record["id"])
+                meta = benchmark_row_by_id.get(row_id, {})
+                fallback_record["router_slot"] = str(meta.get("router_slot", ""))
+                fallback_record["router_family_pred"] = str(meta.get("router_family_pred", ""))
+                fallback_record["router_fallback_target"] = fallback_target
+                fallback_row = fallback_scored_by_id.get(row_id)
+                if fallback_row is None:
+                    raise KeyError(f"Missing scored fallback row for id={row_id}")
+                assignment = assignment_by_id.get(row_id)
+                if assignment is None:
+                    raise KeyError(f"Missing fallback assignment for id={row_id}")
+                assignment["fallback_prediction"] = fallback_row["prediction"]
+                assignment["fallback_format_bucket"] = fallback_row["format_bucket"]
+                assignment["fallback_is_correct"] = fallback_row["is_correct"]
+                record_by_id[row_id] = fallback_record
+        records = list(record_by_id.values())
+
+    records.sort(
+        key=lambda row: (
+            str(row.get("benchmark_name", "")),
+            int(row.get("benchmark_index", 0)),
+            str(row.get("id", "")),
+        )
+    )
+    scored_rows, summary_payload = score_phase0_records(
+        records=records,
+        holdout_rows=holdout_rows,
+        manifest=manifest,
+    )
+    summary_payload["router"] = build_phase0_router_summary(
+        router_profile=str(args.router_profile),
+        assignments=router_assignments,
+        slot_adapter_dirs=slot_adapter_dirs,
+        fallback_assignments=fallback_assignments,
+    )
+    write_phase0_eval_outputs(
+        artifact_root=artifact_root,
+        report_root=report_root,
+        records=records,
+        scored_rows=scored_rows,
+        summary_payload=summary_payload,
+    )
+    write_csv_rows(
+        artifact_root / "phase0_router_assignments.csv",
+        router_assignments,
+        [
+            "id",
+            "benchmark_name",
+            "benchmark_index",
+            "family_short",
+            "router_family",
+            "router_slot",
+            "router_adapter_path",
+        ],
+    )
+    if fallback_assignments:
+        write_csv_rows(
+            artifact_root / "phase0_router_fallbacks.csv",
+            fallback_assignments,
+            [
+                "id",
+                "family_short",
+                "primary_slot",
+                "fallback_target",
+                "fallback_reason",
+                "primary_prediction",
+                "primary_format_bucket",
+                "primary_is_correct",
+                "fallback_prediction",
+                "fallback_format_bucket",
+                "fallback_is_correct",
+            ],
+        )
+    print(json.dumps(summary_payload["overall"], ensure_ascii=False, indent=2))
+    print(json.dumps(summary_payload["router"], ensure_ascii=False, indent=2))
+
+
 def run_phase0_eval_worker(args: argparse.Namespace) -> None:
     adapter_dir = None
     if args.adapter_path is not None:
@@ -8456,6 +9078,45 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval.add_argument("--lazy-load", action="store_true")
     phase0_eval.add_argument("--force-shadow-model", action="store_true")
     phase0_eval.set_defaults(func=run_phase0_eval)
+
+    phase0_router_eval = subparsers.add_parser(
+        "eval-phase0-router",
+        help="Run phase0-style offline evaluation with prompt-routed adapters.",
+    )
+    phase0_router_eval.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
+    phase0_router_eval.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    phase0_router_eval.add_argument("--eval-name", type=str, default="phase0_prompt_router_eval")
+    phase0_router_eval.add_argument("--phase0-prebuilt-root", type=Path, default=DEFAULT_PHASE0_PREBUILT_ROOT)
+    phase0_router_eval.add_argument("--phase0-analysis-csv", type=Path, default=DEFAULT_PHASE0_ANALYSIS_CSV)
+    phase0_router_eval.add_argument("--rebuild-phase0", action="store_true")
+    phase0_router_eval.add_argument("--max-samples", type=int, default=None)
+    phase0_router_eval.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
+    phase0_router_eval.add_argument("--temperature", type=float, default=README_TEMPERATURE)
+    phase0_router_eval.add_argument("--top-p", type=float, default=README_TOP_P)
+    phase0_router_eval.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    phase0_router_eval.add_argument("--num-shards", type=int, default=0)
+    phase0_router_eval.add_argument("--memory-budget-gb", type=float, default=420.0)
+    phase0_router_eval.add_argument("--estimated-worker-memory-gb", type=float, default=100.0)
+    phase0_router_eval.add_argument("--eval-output-root", type=Path, default=None)
+    phase0_router_eval.add_argument("--family-short-filter", type=str, default="")
+    phase0_router_eval.add_argument("--per-family-limit", type=int, default=0)
+    phase0_router_eval.add_argument("--prompt-chunk-size", type=int, default=README_MAX_NUM_SEQS)
+    phase0_router_eval.add_argument("--prefill-batch-size", type=int, default=32)
+    phase0_router_eval.add_argument("--completion-batch-size", type=int, default=32)
+    phase0_router_eval.add_argument("--progress-every", type=int, default=10)
+    phase0_router_eval.add_argument("--eval-thinking", type=str, default="auto")
+    phase0_router_eval.add_argument("--lazy-load", action="store_true")
+    phase0_router_eval.add_argument("--force-shadow-model", action="store_true")
+    phase0_router_eval.add_argument(
+        "--router-profile",
+        type=str,
+        choices=PHASE0_ROUTER_PROFILE_CHOICES,
+        default=PHASE0_ROUTER_PROFILE_PROMPT_V1,
+    )
+    phase0_router_eval.add_argument("--general-adapter-path", type=Path, required=True)
+    phase0_router_eval.add_argument("--reasoning-adapter-path", type=Path, required=True)
+    phase0_router_eval.add_argument("--specialist-adapter-path", type=Path, required=True)
+    phase0_router_eval.set_defaults(func=run_phase0_eval_router)
 
     phase0_eval_worker = subparsers.add_parser(
         "eval-phase0-worker",
