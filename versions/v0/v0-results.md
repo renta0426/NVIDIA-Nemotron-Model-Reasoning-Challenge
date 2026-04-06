@@ -260,6 +260,16 @@ non-overlap breakdown:
   - `v40 symbol60 = 12/60` 比では **gain 10 / loss 2 = net +8**
     - gains は `numeric_2x2` verified `6`, answer_only `4`
     - losses は `numeric_2x2` answer_only `2`
+  - `general200 official = 144/200`
+    - `gravity 25/50`
+    - `roman 50/50`
+    - `text 36/50`
+    - `unit 33/50`
+  - same 200-row control `v40 = 184/200` 比では **gain 11 / loss 51 = net -40**
+    - gains: `text 5`, `gravity 2`, `roman 2`, `unit 2`
+    - losses: `gravity 24`, `unit 17`, `text 10`
+  - failure mode は `gravity` の boxed numeric tolerance miss と、`unit/text` の **`last_number` numeric fallback**
+  - したがって `v97` は **full320 昇格候補ではなく、symbol specialist branch** として扱う
 - `v98` prepare / train / gate24 完了:
   - profile: `single-adapter-fusion-v98`
   - design: `v96` からさらに symbol も外した **numeric-only** variant。sampled-new `unit 64 / gravity 32 / roman 32` を **`boxed_only_done`** で追加
@@ -306,6 +316,8 @@ non-overlap breakdown:
 27. `v96-v98` により、その仮説は当たりだった。**text short-teacher rows を外すだけで** `v97 = 21/24`, `v96 = 20/24` まで戻り、`v92/v93` の net regress は text 注入が主因だったとみなせる。
 28. no-text branch の内部比較では、**pure `boxed_only` の `v97` が `boxed_only_done` の `v96` を上回った**。`v97` は `v40` 比で **gain 1 / loss 0**、`v96` は official tie のまま text 2 件を落としている。
 29. 一方で symbol まで外した `v98` は **18/24** まで落ち、`bit_other` と `unit_fixed_ratio` に `your answer` / numeric fallback を再発させた。したがって no-text branch を続けるなら、**symbol 24 は残す**のが自然。
-30. `README.md` gate24 条件では、現時点の sampled-new general short-teacher best は **`v97 = 21/24, exact 17/24`**。次の triage は、planned どおり **`general_stable_set 200`** で general regress が本当に消えたかを確認する。
-31. `v97` は `symbol60` でも **`20/60`** まで伸び、`v40 = 12/60` を **+8** 更新した。増分はほぼすべて `numeric_2x2` で、**verified 13/15, answer_only 7/15** まで回復している。
-32. ただし `glyph_len5 = 0/20`, `manual_audit_priority = 0/30` は依然として不変で、symbol 側の未回収部分は **glyph/manual symbolic** に集中している。`general200` が崩れないなら、次の強化対象はここになる。
+30. `README.md` gate24 条件では、sampled-new general short-teacher best は **`v97 = 21/24, exact 17/24`** だったが、deeper triage の `general200` では **`144/200`** に沈んだ。
+31. same 200-row control の `v40 = 184/200` に対し、`v97` は **gain 11 / loss 51 = net -40**。loss は **`gravity -22`**, **`unit -15`**, **`text -5`** に集中し、`roman` だけが **+2** だった。
+32. `gravity` の regress は boxed answer 自体は出しつつ **数値丸めの微差**で落ちており、`unit/text` は **`last_number` numeric fallback** が支配的だった。つまり no-text branch の regress は symbol ではなく、**sampled-new general rows 側**にある。
+33. 一方で `v97` は `symbol60` では **`20/60`** まで伸び、`v40 = 12/60` を **+8** 更新した。増分はほぼ `numeric_2x2` で、**verified 13/15, answer_only 7/15** まで回復している。
+34. ただし `glyph_len5 = 0/20`, `manual_audit_priority = 0/30` は依然として不変で、symbol 側の未回収部分は **glyph/manual symbolic** に集中している。したがって次枝は、**unit/gravity/roman を切った sampled-new symbol-only short-teacher** が本命になる。
