@@ -159,6 +159,7 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v78",
     "single-adapter-fusion-v79",
     "single-adapter-fusion-v80",
+    "single-adapter-fusion-v81",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -1566,6 +1567,32 @@ FUSION_V80_AUGMENT_QUOTAS = {
         "answer": "0",
     },
     "binary_prompt_local_current_structured_boxed_done_group_keys": ("safe_formulas", "num_examples"),
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V81_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_prompt_local_current_structured_strict_boxed_only": 16,
+    "binary_prompt_local_current_structured_strict_boxed_only_min_fields": {
+        "bit_no_candidate_positions": 6,
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_structured_strict_boxed_only_max_fields": {
+        "safe_formula_count": 2,
+    },
+    "binary_prompt_local_current_structured_strict_boxed_only_exact_fields": {
+        "safe_prediction_count": 1,
+        "bit_multi_candidate_positions": 0,
+    },
+    "binary_prompt_local_current_structured_strict_boxed_only_group_keys": ("safe_formulas", "num_examples"),
     "symbol_formula_verified": 4,
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 8,
@@ -3253,6 +3280,36 @@ def build_single_adapter_fusion_external_rows(
             ),
             assistant_style="boxed_only_done",
         )
+    if quotas.get("binary_prompt_local_current_structured_strict_boxed_only", 0) > 0:
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_structured_strict_boxed_only",
+            select_joined_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_structured_byte_formula",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_prompt_local_current_structured_strict_boxed_only"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_prompt_local_current_structured_strict_boxed_only_group_keys",
+                        ("safe_formulas", "num_examples"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get(
+                    "binary_prompt_local_current_structured_strict_boxed_only_min_fields"
+                ),
+                max_int_fields=quotas.get(
+                    "binary_prompt_local_current_structured_strict_boxed_only_max_fields"
+                ),
+                exact_fields=quotas.get(
+                    "binary_prompt_local_current_structured_strict_boxed_only_exact_fields"
+                ),
+            ),
+            assistant_style="boxed_only",
+        )
     if quotas.get("symbol_formula_verified", 0) > 0:
         append_phase2_rows(
             "symbol_formula_verified",
@@ -3991,6 +4048,16 @@ def build_single_adapter_fusion_v80_rows(
     )
 
 
+def build_single_adapter_fusion_v81_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v81",
+        quotas=FUSION_V81_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -4138,6 +4205,8 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v79_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v80":
         return build_single_adapter_fusion_v80_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v81":
+        return build_single_adapter_fusion_v81_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
