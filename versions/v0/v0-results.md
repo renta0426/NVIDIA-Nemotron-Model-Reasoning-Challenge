@@ -27,6 +27,7 @@ single-adapter は `v40` が best のままだが、**single-file multi-adapter 
 
 | pipeline | local320 | binary | gravity | roman | symbol | text | unit | note |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `prompt-router-v5` | **270/320 = 0.8438** | `31/60` | `50/50` | `50/50` | `39/60` | `50/50` | `50/50` | `prompt-router-v4` + zero-error unique `numeric_2x2` solver fallback |
 | `prompt-router-v4` | **267/320 = 0.8344** | `31/60` | `50/50` | `50/50` | `36/60` | `50/50` | `50/50` | `prompt-router-v3` + prompt-local safe `numeric_2x2` solver fallback |
 | `prompt-router-v3` | **260/320 = 0.8125** | `31/60` | `50/50` | `50/50` | `29/60` | `50/50` | `50/50` | deterministic solver for `gravity/roman/text/unit` + `focus_v1_full` for `binary/symbol` |
 | `prompt-router-v2` | `252/320 = 0.7875` | `31/60` | `50/50` | `50/50` | `29/60` | `42/50` | `50/50` | `prompt-router-v1` + output-aware base fallback on suspicious `text/roman` outputs |
@@ -46,6 +47,15 @@ single-adapter は `v40` が best のままだが、**single-file multi-adapter 
 - `prompt-router-v4` gate24 も **`24/24 = 1.0000`**
   - initial slot は `solver 16`, `specialist 8`
   - safe `numeric_2x2` fallback は gate24 では追加発火なし
+- `prompt-router-v5` gate24 も **`24/24 = 1.0000`**
+  - initial slot は `solver 16`, `specialist 8`
+  - gate24 fallback は **1 行** (`symbol_numeric_zero_error_solver`)
+- `prompt-router-v5` full320 は **`270/320 = 0.8438`**
+  - `v4` 比 **gain 3 / loss 0**
+  - fallback は **12 行すべて `symbol -> solver`**
+  - newly recovered `numeric_2x2` rows: `6da9eb9a`, `26b716ed`, `d9bedb64`
+  - already official-correct だが exact も揃った rows: `e952f61f`, `2e9639de`
+  - `numeric_2x2` は **`36/40 -> 39/40`**
 - `prompt-router-v4` full320 は **`267/320 = 0.8344`**
   - `v3` 比 **gain 7 / loss 0**
   - fallback は **7 行すべて `symbol -> solver`**
@@ -58,13 +68,14 @@ single-adapter は `v40` が best のままだが、**single-file multi-adapter 
 - `prompt-router-v2` は actual full320 で **fallback 10 行**（`text 9`, `roman 1`）を base へ再実行し、`v1` に対して **gain 7 / loss 0**
   - recovered rows: `08bc3a02`, `3daf5caa`, `487528d5`, `b9e045e8`, `e45a4109`, `f66415c0`, `f7f9ba17`
 - current `v2` miss のうち、**base が既に救える text 3 行**（`dc10ca9b`, `dd24b691`, `e05908dd`）が残っている
-- old 4-model family-wise oracle **`259/320 = 0.8094`** は、`prompt-router-v4` actual により **+8** 上回った
+- old 4-model family-wise oracle **`259/320 = 0.8094`** は、`prompt-router-v5` actual により **+11** 上回った
 - actual `prompt-router-v2` は external strong baseline reference **`249/320 = 0.7781`** も上回った
 - actual `prompt-router-v3` は external strong baseline reference **`249/320 = 0.7781`** を **+11** 上回った
 - actual `prompt-router-v4` は external strong baseline reference **`249/320 = 0.7781`** を **+18** 上回った
+- actual `prompt-router-v5` は external strong baseline reference **`249/320 = 0.7781`** を **+21** 上回った
 - 残差は **binary / symbol のみ**
   - `bit_structured_byte_formula = 6/14` official
-  - `numeric_2x2 = 36/40`
+  - `numeric_2x2 = 39/40`
   - `glyph_len5 = 0/20`
 - したがって、現段階の最有力改善方向は **single-adapter 追加学習ではなく deterministic solver + hard-family specialist pipeline** である
 
