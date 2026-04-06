@@ -196,6 +196,34 @@ non-overlap breakdown:
     - `format_failure_rate = 0.9167`
     - structured 14 行は **`numeric_fallback 14`**
   - **pure `boxed_only` は `boxed_only_done` の `v90` を下回り不採用**
+- `v92` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v92`
+  - design: sampled-new general verified rowsだけを **short `boxed_only_done`** に蒸留して `v40` continuation へ追加
+  - augmentation: `text 96`, `unit 64`, `gravity 32`, `roman 32`, `symbol 24` （計 `248`）
+  - total train rows: `2210`
+  - total iters: `34`
+  - train `0.335 -> 0.325`
+  - peak mem `74.475 GB`
+  - `gate24 official/exact = 19/24, 16/24`
+    - `general_stable = 14/16`
+    - `binary_hard = 3/4`
+    - `symbol_watch = 2/4`
+    - `binary boxed_extraction_success_rate = 1.0`
+    - `binary regex_exact_rate = 0.75`
+- `v93` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v93`
+  - design: `v92` と同一 rows / quota で、teacher だけ **pure `boxed_only`**
+  - augmentation: `text 96`, `unit 64`, `gravity 32`, `roman 32`, `symbol 24` （計 `248`）
+  - total train rows: `2210`
+  - total iters: `34`
+  - train `0.331 -> 0.323`
+  - peak mem `74.475 GB`
+  - `gate24 official/exact = 19/24, 16/24`
+    - `general_stable = 14/16`
+    - `binary_hard = 3/4`
+    - `symbol_watch = 2/4`
+    - `binary boxed_extraction_success_rate = 0.75`
+    - `binary regex_exact_rate = 0.75`
 
 ## Current interpretation
 
@@ -222,3 +250,6 @@ non-overlap breakdown:
 21. `v88` は **official/exact 6/60, 5/60** でも structured exact `0/14`、answer-only `0/20` に留まり、**sampled-new hard-family rows 自体より notebooklike 長尺 CoT 注入が悪さをしている**と解釈するのが自然。
 22. `v85 full320 = 0/320` まで確定したため、**strong baseline の full-layer chat reproduction 系はこの環境では dead branch** と判断した。`v86/v87` queued run も起動前に止めている。
 23. そのため次枝は、**same sampled-new rows / smaller quota / short-output teacher** の clean ablation `v90/v91` に切り替えた。結果は `v90 = 7/60 (exact 5/60)`, `v91 = 5/60 (exact 5/60)` で、**`Done.` 追加の有無を変えても structured exact は 0/14 のまま**。この short-teacher strong-sampled-new branch も一旦閉じる。
+24. sampled-new general verified rows の short-teacher continuation `v92/v93` は、**gate24 でどちらも `19/24`**。same slice の control `v40 = 20/24` を official では超えられなかった。
+25. ただし `v92/v93` は **binary を `2/4 -> 3/4`** まで押し上げ、overall exact も `15/24 -> 16/24` に改善した一方、**text が `4/4 -> 2/4`** へ落ちて net `-1` になった。つまり sampled-new general branch の問題は broad no-text families ではなく、**text short-teacher injection の regress** にある可能性が高い。
+26. `v92` と `v93` の official/exact は同点だが、binary formatting は **`boxed_only_done` の `v92` がやや良い**。もしこの general short-teacher 枝を続けるなら、次は **text を外した `v92` 系** から入るのが自然。

@@ -177,6 +177,10 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v89",
     "single-adapter-fusion-v90",
     "single-adapter-fusion-v91",
+    "single-adapter-fusion-v92",
+    "single-adapter-fusion-v93",
+    "single-adapter-fusion-v94",
+    "single-adapter-fusion-v95",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -492,6 +496,124 @@ STRONG_BASELINE_V2_SAMPLE_FUSION_V91_SPECS = (
         "assistant_style": "boxed_only",
         "quota": 8,
         "group_keys": ("selection_tier", "num_examples"),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V92_SPECS = (
+    {
+        "source_name": "strong_sample_text_general_short_done",
+        "baseline_source_type": "Text Encryption",
+        "label": "text",
+        "assistant_style": "boxed_only_done",
+        "quota": 96,
+        "group_keys": ("prompt_len_bucket", "answer_word_count"),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_unit_general_short_done",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only_done",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_gravity_general_short_done",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only_done",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_roman_general_short_done",
+        "baseline_source_type": "Numeral Conversion",
+        "label": "roman",
+        "assistant_style": "boxed_only_done",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_general_short_done",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only_done",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V93_SPECS = (
+    {
+        "source_name": "strong_sample_text_general_short_boxed",
+        "baseline_source_type": "Text Encryption",
+        "label": "text",
+        "assistant_style": "boxed_only",
+        "quota": 96,
+        "group_keys": ("prompt_len_bucket", "answer_word_count"),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_unit_general_short_boxed",
+        "baseline_source_type": "Unit Conversion",
+        "label": "unit",
+        "assistant_style": "boxed_only",
+        "quota": 64,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_gravity_general_short_boxed",
+        "baseline_source_type": "Gravitational Constant",
+        "label": "gravity",
+        "assistant_style": "boxed_only",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_roman_general_short_boxed",
+        "baseline_source_type": "Numeral Conversion",
+        "label": "roman",
+        "assistant_style": "boxed_only",
+        "quota": 32,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+    {
+        "source_name": "strong_sample_symbol_general_short_boxed",
+        "baseline_source_type": "Equation Transformation",
+        "label": "symbol",
+        "assistant_style": "boxed_only",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V94_SPECS = (
+    *STRONG_BASELINE_V2_SAMPLE_FUSION_V92_SPECS,
+    {
+        "source_name": "strong_sample_bit_general_short_done",
+        "baseline_source_type": "Bit Manipulation",
+        "label": "binary",
+        "assistant_style": "boxed_only_done",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V95_SPECS = (
+    *STRONG_BASELINE_V2_SAMPLE_FUSION_V93_SPECS,
+    {
+        "source_name": "strong_sample_bit_general_short_boxed",
+        "baseline_source_type": "Bit Manipulation",
+        "label": "binary",
+        "assistant_style": "boxed_only",
+        "quota": 24,
+        "group_keys": ("prompt_len_bucket",),
+        "hard_first": False,
     },
 )
 
@@ -2205,6 +2327,11 @@ def load_strong_baseline_cot_v2_sample_index() -> dict[str, dict[str, str]]:
     }
 
 
+@lru_cache(maxsize=1)
+def load_strong_baseline_cot_v2_sample_rows() -> tuple[dict[str, str], ...]:
+    return tuple(load_strong_baseline_cot_v2_sample_index().values())
+
+
 def validate_phase2_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
     if rows:
         actual_columns = list(rows[0].keys())
@@ -2993,6 +3120,60 @@ def select_joined_strong_baseline_candidates(
         candidates.append(row)
     if quota > 0 and len(candidates) > quota:
         selection_group_keys = tuple(group_keys) or ("template_subtype", "selection_tier")
+        return balanced_take(
+            candidates,
+            quota=quota,
+            group_keys=selection_group_keys,
+            hard_first=hard_first,
+        )
+    rank_fn = score_rank_high if hard_first else score_rank_low
+    candidates.sort(key=rank_fn)
+    return candidates
+
+
+def select_direct_strong_baseline_candidates(
+    *,
+    existing_ids: set[str],
+    baseline_source_type: str | None = None,
+    label: str | None = None,
+    quota: int = 0,
+    group_keys: Sequence[str] = (),
+    hard_first: bool = False,
+    min_int_fields: dict[str, int] | None = None,
+    max_int_fields: dict[str, int] | None = None,
+    exact_fields: dict[str, Any] | None = None,
+    startswith_fields: dict[str, str] | None = None,
+) -> list[dict[str, str]]:
+    candidates: list[dict[str, str]] = []
+    for raw_row in load_strong_baseline_cot_v2_sample_rows():
+        row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(row.get("id", "")).strip()
+        if not row_id or row_id in existing_ids:
+            continue
+        if baseline_source_type and str(row.get("baseline_source_type", "")).strip() != baseline_source_type:
+            continue
+        if label and normalize_family_label(row) != label:
+            continue
+        prompt_text = str(row.get("prompt", "")).strip()
+        answer_text = str(row.get("answer", "")).strip()
+        if not prompt_text or not answer_text:
+            continue
+        prompt_chars = len(prompt_text)
+        row["prompt_len_chars"] = str(prompt_chars)
+        row["prompt_len_bucket"] = prompt_len_bucket(prompt_chars)
+        row["answer_word_count"] = str(len(answer_text.split()))
+        row["selection_tier"] = str(row.get("source_selection_tier", "")).strip().lower()
+        if not matches_numeric_field_filters(
+            row,
+            min_int_fields=min_int_fields,
+            max_int_fields=max_int_fields,
+            exact_fields=exact_fields,
+            startswith_fields=startswith_fields,
+        ):
+            continue
+        candidates.append(row)
+    if quota > 0 and len(candidates) > quota:
+        selection_group_keys = tuple(group_keys) or ("prompt_len_bucket",)
         return balanced_take(
             candidates,
             quota=quota,
@@ -4584,31 +4765,53 @@ def build_single_adapter_fusion_strong_sample_rows(
 
     for spec in augmentation_specs:
         source_name = str(spec.get("source_name", "")).strip()
+        baseline_source_type = str(spec.get("baseline_source_type", "")).strip()
         family = str(spec.get("family", "")).strip()
         label = str(spec.get("label", "")).strip()
         template_subtype = str(spec.get("template_subtype", "")).strip()
-        metadata_path = Path(spec.get("metadata_path", AUGMENT_TRAIN_RECOMMENDED_CSV))
-        if not source_name or not family or not label or not template_subtype:
+        metadata_path_value = spec.get("metadata_path")
+        metadata_path = (
+            Path(metadata_path_value)
+            if metadata_path_value
+            else AUGMENT_TRAIN_RECOMMENDED_CSV
+        )
+        if not source_name or not label:
             raise ValueError(f"{profile_name} has an invalid augmentation spec: {spec!r}")
         allowed_tiers = {
             str(value).strip().lower()
             for value in spec.get("allowed_tiers", ())
             if str(value).strip()
         }
-        candidates = select_joined_strong_baseline_candidates(
-            metadata_path=metadata_path,
-            existing_ids=existing_ids,
-            family=family,
-            template_subtype=template_subtype,
-            allowed_tiers=allowed_tiers or None,
-            quota=int(spec.get("quota", 0)),
-            group_keys=tuple(spec.get("group_keys", ("template_subtype", "selection_tier"))),
-            hard_first=bool(spec.get("hard_first", True)),
-            min_int_fields=spec.get("min_int_fields"),
-            max_int_fields=spec.get("max_int_fields"),
-            exact_fields=spec.get("exact_fields"),
-            startswith_fields=spec.get("startswith_fields"),
-        )
+        if baseline_source_type:
+            candidates = select_direct_strong_baseline_candidates(
+                existing_ids=existing_ids,
+                baseline_source_type=baseline_source_type,
+                label=label,
+                quota=int(spec.get("quota", 0)),
+                group_keys=tuple(spec.get("group_keys", ("prompt_len_bucket",))),
+                hard_first=bool(spec.get("hard_first", False)),
+                min_int_fields=spec.get("min_int_fields"),
+                max_int_fields=spec.get("max_int_fields"),
+                exact_fields=spec.get("exact_fields"),
+                startswith_fields=spec.get("startswith_fields"),
+            )
+        else:
+            if not family or not template_subtype:
+                raise ValueError(f"{profile_name} has an invalid joined augmentation spec: {spec!r}")
+            candidates = select_joined_strong_baseline_candidates(
+                metadata_path=metadata_path,
+                existing_ids=existing_ids,
+                family=family,
+                template_subtype=template_subtype,
+                allowed_tiers=allowed_tiers or None,
+                quota=int(spec.get("quota", 0)),
+                group_keys=tuple(spec.get("group_keys", ("template_subtype", "selection_tier"))),
+                hard_first=bool(spec.get("hard_first", True)),
+                min_int_fields=spec.get("min_int_fields"),
+                max_int_fields=spec.get("max_int_fields"),
+                exact_fields=spec.get("exact_fields"),
+                startswith_fields=spec.get("startswith_fields"),
+            )
         appended_rows: list[dict[str, str]] = []
         assistant_style = str(spec.get("assistant_style", "cot_boxed_notebook")).strip() or "cot_boxed_notebook"
         for candidate in candidates:
@@ -4687,6 +4890,46 @@ def build_single_adapter_fusion_v91_rows(
         rows,
         profile_name="single-adapter-fusion-v91",
         augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V91_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v92_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v92",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V92_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v93_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v93",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V93_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v94_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v94",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V94_SPECS,
+    )
+
+
+def build_single_adapter_fusion_v95_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v95",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V95_SPECS,
     )
 
 
@@ -4993,6 +5236,14 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v90_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v91":
         return build_single_adapter_fusion_v91_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v92":
+        return build_single_adapter_fusion_v92_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v93":
+        return build_single_adapter_fusion_v93_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v94":
+        return build_single_adapter_fusion_v94_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v95":
+        return build_single_adapter_fusion_v95_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
@@ -5866,6 +6117,8 @@ def normalize_family_label(row: dict[str, str]) -> str:
     if family in FAMILY_SHORT:
         return FAMILY_SHORT[family]
     label = row.get("label", "")
+    if label in FAMILY_SHORT:
+        return FAMILY_SHORT[label]
     if label:
         return label
     return family
