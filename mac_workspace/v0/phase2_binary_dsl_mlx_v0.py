@@ -38,6 +38,13 @@ DEFAULT_TRAIN_CSV = (
     / "artifacts"
     / "phase2_binary_hybrid_training_data.csv"
 )
+DEFAULT_STRONG_BASELINE_COT_CSV = (
+    REPO_ROOT
+    / "baseline"
+    / "nemotron-sft-lora-with-cot-v2"
+    / "artifacts"
+    / "train_split_with_cot.csv"
+)
 DEFAULT_PHASE0_PREBUILT_ROOT = REPO_ROOT / "baseline" / "cot" / "phase0_offline_eval" / "artifacts"
 DEFAULT_PHASE0_ANALYSIS_CSV = (
     REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts" / "train_row_analysis_v1.csv"
@@ -77,6 +84,7 @@ PHASE2_SYMBOL_SPECIALIST_CSV = (
 )
 TRAIN_PROFILE_CHOICES = (
     "baseline",
+    "strong-baseline-cot-v2",
     "single-adapter-focus-v1",
     "single-adapter-focus-v2",
     "single-adapter-fusion-v1",
@@ -184,6 +192,30 @@ EXPECTED_PHASE2_COLUMNS = [
     "source_selection_tier",
 ]
 EXPECTED_PHASE2_ROWS = 900
+EXPECTED_STRONG_BASELINE_COLUMNS = [
+    "id",
+    "prompt",
+    "answer",
+    "type",
+    "generated_cot",
+]
+STRONG_BASELINE_TYPE_TO_LABEL = {
+    "Bit Manipulation": "bit_manipulation",
+    "Equation Transformation": "symbol_equation",
+    "Gravitational Constant": "gravity_constant",
+    "Numeral Conversion": "roman_numeral",
+    "Text Encryption": "text_decryption",
+    "Unit Conversion": "unit_conversion",
+}
+STRONG_BASELINE_V2_TYPE_SAMPLES = {
+    "Numeral Conversion": 300,
+    "Gravitational Constant": 400,
+    "Unit Conversion": 700,
+    "Text Encryption": 700,
+    "Bit Manipulation": 607,
+    "Equation Transformation": 200,
+}
+STRONG_BASELINE_V2_SEED = 123
 
 README_MAX_LORA_RANK = 32
 README_MAX_TOKENS = 7680
@@ -1837,6 +1869,50 @@ def load_phase2_training_rows(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def load_strong_baseline_cot_rows(path: Path) -> list[dict[str, str]]:
+    rows = load_csv_rows(path)
+    validate_strong_baseline_columns(path, rows)
+    normalized_rows: list[dict[str, str]] = []
+    for raw_row in rows:
+        row = {str(key): "" if value is None else str(value) for key, value in raw_row.items()}
+        row_id = str(row.get("id", "")).strip()
+        prompt = str(row.get("prompt", "")).strip()
+        answer = str(row.get("answer", "")).strip()
+        source_type = str(row.get("type", "")).strip()
+        generated_cot = str(row.get("generated_cot", "")).strip()
+        if not row_id:
+            raise ValueError(f"Strong baseline row is missing id in {path}")
+        if not prompt:
+            raise ValueError(f"Strong baseline row {row_id} is missing prompt")
+        if not answer:
+            raise ValueError(f"Strong baseline row {row_id} is missing answer")
+        if not generated_cot or generated_cot.lower() == "nan":
+            raise ValueError(f"Strong baseline row {row_id} is missing generated_cot")
+        label = STRONG_BASELINE_TYPE_TO_LABEL.get(source_type, "")
+        if not label:
+            raise ValueError(f"Unsupported strong baseline type for row {row_id}: {source_type!r}")
+        normalized_rows.append(
+            {
+                "id": row_id,
+                "prompt": prompt,
+                "answer": answer,
+                "generated_cot": generated_cot,
+                "label": label,
+                "assistant_style": "cot_boxed_notebook",
+                "source_selection_tier": "verified_trace_ready",
+                "baseline_source_type": source_type,
+            }
+        )
+    return normalized_rows
+
+
+def load_training_source_rows(path: Path, *, profile: str) -> list[dict[str, str]]:
+    normalized_profile = str(profile).strip().lower() or "baseline"
+    if normalized_profile == "strong-baseline-cot-v2":
+        return load_strong_baseline_cot_rows(path)
+    return load_phase2_training_rows(path)
+
+
 def validate_phase2_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
     if rows:
         actual_columns = list(rows[0].keys())
@@ -1844,6 +1920,16 @@ def validate_phase2_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
             raise ValueError(
                 f"Unexpected CSV columns in {path}: {actual_columns} "
                 f"(expected {EXPECTED_PHASE2_COLUMNS})"
+            )
+
+
+def validate_strong_baseline_columns(path: Path, rows: Sequence[dict[str, str]]) -> None:
+    if rows:
+        actual_columns = list(rows[0].keys())
+        if actual_columns != EXPECTED_STRONG_BASELINE_COLUMNS:
+            raise ValueError(
+                f"Unexpected CSV columns in {path}: {actual_columns} "
+                f"(expected {EXPECTED_STRONG_BASELINE_COLUMNS})"
             )
 
 
@@ -2173,6 +2259,12 @@ def build_user_message(prompt: str) -> str:
     return f"{prompt}\n{BOXED_INSTRUCTION}"
 
 
+def clean_notebook_cot_text(generated_cot: str) -> str:
+    cleaned = re.sub(r"\\boxed\{[^}]*\}", "", str(generated_cot)).rstrip()
+    cleaned = re.sub(r"</think>\s*$", "", cleaned).rstrip()
+    return cleaned
+
+
 def build_binary_strict_boxed_prompt(prompt: str) -> str:
     prompt_text = str(prompt).strip()
     if not prompt_text:
@@ -2388,6 +2480,13 @@ def render_assistant_message(row: dict[str, str]) -> str:
     style = str(row.get("assistant_style", "")).strip()
     answer = str(row.get("answer", "")).strip()
     generated_cot = str(row.get("generated_cot", "")).strip()
+    if style == "cot_boxed_notebook":
+        if not generated_cot or generated_cot.lower() == "nan":
+            raise ValueError(f"cot_boxed_notebook row {row.get('id', '')} is missing generated_cot")
+        cot_cleaned = clean_notebook_cot_text(generated_cot)
+        if cot_cleaned:
+            return f"{cot_cleaned}\n</think>\n\\boxed{{{answer}}}"
+        return f"</think>\n\\boxed{{{answer}}}"
     if style == "trace_boxed":
         if not generated_cot:
             raise ValueError(f"trace_boxed row {row.get('id', '')} is missing generated_cot")
@@ -4114,6 +4213,40 @@ def build_single_adapter_fusion_v84_rows(
     )
 
 
+def build_strong_baseline_cot_v2_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    grouped_rows: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in rows:
+        source_type = str(row.get("baseline_source_type", "")).strip()
+        if source_type:
+            grouped_rows[source_type].append(clone_phase2_row(row))
+
+    sampled_rows: list[dict[str, str]] = []
+    transform_counts: Counter[str] = Counter()
+    rng = random.Random(STRONG_BASELINE_V2_SEED)
+    for source_type, target_count in STRONG_BASELINE_V2_TYPE_SAMPLES.items():
+        source_rows = grouped_rows.get(source_type, [])
+        if not source_rows:
+            raise ValueError(f"Strong baseline source is missing rows for type {source_type!r}")
+        if target_count >= len(source_rows):
+            selected_rows = [clone_phase2_row(row) for row in source_rows]
+            transform_counts[f"keep_all:{source_type}"] += len(selected_rows)
+        else:
+            selected_rows = [clone_phase2_row(row) for row in rng.sample(source_rows, target_count)]
+            transform_counts[f"sample:{source_type}"] += len(selected_rows)
+        sampled_rows.extend(selected_rows)
+    rng.shuffle(sampled_rows)
+    return sampled_rows, {
+        "profile": "strong-baseline-cot-v2",
+        "input": summarize_phase2_rows(rows),
+        "output": summarize_phase2_rows(sampled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+    }
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -4129,6 +4262,8 @@ def apply_phase2_train_profile(
             "output": summary,
             "transform_counts": {},
         }
+    if normalized_profile == "strong-baseline-cot-v2":
+        return build_strong_baseline_cot_v2_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v15":
         return build_single_adapter_fusion_v15_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v16":
@@ -4800,7 +4935,10 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         run_root / "shadow_model",
         force=bool(args.force_shadow_model),
     )
-    source_rows = load_phase2_training_rows(Path(args.train_csv))
+    source_rows = load_training_source_rows(
+        Path(args.train_csv),
+        profile=str(args.train_profile),
+    )
     profiled_rows, profile_summary = apply_phase2_train_profile(
         source_rows,
         profile=str(args.train_profile),
@@ -4889,7 +5027,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         "model_root": str(Path(args.model_root).resolve()),
         "shadow_model_dir": str(shadow_model_dir),
         "train_csv": str(Path(args.train_csv).resolve()),
-        "phase2_rows": len(source_rows),
+        "source_rows": len(source_rows),
         "training_profile": profile_summary,
         "dataset": {
             "dataset_dir": str(dataset_dir),

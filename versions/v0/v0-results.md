@@ -21,6 +21,14 @@
 
 `v40` の主改善は `text` / `numeric_2x2` / `bit_other` の一部で、**`bit_structured_byte_formula exact = 0/14`** は未解決のまま。
 
+## External strong baseline reference
+
+`baseline/nemotron-sft-lora-with-cot-v2` は、**verified-correct CoT 6,558 rows** から notebook 内 sampling で **2,907 rows** を使い、README 基準 local **`249/320 = 0.7781`** を出している。
+
+| reference | local320 | binary | structured | symbol | text | unit | note |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `nemotron-sft-lora-with-cot-v2` | `249/320 = 0.7781` | `29/60` | `5/14` official | `22/60` | `49/50` | `49/50` | broad verified CoT baseline |
+
 ## Binary follow-up ledger
 
 | version | design | measured result | decision |
@@ -63,7 +71,20 @@ non-overlap breakdown:
 | `v75` | leading-zero exact-trace + same-prompt boxed-only twin | `1994 rows`, `124 iters` | **無効化**: 初回 train は baseline/chat default へ上書き。正しい rerun 未回収 |
 | `v78` | strict 8-bit prompt + closure trace + boxed-only-done twin + leading-zero focus | `1978 rows`, `123 iters` | corrected rerun train `0.353 -> 0.329`, `binary60 official/exact 3/60, 3/60`, `structured official/exact 0/14, 0/14` |
 | `v79` | strict 8-bit prompt + boxed-only-done only | `1962 rows`, `122 iters` | corrected rerun train `0.353 -> 0.346`, `binary60 official/exact 6/60, 6/60`, `structured official/exact 2/14, 2/14`, `leading-zero official/exact 2/6, 2/6` |
+| `v80` | leading-zero filtered `boxed_only_done` | `1962 rows`, `122 iters` | corrected rerun train `0.353 -> 0.347`, `binary60 official/exact 7/60, 4/60`, `structured official/exact 2/14, 0/14`; hits は tolerance / leading-zero collapse のみ |
 | `v81` | strict 8-bit prompt + pure boxed-only | `1962 rows`, `122 iters` | corrected rerun train `0.353 -> 0.346`, `binary60 official/exact 6/60, 3/60`, `structured official/exact 1/14, 0/14`; `55f5e590` は `10001111 -> 10101111` の numeric-tolerance hit |
+| `v82` | `v79` + same-row `boxed_only` twin | `1978 rows`, `123 iters` | train `0.353 -> 0.329`, `binary60 official/exact 7/60, 4/60`, `structured official/exact 0/14, 0/14` |
+
+## Strong baseline MLX reproduction pivot
+
+- `v85` prepare 完了:
+  - source: `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv`
+  - normalized rows: `6558`
+  - notebooklike sampled rows: `2907`
+  - family mix: `roman 300`, `gravity 400`, `unit 700`, `text 700`, `binary 607`, `symbol 200`
+  - dataset format: `chat`
+  - teacher shape: `generated_cot` から既存 `\boxed{}` を除去し、`</think>\n\boxed{answer}` で閉じる
+  - train config: `full-layer`, `bs=1`, `ga=8`, `lr=1e-4`, `epochs=2`, `max_seq_length=4096`
 
 ## Current interpretation
 
@@ -81,4 +102,7 @@ non-overlap breakdown:
 12. `v79` は **`binary60 official/exact 6/60, 6/60`**, **`structured official/exact 2/14, 2/14`**, **`leading-zero exact 2/6`** を達成し、現時点の valid run では **structured exact の新 best**。ただし structured 14 行は依然すべて `last_number` fallback で、boxed retention 自体は回復していない。
 13. `v81` は official `6/60` で `v79` に並んだが、exact は `3/60` まで落ちた。`55f5e590` の structured official hit は `10001111 -> 10101111` が **README.md の numeric tolerance** で通っただけで、exact recovery ではない。
 14. `v79` vs `v81` から、prompt/teacher の `Done.` 矛盾を消すこと自体は主因ではなかった。**pure boxed-only は boxed count を増やしても structured exact を押し上げない**。
-15. 次の判定軸は引き続き **binary60 structured exact / boxed retention / leading-zero exact** だが、今後は **修正後に再実行した run だけ**を ledger に残す。
+15. `v80` は official `7/60` まで上がったが、exact は `4/60` に落ち、structured 14 行は **全件 `last_number` fallback** だった。leading-zero filtered `boxed_only_done` だけでは `v79` を超えない。
+16. `v82` も official `7/60`, exact `4/60` で、**same-row boxed-only twin は `v79` の structured exact 2/14 を保持できなかった**。structured 14 行は `boxed 0`, `last_number 14` のまま。
+17. したがって `v79` 近傍の local boxed-twin / leading-zero tweak はここでいったん閉じ、次の本命は **`nemotron-sft-lora-with-cot-v2` の broad verified CoT baseline を MLX 単一ファイルへ移植する `v85`** に置く。
+18. 次の判定軸は引き続き **README.md 基準の full320 / binary60 / symbol60** だが、今後は **修正後に再実行した run だけ**を ledger に残す。
