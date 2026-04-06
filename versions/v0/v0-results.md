@@ -311,6 +311,20 @@ non-overlap breakdown:
   - `gate24 official = 18/24`
     - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 2/4`, `unit 4/4`
   - failure 6 件のうち **4 件が `\boxed{your answer}`** で、glyph/numeric joined mix は format 汚染だけを増やした
+- `v102` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v102`
+  - design: sampled-new **roman 32 + symbol 24** の clean ablation。teacher は **pure `boxed_only`**
+  - final val **`0.349`**
+  - `gate24 official = 17/24`
+    - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 0/4`, `text 4/4`, `unit 4/4`
+  - general 16/16 は守った一方で、`bit_other` は `1/4`、`numeric_2x2` は **`0/4`** まで崩れた。`roman` 追加だけでは `v97` の specialist gain を再現できない
+- `v103` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v103`
+  - design: `v102` と同じ **roman 32 + symbol 24** で、teacher だけ **`boxed_only_done`**
+  - final val **`0.350`**
+  - `gate24 official = 18/24`
+    - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 4/4`, `unit 4/4`
+  - `Done.` 追加で `numeric_2x2` を **1 問だけ**戻したが、`bit_other` は依然 `1/4` のまま。roman+symbol mix 全体としては dead branch
 
 ## Current interpretation
 
@@ -350,4 +364,6 @@ non-overlap breakdown:
 34. ただし `glyph_len5 = 0/20`, `manual_audit_priority = 0/30` は依然として不変で、symbol 側の未回収部分は **glyph/manual symbolic** に集中している。したがって次枝は、**unit/gravity/roman を切った sampled-new symbol-only short-teacher** が本命になる。
 35. その clean ablation として切った `v99-v101` は、**gate24 が `18/24`, `19/24`, `18/24`** で全滅した。pure symbol-only にすると `numeric_2x2` すら落ち、glyph joined mix は `\boxed{your answer}` を増やした。
 36. best の `v100` でも `symbol60 = 9/60` で、control `v40 = 12/60` より悪かった。したがって **`v97` の symbol gain は symbol rows 単体では再現せず、何らかの mixed-context が必要**とみなせる。
-37. `v97 general200` の same-200 比較では `roman +2` に対し、loss の大半は `gravity/unit` に集中していた。したがって次の sampled-new pivot は、**pure symbol-only ではなく roman+symbol mix** を最優先で試すのが自然。
+37. `v97 general200` の same-200 比較では `roman +2` が唯一の plus だったが、実際に切った `v102/v103` の **roman+symbol mix は `17/24`, `18/24`** で失敗した。general 16/16 は保てても、**binary/symbol は `1/4`・`0-1/4`** まで崩れる。
+38. したがって **`roman` は `v97` の specialist gain を支えていた mixed context ではない**。`v97` の効きは `unit/gravity` 側の numeric context にある可能性が高い。
+39. 次の sampled-new pivot は、**`v97` から roman だけを外した `unit + gravity + symbol`** を first candidate に置く。そのうえで `unit+symbol` / `gravity+symbol` を並列 ablation して、どの numeric support が `numeric_2x2` と `bit_other` を支えているかを切る。
