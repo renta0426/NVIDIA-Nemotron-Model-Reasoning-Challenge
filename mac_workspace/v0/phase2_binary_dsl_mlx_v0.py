@@ -85,6 +85,8 @@ PHASE2_SYMBOL_SPECIALIST_CSV = (
 TRAIN_PROFILE_CHOICES = (
     "baseline",
     "strong-baseline-cot-v2",
+    "strong-baseline-cot-v2-structured-anchor-v1",
+    "strong-baseline-cot-v2-structured-anchor-v2",
     "single-adapter-focus-v1",
     "single-adapter-focus-v2",
     "single-adapter-fusion-v1",
@@ -216,6 +218,39 @@ STRONG_BASELINE_V2_TYPE_SAMPLES = {
     "Equation Transformation": 200,
 }
 STRONG_BASELINE_V2_SEED = 123
+STRONG_BASELINE_V2_STRUCTURED_ANCHOR_V1_SPECS = (
+    {
+        "source_name": "recommended_binary_formula_verified",
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("verified_trace_ready",),
+    },
+    {
+        "source_name": "recommended_binary_formula_answer_only",
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_structured_byte_formula",
+        "allowed_tiers": ("answer_only_keep",),
+    },
+    {
+        "source_name": "recommended_symbol_numeric_verified",
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("verified_trace_ready",),
+    },
+)
+STRONG_BASELINE_V2_STRUCTURED_ANCHOR_V2_SPECS = (
+    *STRONG_BASELINE_V2_STRUCTURED_ANCHOR_V1_SPECS,
+    {
+        "source_name": "recommended_symbol_numeric_answer_only",
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("answer_only_keep",),
+    },
+)
 
 README_MAX_LORA_RANK = 32
 README_MAX_TOKENS = 7680
@@ -1908,7 +1943,7 @@ def load_strong_baseline_cot_rows(path: Path) -> list[dict[str, str]]:
 
 def load_training_source_rows(path: Path, *, profile: str) -> list[dict[str, str]]:
     normalized_profile = str(profile).strip().lower() or "baseline"
-    if normalized_profile == "strong-baseline-cot-v2":
+    if normalized_profile.startswith("strong-baseline-cot-v2"):
         return load_strong_baseline_cot_rows(path)
     return load_phase2_training_rows(path)
 
@@ -4247,6 +4282,106 @@ def build_strong_baseline_cot_v2_rows(
     }
 
 
+def build_strong_baseline_cot_v2_structured_anchor_rows(
+    rows: Sequence[dict[str, str]],
+    *,
+    profile_name: str,
+    augmentation_specs: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    base_rows, base_summary = build_strong_baseline_cot_v2_rows(rows)
+    profiled_rows = [clone_phase2_row(row) for row in base_rows]
+    existing_ids = {
+        str(row.get("id", "")).strip()
+        for row in profiled_rows
+        if str(row.get("id", "")).strip()
+    }
+    augmentation_rows: list[dict[str, str]] = []
+    source_summaries: dict[str, Any] = {}
+    transform_counts = Counter(base_summary.get("transform_counts", {}))
+
+    for spec in augmentation_specs:
+        source_name = str(spec.get("source_name", "")).strip()
+        family = str(spec.get("family", "")).strip()
+        label = str(spec.get("label", "")).strip()
+        template_subtype = str(spec.get("template_subtype", "")).strip()
+        if not source_name or not family or not label or not template_subtype:
+            raise ValueError(f"{profile_name} has an invalid augmentation spec: {spec!r}")
+        allowed_tiers = {str(value).strip().lower() for value in spec.get("allowed_tiers", ()) if str(value).strip()}
+        candidates = select_joined_augmentation_candidates(
+            base_path=DEFAULT_PHASE0_ANALYSIS_CSV,
+            candidate_path=AUGMENT_TRAIN_RECOMMENDED_CSV,
+            existing_ids=existing_ids,
+            family=family,
+            template_subtype=template_subtype,
+            allowed_tiers=allowed_tiers or None,
+            quota=int(spec.get("quota", 0)),
+            group_keys=tuple(
+                spec.get(
+                    "group_keys",
+                    ("template_subtype", "selection_tier", "teacher_solver_candidate"),
+                )
+            ),
+            hard_first=bool(spec.get("hard_first", True)),
+        )
+        appended_rows: list[dict[str, str]] = []
+        assistant_style = str(spec.get("assistant_style", "boxed_only")).strip() or "boxed_only"
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(
+                candidate,
+                label=label,
+                assistant_style=assistant_style,
+            )
+            row_id = phase2_row["id"]
+            if row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
+    profiled_rows.extend(augmentation_rows)
+    return profiled_rows, {
+        "profile": profile_name,
+        "input": base_summary.get("input", summarize_phase2_rows(rows)),
+        "base": base_summary.get("output", summarize_phase2_rows(base_rows)),
+        "output": summarize_phase2_rows(profiled_rows),
+        "transform_counts": {
+            name: count for name, count in sorted(transform_counts.items())
+        },
+        "augmentation": {
+            "rows": len(augmentation_rows),
+            "summary": summarize_phase2_rows(augmentation_rows),
+            "sources": source_summaries,
+        },
+    }
+
+
+def build_strong_baseline_cot_v2_structured_anchor_v1_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_strong_baseline_cot_v2_structured_anchor_rows(
+        rows,
+        profile_name="strong-baseline-cot-v2-structured-anchor-v1",
+        augmentation_specs=STRONG_BASELINE_V2_STRUCTURED_ANCHOR_V1_SPECS,
+    )
+
+
+def build_strong_baseline_cot_v2_structured_anchor_v2_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_strong_baseline_cot_v2_structured_anchor_rows(
+        rows,
+        profile_name="strong-baseline-cot-v2-structured-anchor-v2",
+        augmentation_specs=STRONG_BASELINE_V2_STRUCTURED_ANCHOR_V2_SPECS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -4264,6 +4399,10 @@ def apply_phase2_train_profile(
         }
     if normalized_profile == "strong-baseline-cot-v2":
         return build_strong_baseline_cot_v2_rows(input_rows)
+    if normalized_profile == "strong-baseline-cot-v2-structured-anchor-v1":
+        return build_strong_baseline_cot_v2_structured_anchor_v1_rows(input_rows)
+    if normalized_profile == "strong-baseline-cot-v2-structured-anchor-v2":
+        return build_strong_baseline_cot_v2_structured_anchor_v2_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v15":
         return build_single_adapter_fusion_v15_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v16":

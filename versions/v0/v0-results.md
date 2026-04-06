@@ -88,6 +88,26 @@ non-overlap breakdown:
   - teacher shape: `generated_cot` から既存 `\boxed{}` を除去し、`</think>\n\boxed{answer}` で閉じる
   - train config: `full-layer`, `bs=1`, `ga=8`, `lr=1e-4`, `epochs=2`, `max_seq_length=4096`
 - `v85` train は進行中だが、**README 基準の full320 / binary60 / symbol60 score はまだ未回収**。したがって、現時点では **MLX reproduced score なし**。
+- `v86` prepare 完了:
+  - profile: `strong-baseline-cot-v2-structured-anchor-v1`
+  - base sampled rows: `2907`
+  - augmentation: `597`
+    - `binary boxed_only = 562` (`bit_structured_byte_formula verified 416 + answer_only 146`)
+    - `symbol boxed_only = 35` (`numeric_2x2 verified`)
+  - total train rows: `3504`
+  - total iters: `7008`
+- `v86` early train signal:
+  - `Iter 1 Val loss 0.691`
+  - `Iter 35 Train loss 0.483` までは安定
+  - `Iter 45 Train loss 11.536` まで急騰
+  - ただし **parallel `v85 + v86` で PhysMem `450 GB`** まで上がり、ユーザー指定 RAM cap を超えたため **手動停止 (`exit 143`)**
+- `v87` prepare 完了:
+  - profile: `strong-baseline-cot-v2-structured-anchor-v2`
+  - `v86` の augmentation に加え `symbol numeric_2x2 answer_only = 479` を追加
+  - augmentation total: `1076`
+  - total train rows: `3983`
+  - total iters: `7966`
+  - まだ未 train
 
 ## Current interpretation
 
@@ -109,3 +129,5 @@ non-overlap breakdown:
 16. `v82` も official `7/60`, exact `4/60` で、**same-row boxed-only twin は `v79` の structured exact 2/14 を保持できなかった**。structured 14 行は `boxed 0`, `last_number 14` のまま。
 17. したがって `v79` 近傍の local boxed-twin / leading-zero tweak はここでいったん閉じ、次の本命は **`nemotron-sft-lora-with-cot-v2` の broad verified CoT baseline を MLX 単一ファイルへ移植する `v85`** に置く。
 18. 次の判定軸は引き続き **README.md 基準の full320 / binary60 / symbol60** だが、今後は **修正後に再実行した run だけ**を ledger に残す。
+19. `v86/v87` の次段は、**strong baseline の broad CoT を保ったまま、analysis docs 由来の `bit_structured_byte_formula` / `numeric_2x2` を `boxed_only` anchor として追加する** data-only 改善路線。
+20. ただし full-layer strong-baseline 系は **2 本並列で RAM cap を超える**。この系列は **single parallel max** で回し、`v85` の README eval 完了後に `v86/v87` を順次流す運用へ切り替える。
