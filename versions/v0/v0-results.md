@@ -325,6 +325,27 @@ non-overlap breakdown:
   - `gate24 official = 18/24`
     - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 4/4`, `unit 4/4`
   - `Done.` 追加で `numeric_2x2` を **1 問だけ**戻したが、`bit_other` は依然 `1/4` のまま。roman+symbol mix 全体としては dead branch
+- `v104` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v104`
+  - design: sampled-new **unit 64 + gravity 32 + symbol 24**。`v97` から **roman 32** だけを外した ablation
+  - final val **`0.326`**
+  - `gate24 official = 19/24`
+    - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 4/4`, `unit 4/4`
+  - `v104` は `v104-v106` の中では best だったが、**`v97 = 21/24` には 2 問届かない**。`unit` と `gravity` の両方は効いているが、roman もまだ必要
+- `v105` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v105`
+  - design: sampled-new **unit 64 + symbol 24**。gravity を落とした ablation
+  - final val **`0.314`**（3 本中で最良）
+  - `gate24 official = 17/24`
+    - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 0/4`, `text 3/4`, `unit 4/4`
+  - train val は最良でも、`numeric_2x2` が **0/4** に沈み、text も 1 件落とした。**train val と README gate は相関しない**ことを再確認した
+- `v106` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v106`
+  - design: sampled-new **gravity 32 + symbol 24**。unit を落とした ablation
+  - final val **`0.350`**
+  - `gate24 official = 18/24`
+    - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 3/4`, `unit 4/4`
+  - gravity だけでも `v105` より `numeric_2x2` は戻るが、text が 1 件崩れる。**gravity 単独 / unit 単独のどちらでも `v97` の mixed-context には届かない**
 
 ## Current interpretation
 
@@ -366,4 +387,6 @@ non-overlap breakdown:
 36. best の `v100` でも `symbol60 = 9/60` で、control `v40 = 12/60` より悪かった。したがって **`v97` の symbol gain は symbol rows 単体では再現せず、何らかの mixed-context が必要**とみなせる。
 37. `v97 general200` の same-200 比較では `roman +2` が唯一の plus だったが、実際に切った `v102/v103` の **roman+symbol mix は `17/24`, `18/24`** で失敗した。general 16/16 は保てても、**binary/symbol は `1/4`・`0-1/4`** まで崩れる。
 38. したがって **`roman` は `v97` の specialist gain を支えていた mixed context ではない**。`v97` の効きは `unit/gravity` 側の numeric context にある可能性が高い。
-39. 次の sampled-new pivot は、**`v97` から roman だけを外した `unit + gravity + symbol`** を first candidate に置く。そのうえで `unit+symbol` / `gravity+symbol` を並列 ablation して、どの numeric support が `numeric_2x2` と `bit_other` を支えているかを切る。
+39. `v104-v106` により、sampled-new support は **`unit + gravity + symbol = 19/24`**, **`gravity + symbol = 18/24`**, **`unit + symbol = 17/24`** の順だった。つまり **unit と gravity の両方が寄与**しており、片方だけでは `v97` の specialist gain を再現できない。
+40. 一方で `v104` でも **`v97 = 21/24` より -2** なので、`roman` も「単独では無力だが、unit/gravity がある前提では still helpful」な可能性が高い。`v102-v106` をまとめると、**必要なのは family drop ではなく `v97` の mixed context を保ったまま collateral source を軽くすること**だと読める。
+41. 次の sampled-new pivot は、**roman 32 + symbol 24 を維持したまま unit / gravity quota だけを減らす `v97-lite`** を first candidate に置く。目的は gate24 `21/24` 近傍を保ちながら、`general200` で崩れた `gravity/unit` collateral を少しでも減らすこと。
