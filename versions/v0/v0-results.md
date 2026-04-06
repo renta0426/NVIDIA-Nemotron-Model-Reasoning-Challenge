@@ -346,6 +346,27 @@ non-overlap breakdown:
   - `gate24 official = 18/24`
     - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 3/4`, `unit 4/4`
   - gravity だけでも `v105` より `numeric_2x2` は戻るが、text が 1 件崩れる。**gravity 単独 / unit 単独のどちらでも `v97` の mixed-context には届かない**
+- `v107` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v107`
+  - design: `v97-lite` その1。sampled-new **unit 64 + gravity 16 + roman 32 + symbol 24**
+  - final val **`0.310`**
+  - `gate24 official = 20/24`
+    - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 3/4`, `text 4/4`, `unit 4/4`
+  - gravity quota を **32 → 16** に落とすと、general は守れても **binary が `2/4 -> 1/4`** に落ちて `v97 = 21/24` を維持できなかった
+- `v108` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v108`
+  - design: `v97-lite` その2。sampled-new **unit 32 + gravity 32 + roman 32 + symbol 24**
+  - final val **`0.325`**
+  - `gate24 official = 18/24`
+    - `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 4/4`, `unit 4/4`
+  - unit quota を **64 → 32** に落とすと劣化が大きく、`numeric_2x2` と `bit_other` が同時に崩れた。**unit quota の方が gravity より重要**だと読める
+- `v109` prepare / train / gate24 完了:
+  - profile: `single-adapter-fusion-v109`
+  - design: `v97-lite` その3。sampled-new **unit 32 + gravity 16 + roman 32 + symbol 24**
+  - final val **`0.309`**（3 本中で最良）
+  - `gate24 official = 19/24`
+    - `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 3/4`, `unit 4/4`
+  - val は最良でも README gate では `v107` に負け、**train val と gate24 の非相関**を再確認した。両 quota を一気に軽くすると `text` まで 1 件落ちる
 
 ## Current interpretation
 
@@ -389,4 +410,6 @@ non-overlap breakdown:
 38. したがって **`roman` は `v97` の specialist gain を支えていた mixed context ではない**。`v97` の効きは `unit/gravity` 側の numeric context にある可能性が高い。
 39. `v104-v106` により、sampled-new support は **`unit + gravity + symbol = 19/24`**, **`gravity + symbol = 18/24`**, **`unit + symbol = 17/24`** の順だった。つまり **unit と gravity の両方が寄与**しており、片方だけでは `v97` の specialist gain を再現できない。
 40. 一方で `v104` でも **`v97 = 21/24` より -2** なので、`roman` も「単独では無力だが、unit/gravity がある前提では still helpful」な可能性が高い。`v102-v106` をまとめると、**必要なのは family drop ではなく `v97` の mixed context を保ったまま collateral source を軽くすること**だと読める。
-41. 次の sampled-new pivot は、**roman 32 + symbol 24 を維持したまま unit / gravity quota だけを減らす `v97-lite`** を first candidate に置く。目的は gate24 `21/24` 近傍を保ちながら、`general200` で崩れた `gravity/unit` collateral を少しでも減らすこと。
+41. その仮説に基づいて切った `v107-v109` は **`20/24`, `18/24`, `19/24`** で全滅した。したがって、**quota を大きく落とす `v97-lite` は specialist mixed-context を保持できない**。
+42. 劣化の大きさを見ると、**gravity 32 → 16 は `21/24 -> 20/24`、unit 64 → 32 は `21/24 -> 18/24`** だった。つまり sampled-new mixed-context では **unit quota の方が gravity quota より重要**で、`v97` の効きは `unit` 側により強く依存している。
+43. 一方で `v107 = 20/24` は `v109 = 19/24` より良く、**gravity を軽く削ること自体は完全には外れていない**。次の本命は、`32 → 16` / `64 → 32` のような大きい削りではなく、**`gravity 32 → 24` と `unit 64 → 48` の finer threshold sweep** に置く。
