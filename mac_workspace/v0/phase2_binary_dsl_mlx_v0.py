@@ -8,12 +8,14 @@ import json
 import math
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -146,6 +148,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v67",
     "single-adapter-fusion-v68",
     "single-adapter-fusion-v69",
+    "single-adapter-fusion-v70",
+    "single-adapter-fusion-v71",
+    "single-adapter-fusion-v72",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -1181,6 +1186,120 @@ FUSION_V69_AUGMENT_QUOTAS = {
     "symbol_formula_answer_only": 0,
     "text_verified_anchor_mod": 8,
 }
+FUSION_V70_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_exact_trace_formula": 16,
+    "binary_exact_trace_formula_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_formula_startswith_fields": {
+        "answer": "0",
+    },
+    "binary_exact_trace_abstract": 8,
+    "binary_exact_trace_abstract_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_abstract_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_abstract_startswith_fields": {
+        "answer": "0",
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V71_AUGMENT_QUOTAS = {
+    "binary_candidates": 0,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_exact_trace_formula": 16,
+    "binary_exact_trace_formula_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_abstract": 8,
+    "binary_exact_trace_abstract_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_abstract_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
+FUSION_V72_AUGMENT_QUOTAS = {
+    "binary_candidates": 8,
+    "binary_answer_only_bit_other": 0,
+    "symbol_verified": 0,
+    "symbol_answer_only": 0,
+    "symbol_manual": 0,
+    "symbol_glyph_answer_only": 0,
+    "binary_affine_verified": 12,
+    "binary_structured_answer_only": 8,
+    "binary_exact_trace_formula": 12,
+    "binary_exact_trace_formula_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_abstract": 8,
+    "binary_exact_trace_abstract_group_keys": (
+        "bit_structured_formula_abstract_family",
+        "bit_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_abstract_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "binary_exact_trace_not_formula": 4,
+    "binary_exact_trace_not_formula_group_keys": (
+        "bit_not_structured_formula_name",
+        "bit_no_candidate_positions",
+    ),
+    "binary_exact_trace_not_formula_min_fields": {
+        "bit_no_candidate_positions": 5,
+        "num_examples": 8,
+    },
+    "symbol_formula_verified": 4,
+    "symbol_formula_answer_only": 0,
+    "text_verified_anchor_mod": 8,
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -1427,6 +1546,268 @@ def load_phase0_analysis_index() -> dict[str, dict[str, str]]:
     return index
 
 
+def parse_family_payload(row: dict[str, str]) -> dict[str, Any]:
+    text = str(row.get("family_analysis_json", "")).strip()
+    if not text:
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+@dataclass(frozen=True)
+class ExprNode:
+    name: str
+    args: tuple["ExprNode", ...] = ()
+
+
+def split_top_level_args(text: str) -> list[str]:
+    args: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in text:
+        if char == "," and depth == 0:
+            args.append("".join(current).strip())
+            current = []
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                raise ValueError(f"Unbalanced expression: {text}")
+        current.append(char)
+    if depth != 0:
+        raise ValueError(f"Unbalanced expression: {text}")
+    tail = "".join(current).strip()
+    if tail:
+        args.append(tail)
+    return args
+
+
+def parse_expr(text: str) -> ExprNode:
+    expr = text.strip()
+    if not expr:
+        raise ValueError("Expression is empty")
+    if "(" not in expr:
+        return ExprNode(name=expr, args=())
+    if not expr.endswith(")"):
+        raise ValueError(f"Malformed expression: {expr}")
+    name, rest = expr.split("(", 1)
+    inner = rest[:-1]
+    args = tuple(parse_expr(part) for part in split_top_level_args(inner))
+    return ExprNode(name=name.strip(), args=args)
+
+
+def expr_to_text(node: ExprNode) -> str:
+    if not node.args:
+        return node.name
+    return f"{node.name}({','.join(expr_to_text(arg) for arg in node.args)})"
+
+
+def format_byte(value: int) -> str:
+    return format(value & 0xFF, "08b")
+
+
+def rotate_left(value: int, shift: int) -> int:
+    shift %= 8
+    value &= 0xFF
+    return ((value << shift) | (value >> (8 - shift))) & 0xFF
+
+
+def rotate_right(value: int, shift: int) -> int:
+    shift %= 8
+    value &= 0xFF
+    return ((value >> shift) | (value << (8 - shift))) & 0xFF
+
+
+def nibble_swap(value: int) -> int:
+    value &= 0xFF
+    return ((value & 0x0F) << 4) | ((value & 0xF0) >> 4)
+
+
+def eval_atom(name: str, query_value: int) -> int:
+    token = name.strip()
+    if token in {"x", "query"}:
+        return query_value & 0xFF
+    if token == "nibble_swap":
+        return nibble_swap(query_value)
+    if token in {"rshift", "shr"}:
+        return (query_value >> 1) & 0xFF
+    if token in {"lshift", "shl"}:
+        return (query_value << 1) & 0xFF
+    if token in {"rol", "lrot"}:
+        return rotate_left(query_value, 1)
+    if token in {"ror", "rrot"}:
+        return rotate_right(query_value, 1)
+    match = re.fullmatch(r"(shl|shr|rol|ror|lrot|rrot)(\d+)", token)
+    if match:
+        op = match.group(1)
+        shift = int(match.group(2))
+        if op == "shl":
+            return (query_value << shift) & 0xFF
+        if op == "shr":
+            return (query_value >> shift) & 0xFF
+        if op in {"rol", "lrot"}:
+            return rotate_left(query_value, shift)
+        if op in {"ror", "rrot"}:
+            return rotate_right(query_value, shift)
+    raise ValueError(f"Unsupported atom: {token}")
+
+
+def eval_expr(node: ExprNode, query_value: int) -> int:
+    if not node.args:
+        return eval_atom(node.name, query_value)
+    values = [eval_expr(arg, query_value) for arg in node.args]
+    name = node.name
+    if name == "not":
+        if len(values) != 1:
+            raise ValueError("not() expects one arg")
+        return (~values[0]) & 0xFF
+    if name == "xor":
+        if len(values) != 2:
+            raise ValueError("xor() expects two args")
+        return (values[0] ^ values[1]) & 0xFF
+    if name == "and":
+        if len(values) != 2:
+            raise ValueError("and() expects two args")
+        return (values[0] & values[1]) & 0xFF
+    if name == "or":
+        if len(values) != 2:
+            raise ValueError("or() expects two args")
+        return (values[0] | values[1]) & 0xFF
+    if name == "majority":
+        if len(values) != 3:
+            raise ValueError("majority() expects three args")
+        return ((values[0] & values[1]) | (values[0] & values[2]) | (values[1] & values[2])) & 0xFF
+    if name == "choose":
+        if len(values) != 3:
+            raise ValueError("choose() expects three args")
+        a, b, c = values
+        return ((a & b) | ((~a) & c)) & 0xFF
+    raise ValueError(f"Unsupported function: {name}")
+
+
+def resolve_binary_rule(row: dict[str, str], payload: dict[str, Any]) -> tuple[str, str] | None:
+    direct_candidates = [
+        str(row.get("bit_structured_formula_name", "")).strip(),
+        str(payload.get("structured_formula_name", "")).strip(),
+        str(row.get("bit_not_structured_formula_name", "")).strip(),
+        str(payload.get("not_structured_formula_name", "")).strip(),
+    ]
+    for candidate in direct_candidates:
+        if candidate:
+            return candidate, "exact_formula"
+    names = str(row.get("bit_byte_transform_names", "")).strip()
+    if names:
+        split_names = [name.strip() for name in names.split("|") if name.strip()]
+        if len(split_names) == 1:
+            return split_names[0], "byte_transform"
+    payload_names = payload.get("byte_transform_names", [])
+    if isinstance(payload_names, list):
+        cleaned = [str(item).strip() for item in payload_names if str(item).strip()]
+        if len(cleaned) == 1:
+            return cleaned[0], "byte_transform"
+    return None
+
+
+def extract_binary_example_pairs(prompt: str) -> list[tuple[str, str]]:
+    pairs = re.findall(r"([01]{8})\s*->\s*([01]{8})", prompt)
+    if not pairs:
+        raise ValueError("Binary prompt did not contain any example input/output pairs")
+    return [(left, right) for left, right in pairs]
+
+
+def collect_expr_nodes(node: ExprNode, steps: list[ExprNode], seen: set[str]) -> None:
+    for child in node.args:
+        collect_expr_nodes(child, steps, seen)
+    text = expr_to_text(node)
+    if text in {"x", "query"} or text in seen:
+        return
+    seen.add(text)
+    steps.append(node)
+
+
+def support_step_label(node: ExprNode, root_text: str) -> str:
+    text = expr_to_text(node)
+    if text == root_text and node.args:
+        return node.name
+    return text
+
+
+def expr_to_query_text(node: ExprNode) -> str:
+    if not node.args:
+        if node.name in {"x", "query"}:
+            return "x"
+        return f"{node.name}(x)"
+    return f"{node.name}({','.join(expr_to_query_text(arg) for arg in node.args)})"
+
+
+def render_binary_support_steps(rule_text: str, input_bits: str) -> tuple[list[str], str]:
+    if not re.fullmatch(r"[01]{8}", input_bits):
+        raise ValueError(f"Binary support input is not an exact 8-bit string: {input_bits}")
+    root = parse_expr(rule_text)
+    root_text = expr_to_text(root)
+    query_value = int(input_bits, 2)
+    steps: list[ExprNode] = []
+    collect_expr_nodes(root, steps, set())
+    rendered_steps = [
+        f"{support_step_label(node, root_text)}={format_byte(eval_expr(node, query_value))}"
+        for node in steps
+    ]
+    return rendered_steps, format_byte(eval_expr(root, query_value))
+
+
+def build_exact_binary_program_trace(row: dict[str, str]) -> str:
+    query_text = str(row.get("query_raw") or row.get("bit_query_binary") or "").strip()
+    answer = str(row.get("answer", "")).strip()
+    if not re.fullmatch(r"[01]{8}", query_text):
+        raise ValueError(f"Binary query is not an exact 8-bit string: {row.get('id', '')}")
+    if not re.fullmatch(r"[01]{8}", answer):
+        raise ValueError(f"Binary answer is not an exact 8-bit string: {row.get('id', '')}")
+    payload = parse_family_payload(row)
+    resolved = resolve_binary_rule(row, payload)
+    if resolved is None:
+        raise ValueError(f"Unable to resolve an exact binary rule for {row.get('id', '')}")
+    rule_text, _rule_source = resolved
+    support_pairs = extract_binary_example_pairs(str(row.get("prompt", "")))[:2]
+    support_lines: list[str] = []
+    for input_bits, output_bits in support_pairs:
+        rendered_steps, recomputed = render_binary_support_steps(rule_text, input_bits)
+        if recomputed != output_bits:
+            raise ValueError(
+                f"Resolved rule {rule_text} does not reproduce support example for {row.get('id', '')}: "
+                f"{input_bits} -> {output_bits} vs {recomputed}"
+            )
+        support_lines.append(f"- {input_bits} -> {output_bits} because {', '.join(rendered_steps)}")
+    root = parse_expr(rule_text)
+    root_value = format_byte(eval_expr(root, int(query_text, 2)))
+    if root_value != answer:
+        raise ValueError(
+            f"Resolved rule {rule_text} does not reproduce query answer for {row.get('id', '')}: "
+            f"{root_value} vs {answer}"
+        )
+    query_steps: list[ExprNode] = []
+    collect_expr_nodes(root, query_steps, set())
+    query_lines = [
+        f"{expr_to_query_text(node)} = {format_byte(eval_expr(node, int(query_text, 2)))}"
+        for node in query_steps
+    ]
+    lines = [
+        "<think>",
+        "Check examples:",
+        *support_lines,
+        f"So the rule is {rule_text}.",
+        f"Query x = {query_text}",
+        *query_lines,
+        f"Final answer = {answer}",
+        "</think>",
+    ]
+    return "\n".join(lines)
+
+
 def infer_candidate_selection_tier(row: dict[str, str]) -> str:
     tier = str(row.get("selection_tier", "")).strip().lower()
     if tier:
@@ -1444,6 +1825,7 @@ def make_phase2_row_from_candidate(
     label: str | None = None,
     assistant_style: str = "boxed_only",
     source_selection_tier: str | None = None,
+    generated_cot: str = "",
 ) -> dict[str, str]:
     row_id = str(row.get("id", "")).strip()
     prompt = str(row.get("prompt", "")).strip()
@@ -1460,11 +1842,14 @@ def make_phase2_row_from_candidate(
     resolved_tier = str(source_selection_tier or infer_candidate_selection_tier(row)).strip().lower()
     if not resolved_tier:
         raise ValueError(f"Unable to infer selection tier for augmentation row {row_id}")
+    resolved_generated_cot = str(generated_cot).strip()
+    if assistant_style == "trace_boxed" and not resolved_generated_cot:
+        raise ValueError(f"trace_boxed augmentation row {row_id} is missing generated_cot")
     return {
         "id": row_id,
         "prompt": prompt,
         "answer": answer,
-        "generated_cot": "",
+        "generated_cot": resolved_generated_cot,
         "label": resolved_label,
         "assistant_style": assistant_style,
         "source_selection_tier": resolved_tier,
@@ -1926,6 +2311,32 @@ def build_single_adapter_fusion_external_rows(
             "summary": summarize_phase2_rows(appended_rows),
         }
 
+    def append_binary_trace_candidates(
+        source_name: str,
+        candidates: Sequence[dict[str, str]],
+    ) -> None:
+        appended_rows: list[dict[str, str]] = []
+        for candidate in candidates:
+            phase2_row = make_phase2_row_from_candidate(
+                candidate,
+                label="binary",
+                assistant_style="trace_boxed",
+                generated_cot=build_exact_binary_program_trace(candidate),
+            )
+            row_id = phase2_row["id"]
+            if row_id in existing_ids:
+                continue
+            existing_ids.add(row_id)
+            augmentation_rows.append(phase2_row)
+            appended_rows.append(phase2_row)
+            transform_counts[
+                f"append_aug:{source_name}:{phase2_row['label']}:{phase2_row['source_selection_tier']}"
+            ] += 1
+        source_summaries[source_name] = {
+            "selected": len(appended_rows),
+            "summary": summarize_phase2_rows(appended_rows),
+        }
+
     def append_phase2_rows(source_name: str, candidates: Sequence[dict[str, str]]) -> None:
         appended_rows: list[dict[str, str]] = []
         for candidate in candidates:
@@ -2082,6 +2493,92 @@ def build_single_adapter_fusion_external_rows(
                 ),
             ),
             label="binary",
+        )
+    if quotas.get("binary_exact_trace_formula", 0) > 0:
+        append_binary_trace_candidates(
+            "binary_exact_trace_formula",
+            select_augmentation_candidates(
+                DEFAULT_PHASE0_ANALYSIS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                allowed_tiers={"verified_trace_ready"},
+                quota=quotas["binary_exact_trace_formula"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_exact_trace_formula_group_keys",
+                        (
+                            "bit_structured_formula_abstract_family",
+                            "bit_structured_formula_name",
+                            "bit_no_candidate_positions",
+                        ),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_exact_trace_formula_min_fields"),
+                max_int_fields=quotas.get("binary_exact_trace_formula_max_fields"),
+                exact_fields={
+                    "teacher_solver_candidate": "binary_structured_byte_formula",
+                    **dict(quotas.get("binary_exact_trace_formula_exact_fields", {})),
+                },
+                startswith_fields=quotas.get("binary_exact_trace_formula_startswith_fields"),
+            ),
+        )
+    if quotas.get("binary_exact_trace_abstract", 0) > 0:
+        append_binary_trace_candidates(
+            "binary_exact_trace_abstract",
+            select_augmentation_candidates(
+                DEFAULT_PHASE0_ANALYSIS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                allowed_tiers={"verified_trace_ready"},
+                quota=quotas["binary_exact_trace_abstract"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_exact_trace_abstract_group_keys",
+                        (
+                            "bit_structured_formula_abstract_family",
+                            "bit_structured_formula_name",
+                            "bit_no_candidate_positions",
+                        ),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_exact_trace_abstract_min_fields"),
+                max_int_fields=quotas.get("binary_exact_trace_abstract_max_fields"),
+                exact_fields={
+                    "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
+                    **dict(quotas.get("binary_exact_trace_abstract_exact_fields", {})),
+                },
+                startswith_fields=quotas.get("binary_exact_trace_abstract_startswith_fields"),
+            ),
+        )
+    if quotas.get("binary_exact_trace_not_formula", 0) > 0:
+        append_binary_trace_candidates(
+            "binary_exact_trace_not_formula",
+            select_augmentation_candidates(
+                DEFAULT_PHASE0_ANALYSIS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                allowed_tiers={"verified_trace_ready"},
+                quota=quotas["binary_exact_trace_not_formula"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_exact_trace_not_formula_group_keys",
+                        (
+                            "bit_not_structured_formula_name",
+                            "bit_no_candidate_positions",
+                        ),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get("binary_exact_trace_not_formula_min_fields"),
+                max_int_fields=quotas.get("binary_exact_trace_not_formula_max_fields"),
+                exact_fields={
+                    "teacher_solver_candidate": "binary_structured_byte_not_formula",
+                    **dict(quotas.get("binary_exact_trace_not_formula_exact_fields", {})),
+                },
+                startswith_fields=quotas.get("binary_exact_trace_not_formula_startswith_fields"),
+            ),
         )
     if quotas.get("binary_answer_only_bit_other", 0) > 0:
         append_candidates(
@@ -2939,6 +3436,36 @@ def build_single_adapter_fusion_v69_rows(
     )
 
 
+def build_single_adapter_fusion_v70_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v70",
+        quotas=FUSION_V70_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v71_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v71",
+        quotas=FUSION_V71_AUGMENT_QUOTAS,
+    )
+
+
+def build_single_adapter_fusion_v72_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v72",
+        quotas=FUSION_V72_AUGMENT_QUOTAS,
+    )
+
+
 def apply_phase2_train_profile(
     rows: Sequence[dict[str, str]],
     *,
@@ -3064,6 +3591,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v68_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v69":
         return build_single_adapter_fusion_v69_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v70":
+        return build_single_adapter_fusion_v70_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v71":
+        return build_single_adapter_fusion_v71_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v72":
+        return build_single_adapter_fusion_v72_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
