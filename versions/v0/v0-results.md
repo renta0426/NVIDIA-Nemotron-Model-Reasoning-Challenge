@@ -28,9 +28,9 @@
 | `v64` | solver-backed source swap: `binary_hybrid_consensus 8 + structured_recommended 16` | `binary60 official 5/60`, `exact 2/60`, `structured official/exact 1/14, 0/14` | 不採用 |
 | `v65` | solver-backed source swap: `binary_hybrid_consensus 8 + structured_recommended 24` | `binary60 official 4/60`, `exact 3/60`, `structured official/exact 0/14, 0/14` | 不採用 |
 | `v66` | solver-backed source swap: `binary_hybrid_consensus 16 + structured_recommended 16` | `binary60 official 5/60`, `exact 4/60`, `structured official/exact 0/14, 0/14` | 不採用 |
-| `v67` | format-safe structured answer-only + high-support verified (`gap>=5`, `safe_support>=10`) | `final val 0.353`, `1961 rows`, `123 iters`; `binary60` safe eval running | 継続 |
-| `v68` | format-safe structured answer-only + broader high-support verified (`gap>=5`, `safe_support>=4`) | `final val 0.354`, `1962 rows`, `123 iters`; `binary60` safe eval running | 継続 |
-| `v69` | format-safe structured answer-only only | `final val 0.357`, `1954 rows`, `123 iters`; `binary60` safe eval running | 継続 |
+| `v67` | format-safe structured answer-only + high-support verified (`gap>=5`, `safe_support>=10`) | `final val 0.353`; `binary60 official 6/60`, `exact 5/60`, `structured official/exact 2/14, 1/14` | 参考保持 |
+| `v68` | format-safe structured answer-only + broader high-support verified (`gap>=5`, `safe_support>=4`) | `final val 0.354`; `binary60 official 5/60`, `exact 2/60`, `structured official/exact 0/14, 0/14` | 不採用 |
+| `v69` | format-safe structured answer-only only | `final val 0.357`; `binary60 official 8/60`, `exact 5/60`, `structured official/exact 1/14, 0/14` | 不採用 |
 
 ## Exact-trace-safe pivot
 
@@ -60,5 +60,7 @@ non-overlap breakdown:
 
 1. **broad answer-only / solver-backed source swap だけでは structured exact は動かない。**
 2. 次の本命は、`README.md` の boxed extraction を維持したまま **exact executable rule を短い program trace で教える** route。
-3. `v70-v72` は hyperparameter sweep ではなく、**data/teacher redesign only** の follow-up である。
-4. train 指標では `v71` が `v70` をわずかに上回ったが、差は小さい。採否は `README.md` 条件の `binary60` / full320 で決める。
+3. `v67-v69` は narrow format-safe pivot としては一定の改善を出したが、structured failure の大半は依然 **`numeric_fallback / last_number`** で、boxed retention は回復していない。
+4. `v67` だけが `bdd63604` で **structured exact 1/14** を取った一方、他の structured official hit は `00000000 -> 000/0` のような leading-zero collapse だった。
+5. `v70-v72` は hyperparameter sweep ではなく、**data/teacher redesign only** の follow-up である。
+6. train 指標では `v71` が `v70` をわずかに上回ったが、差は小さい。採否は `README.md` 条件の `binary60` / full320 で決める。
