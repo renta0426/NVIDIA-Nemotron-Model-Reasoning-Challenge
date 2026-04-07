@@ -337,3 +337,36 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v128_lr1p25e6_ep025/training_result.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v129_lr1p25e6_ep025/prepare_manifest.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v129_lr1p25e6_ep025/training_result.json`
+
+### v130-v133 v40-base safe-aug diagnostics
+
+`v124` の 64-row safe augmentation を **`v40` 側へ載せ替えれば、`v40` の text/unit 保持を壊さず binary/symbol を上積みできるか** を切り分けた。  
+ここでは README 条件の score に入る前段として、まず **train 完走 → binary 1-row probe / gate24 の decode 健全性** を確認した。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v130` | `single-adapter-fusion-v124` の recipe をそのまま使い、resume だけ `v110 -> v40` へ差し替え | `2170 rows`, `33 iters`; `final val 0.325 -> 0.322` | gate24 は **`>12 min`** でも chunk 完了 0、binary 1-row probe も **`>90s`** | 不採用 |
+| `v131` | **corrected branch**: `single-adapter-fusion-v40` base + `v124` safe aug 全量 (`binary 48 + symbol 16`) | `2026 rows`, `31 iters`; `final val 0.355 -> 0.347` | binary 1-row probe が **`>90s`** | 不採用 |
+| `v132` | `single-adapter-fusion-v40` base + `v124` binary safe aug のみ (`48`) | `2010 rows`, `31 iters`; prepare only | `v133` で同型 failure を確認したため未実行 | 打ち切り |
+| `v133` | `single-adapter-fusion-v40` base + `v124` symbol safe aug のみ (`16`) | `1978 rows`, `30 iters`; `final val 0.355 -> 0.348` | binary 1-row probe が **`>90s`** | 不採用 |
+
+解釈:
+
+- `v130` により、**`v110` base recipe を抱えたまま `v40` に resume するだけ**でも README decode は長文化することが分かった。
+- そのため `v131-v133` で **本当に切りたかった条件**、つまり **`v40` base に `v124` 系 short-done rows を載せる枝**を直接切り直した。
+- しかし `v133` でも binary 1-row probe が **`>90s`** のままだったため、stall の主因は **`v124` binary 48 rows 単独ではなく、`v40` base に `v124` 系 `boxed_only_done` verified-short rows を混ぜる方針そのもの**だと判断した。
+- したがってこの route は **gate24/full320 に進める前段で closed**。`v40` を起点にする次枝は、`v124` 系 short-done verified rows ではなく、**別 teacher style / 別 source family** で切る。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v130_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v130_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v130_gate24/gate24_top8_fusion_v130_from_v40_lr1p25e6_ep025/phase0_offline_eval/artifacts/phase0_eval_manifest.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v130_binary1/`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v131_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v131_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v131_binary1/`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v132_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v133_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v133_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v133_binary1/`
