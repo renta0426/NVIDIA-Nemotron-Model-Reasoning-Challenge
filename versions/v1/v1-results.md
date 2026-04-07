@@ -370,3 +370,28 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v133_lr1p25e6_ep025/prepare_manifest.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v133_lr1p25e6_ep025/adapter/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v133_binary1/`
+
+### v134-v136 pure boxed-only follow-up
+
+`v133` でも stall したため、次は source family を変えず **teacher style だけ**を `boxed_only_done -> boxed_only` に差し替えた。  
+狙いは、`Done.` が decode 長文化の trigger なら、pure boxed-only で `v40` base の binary probe が元に戻るかを切ることだった。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v134` | `single-adapter-fusion-v40` base + `v124` safe aug 全量 (`binary 48 + symbol 16`), teacher=`boxed_only` | `2026 rows`, `31 iters`; prepare only | `v135` で route closure を確認したため未実行 | 打ち切り |
+| `v135` | `single-adapter-fusion-v40` base + `v124` symbol safe aug のみ (`16`), teacher=`boxed_only` | `1978 rows`, `30 iters`; `final val 0.355 -> 0.347` | binary 1-row probe が **`>90s`** | 不採用 |
+| `v136` | `single-adapter-fusion-v40` base + `v124` binary safe aug のみ (`48`), teacher=`boxed_only` | `2010 rows`, `31 iters`; prepare only | `v135` で route closure を確認したため未実行 | 打ち切り |
+
+解釈:
+
+- `v135` が **symbol-only かつ pure boxed-only** でも binary 1-row probe を **`>90s`** で返せなかったため、**`Done.` の有無は主因ではない**。
+- これで `v130-v136` 全体から、`v40` 起点で **`v124` 系 verified-short rows（binary/symbol, boxed_only_done/boxed_only）を混ぜる方針そのもの**が README decode を壊すと判断した。
+- したがって、次の `v40` continuation は **source family も teacher style も別物**へ切り替える。`v124` 系 short verified rows は route closed。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v134_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v135_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v135_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v135_binary1/`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v136_lr1p25e6_ep025/prepare_manifest.json`

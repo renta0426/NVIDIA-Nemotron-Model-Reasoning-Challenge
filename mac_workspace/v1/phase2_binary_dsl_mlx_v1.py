@@ -299,6 +299,9 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v131",
     "single-adapter-fusion-v132",
     "single-adapter-fusion-v133",
+    "single-adapter-fusion-v134",
+    "single-adapter-fusion-v135",
+    "single-adapter-fusion-v136",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -676,6 +679,32 @@ STRONG_BASELINE_V2_SAMPLE_FUSION_V132_SPECS = (
 )
 STRONG_BASELINE_V2_SAMPLE_FUSION_V133_SPECS = (
     STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS[1],
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V134_SPECS = (
+    {
+        **STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS[0],
+        "assistant_style": "boxed_only",
+        "source_name": "strong_sample_binary_other_verified_short_boxed_v134",
+    },
+    {
+        **STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS[1],
+        "assistant_style": "boxed_only",
+        "source_name": "strong_sample_symbol_numeric_verified_short_boxed_v134",
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V135_SPECS = (
+    {
+        **STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS[1],
+        "assistant_style": "boxed_only",
+        "source_name": "strong_sample_symbol_numeric_verified_short_boxed_v135",
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V136_SPECS = (
+    {
+        **STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS[0],
+        "assistant_style": "boxed_only",
+        "source_name": "strong_sample_binary_other_verified_short_boxed_v136",
+    },
 )
 STRONG_BASELINE_V2_SAMPLE_FUSION_V92_SPECS = (
     {
@@ -6288,6 +6317,39 @@ def build_single_adapter_fusion_v133_rows(
     )
 
 
+def build_single_adapter_fusion_v134_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v134",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V134_SPECS,
+        base_profile="single-adapter-fusion-v40",
+    )
+
+
+def build_single_adapter_fusion_v135_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v135",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V135_SPECS,
+        base_profile="single-adapter-fusion-v40",
+    )
+
+
+def build_single_adapter_fusion_v136_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v136",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V136_SPECS,
+        base_profile="single-adapter-fusion-v40",
+    )
+
+
 def build_strong_baseline_cot_v2_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -6667,6 +6729,12 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v132_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v133":
         return build_single_adapter_fusion_v133_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v134":
+        return build_single_adapter_fusion_v134_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v135":
+        return build_single_adapter_fusion_v135_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v136":
+        return build_single_adapter_fusion_v136_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
