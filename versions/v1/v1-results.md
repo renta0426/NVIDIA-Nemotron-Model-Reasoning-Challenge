@@ -475,3 +475,29 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v142_lr1p25e6_ep025/prepare_manifest.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v142_lr1p25e6_ep025/adapter/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v142_binary1/`
+
+### v94-v95 deferred general+bit short retry
+
+`v94 / v95` は `v0` では RAM 都合で initial val を見た時点で止めていた partial branch だった。  
+`v1` では同じ tracked profile を **`v40` seed / top8 / `lr=2.5e-6` / `epoch=0.25`** で intended config のまま切り直し、README 条件 gate24 を actual で回収した。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v94` | `v92` general-short-`boxed_only_done` mix + `bit` general short `24` | `2234 rows`, `34 iters`; `final val 0.350 -> 0.338` | gate24 **`17/24`**（`binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 2/4`, `unit 4/4`）, 完走 **805.9s** | 不採用 |
+| `v95` | `v93` general-short-`boxed_only` mix + `bit` general short `24` | `2234 rows`, `34 iters`; `final val 0.339 -> 0.336` | gate24 **`17/24`**（`binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 2/4`, `unit 3/4`）, 完走 **1002.8s** | 不採用 |
+
+解釈:
+
+- `v94 / v95` はどちらも **`v40 = 20/24`** を明確に下回った。
+- `v95` は `binary 2/4` まで戻したが、代わりに `unit 3/4` へ落ち、overall は **`17/24`** のままだった。
+- したがって **sampled-new general short mix (`v92/v93`) に `bit` general short `24` を足す route** も、README gate24 観点では branch closure。
+- 重要なのは、`v94 / v95` は `v130-v142` のような decode-toxic stall ではなく、**完走したうえで score が足りない** こと。以後この route は timing ではなく **actual score closure** として扱う。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v94_lr2p5e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v94_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v94_gate24/gate24_top8_fusion_v94_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v95_lr2p5e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v95_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v95_gate24/gate24_top8_fusion_v95_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
