@@ -104,3 +104,35 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v119_lr1p25e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v120_lr1p25e6_ep025/training_result.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v120_lr1p25e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+
+### v123-v124 verified-only follow-up
+
+manual prompt-local branch が formatting を壊したため、次は **verified-only strong-sample** を `v110` continuation に narrow append する safer branch を切った。
+
+| version | design | prepare result | train | gate24 | follow-up |
+| --- | --- | --- | --- | ---: | --- |
+| `v123` | `v110 + bit_other verified 24 + numeric_2x2 verified 8` | `2138 rows`, `33 iters`, augmentation `32` | `final val 0.311 -> 0.309` | `16/24` | branch closure |
+| `v124` | `v110 + bit_other verified 48 + numeric_2x2 verified 16` | `2170 rows`, `33 iters`, augmentation `64` | `final val 0.311 -> 0.309` | `21/24` | slice triage 実施 → full320 昇格 |
+
+`v124` は gate24 では **`v110` と同点 `21/24`** だったが、中身は単純な tie ではなかった。
+
+- gain: `c625ba91` (`bit_other`) を `your answer` から **`11111111`** に回収
+- loss: `0fdc689e` (`unit_fixed_ratio`) を **`29.56 -> 795`** の numeric fallback に悪化
+- 未回収: `12e947ca` (`bit_other`), `db6a5663` (`numeric_2x2`)
+
+そのため full320 の前に README 条件の slice を切った。
+
+| version | slice | result | comparison vs `v110` | note |
+| --- | --- | ---: | --- | --- |
+| `v124` | `unit50` | `44/50 = 0.88` | `v110 unit = 42/50` より **+2** | gate24 の unit 1-loss は全体では regress ではなかった |
+| `v124` | `binary60` | `4/60 = 0.0667` | `v110 binary60 = 3/60` より **+1** | `bit_other 4/46`, `bit_structured_byte_formula 0/14`, `format_failure_rate 0.9333` |
+
+判断:
+
+- `v123` は `16/24` で dead branch
+- `v124` は **binary +1 / unit +2** と `v110` を上回る slice signal が見えたため、**separate eval root で README actual full320** へ進める
+
+運用メモ:
+
+- `mac_workspace/v1/phase2_binary_dsl_mlx_v1.py eval-phase0` は、`--adapter-path` 指定時に **既定では adapter run dir の `phase0_offline_eval` を上書き**する
+- slice / full320 を並行管理するには **`--eval-output-root` を明示**する必要がある
