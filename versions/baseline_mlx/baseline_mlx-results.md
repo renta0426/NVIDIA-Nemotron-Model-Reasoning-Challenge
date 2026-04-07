@@ -99,7 +99,7 @@ row-level overlap:
 | version | run_name | status | measured | notes |
 | --- | --- | --- | --- | --- |
 | `baseline-mlx-lora-fix-smoke-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_smoke_v1` | 完走 | `val_loss=0.607`, `train_loss=0.565`, `peak_mem=71.683 GB` | smoke では loss は旧 v1 と同値だが、trainable params は `23.976M -> 880.138M`、adapter は `3.52 GB` に増加 |
-| `baseline-mlx-lora-fix-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v1` | in progress | `iter1 val_loss=0.683`; `iter190 train_loss=0.433`; `peak_mem=80.641 GB` | `train_split_with_cot.csv` / `607` 行 sampling を維持したまま、拡張 LoRA target で full retrain を継続中 |
+| `baseline-mlx-lora-fix-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v1` | in progress | `iter1 val_loss=0.683`; `iter200 val_loss=0.340`; `iter400 val_loss=0.276`; `iter600 val_loss=0.259`; `iter730 train_loss=0.216`; `peak_mem=81.271 GB` | `train_split_with_cot.csv` / `607` 行 sampling を維持したまま、拡張 LoRA target で full retrain を継続中 |
 
 ## Notes
 
@@ -110,3 +110,4 @@ row-level overlap:
 - 一方で `roman 50/50`, `unit 50/50` は README 条件下でも完全再現できており、baseline notebook 由来の知識は family ごとに保持率が大きく異なる。
 - row-level で origin reference と突き合わせると `HF-only 65`, `MLX-only 12`, `both_wrong 59`, `both_correct 184`。HF-only loss は `text 29`, `binary 16`, `gravity 11`, `symbol 9` が中心で、特に text は **HF が取れて MLX だけ落とす**再現差が支配的。
 - notebook 現在版の学習セルは `train_split_with_cot_v3f_safe_plus_notformula.csv` と `Bit Manipulation = 1021` を指している。したがって、今回の `train_split_with_cot.csv` / `607` 再現は「元 CSV baseline」の記録として保持しつつ、次段では **notebook current config の MLX 再現**も別 run として切り分ける。
+- 2026-04-07 の現タスクでは、ユーザー指示により **並列学習は禁止**。LoRA target fix の full retrain 1 本だけを継続し、追加の並列再学習やアブレーション起動は保留にした。
