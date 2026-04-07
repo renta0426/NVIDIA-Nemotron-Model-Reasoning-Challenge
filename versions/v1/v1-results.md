@@ -160,9 +160,48 @@ manual prompt-local branch が formatting を壊したため、次は **verified
 - ただし single-adapter の best known `v40 = 205/320` を **11 点下回る**
 - したがってこのまま mainline にはせず、ユーザー懸念どおり **`0.25 epoch` undertraining 仮説**を潰すため、次は同 profile / 同条件で **epoch 比較 (`0.25 / 0.5 / 1.0 / 2.0`)** を 1 回だけ実施して、以後の実験で使う epoch を決める
 
+#### `v40` gap audit
+
+README actual full320 の row-level を best known single-adapter `v40` と突き合わせると、overlap 320 行の内訳は次のとおりだった。
+
+- `both_correct = 179`
+- `both_wrong = 100`
+- `v40_only = 26`
+- `v124_only = 15`
+- net は **`-11`**
+
+family net delta (`v124 - v40`):
+
+- `text -6` (`gain 7 / loss 13`)
+- `binary -4` (`gain 2 / loss 6`)
+- `unit -3` (`gain 0 / loss 3`)
+- `roman -1`
+- `symbol +1`
+- `gravity +2`
+
+loss profile (`v40_only 26`):
+
+- fallback は **`last_number 17`**, `boxed_non_empty 8`, `boxed_empty 1`
+- prediction kind は `number_only 10`, `placeholder("your answer") 8`, `binary_like 7`, `empty 1`
+- 特に `text` loss 13 件は `number_only 9`, `placeholder 2`, `binary_like 2`
+- `binary` loss 6 件は `binary_like 5`, `placeholder 1`
+
+gain profile (`v124_only 15`):
+
+- `text` gain 7 件はすべて **textual final answer の回収**
+- `gravity` gain 3 件は unit suffix / placeholder を落とした **plain numeric** 回収
+- `symbol` gain 3 件は `numeric_2x2` 側の回収
+
+解釈:
+
+- `v124` の `v40` 比 **-11** は、`symbol` ではなく **`text + binary + unit`** の取りこぼしが主因
+- 次枝で優先すべきなのは `numeric_2x2` の追加 gain ではなく、**text final-answer fidelity** と **binary の boxed / placeholder 崩れ抑制** である
+
 artifact source of truth:
 
 - `mac_workspace/v1/outputs/eval_single_adapter_v124_full320_shard2/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v124_full320_shard2/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
+- `mac_workspace/v0/outputs/eval_safe_resume_v10_binarycandidates_v40_v41/full320_full_fusion_v40_lr1p25e6_ep0125_shard2/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
 
 ### epoch sweep (`v124` / `v125` / `v126` / `v127`)
 
