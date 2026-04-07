@@ -392,6 +392,7 @@ def build_mlx_lora_config(
     num_layers: int,
     steps_per_report: int,
     steps_per_eval: int,
+    save_every: int,
     seed: int,
     lr_schedule_name: str | None,
     lr_schedule_end: float,
@@ -431,7 +432,7 @@ def build_mlx_lora_config(
         "steps_per_eval": steps_per_eval,
         "grad_accumulation_steps": grad_accumulation_steps,
         "adapter_path": str(adapter_dir),
-        "save_every": total_iters,
+        "save_every": total_iters if save_every <= 0 else save_every,
         "max_seq_length": max_seq_length,
         "grad_checkpoint": True,
         "seed": seed,
@@ -898,6 +899,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         num_layers=int(args.num_layers),
         steps_per_report=int(args.steps_per_report),
         steps_per_eval=int(args.steps_per_eval),
+        save_every=int(args.save_every),
         seed=int(args.seed),
         lr_schedule_name=args.lr_schedule_name,
         lr_schedule_end=float(args.lr_schedule_end),
@@ -977,6 +979,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "num_layers": int(args.num_layers),
             "steps_per_report": int(args.steps_per_report),
             "steps_per_eval": int(args.steps_per_eval),
+            "save_every": int(config["save_every"]),
             "lr_schedule_name": str(args.lr_schedule_name or ""),
             "lr_schedule_end": float(args.lr_schedule_end),
             "lr_warmup_ratio": float(args.lr_warmup_ratio),
@@ -1142,6 +1145,12 @@ def build_parser() -> argparse.ArgumentParser:
         )
         target.add_argument("--steps-per-report", type=int, default=10)
         target.add_argument("--steps-per-eval", type=int, default=200)
+        target.add_argument(
+            "--save-every",
+            type=int,
+            default=0,
+            help="Save intermediate adapter checkpoints every N microsteps; 0 keeps final-only behavior.",
+        )
         target.add_argument("--lr-schedule-name", type=str, default="cosine_decay")
         target.add_argument("--lr-schedule-end", type=float, default=0.0)
         target.add_argument("--lr-warmup-ratio", type=float, default=0.05)
