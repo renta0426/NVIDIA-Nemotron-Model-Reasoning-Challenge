@@ -260,3 +260,41 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/eval_single_adapter_v125_unit50/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v125_binary60/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v125_full320_shard2/eval_single_adapter_v125_full320_shard2/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+
+### v128-v129 boxed-safe follow-up
+
+`v125` が actual full320 で regress したため、次は epoch ではなく **boxed fidelity を崩さない narrow repair** に切り替えた。  
+どちらも `v124` adapter continuation / `lr=1.25e-6` / `epoch=0.25` / `top8` / `dataset_format=text` で揃えている。
+
+| version | design | prepare result | train | README score | decision |
+| --- | --- | --- | --- | --- | --- |
+| `v128` | `v124 + v67-style exact-trace-safe structured repair` | `2223 rows`, `34 iters`, augmentation `53` (`binary 35`, `symbol 4`, `text 14`) | `final val 0.309 -> 0.306`, peak mem `74.475 GB` | **未計測**（gate24 を `>12 min` で中止、1-row binary probe も `>50s`） | 不採用 |
+| `v129` | `v124 + v79-style strict boxed_done structured repair` | `2224 rows`, `34 iters`, augmentation `54` (`binary 36`, `symbol 4`, `text 14`) | `final val 0.309 -> 0.306`, peak mem `74.475 GB` | **未計測**（gate24 を `>12 min` で中止、1-row binary probe も `>50s`） | 不採用 |
+
+補足:
+
+- `v128` は source を
+  - `binary_structured_answer_only_abstract_safe 7`
+  - `binary_affine_verified 12`
+  - `binary_structured_answer_only 8`
+  - `binary_structured_recommended 8`
+  - `symbol_formula_verified 4`
+  - `text_verified_anchor 14`
+  に絞った conservative branch。
+- `v129` は source を
+  - `binary_affine_verified 12`
+  - `binary_structured_answer_only 8`
+  - `binary_prompt_local_current_structured_boxed_done 16`
+  - `symbol_formula_verified 4`
+  - `text_verified_anchor 14`
+  に置いた strict `boxed_only_done` branch。
+- しかし README 条件の `gate24` は、**どちらも chunk1/1 のまま 12 分以上進まず、prediction artifact も manifest 以外は生成されなかった**。
+- さらに `binary` 1-row probe (`per_family_limit=1`, `max_samples=1`) でも、**どちらも 50 秒超で完了しなかった**。
+- したがってこの 2 本は、「score が低い」より前に **README decoding 下で long-generation / final-format regression を起こしている** と判断し、mainline 候補から外した。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v128_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v128_lr1p25e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v129_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v124_to_top8_fusion_v129_lr1p25e6_ep025/training_result.json`
