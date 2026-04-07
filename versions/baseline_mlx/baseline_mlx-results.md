@@ -86,9 +86,16 @@ row-level overlap:
 - **symbol**: `glyph_len5` は origin / MLX とも `0/20`。差分は主に `numeric_2x2` の `22/40 -> 17/40` (`-5`)。
 - 差分の大半は hard/manual ではなく **`verified_trace_ready` の再現差**で、selection tier でも `226/235 -> 177/235` (`-49`) が最大の落差。
 
+構成差から見つかった具体的な bug candidate:
+
+- HF `NemotronHMOE` は `experts[*].up_proj/down_proj` と `shared_experts.up_proj/down_proj` を持つが、MLX v1 script の default LoRA keys は **`mixer.shared_experts.up_proj/down_proj` しか拾っていなかった**。
+- MLX `nemotron_h.py` では routed experts が `mixer.switch_mlp.fc1/fc2` に畳み込まれており、`mlx_lm` の LoRA 実装は `SwitchLinear` をサポートしている。
+- つまり v1 run は MoE block で **shared expert だけを学習し、routed experts 側 (`switch_mlp.fc1/fc2`) を未学習**だった可能性が高い。
+- そのため `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` の default LoRA keys は、後続修正で `mixer.switch_mlp.fc1/fc2`（および generic `mixer.up_proj/down_proj`）を含む形へ拡張した。
+
 ## Notes
 
-- LoRA target は MLX Nemotron の module 名に合わせて `mixer.in_proj`, `mixer.out_proj`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj` に固定した。これは HF notebook の `in_proj|out_proj|up_proj|down_proj` を MLX 側へ最も近く写した設定。
+- 初期 v1 run の LoRA target は `mixer.in_proj`, `mixer.out_proj`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj` だけだったが、後続の構成照合で routed expert 側の `mixer.switch_mlp.fc1/fc2` も必要と判明した。現行 script では generic `mixer.up_proj/down_proj` を含めて target を拡張している。
 - warmup 中の `Learning Rate` 表示は iter 10 付近で見た目が不自然だったが、schedule 単体検証と以後の train log では non-zero で立ち上がっていることを確認済み。
 - 今回の full run は **`train_split_with_cot.csv` の元 baseline 再現**であり、Bit Manipulation は `607` 行 sampling のまま。IDE 上で見えていた `1021` 行設定は別 notebook 変更で、今回の完走 run には使っていない。
 - full320 実測は HF notebook reference `249/320 = 0.7781` を下回り、主な失点は `symbol 17/60`, `binary 19/60`, `text 21/50`。特に `glyph_len5 0/20`, `numeric_2x2 17/40`, `bit_other 13/46` が弱い。

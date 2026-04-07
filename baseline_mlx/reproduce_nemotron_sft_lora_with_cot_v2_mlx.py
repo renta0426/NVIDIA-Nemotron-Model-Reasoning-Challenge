@@ -54,6 +54,10 @@ DEFAULT_SEED = 123
 DEFAULT_LORA_KEYS = [
     "mixer.in_proj",
     "mixer.out_proj",
+    "mixer.up_proj",
+    "mixer.down_proj",
+    "mixer.switch_mlp.fc1",
+    "mixer.switch_mlp.fc2",
     "mixer.shared_experts.up_proj",
     "mixer.shared_experts.down_proj",
 ]
