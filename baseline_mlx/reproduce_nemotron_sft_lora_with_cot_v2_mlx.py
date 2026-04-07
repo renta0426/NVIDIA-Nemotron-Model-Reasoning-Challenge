@@ -214,6 +214,11 @@ def resolve_type_samples(args: argparse.Namespace) -> dict[str, int]:
     return type_samples
 
 
+def resolve_lora_keys(entries: Sequence[str]) -> list[str]:
+    keys = [entry.strip() for entry in entries if entry.strip()]
+    return keys or list(DEFAULT_LORA_KEYS)
+
+
 def sample_training_df(df: pd.DataFrame, *, type_samples: dict[str, int], seed: int) -> pd.DataFrame:
     sampled_dfs: list[pd.DataFrame] = []
     for puzzle_type, sample_count in type_samples.items():
@@ -618,6 +623,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
     df = pd.read_csv(train_csv)
     validate_training_frame(df, train_csv)
     type_samples = resolve_type_samples(args)
+    lora_keys = resolve_lora_keys(args.lora_key or [])
     sampled_train_df = sample_training_df(
         df,
         type_samples=type_samples,
@@ -644,8 +650,8 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         resume_adapter_file=(
             Path(args.resume_adapter_file).resolve() if args.resume_adapter_file else None
         ),
-        mask_prompt=True,
-        enable_thinking=True,
+        mask_prompt=bool(args.mask_prompt),
+        enable_thinking=bool(args.enable_thinking),
         batch_size=int(args.batch_size),
         num_epochs=float(args.num_epochs),
         learning_rate=float(args.learning_rate),
@@ -654,7 +660,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         lora_rank=int(args.lora_rank),
         lora_alpha=float(args.lora_alpha),
         lora_dropout=float(args.lora_dropout),
-        lora_keys=DEFAULT_LORA_KEYS,
+        lora_keys=lora_keys,
         num_layers=int(args.num_layers),
         steps_per_report=int(args.steps_per_report),
         steps_per_eval=int(args.steps_per_eval),
@@ -706,10 +712,12 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "num_epochs": float(args.num_epochs),
             "learning_rate": float(args.learning_rate),
             "max_seq_length": int(args.max_seq_length),
+            "mask_prompt": bool(args.mask_prompt),
+            "enable_thinking": bool(args.enable_thinking),
             "lora_rank": int(args.lora_rank),
             "lora_alpha": float(args.lora_alpha),
             "lora_dropout": float(args.lora_dropout),
-            "lora_keys": list(DEFAULT_LORA_KEYS),
+            "lora_keys": list(lora_keys),
             "num_layers": int(args.num_layers),
             "steps_per_report": int(args.steps_per_report),
             "steps_per_eval": int(args.steps_per_eval),
@@ -844,9 +852,27 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument("--num-epochs", type=float, default=2.0)
         target.add_argument("--learning-rate", type=float, default=1e-4)
         target.add_argument("--max-seq-length", type=int, default=4096)
+        target.add_argument(
+            "--mask-prompt",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Mask prompt tokens from the loss. Use --no-mask-prompt for HF-style ablations.",
+        )
+        target.add_argument(
+            "--enable-thinking",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Pass enable_thinking through the chat template when supported.",
+        )
         target.add_argument("--lora-rank", type=int, default=32)
         target.add_argument("--lora-alpha", type=float, default=32.0)
         target.add_argument("--lora-dropout", type=float, default=0.05)
+        target.add_argument(
+            "--lora-key",
+            action="append",
+            default=[],
+            help="Override LoRA target keys. Repeat the flag to provide multiple keys.",
+        )
         target.add_argument(
             "--num-layers",
             type=int,
