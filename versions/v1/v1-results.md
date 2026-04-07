@@ -50,3 +50,57 @@ metric は **`\boxed{}` 優先抽出 → heuristic fallback → last numeric fal
 - artifact source of truth:
   - `mac_workspace/v1/outputs/eval_prompt_router_v6_repro/gate24/phase0_offline_eval/artifacts/phase0_eval_summary.json`
   - `mac_workspace/v1/outputs/eval_prompt_router_v6_repro/full320_shard2/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+
+## Submission-compatible single-adapter track
+
+README の提出要件を満たす本命は、**single adapter 1 本**で local score を上げること。  
+`v1` ではまず、`v0` の `v110` general-support mix を土台にしつつ、`prompt-router-v6` の gain 源に近い **`bit_other` prompt-local consensus** を teacher row として追加する枝から再開した。
+
+重要な切り分け:
+
+- `binary_prompt_local_current_consensus_candidates_v1.csv` の **`bit_other + answer_only_keep` 52 行は、すべて現行 900-row phase2 train CSV と重複**していた
+- したがって今回の新規 signal は **`bit_other + manual_audit_priority`** が中心
+- first batch は `v110` adapter からの top8 continuation (`lr=1.25e-6`, `epoch=0.25`, `dataset_format=text`) で揃える
+
+### v119-v122 prepare batch
+
+| version | design | prepare result | status |
+| --- | --- | --- | --- |
+| `v119` | `v110 + bit_other prompt-local manual` conservative | `2114 rows`, `33 iters`, augmentation `8` (`boxed_only_done 8`) | gate24 実測済み |
+| `v120` | `v110 + bit_other prompt-local manual` broad | `2118 rows`, `33 iters`, augmentation `12` (`boxed_only_done 12`) | gate24 実測済み |
+| `v121` | `v110 + bit_other prompt-local manual` + same-row boxed twin | `2122 rows`, `33 iters`, augmentation `16` (`boxed_only_done 8 + boxed_only 8`) | prepare only |
+| `v122` | `v110 + bit_other prompt-local manual` + hybrid-consensus verified | `2122 rows`, `33 iters`, augmentation `16` (`manual boxed_only_done 8 + hybrid boxed_only 8`) | prepare only |
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v119_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v120_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v121_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v122_lr1p25e6_ep025/prepare_manifest.json`
+
+### v119-v122 gate24 follow-up
+
+`v119` / `v120` を `v110` adapter から top8 continuation で学習し、OOM 回避のため **single-shard gate24** で先に評価した。  
+結果は **どちらも `v110` の `21/24` を下回り、この枝は branch closure**。
+
+| version | train | gate24 | family breakdown | decision |
+| --- | --- | ---: | --- | --- |
+| `v119` | `final val 0.311 -> 0.312` | `16/24` | `binary 0/4`, `gravity 4/4`, `roman 4/4`, `symbol 0/4`, `text 4/4`, `unit 4/4` | 不採用 |
+| `v120` | `final val 0.311 -> 0.310` | `17/24` | `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 2/4`, `unit 4/4` | 不採用 |
+| `v121` | prepare only | OOM 対応で train 停止 | twin 追加枝 | 打ち切り |
+| `v122` | prepare only | OOM 対応で train 停止 | hybrid 混合枝 | 打ち切り |
+
+観察:
+
+- `bit_other` manual を足すと **binary hard prompt の boxed formatting が崩れた**。
+  - `v119` binary metrics: `boxed_extraction_success_rate 0.0`, `format_failure_rate 1.0`
+  - `v120` binary metrics: `boxed_extraction_success_rate 0.5`, `format_failure_rate 0.75`
+- `v120` は `v119` より広い manual quota で **symbol 2/4** までは戻したが、`binary 1/4` / `text 2/4` に留まり、`v110` 改善には繋がらなかった。
+- row-level では `your answer` placeholder と `last_number` fallback が再発しており、**current prompt-local manual teacher は single-adapter continuation だと出力形式安定性を壊す**。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v119_lr1p25e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v119_lr1p25e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v120_lr1p25e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v110_to_top8_fusion_v120_lr1p25e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`

@@ -288,6 +288,10 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v116",
     "single-adapter-fusion-v117",
     "single-adapter-fusion-v118",
+    "single-adapter-fusion-v119",
+    "single-adapter-fusion-v120",
+    "single-adapter-fusion-v121",
+    "single-adapter-fusion-v122",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -2809,6 +2813,46 @@ FUSION_V115_AUGMENT_QUOTAS = {
         "binary_structured_answer_only_abstract_safe_exact_fields"
     ],
 }
+FUSION_V119_AUGMENT_QUOTAS = {
+    "binary_prompt_local_current_bit_other_manual_boxed_done": 8,
+    "binary_prompt_local_current_bit_other_manual_boxed_done_group_keys": (
+        "safe_formulas",
+        "num_examples",
+    ),
+    "binary_prompt_local_current_bit_other_manual_boxed_done_min_fields": {
+        "num_examples": 9,
+    },
+    "binary_prompt_local_current_bit_other_manual_boxed_done_max_fields": {
+        "safe_formula_count": 4,
+    },
+    "binary_prompt_local_current_bit_other_manual_boxed_done_exact_fields": {
+        "safe_prediction_count": 1,
+    },
+}
+FUSION_V120_AUGMENT_QUOTAS = {
+    **FUSION_V119_AUGMENT_QUOTAS,
+    "binary_prompt_local_current_bit_other_manual_boxed_done_min_fields": {
+        "num_examples": 8,
+    },
+    "binary_prompt_local_current_bit_other_manual_boxed_done": 12,
+}
+FUSION_V121_AUGMENT_QUOTAS = {
+    **FUSION_V119_AUGMENT_QUOTAS,
+    "binary_prompt_local_current_bit_other_manual_boxed_only_twin": 8,
+}
+FUSION_V122_AUGMENT_QUOTAS = {
+    **FUSION_V119_AUGMENT_QUOTAS,
+    "binary_hybrid_consensus": 8,
+    "binary_hybrid_consensus_allowed_tiers": ("verified_trace_ready",),
+    "binary_hybrid_consensus_group_keys": (
+        "teacher_solver_candidate",
+        "num_examples",
+    ),
+    "binary_hybrid_consensus_exact_fields": {
+        "bit_hybrid_consensus_ready": "True",
+        "auto_solver_match": "True",
+    },
+}
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -4759,6 +4803,98 @@ def build_single_adapter_fusion_external_rows(
             ),
             assistant_style="boxed_only",
         )
+    selected_binary_prompt_local_current_bit_other_answer_only_boxed_done: list[dict[str, str]] = []
+    if quotas.get("binary_prompt_local_current_bit_other_answer_only_boxed_done", 0) > 0:
+        selected_binary_prompt_local_current_bit_other_answer_only_boxed_done = (
+            select_joined_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_other",
+                allowed_tiers={"answer_only_keep"},
+                quota=quotas["binary_prompt_local_current_bit_other_answer_only_boxed_done"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_prompt_local_current_bit_other_answer_only_boxed_done_group_keys",
+                        ("safe_formulas", "num_examples"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_answer_only_boxed_done_min_fields"
+                ),
+                max_int_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_answer_only_boxed_done_max_fields"
+                ),
+                exact_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_answer_only_boxed_done_exact_fields"
+                ),
+                startswith_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_answer_only_boxed_done_startswith_fields"
+                ),
+            )
+        )
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_bit_other_answer_only_boxed_done",
+            selected_binary_prompt_local_current_bit_other_answer_only_boxed_done,
+            assistant_style="boxed_only_done",
+        )
+    if quotas.get("binary_prompt_local_current_bit_other_answer_only_boxed_only_twin", 0) > 0:
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_bit_other_answer_only_boxed_only_twin",
+            selected_binary_prompt_local_current_bit_other_answer_only_boxed_done[
+                : quotas["binary_prompt_local_current_bit_other_answer_only_boxed_only_twin"]
+            ],
+            assistant_style="boxed_only",
+            duplicate_ok=True,
+        )
+    selected_binary_prompt_local_current_bit_other_manual_boxed_done: list[dict[str, str]] = []
+    if quotas.get("binary_prompt_local_current_bit_other_manual_boxed_done", 0) > 0:
+        selected_binary_prompt_local_current_bit_other_manual_boxed_done = (
+            select_joined_augmentation_candidates(
+                AUGMENT_ANSWER_ONLY_CSV,
+                AUGMENT_BINARY_PROMPT_LOCAL_CURRENT_CONSENSUS_CSV,
+                existing_ids=existing_ids,
+                family="bit_manipulation",
+                template_subtype="bit_other",
+                allowed_tiers={"manual_audit_priority"},
+                quota=quotas["binary_prompt_local_current_bit_other_manual_boxed_done"],
+                group_keys=tuple(
+                    quotas.get(
+                        "binary_prompt_local_current_bit_other_manual_boxed_done_group_keys",
+                        ("safe_formulas", "num_examples"),
+                    )
+                ),
+                hard_first=True,
+                min_int_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_manual_boxed_done_min_fields"
+                ),
+                max_int_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_manual_boxed_done_max_fields"
+                ),
+                exact_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_manual_boxed_done_exact_fields"
+                ),
+                startswith_fields=quotas.get(
+                    "binary_prompt_local_current_bit_other_manual_boxed_done_startswith_fields"
+                ),
+            )
+        )
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_bit_other_manual_boxed_done",
+            selected_binary_prompt_local_current_bit_other_manual_boxed_done,
+            assistant_style="boxed_only_done",
+        )
+    if quotas.get("binary_prompt_local_current_bit_other_manual_boxed_only_twin", 0) > 0:
+        append_binary_closure_candidates(
+            "binary_prompt_local_current_bit_other_manual_boxed_only_twin",
+            selected_binary_prompt_local_current_bit_other_manual_boxed_done[
+                : quotas["binary_prompt_local_current_bit_other_manual_boxed_only_twin"]
+            ],
+            assistant_style="boxed_only",
+            duplicate_ok=True,
+        )
     if quotas.get("symbol_formula_verified", 0) > 0:
         append_phase2_rows(
             "symbol_formula_verified",
@@ -5962,6 +6098,50 @@ def build_single_adapter_fusion_v118_rows(
     )
 
 
+def build_single_adapter_fusion_v119_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v119",
+        quotas=FUSION_V119_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v120_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v120",
+        quotas=FUSION_V120_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v121_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v121",
+        quotas=FUSION_V121_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v122_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v122",
+        quotas=FUSION_V122_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
 def build_strong_baseline_cot_v2_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -6319,6 +6499,14 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v117_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v118":
         return build_single_adapter_fusion_v118_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v119":
+        return build_single_adapter_fusion_v119_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v120":
+        return build_single_adapter_fusion_v120_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v121":
+        return build_single_adapter_fusion_v121_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v122":
+        return build_single_adapter_fusion_v122_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
