@@ -37,6 +37,7 @@
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `baseline-mlx-eval-smoke-v1` | `baseline_mlx_eval_smoke_v1` | smoke 6 rows | `4/6 = 0.6667` | `1/1` | `1/1` | `1/1` | `0/1` | `0/1` | `1/1` | `peak_memory_gb=65.63`, `generation_tps=8.20` |
 | `baseline-mlx-eval-full320-v1` | `baseline_mlx_eval_full320_shard2_v1` | README local320 | `196/320 = 0.6125` | `19/60` | `39/50` | `50/50` | `17/60` | `21/50` | `50/50` | shard parallel; chunk peak `73.69 GB`; binary boxed extraction `1.0`; leading-zero retention `0.9` |
+| `baseline-mlx-eval-full320-lora-fix-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_v1` | README local320 | `6/320 = 0.0187` | `5/60` | `0/50` | `0/50` | `1/60` | `0/50` | `0/50` | one-shard rerun after stopping 2-shard for memory; binary boxed extraction `0.0`; format failure `1.0`; peak_memory_gb `76.08` |
 
 ## In-flight follow-up batch
 
@@ -99,14 +100,22 @@ row-level overlap:
 | version | run_name | status | measured | notes |
 | --- | --- | --- | --- | --- |
 | `baseline-mlx-lora-fix-smoke-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_smoke_v1` | 完走 | `val_loss=0.607`, `train_loss=0.565`, `peak_mem=71.683 GB` | smoke では loss は旧 v1 と同値だが、trainable params は `23.976M -> 880.138M`、adapter は `3.52 GB` に増加 |
-| `baseline-mlx-lora-fix-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v1` | in progress | `iter1 val_loss=0.683`; `iter200 val_loss=0.340`; `iter400 val_loss=0.276`; `iter600 val_loss=0.259`; `iter730 train_loss=0.216`; `peak_mem=81.271 GB` | `train_split_with_cot.csv` / `607` 行 sampling を維持したまま、拡張 LoRA target で full retrain を継続中 |
+| `baseline-mlx-lora-fix-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v1` | 完走 | `iter1 val_loss=0.683`; `iter200 val_loss=0.340`; `iter400 val_loss=0.276`; `iter600 val_loss=0.259`; `iter5200 val_loss=5.089`; `iter5400 val_loss=4.772`; `iter5600 val_loss=4.716`; `iter5800 val_loss=4.676`; `iter5814 val_loss=4.705`; `iter5814 train_loss=5.676`; `peak_mem=82.603 GB` | 拡張 LoRA target 自体は HF trainable params 規模に近づいたが、README local320 は `6/320` まで崩壊。終盤でも `learning_rate≈9.863e-05` のままで、scheduler step 単位 mismatch が有力 |
+
+## Scheduler mismatch finding
+
+- notebook (`baseline/nemotron-sft-lora-with-cot-v2.ipynb`) は `learning_rate=1e-4`, `lr_scheduler_type="cosine"`, `warmup_ratio=0.05`, `gradient_accumulation_steps=8`, `num_train_epochs=2`。
+- 現行 MLX 再現では schedule の decay/warmup steps を **microstep (`iters=5814`) 基準**で構築していたが、`mlx_lm` trainer は optimizer update を **8 microstep ごと**にしか進めない。
+- その結果、warmup と cosine decay が **約 8 倍遅く進み**、実ログでも終盤 `iter5800` 付近で `learning_rate≈9.864e-05` とほぼ初期値のままだった。
+- 次 run では `lr_schedule_step_unit=optimizer` を導入し、今回の baseline 条件 (`2907 rows`, `epochs=2`, `batch=1`, `grad_accum=8`) では **effective schedule steps = 726** として notebook 相当に合わせる。
 
 ## Notes
 
 - 初期 v1 run の LoRA target は `mixer.in_proj`, `mixer.out_proj`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj` だけだったが、後続の構成照合で routed expert 側の `mixer.switch_mlp.fc1/fc2` も必要と判明した。現行 script では generic `mixer.up_proj/down_proj` を含めて target を拡張している。
-- warmup 中の `Learning Rate` 表示は iter 10 付近で見た目が不自然だったが、schedule 単体検証と以後の train log では non-zero で立ち上がっていることを確認済み。
+- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` は 2026-04-07 更新で `--lr-schedule-step-unit {optimizer,micro}` を追加し、default を `optimizer` に変更した。今後の notebook 再現 run は optimizer-step 基準 schedule を使う。
 - 今回の full run は **`train_split_with_cot.csv` の元 baseline 再現**であり、Bit Manipulation は `607` 行 sampling のまま。IDE 上で見えていた `1021` 行設定は別 notebook 変更で、今回の完走 run には使っていない。
 - full320 実測は HF notebook reference `249/320 = 0.7781` を下回り、主な失点は `symbol 17/60`, `binary 19/60`, `text 21/50`。特に `glyph_len5 0/20`, `numeric_2x2 17/40`, `bit_other 13/46` が弱い。
+- 拡張 LoRA target の full run は local320 `6/320` まで崩れ、binary ですら `boxed_extraction_success_rate=0.0`, `format_failure_rate=1.0` になった。これは単なる target 拡張の問題ではなく、schedule mismatch を含む学習設定不整合の可能性が高い。
 - 一方で `roman 50/50`, `unit 50/50` は README 条件下でも完全再現できており、baseline notebook 由来の知識は family ごとに保持率が大きく異なる。
 - row-level で origin reference と突き合わせると `HF-only 65`, `MLX-only 12`, `both_wrong 59`, `both_correct 184`。HF-only loss は `text 29`, `binary 16`, `gravity 11`, `symbol 9` が中心で、特に text は **HF が取れて MLX だけ落とす**再現差が支配的。
 - notebook 現在版の学習セルは `train_split_with_cot_v3f_safe_plus_notformula.csv` と `Bit Manipulation = 1021` を指している。したがって、今回の `train_split_with_cot.csv` / `607` 再現は「元 CSV baseline」の記録として保持しつつ、次段では **notebook current config の MLX 再現**も別 run として切り分ける。
