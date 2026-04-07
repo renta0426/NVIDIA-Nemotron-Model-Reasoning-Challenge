@@ -136,3 +136,30 @@ manual prompt-local branch が formatting を壊したため、次は **verified
 
 - `mac_workspace/v1/phase2_binary_dsl_mlx_v1.py eval-phase0` は、`--adapter-path` 指定時に **既定では adapter run dir の `phase0_offline_eval` を上書き**する
 - slice / full320 を並行管理するには **`--eval-output-root` を明示**する必要がある
+
+### v124 full320 actual
+
+`v124` を separate root (`eval_single_adapter_v124_full320_shard2`) で README 条件 actual full320 に流した。
+
+| version | local320 | binary | gravity | roman | symbol | text | unit | note |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `v124` | `194/320 = 0.6062` | `5/60` | `49/50` | `47/50` | `13/60` | `35/50` | `45/50` | `v110` slice-equivalent `192/320` より **+2**、ただし `v40 = 205/320` には未達 |
+
+`v110` 比の family delta:
+
+- `binary +2` (`3 -> 5`)
+- `gravity +1` (`48 -> 49`)
+- `roman ±0` (`47 -> 47`)
+- `symbol +2` (`11 -> 13`)
+- `text -6` (`41 -> 35`)
+- `unit +3` (`42 -> 45`)
+
+結論:
+
+- `v124` は **`v110` からは改善**した
+- ただし single-adapter の best known `v40 = 205/320` を **11 点下回る**
+- したがってこのまま mainline にはせず、ユーザー懸念どおり **`0.25 epoch` undertraining 仮説**を潰すため、次は同 profile / 同条件で **epoch 比較 (`0.25 / 0.5 / 1.0 / 2.0`)** を 1 回だけ実施して、以後の実験で使う epoch を決める
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/eval_single_adapter_v124_full320_shard2/phase0_offline_eval/artifacts/phase0_eval_summary.json`
