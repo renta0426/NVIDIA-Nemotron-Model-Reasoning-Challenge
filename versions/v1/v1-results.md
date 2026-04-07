@@ -420,3 +420,56 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v138_lr1p25e6_ep025/prepare_manifest.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v138_lr1p25e6_ep025/adapter/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v138_binary1/`
+
+### v139 recipe-mismatch anchor diagnostic
+
+次の候補として `single-adapter-fusion-v31`（`text/unit verified anchor`）を `v40` から継続しようとしたが、既存 profile をそのまま使うと **dataset base が `single-adapter-fusion-v10` のまま**だった。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v139` | `v40` resume + `single-adapter-fusion-v31` | `2017 rows`, `31 iters`; `final val 0.355 -> 0.347` | binary 1-row probe は **54.4s** で完走したが、profile base は `single-adapter-fusion-v10` | 参考値のみ |
+
+解釈:
+
+- `v139` は **decode 無限化ではなく完走**したが、clean test ではない。
+- したがって次は、同じ anchor quotas を **`v40 base` に直接載せる corrected branch (`v140-v142`)** を切り直した。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v139_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v139_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v139_binary1/`
+
+### v140-v142 corrected anchor route
+
+`v139` の recipe mismatch を直し、`v29/v30/v31` の quotas をそのまま使いながら **base_profile だけ `single-adapter-fusion-v40` へ固定**した corrected branch を比較した。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v140` | corrected `v31` = `text + unit anchor` | `2071 rows`, `32 iters`; `final val 0.325 -> 0.319` | binary 1-row probe は **54.4s** で完走、しかし gate24 は **`>12 min`** でも chunk 完了 0 | 不採用 |
+| `v141` | corrected `v29` = `text anchor only` | `2045 rows`, `31 iters`; `final val 0.355 -> 0.350` | binary 1-row probe が **`>75s`** | 不採用 |
+| `v142` | corrected `v30` = `unit anchor only` | `2036 rows`, `31 iters`; `final val 0.355 -> 0.350` | binary 1-row probe が **`>75s`** | 不採用 |
+
+解釈:
+
+- `v140` は corrected route の中で train signal が最良だったが、**README gate24 が依然として重すぎる**。
+- `v141` と `v142` はそれぞれ `text-only` / `unit-only` に軽くしても、binary 1-row が **`>75s`** のままだった。
+- したがって **`v40` continuation に verified anchor family (`text_verified_anchor`, `unit_verified_anchor`) を積む route も、README decode 観点では不採用**。
+- これで `v40` 周辺では、少なくとも
+  - `v124` 系 verified-short strong-sample rows
+  - `strong_sample_symbol_numeric_verified_short`
+  - corrected `text/unit verified anchor`
+  の 3 系統が decode-safe ではないと確定した。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v140_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v140_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v140_binary1/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v140_gate24/`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v141_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v141_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v141_binary1/`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v142_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v142_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v142_binary1/`
