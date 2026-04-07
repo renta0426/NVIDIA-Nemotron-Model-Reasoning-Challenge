@@ -395,3 +395,28 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v135_lr1p25e6_ep025/adapter/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v135_binary1/`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v136_lr1p25e6_ep025/prepare_manifest.json`
+
+### v137-v138 low-dose symbol boxed-only follow-up
+
+`v135` で `16` 行が toxic だったため、同じ `strong_sample_symbol_numeric_verified_short` family を **`4` / `8` 行**まで下げて threshold を切った。  
+teacher style は `v135` と同じ **pure `boxed_only`** で、変えるのは quota だけ。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v137` | `single-adapter-fusion-v40` base + `strong_sample_symbol_numeric_verified_short` `4` rows, teacher=`boxed_only` | `1966 rows`, `30 iters`; `final val 0.355 -> 0.348` | binary 1-row probe が **`>75s`** | 不採用 |
+| `v138` | `single-adapter-fusion-v40` base + `strong_sample_symbol_numeric_verified_short` `8` rows, teacher=`boxed_only` | `1970 rows`, `30 iters`; `final val 0.355 -> 0.347` | binary 1-row probe が **`>75s`** | 不採用 |
+
+解釈:
+
+- **quota 16 だけでなく 8 / 4 でも decode stall は消えなかった**。
+- したがって `strong_sample_symbol_numeric_verified_short` family は、`v40` continuation に対して **dose を下げても toxic** とみなす。
+- 今後の `v40` continuation では、この family を source 候補から外す。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v137_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v137_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v137_binary1/`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v138_lr1p25e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v138_lr1p25e6_ep025/adapter/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v138_binary1/`
