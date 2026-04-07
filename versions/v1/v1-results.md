@@ -446,13 +446,14 @@ artifact source of truth:
 
 | version | design | prepare/train | README判定 | decision |
 | --- | --- | --- | --- | --- |
-| `v140` | corrected `v31` = `text + unit anchor` | `2071 rows`, `32 iters`; `final val 0.325 -> 0.319` | binary 1-row probe は **54.4s** で完走、しかし gate24 は **`>12 min`** でも chunk 完了 0 | 不採用 |
+| `v140` | corrected `v31` = `text + unit anchor` | `2071 rows`, `32 iters`; `final val 0.325 -> 0.319` | binary 1-row probe は **54.4s** で完走。gate24 rerun1 は **`17/24`**（`binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 2/4`, `unit 4/4`）、完走時間 **873.5s** | 不採用 |
 | `v141` | corrected `v29` = `text anchor only` | `2045 rows`, `31 iters`; `final val 0.355 -> 0.350` | binary 1-row probe が **`>75s`** | 不採用 |
 | `v142` | corrected `v30` = `unit anchor only` | `2036 rows`, `31 iters`; `final val 0.355 -> 0.350` | binary 1-row probe が **`>75s`** | 不採用 |
 
 解釈:
 
-- `v140` は corrected route の中で train signal が最良だったが、**README gate24 が依然として重すぎる**。
+- `v140` は corrected route の中で train signal が最良で、初回の **`>12 min`** cut は早すぎた。  
+  rerun1 は **873.5s で完走**し、実スコアは **`17/24`** だったため、この route は **timing ではなく actual score で閉じる**。
 - `v141` と `v142` はそれぞれ `text-only` / `unit-only` に軽くしても、binary 1-row が **`>75s`** のままだった。
 - したがって **`v40` continuation に verified anchor family (`text_verified_anchor`, `unit_verified_anchor`) を積む route も、README decode 観点では不採用**。
 - これで `v40` 周辺では、少なくとも
@@ -467,6 +468,7 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v140_lr1p25e6_ep025/adapter/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v140_binary1/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v140_gate24/`
+- `mac_workspace/v1/outputs/eval_single_adapter_v140_gate24_rerun1/gate24_top8_fusion_v140_from_v40_lr1p25e6_ep025_rerun1/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v141_lr1p25e6_ep025/prepare_manifest.json`
 - `mac_workspace/v1/outputs/phase2_binary_hybrid_mlx_v1_resume_v40_to_top8_fusion_v141_lr1p25e6_ep025/adapter/`
 - `mac_workspace/v1/outputs/eval_single_adapter_v141_binary1/`
