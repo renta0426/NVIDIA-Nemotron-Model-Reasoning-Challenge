@@ -431,19 +431,19 @@ v3 で採るべき方針は次の 5 つ。
 
 1. `We infer the rule from the examples.`
 2. `The rule is: ...`
-3. `For the query, apply the same rule bit-by-bit and keep the exact 8-bit result with leading zeros for the final boxed answer.`
+3. `For the query, apply the same rule bit-by-bit and keep the exact 8-bit result with leading zeros for the final box.`
 
 #### abstract 向け
 
 1. `We infer the abstract bit rule from the examples.`
 2. `The verified pattern is: ...`
-3. `Apply that same pattern to the query and keep the exact 8-bit result for the final boxed answer.`
+3. `Apply that same pattern to the query and keep the exact 8-bit result for the final box.`
 
 #### not-formula 向け
 
 1. `We infer the rule from the examples.`
 2. `The verified byte rule that matches the examples is: ...`
-3. `For the query, apply that same verified rule directly and keep the exact 8-bit result with leading zeros for the final boxed answer.`
+3. `For the query, apply that same verified rule directly and keep the exact 8-bit result with leading zeros for the final box.`
 
 ### 10.6 v3 の評価軸
 
@@ -493,3 +493,123 @@ v3 の主眼は **「verified structured をもっと増やす」ことではな
 5. **boxed closure を content supervision と一緒に守る**
 
 であり、**同型 synthetic の追加量勝負ではなく、teacher 設計の質で勝つ**方向へ切り替えるべきだと結論づける。
+
+## 11. v3f synthetic CoT 監査
+
+`train_split_with_cot_v3f_safe_plus_notformula.csv` に含まれる **追加 Bit Manipulation synthetic 414 行**について、base の Bit Manipulation 607 行と比較して phrasing / 構造 / safety を監査した。
+
+### 11.1 対象内訳
+
+| subset | rows |
+| --- | ---: |
+| base bit rows | `607` |
+| added synthetic rows | `414` |
+| `binary_structured_byte_formula` | `281` |
+| `binary_structured_byte_formula_abstract` | `110` |
+| `binary_structured_byte_not_formula` | `23` |
+
+### 11.2 safety check
+
+追加 414 行については、以下はすべて満たしている。
+
+- `answer` の plain-text leak: **`0/414`**
+- `\boxed{}` の混入: **`0/414`**
+- `<think>` / `</think>` の混入: **`0/414`**
+- `exact 8-bit` / `leading zeros` 系の final-answer guidance: **`414/414`**
+
+この点では、training notebook が最後に `</think>\n\boxed{answer}` を付ける前提と整合している。
+
+### 11.3 分布から浮いている phrase
+
+監査結果として、追加 synthetic 側には base Bit 行にない phrase がまだかなりある。
+
+#### safe / not-formula 304 行で新規に強く出るもの
+
+- `We infer the rule from the examples.`: `304/414`
+- `The verified rule is`: `391/414`
+- `The verified byte rule that matches the examples is`: `23/414`
+- `For the query, apply that same verified rule directly`: `304/414`
+
+#### abstract 110 行に残っている旧 v2 template
+
+- `Check examples:`: `110/414`
+- `So the verified rule is`: `110/414`
+- `Query x =`: `110/414`
+- `Constraints:`: `110/414`
+
+#### 既に除去した問題 phrase
+
+次の phrase は監査を踏まえて除去済み。
+
+- `structured-safe family`: **`0`**
+- `not the right fit here`: **`0`**
+- `verified supported rule`: **`0`**
+- `final boxed answer`: **`0`**
+
+つまり、**safe / not-formula 側の jargon drift は一段抑えられたが、abstract 110 行には旧 template 由来の drift がまだ残る**。
+
+### 11.4 構造監査
+
+| subset | mean chars | median chars | mean lines | mean sentences |
+| --- | ---: | ---: | ---: | ---: |
+| base bit | `290.7` | `279` | `14.34` | `1.25` |
+| added all | `309.4` | `247.0` | `2.59` | `3.00` |
+| added safe | `241.8` | `240` | `1.00` | `3.00` |
+| added abstract | `488.0` | `498.0` | `7.00` | `3.00` |
+| added not-formula | `280.2` | `275` | `1.00` | `3.00` |
+
+ここから分かるのは次の 3 点。
+
+1. **safe / not-formula はかなり短く、3 文で閉じる deterministic template**
+2. **abstract だけがまだ長く、`Check examples:` テンプレート由来の 7 行構造**
+3. base Bit は per-bit analysis をそのまま貼る都合で行数が多く、v3f synthetic はそれとはかなり違う
+
+したがって、v3f synthetic 全体は **「base と同分布」ではない**。  
+ただし safe / not-formula 304 行は、長文化や answer leak を避けるという意味では構造的にかなり安定している。
+
+### 11.5 表現として良い点
+
+追加 synthetic CoT の良い点は明確。
+
+1. **rule commitment が明示的**  
+   `The verified rule is ...` / `The verified byte rule that matches the examples is ...` で、何を信じるかがはっきりしている。
+2. **query 適用が明示的**  
+   `For the query, apply ...` があるので、rule と answer の橋が短い。
+3. **final answer guidance が安定**  
+   `exact 8-bit`, `leading zeros`, `final box` が全行で明示される。
+4. **answer leak がない**  
+   notebook の suffix 付与ロジックと矛盾しない。
+
+このため、**安全性と supervision の明確さという意味では、現在の safe / not-formula template はかなり良い**。
+
+### 11.6 表現としてまだ気になる点
+
+一方で、網羅監査として気になる点もある。
+
+1. **304 行の lexical repetition が強い**  
+   `We infer the rule from the examples.` と `For the query, apply that same verified rule directly ...` が大量反復している。
+2. **formula notation が code-like**  
+   追加 414 行中 `412` 行で `xor(...)`, `choose(...)` などの formula token が出る。  
+   base Bit は `115/607` なので、formula-style はかなり増えている。
+3. **backtick usage が多い**  
+   base Bit `118/607` に対し、追加 synthetic は `304/414`。  
+   完全な異物ではないが、やや多い。
+4. **abstract 110 行は旧 template のまま**  
+   `Check examples:` / `Constraints:` は残っており、ここが現状の最大 drift 源。
+
+### 11.7 総合評価
+
+現在の v3f synthetic CoT は、
+
+- **blocking な safety 問題はない**
+- **not-formula の jargon drift は修正済み**
+- **safe / not-formula 304 行の構造は短く明確で良い**
+
+一方で、
+
+- **template repetition は強い**
+- **abstract 110 行には旧 v2 phrasing が残る**
+
+という状態にある。
+
+したがって、今回の v3f をこのまま学習に使うこと自体は妥当だが、**追加で phrasing cleanup をするなら次の優先対象は safe / not-formula ではなく abstract 110 行**である。
