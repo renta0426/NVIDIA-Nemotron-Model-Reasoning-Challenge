@@ -331,3 +331,161 @@ target slice でも **2-box が最も強い**。
 という形で出ている。
 
 したがって次の改善は、**「teacher phrase をもっと増やす」ではなく、「正しい rule commitment を短く言い切って 2-box で閉じる」ように safe / not-formula 別で supervision を作り直すこと**が最も有望である。
+
+## 10. v3 改善方針・実験計画
+
+ここまでの比較を踏まえると、v3 の主眼は **`verified_trace_ready && bit_structured_byte_formula` の内容誤りを直しつつ、README 前提の boxed-first 評価を壊さないこと**に尽きる。
+
+### 10.1 v3 の基本方針
+
+v3 で採るべき方針は次の 5 つ。
+
+1. **phrase imitation ではなく rule commitment quality を上げる**  
+   `Check examples:` や `So the verified rule is ...` の表層転写は起きていないので、teacher phrase を増やすのではなく、**正しい rule を短く断言する supervision** を増やす。
+2. **safe / abstract / not-formula を別 teacher に分ける**  
+   `abstract` は微改善、`safe` は悪化、`not-formula` は `0/25` まで落ちたので、structured を一括で扱ってはいけない。
+3. **model-native な冒頭に寄せる**  
+   v2 で残った自然出力は `We need to infer ...` / `Let’s analyze.` 系だった。したがって teacher 冒頭はモデルの既存 scaffold に近づける。
+4. **長文化を抑える**  
+   改善行は短く、悪化行は長くなる。teacher も 3〜5 文程度に抑え、探索文の横流れを避ける。
+5. **boxed closure は content supervision とセットで守る**  
+   no-box は全滅で、`gold_anywhere` だけ増えても意味が薄い。最終的には正しい答えを boxed answer に commit させる必要がある。
+
+### 10.2 v3 で優先して直す点
+
+#### A. safe formula teacher の再設計
+
+`binary_structured_byte_formula` は boxed / `contains_so_rule` が増えたのに accuracy が落ちた。  
+よって v3 では、safe formula 用 teacher を
+
+1. support を短く明示
+2. bit position または byte transform を canonical に一文で固定
+3. query 適用を 1 段で閉じる
+
+形に変え、**探索風の文章ではなく deterministic な rule description** に寄せる。
+
+#### B. abstract は維持しつつ hard-mining
+
+`binary_structured_byte_formula_abstract` は唯一改善しているので、方向性は維持する。  
+ただし量を増やすだけでなく、
+
+- v2-only correct rows を優先参照
+- origin-only correct / v2 regressed rows に近い失敗 pattern を避ける
+
+という row-level hard-mining を入れる。
+
+#### C. not-formula を別問題として扱う
+
+`binary_structured_byte_not_formula` は現状 `0/25`。  
+ここは safe formula と同じ teacher にせず、
+
+1. `No single fixed byte formula fits all examples.` のように formula 仮定を先に否定
+2. verified support / counterexample を短く明示
+3. query ではその support に従って決める
+
+という **counterexample-first / exclusion-first** teacher に切り替える。
+
+#### D. closure 補助は低比率でのみ追加
+
+`answer_only_keep` は主戦力ではないが、no-box 全滅を踏まえると closure 補助としては使える。  
+したがって
+
+- verified structured teacher を主役に据えたまま
+- 低比率で boxed-only / short-rationale 補助を足す
+
+枝は検討価値がある。
+
+### 10.3 実験セット
+
+| run | 変更内容 | 仮説 | 期待効果 | リスク |
+| --- | --- | --- | --- | --- |
+| `v3a-native-safe` | safe formula 281 行を model-native 冒頭 + explicit rule commitment 形式で再生成 | v2 の safe 悪化は teacher phrase mismatch と rule description の弱さが原因 | `binary_structured_byte_formula` 回復 | generic 化しすぎると supervision が弱い |
+| `v3b-native-safe-abstract` | `v3a` + abstract 110 行も同形式で再生成 | abstract の改善を維持しつつ safe も戻す | target slice 全体の純増 | abstract を壊す可能性 |
+| `v3c-notformula-special` | not-formula 23 行だけ counterexample-first teacher に差し替え | not-formula は別ロジックが必要 | `0/25` 脱出 | 行数が少なく効果が小さい可能性 |
+| `v3d-hardmined-regression-fix` | origin-only correct / v2 regressed 近傍の training rows を優先再生成 | 実害のあった style drift を戻せる | regression 回収 | 局所最適化 |
+| `v3e-closure-aux-lowratio` | `v3b` or `v3c` に少量の boxed-only / short-rationale 補助を低比率で追加 | last_number 落ちをさらに減らせる | closure 改善 | answer_only 由来の content 弱化 |
+| `v3f-safe-plus-notformula` | safe と not-formula だけ別 teacher にし、abstract は v2 のまま | 問題 slice を最小変更で叩ける | リスク低めで効果確認 | gain が小さい可能性 |
+
+### 10.4 実験優先順位
+
+1. **`v3c-notformula-special`**  
+   現状 `0/25` で最も未解決度が高い。
+2. **`v3a-native-safe`**  
+   safe formula 悪化を戻せるかを見る最小変更。
+3. **`v3f-safe-plus-notformula`**  
+   safe / not-formula を同時に叩きつつ abstract を壊さないか確認。
+4. **`v3b-native-safe-abstract`**  
+   safe 回復と abstract 維持を両立できるか確認。
+5. **`v3e-closure-aux-lowratio`**  
+   content 改善の方向が見えた後で closure 補助を載せる。
+6. **`v3d-hardmined-regression-fix`**  
+   最後に row-level regressed set を補修する。
+
+### 10.5 teacher 具体案
+
+#### safe formula 向け
+
+1. `We infer the rule from the examples.`
+2. `The rule is: ...`
+3. `For the query, apply the same rule bit-by-bit and keep the exact 8-bit result with leading zeros for the final boxed answer.`
+
+#### abstract 向け
+
+1. `We infer the abstract bit rule from the examples.`
+2. `The verified pattern is: ...`
+3. `Apply that same pattern to the query and keep the exact 8-bit result for the final boxed answer.`
+
+#### not-formula 向け
+
+1. `No single fixed byte formula fits all examples.`
+2. `The verified support is: ...`
+3. `So for the query, follow that same verified support and keep the exact 8-bit result with leading zeros for the final boxed answer.`
+
+### 10.6 v3 の評価軸
+
+#### primary
+
+1. `verified_trace_ready && bit_structured_byte_formula` 全体 accuracy
+2. `binary_structured_byte_formula` accuracy
+3. `binary_structured_byte_formula_abstract` accuracy
+4. `binary_structured_byte_not_formula` accuracy
+
+#### secondary
+
+1. `boxed_non_empty` rate
+2. `last_number` rate
+3. `gold_anywhere but wrong` 件数
+4. `contains_so_rule` 件数とその正答率
+5. mean / median `raw_output_chars`
+6. `1-box` / `2-box` の正答率
+
+#### guardrail
+
+1. overall specialized accuracy が v2 (`204/563`) を下回らない
+2. `boxed_non_empty` が大きく悪化しない
+3. `bit_other`, `bit_permutation_inversion` など非ターゲット強みを不必要に壊さない
+
+### 10.7 v3 成功条件
+
+最低限の成功条件は次の通り。
+
+1. target slice `34/185` を上回る
+2. `binary_structured_byte_formula` を `16/87` より改善する
+3. `binary_structured_byte_not_formula` を `0/25` から脱出する
+4. `last_number` を v2 の `42/185` より減らす
+5. `gold_anywhere but wrong` を `52` より減らす
+
+特に **not-formula 脱出**は、v3 が問題の本体に効いたかを見る最重要シグナルになる。
+
+## 最終整理
+
+v3 の主眼は **「verified structured をもっと増やす」ことではなく、solver-slice ごとに teacher を再設計すること**である。  
+つまり次にやるべきことは、
+
+1. **teacher を model-native に寄せる**
+2. **safe / abstract / not-formula を分ける**
+3. **正しい rule commitment を短く強くする**
+4. **長文化を抑える**
+5. **boxed closure を content supervision と一緒に守る**
+
+であり、**同型 synthetic の追加量勝負ではなく、teacher 設計の質で勝つ**方向へ切り替えるべきだと結論づける。
