@@ -62,6 +62,7 @@ DEFAULT_LORA_KEYS = [
     "mixer.shared_experts.down_proj",
 ]
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
+LR_SCHEDULE_STEP_UNITS = ("optimizer", "micro")
 
 
 def utc_now() -> str:
@@ -330,6 +331,47 @@ def compute_total_iters(*, num_rows: int, num_epochs: float, batch_size: int) ->
     return max(1, int(max(1, num_rows) * num_epochs // batch_size))
 
 
+def compute_schedule_steps(
+    *,
+    total_iters: int,
+    grad_accumulation_steps: int,
+    schedule_step_unit: str,
+) -> int:
+    if total_iters <= 0:
+        raise ValueError(f"total_iters must be > 0, got {total_iters}")
+    if grad_accumulation_steps <= 0:
+        raise ValueError(
+            f"grad_accumulation_steps must be > 0, got {grad_accumulation_steps}"
+        )
+    normalized_unit = schedule_step_unit.strip().lower()
+    if normalized_unit not in LR_SCHEDULE_STEP_UNITS:
+        raise ValueError(
+            f"lr_schedule_step_unit must be one of {LR_SCHEDULE_STEP_UNITS}, got {schedule_step_unit!r}"
+        )
+    if normalized_unit == "micro":
+        return total_iters
+    # mlx_lm advances the optimizer and its learning-rate schedule only when an
+    # accumulated update is applied, so notebook parity requires optimizer-step units.
+    return max(1, (total_iters + grad_accumulation_steps - 1) // grad_accumulation_steps)
+
+
+def compute_final_optimizer_step_microbatches(
+    *,
+    total_iters: int,
+    grad_accumulation_steps: int,
+) -> int:
+    if total_iters <= 0:
+        raise ValueError(f"total_iters must be > 0, got {total_iters}")
+    if grad_accumulation_steps <= 0:
+        raise ValueError(
+            f"grad_accumulation_steps must be > 0, got {grad_accumulation_steps}"
+        )
+    remainder = total_iters % grad_accumulation_steps
+    if remainder:
+        return remainder
+    return min(total_iters, grad_accumulation_steps)
+
+
 def build_mlx_lora_config(
     *,
     model_path: Path,
@@ -354,6 +396,7 @@ def build_mlx_lora_config(
     lr_schedule_name: str | None,
     lr_schedule_end: float,
     lr_warmup_ratio: float,
+    lr_schedule_step_unit: str,
 ) -> dict[str, Any]:
     if lora_rank <= 0 or lora_rank > README_MAX_LORA_RANK:
         raise ValueError(
@@ -365,6 +408,11 @@ def build_mlx_lora_config(
         num_rows=sum(1 for _ in (dataset_dir / "train.jsonl").open("r", encoding="utf-8")),
         num_epochs=num_epochs,
         batch_size=batch_size,
+    )
+    schedule_steps = compute_schedule_steps(
+        total_iters=total_iters,
+        grad_accumulation_steps=grad_accumulation_steps,
+        schedule_step_unit=lr_schedule_step_unit,
     )
     config: dict[str, Any] = {
         "model": str(model_path),
@@ -402,9 +450,9 @@ def build_mlx_lora_config(
             raise ValueError(f"Unsupported lr_schedule_name: {schedule_name}")
         schedule_config: dict[str, Any] = {
             "name": schedule_name,
-            "arguments": [learning_rate, total_iters, float(lr_schedule_end)],
+            "arguments": [learning_rate, schedule_steps, float(lr_schedule_end)],
         }
-        warmup_steps = int(total_iters * lr_warmup_ratio)
+        warmup_steps = int(schedule_steps * lr_warmup_ratio)
         if warmup_steps > 0:
             schedule_config["warmup"] = warmup_steps
         config["lr_schedule"] = schedule_config
@@ -614,6 +662,188 @@ def maybe_patch_mlx_chat_dataset_enable_thinking() -> None:
     tuner_datasets._nemotron_enable_thinking_patch = True
 
 
+def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
+    import time
+    from functools import partial
+
+    import mlx.core as mx
+    import mlx.nn as nn
+    import mlx_lm.lora as mlx_lora
+    import mlx_lm.tuner.trainer as tuner_trainer
+    from mlx.nn.utils import average_gradients
+    from mlx.utils import tree_flatten, tree_map
+
+    if getattr(tuner_trainer, "_nemotron_final_accum_flush_patch", False):
+        return
+
+    def patched_train(
+        model: Any,
+        optimizer: Any,
+        train_dataset: Any,
+        val_dataset: Any,
+        args: Any = tuner_trainer.TrainingArgs(),
+        loss: Any = tuner_trainer.default_loss,
+        iterate_batches: Any = tuner_trainer.iterate_batches,
+        training_callback: Any = None,
+    ) -> None:
+        if mx.metal.is_available():
+            mx.set_wired_limit(mx.metal.device_info()["max_recommended_working_set_size"])
+        print(f"Starting training..., iters: {args.iters}")
+        world = mx.distributed.init()
+        world_size = world.size()
+        rank = world.rank()
+        if world_size > 1:
+            print(f"Node {rank} of {world_size}")
+
+        if args.grad_checkpoint:
+            tuner_trainer.grad_checkpoint(model.layers[0])
+
+        loss_value_and_grad = nn.value_and_grad(model, loss)
+
+        grad_accum_steps = args.grad_accumulation_steps
+        if grad_accum_steps < 1:
+            raise ValueError("grad_accumulation_steps must be at least 1")
+
+        state = [model.state, optimizer.state, mx.random.state]
+
+        @partial(mx.compile, inputs=state, outputs=state)
+        def step(batch: Any, prev_grad: Any, do_update: bool, grad_divisor: int) -> Any:
+            (lvalue, toks), grad = loss_value_and_grad(model, *batch)
+
+            if prev_grad is not None:
+                grad = tree_map(lambda x, y: x + y, grad, prev_grad)
+
+            if do_update:
+                grad = average_gradients(grad)
+                if grad_divisor > 1:
+                    grad = tree_map(lambda x: x / grad_divisor, grad)
+                optimizer.update(model, grad)
+                grad = None
+
+            return lvalue, toks, grad
+
+        model.train()
+        losses = 0
+        n_tokens = 0
+        steps = 0
+        trained_tokens = 0
+        train_time = 0
+        grad_accum = None
+        pending_micro_steps = 0
+
+        for it, batch in zip(
+            range(1, args.iters + 1),
+            iterate_batches(
+                dataset=train_dataset,
+                batch_size=args.batch_size,
+                max_seq_length=args.max_seq_length,
+                loop=True,
+                comm_group=world,
+            ),
+        ):
+            tic = time.perf_counter()
+            if it == 1 or it % args.steps_per_eval == 0 or it == args.iters:
+                tic = time.perf_counter()
+                val_loss = tuner_trainer.evaluate(
+                    model=model,
+                    dataset=val_dataset,
+                    loss=loss,
+                    batch_size=args.batch_size,
+                    num_batches=args.val_batches,
+                    max_seq_length=args.max_seq_length,
+                    iterate_batches=iterate_batches,
+                )
+                model.train()
+                val_time = time.perf_counter() - tic
+                if rank == 0:
+                    print(
+                        f"Iter {it}: "
+                        f"Val loss {val_loss:.3f}, "
+                        f"Val took {val_time:.3f}s",
+                        flush=True,
+                    )
+
+                if training_callback is not None:
+                    val_info = {
+                        "iteration": it - 1,
+                        "val_loss": val_loss,
+                        "val_time": val_time,
+                    }
+                    training_callback.on_val_loss_report(val_info)
+
+                tic = time.perf_counter()
+
+            pending_micro_steps += 1
+            do_update = pending_micro_steps == grad_accum_steps or it == args.iters
+            grad_divisor = pending_micro_steps if do_update else grad_accum_steps
+            lvalue, toks, grad_accum = step(batch, grad_accum, do_update, grad_divisor)
+            if do_update:
+                pending_micro_steps = 0
+
+            losses += lvalue
+            n_tokens += toks
+            steps += 1
+            mx.eval(state, losses, n_tokens, grad_accum)
+            train_time += time.perf_counter() - tic
+
+            if it % args.steps_per_report == 0 or it == args.iters:
+                train_loss = mx.distributed.all_sum(losses, stream=mx.cpu).item()
+                train_loss /= steps * world_size
+                n_tokens = mx.distributed.all_sum(n_tokens, stream=mx.cpu).item()
+                learning_rate = optimizer.learning_rate.item()
+                it_sec = args.steps_per_report / train_time
+                tokens_sec = float(n_tokens) / train_time
+                trained_tokens += n_tokens
+                peak_mem = mx.get_peak_memory() / 1e9
+                if rank == 0:
+                    print(
+                        f"Iter {it}: Train loss {train_loss:.3f}, "
+                        f"Learning Rate {learning_rate:.3e}, "
+                        f"It/sec {it_sec:.3f}, "
+                        f"Tokens/sec {tokens_sec:.3f}, "
+                        f"Trained Tokens {trained_tokens}, "
+                        f"Peak mem {peak_mem:.3f} GB",
+                        flush=True,
+                    )
+
+                if training_callback is not None:
+                    train_info = {
+                        "iteration": it,
+                        "train_loss": train_loss,
+                        "learning_rate": learning_rate,
+                        "iterations_per_second": it_sec,
+                        "tokens_per_second": tokens_sec,
+                        "trained_tokens": trained_tokens,
+                        "peak_memory": peak_mem,
+                    }
+                    training_callback.on_train_loss_report(train_info)
+
+                losses = 0
+                n_tokens = 0
+                steps = 0
+                train_time = 0
+
+            if it % args.steps_per_save == 0 and rank == 0:
+                adapter_weights = dict(tree_flatten(model.trainable_parameters()))
+                mx.save_safetensors(str(args.adapter_file), adapter_weights)
+                checkpoint = Path(args.adapter_file).parent / f"{it:07d}_adapters.safetensors"
+                mx.save_safetensors(str(checkpoint), adapter_weights)
+                print(
+                    f"Iter {it}: Saved adapter weights to "
+                    f"{args.adapter_file} and {checkpoint}.",
+                    flush=True,
+                )
+
+        if rank == 0:
+            adapter_weights = dict(tree_flatten(model.trainable_parameters()))
+            mx.save_safetensors(str(args.adapter_file), adapter_weights)
+            print(f"Saved final weights to {args.adapter_file}.")
+
+    tuner_trainer.train = patched_train
+    mlx_lora.train = patched_train
+    tuner_trainer._nemotron_final_accum_flush_patch = True
+
+
 def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
     run_root = Path(args.output_root).resolve() / args.run_name
     ensure_dir(run_root)
@@ -672,14 +902,36 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         lr_schedule_name=args.lr_schedule_name,
         lr_schedule_end=float(args.lr_schedule_end),
         lr_warmup_ratio=float(args.lr_warmup_ratio),
+        lr_schedule_step_unit=str(args.lr_schedule_step_unit),
     )
 
     config_path = run_root / "mlx_lora_config.yaml"
     write_text(config_path, yaml.safe_dump(config, sort_keys=False))
     command_path = run_root / "train_cmd.sh"
     write_text(command_path, render_train_command(config_path))
+    total_optimizer_steps = compute_schedule_steps(
+        total_iters=int(config["iters"]),
+        grad_accumulation_steps=int(args.grad_accumulation_steps),
+        schedule_step_unit="optimizer",
+    )
+    effective_schedule_steps = compute_schedule_steps(
+        total_iters=int(config["iters"]),
+        grad_accumulation_steps=int(args.grad_accumulation_steps),
+        schedule_step_unit=str(args.lr_schedule_step_unit),
+    )
+    final_optimizer_step_microbatches = compute_final_optimizer_step_microbatches(
+        total_iters=int(config["iters"]),
+        grad_accumulation_steps=int(args.grad_accumulation_steps),
+    )
 
     manifest = {
+        "schedule": {
+            "step_unit": str(args.lr_schedule_step_unit),
+            "total_optimizer_steps": total_optimizer_steps,
+            "effective_schedule_steps": effective_schedule_steps,
+            "final_optimizer_step_microbatches": final_optimizer_step_microbatches,
+            "final_grad_accumulation_flush": True,
+        },
         "created_at": utc_now(),
         "repo_root": str(REPO_ROOT),
         "run_root": str(run_root),
@@ -728,7 +980,11 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "lr_schedule_name": str(args.lr_schedule_name or ""),
             "lr_schedule_end": float(args.lr_schedule_end),
             "lr_warmup_ratio": float(args.lr_warmup_ratio),
+            "lr_schedule_step_unit": str(args.lr_schedule_step_unit),
             "total_iters": int(config["iters"]),
+            "optimizer_steps": int(total_optimizer_steps),
+            "final_optimizer_step_microbatches": int(final_optimizer_step_microbatches),
+            "final_grad_accumulation_flush": True,
             "resume_adapter_file": str(Path(args.resume_adapter_file).resolve())
             if args.resume_adapter_file
             else "",
@@ -789,6 +1045,7 @@ def run_mlx_lora_training_from_config(config_path: Path) -> None:
 
     os.environ["TOKENIZERS_PARALLELISM"] = "true"
     maybe_patch_mlx_chat_dataset_enable_thinking()
+    maybe_patch_mlx_trainer_final_accumulation_flush()
     with config_path.open("r", encoding="utf-8") as handle:
         config = yaml.load(handle, Loader=mlx_lora.yaml_loader) or {}
     for key, value in mlx_lora.CONFIG_DEFAULTS.items():
@@ -888,6 +1145,12 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument("--lr-schedule-name", type=str, default="cosine_decay")
         target.add_argument("--lr-schedule-end", type=float, default=0.0)
         target.add_argument("--lr-warmup-ratio", type=float, default=0.05)
+        target.add_argument(
+            "--lr-schedule-step-unit",
+            choices=LR_SCHEDULE_STEP_UNITS,
+            default="optimizer",
+            help="Interpret LR warmup/decay steps in optimizer updates (HF-like) or raw microsteps.",
+        )
         target.add_argument("--resume-adapter-file", type=Path, default=None)
         target.add_argument("--force-shadow-model", action="store_true")
         target.add_argument("--force-prepare", action="store_true")
