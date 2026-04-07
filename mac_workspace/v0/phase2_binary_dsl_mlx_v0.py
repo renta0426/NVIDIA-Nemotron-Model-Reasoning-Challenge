@@ -18,6 +18,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
+from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -56,12 +57,14 @@ PHASE0_ROUTER_PROFILE_PROMPT_V2 = "prompt-router-v2"
 PHASE0_ROUTER_PROFILE_PROMPT_V3 = "prompt-router-v3"
 PHASE0_ROUTER_PROFILE_PROMPT_V4 = "prompt-router-v4"
 PHASE0_ROUTER_PROFILE_PROMPT_V5 = "prompt-router-v5"
+PHASE0_ROUTER_PROFILE_PROMPT_V6 = "prompt-router-v6"
 PHASE0_ROUTER_PROFILE_CHOICES = (
     PHASE0_ROUTER_PROFILE_PROMPT_V1,
     PHASE0_ROUTER_PROFILE_PROMPT_V2,
     PHASE0_ROUTER_PROFILE_PROMPT_V3,
     PHASE0_ROUTER_PROFILE_PROMPT_V4,
     PHASE0_ROUTER_PROFILE_PROMPT_V5,
+    PHASE0_ROUTER_PROFILE_PROMPT_V6,
 )
 PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
     PHASE0_ROUTER_PROFILE_PROMPT_V1: {
@@ -97,6 +100,14 @@ PHASE0_ROUTER_SLOT_BY_FAMILY: dict[str, dict[str, str]] = {
         "text": "solver",
     },
     PHASE0_ROUTER_PROFILE_PROMPT_V5: {
+        "binary": "specialist",
+        "symbol": "specialist",
+        "unit": "solver",
+        "gravity": "solver",
+        "roman": "solver",
+        "text": "solver",
+    },
+    PHASE0_ROUTER_PROFILE_PROMPT_V6: {
         "binary": "specialist",
         "symbol": "specialist",
         "unit": "solver",
@@ -2807,6 +2818,17 @@ FINAL_ANSWER_PATTERNS = (
 )
 NUMBER_PATTERN = __import__("re").compile(r"-?\d+(?:\.\d+)?")
 BIT8_PATTERN = __import__("re").compile(r"^[01]{8}$")
+PHASE0_BINARY_EXAMPLE_PATTERN = __import__("re").compile(r"^([01]{8}) -> ([01]{8})$")
+PHASE0_BINARY_QUERY_PATTERN = __import__("re").compile(r"Now, determine the output for: ([01]{8})")
+PHASE0_BINARY_STRUCTURED_BYTE_BINARY_OPERATIONS = {
+    "xor": lambda a, b: a ^ b,
+    "and": lambda a, b: a & b,
+    "or": lambda a, b: a | b,
+}
+PHASE0_BINARY_STRUCTURED_BYTE_TERNARY_OPERATIONS = {
+    "choose": lambda selector, when_true, when_false: (selector & when_true) | (((~selector) & 0xFF) & when_false),
+    "majority": lambda a, b, c: (a & b) | (a & c) | (b & c),
+}
 PHASE0_SYMBOL_NUMERIC_EXAMPLE_PATTERN = __import__("re").compile(r"^(\d{2})(.)(\d{2}) = (.+)$")
 PHASE0_SYMBOL_NUMERIC_QUERY_PATTERN = __import__("re").compile(
     r"^Now, determine the result for: (\d{2})(.)(\d{2})$"
@@ -8171,9 +8193,14 @@ def resolve_phase0_router_fallback_target(
     if profile in {
         PHASE0_ROUTER_PROFILE_PROMPT_V4,
         PHASE0_ROUTER_PROFILE_PROMPT_V5,
+        PHASE0_ROUTER_PROFILE_PROMPT_V6,
     }:
         family_short = str(scored_row.get("family_short", "")).strip()
         template_subtype = str(scored_row.get("template_subtype", "")).strip()
+        if profile == PHASE0_ROUTER_PROFILE_PROMPT_V6 and family_short == "binary" and benchmark_row is not None:
+            solver_prediction = maybe_solve_phase0_binary_formula_prompt(str(benchmark_row.get("prompt", "")))
+            if solver_prediction is not None and solver_prediction != str(scored_row.get("prediction", "")).strip():
+                return ("solver", "binary_formula_consensus_solver")
         if family_short == "symbol" and template_subtype == "numeric_2x2" and benchmark_row is not None:
             prompt_text = str(benchmark_row.get("prompt", ""))
             if profile == PHASE0_ROUTER_PROFILE_PROMPT_V4:
@@ -8212,6 +8239,273 @@ def format_phase0_solver_numeric(value: float) -> str:
 
 def parse_phase0_prompt_lines(prompt: str) -> list[str]:
     return [line.strip() for line in str(prompt).splitlines() if line.strip()]
+
+
+def phase0_rotate_left_byte(value: int, shift: int) -> int:
+    masked = value & 0xFF
+    return ((masked << shift) & 0xFF) | (masked >> (8 - shift))
+
+
+def phase0_rotate_right_byte(value: int, shift: int) -> int:
+    masked = value & 0xFF
+    return (masked >> shift) | ((masked << (8 - shift)) & 0xFF)
+
+
+def phase0_reverse_byte_bits(value: int) -> int:
+    return int(format(value & 0xFF, "08b")[::-1], 2)
+
+
+def phase0_nibble_swap_byte(value: int) -> int:
+    bits = format(value & 0xFF, "08b")
+    return int(bits[4:] + bits[:4], 2)
+
+
+@lru_cache(maxsize=1)
+def build_phase0_binary_structured_byte_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    raw_sources = [
+        ("x", lambda value: value & 0xFF),
+        ("reverse", phase0_reverse_byte_bits),
+        ("nibble_swap", phase0_nibble_swap_byte),
+    ]
+    for shift in range(1, 8):
+        raw_sources.append((f"rol{shift}", lambda value, shift=shift: phase0_rotate_left_byte(value, shift)))
+        raw_sources.append((f"ror{shift}", lambda value, shift=shift: phase0_rotate_right_byte(value, shift)))
+    for shift in range(1, 8):
+        raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
+        raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
+
+    canonical_sources: dict[tuple[int, ...], str] = {}
+    for name, function in raw_sources:
+        signature = tuple(function(value) & 0xFF for value in range(256))
+        canonical_sources.setdefault(signature, name)
+    sources = [(name, signature) for signature, name in sorted(canonical_sources.items(), key=lambda item: item[1])]
+
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in sources:
+        formulas.setdefault(signature, name)
+    for (name_a, signature_a), (name_b, signature_b) in combinations_with_replacement(sources, 2):
+        for op_name, operation in PHASE0_BINARY_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+            signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
+            formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    for selector_name, selector_signature in sources:
+        for true_name, true_signature in sources:
+            for false_name, false_signature in sources:
+                signature = tuple(
+                    PHASE0_BINARY_STRUCTURED_BYTE_TERNARY_OPERATIONS["choose"](
+                        selector_signature[value],
+                        true_signature[value],
+                        false_signature[value],
+                    )
+                    & 0xFF
+                    for value in range(256)
+                )
+                formulas.setdefault(signature, f"choose({selector_name},{true_name},{false_name})")
+    for (name_a, signature_a), (name_b, signature_b), (name_c, signature_c) in combinations_with_replacement(sources, 3):
+        signature = tuple(
+            PHASE0_BINARY_STRUCTURED_BYTE_TERNARY_OPERATIONS["majority"](
+                signature_a[value],
+                signature_b[value],
+                signature_c[value],
+            )
+            & 0xFF
+            for value in range(256)
+        )
+        formulas.setdefault(signature, f"majority({name_a},{name_b},{name_c})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+@lru_cache(maxsize=1)
+def build_phase0_binary_structured_byte_not_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    raw_sources = [
+        ("x", lambda value: value & 0xFF),
+        ("reverse", phase0_reverse_byte_bits),
+        ("nibble_swap", phase0_nibble_swap_byte),
+    ]
+    for shift in range(1, 8):
+        raw_sources.append((f"rol{shift}", lambda value, shift=shift: phase0_rotate_left_byte(value, shift)))
+        raw_sources.append((f"ror{shift}", lambda value, shift=shift: phase0_rotate_right_byte(value, shift)))
+    for shift in range(1, 8):
+        raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
+        raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
+    extended_sources = list(raw_sources)
+    for name, function in raw_sources:
+        extended_sources.append((f"not({name})", lambda value, function=function: (~function(value)) & 0xFF))
+
+    canonical_sources: dict[tuple[int, ...], str] = {}
+    for name, function in extended_sources:
+        signature = tuple(function(value) & 0xFF for value in range(256))
+        canonical_sources.setdefault(signature, name)
+    sources = [(name, signature) for signature, name in sorted(canonical_sources.items(), key=lambda item: item[1])]
+
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in sources:
+        formulas.setdefault(signature, name)
+    for (name_a, signature_a), (name_b, signature_b) in combinations_with_replacement(sources, 2):
+        for op_name, operation in PHASE0_BINARY_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+            signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
+            formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    for selector_name, selector_signature in sources:
+        for true_name, true_signature in sources:
+            for false_name, false_signature in sources:
+                signature = tuple(
+                    PHASE0_BINARY_STRUCTURED_BYTE_TERNARY_OPERATIONS["choose"](
+                        selector_signature[value],
+                        true_signature[value],
+                        false_signature[value],
+                    )
+                    & 0xFF
+                    for value in range(256)
+                )
+                formulas.setdefault(signature, f"choose({selector_name},{true_name},{false_name})")
+    for (name_a, signature_a), (name_b, signature_b), (name_c, signature_c) in combinations_with_replacement(sources, 3):
+        signature = tuple(
+            PHASE0_BINARY_STRUCTURED_BYTE_TERNARY_OPERATIONS["majority"](
+                signature_a[value],
+                signature_b[value],
+                signature_c[value],
+            )
+            & 0xFF
+            for value in range(256)
+        )
+        formulas.setdefault(signature, f"majority({name_a},{name_b},{name_c})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+@lru_cache(maxsize=1)
+def build_phase0_binary_prompt_local_extended_sources() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    raw_sources = [
+        ("x", lambda value: value & 0xFF),
+        ("reverse", phase0_reverse_byte_bits),
+        ("nibble_swap", phase0_nibble_swap_byte),
+        ("zero", lambda value: 0),
+        ("ones", lambda value: 0xFF),
+    ]
+    for shift in range(1, 8):
+        raw_sources.append((f"rol{shift}", lambda value, shift=shift: phase0_rotate_left_byte(value, shift)))
+        raw_sources.append((f"ror{shift}", lambda value, shift=shift: phase0_rotate_right_byte(value, shift)))
+    for shift in range(1, 8):
+        raw_sources.append((f"shl{shift}", lambda value, shift=shift: ((value & 0xFF) << shift) & 0xFF))
+        raw_sources.append((f"shr{shift}", lambda value, shift=shift: (value & 0xFF) >> shift))
+
+    extended_sources = list(raw_sources)
+    for name, function in raw_sources:
+        if name in {"zero", "ones"}:
+            continue
+        extended_sources.append((f"not({name})", lambda value, function=function: (~function(value)) & 0xFF))
+    for bit in range(8):
+        mask = 1 << bit
+        extended_sources.append((f"const_{mask:08b}", lambda value, mask=mask: mask))
+        extended_sources.append((f"const_not_{mask:08b}", lambda value, mask=mask: (~mask) & 0xFF))
+
+    canonical_sources: dict[tuple[int, ...], str] = {}
+    for name, function in extended_sources:
+        signature = tuple(function(value) & 0xFF for value in range(256))
+        canonical_sources.setdefault(signature, name)
+    return tuple((name, signature) for signature, name in sorted(canonical_sources.items(), key=lambda item: item[1]))
+
+
+@lru_cache(maxsize=1)
+def build_phase0_binary_prompt_local_stage1_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    sources = build_phase0_binary_prompt_local_extended_sources()
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in sources:
+        formulas.setdefault(signature, name)
+    for (name_a, signature_a), (name_b, signature_b) in combinations_with_replacement(sources, 2):
+        for op_name, operation in PHASE0_BINARY_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+            signature = tuple(operation(signature_a[value], signature_b[value]) & 0xFF for value in range(256))
+            formulas.setdefault(signature, f"{op_name}({name_a},{name_b})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+@lru_cache(maxsize=1)
+def build_phase0_binary_prompt_local_stage2_formulas() -> tuple[tuple[str, tuple[int, ...]], ...]:
+    sources = build_phase0_binary_prompt_local_extended_sources()
+    stage1_formulas = build_phase0_binary_prompt_local_stage1_formulas()
+    formulas: dict[tuple[int, ...], str] = {}
+    for name, signature in stage1_formulas:
+        formulas.setdefault(signature, name)
+    for source_name, source_signature in sources:
+        for formula_name, formula_signature in stage1_formulas:
+            for op_name, operation in PHASE0_BINARY_STRUCTURED_BYTE_BINARY_OPERATIONS.items():
+                signature = tuple(
+                    operation(source_signature[value], formula_signature[value]) & 0xFF for value in range(256)
+                )
+                formulas.setdefault(signature, f"{op_name}({source_name},{formula_name})")
+    return tuple((name, signature) for signature, name in sorted(formulas.items(), key=lambda item: item[1]))
+
+
+def infer_phase0_binary_formula_matches(
+    formulas: tuple[tuple[str, tuple[int, ...]], ...],
+    examples: list[tuple[str, str]],
+    query_bits: str,
+) -> list[tuple[str, str]]:
+    if len(query_bits) != 8 or not examples:
+        return []
+    pairs = [(int(input_bits, 2), int(output_bits, 2)) for input_bits, output_bits in examples]
+    query_value = int(query_bits, 2)
+    matches: list[tuple[str, str]] = []
+    for formula_name, signature in formulas:
+        if all(signature[input_value] == output_value for input_value, output_value in pairs):
+            matches.append((formula_name, format(signature[query_value] & 0xFF, "08b")))
+    return matches
+
+
+def infer_phase0_binary_structured_formula_matches(
+    examples: list[tuple[str, str]],
+    query_bits: str,
+) -> list[tuple[str, str]]:
+    return infer_phase0_binary_formula_matches(build_phase0_binary_structured_byte_formulas(), examples, query_bits)
+
+
+def infer_phase0_binary_structured_not_formula_matches(
+    examples: list[tuple[str, str]],
+    query_bits: str,
+) -> list[tuple[str, str]]:
+    return infer_phase0_binary_formula_matches(build_phase0_binary_structured_byte_not_formulas(), examples, query_bits)
+
+
+def infer_phase0_binary_prompt_local_stage2_formula_matches(
+    examples: list[tuple[str, str]],
+    query_bits: str,
+) -> list[tuple[str, str]]:
+    return infer_phase0_binary_formula_matches(build_phase0_binary_prompt_local_stage2_formulas(), examples, query_bits)
+
+
+def parse_phase0_binary_prompt(prompt: str) -> tuple[list[tuple[str, str]], str | None]:
+    examples: list[tuple[str, str]] = []
+    query_bits: str | None = None
+    for line in parse_phase0_prompt_lines(prompt):
+        example_match = PHASE0_BINARY_EXAMPLE_PATTERN.match(line)
+        if example_match is not None:
+            examples.append((example_match.group(1), example_match.group(2)))
+            continue
+        query_match = PHASE0_BINARY_QUERY_PATTERN.search(line)
+        if query_match is not None:
+            query_bits = query_match.group(1)
+    return examples, query_bits
+
+
+def collect_phase0_binary_formula_predictions(prompt: str) -> list[str]:
+    examples, query_bits = parse_phase0_binary_prompt(prompt)
+    if query_bits is None or not examples:
+        return []
+    predictions: set[str] = set()
+    for matches in (
+        infer_phase0_binary_structured_formula_matches(examples, query_bits),
+        infer_phase0_binary_structured_not_formula_matches(examples, query_bits),
+        infer_phase0_binary_prompt_local_stage2_formula_matches(examples, query_bits),
+    ):
+        unique_predictions = sorted({prediction for _, prediction in matches})
+        if len(unique_predictions) == 1:
+            predictions.add(unique_predictions[0])
+    return sorted(predictions)
+
+
+def maybe_solve_phase0_binary_formula_prompt(prompt: str) -> str | None:
+    predictions = collect_phase0_binary_formula_predictions(prompt)
+    if len(predictions) == 1:
+        return predictions[0]
+    return None
 
 
 def normalize_phase0_symbol_query_operator(query_operator: str) -> str:
@@ -8611,6 +8905,16 @@ def maybe_solve_phase0_symbol_numeric_zero_error_prompt(prompt: str) -> str | No
     return None
 
 
+def solve_phase0_binary_prompt(row: dict[str, Any]) -> str:
+    solver_mode = str(row.get("router_solver_mode", "")).strip()
+    if solver_mode not in {"", "binary_formula_consensus"}:
+        raise ValueError(f"Unsupported binary solver mode: {solver_mode}")
+    predicted_answer = maybe_solve_phase0_binary_formula_prompt(str(row.get("prompt", "")))
+    if predicted_answer is None:
+        raise ValueError(f"Unable to derive a unique binary formula consensus prediction for id={row.get('id')}")
+    return predicted_answer
+
+
 def solve_phase0_symbol_prompt(row: dict[str, Any]) -> str:
     if str(row.get("template_subtype", "")).strip() != "numeric_2x2":
         raise ValueError(f"Unsupported symbol solver subtype: {row.get('template_subtype')}")
@@ -8745,6 +9049,8 @@ def solve_phase0_text_prompt(prompt: str) -> str:
 def solve_phase0_router_prompt(row: dict[str, Any]) -> str:
     family_short = str(row.get("family_short", "")).strip()
     prompt_text = str(row.get("prompt", ""))
+    if family_short == "binary":
+        return solve_phase0_binary_prompt(row)
     if family_short == "gravity":
         return solve_phase0_gravity_prompt(prompt_text)
     if family_short == "symbol":
@@ -9500,6 +9806,9 @@ def run_phase0_eval_router(args: argparse.Namespace) -> None:
         if fallback_reason == "symbol_numeric_zero_error_solver":
             fallback_row = dict(fallback_row)
             fallback_row["router_solver_mode"] = "symbol_numeric_zero_error"
+        elif fallback_reason == "binary_formula_consensus_solver":
+            fallback_row = dict(fallback_row)
+            fallback_row["router_solver_mode"] = "binary_formula_consensus"
         fallback_rows_by_target[fallback_target].append(fallback_row)
         fallback_assignments.append(
             {

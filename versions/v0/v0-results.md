@@ -27,6 +27,7 @@ single-adapter は `v40` が best のままだが、**single-file multi-adapter 
 
 | pipeline | local320 | binary | gravity | roman | symbol | text | unit | note |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `prompt-router-v6` | **293/320 = 0.9156** | `54/60` | `50/50` | `50/50` | `39/60` | `50/50` | `50/50` | `prompt-router-v5` + prompt-local binary formula-consensus fallback (`structured_formula` / `not_formula` / `prompt_stage2`) |
 | `prompt-router-v5` | **270/320 = 0.8438** | `31/60` | `50/50` | `50/50` | `39/60` | `50/50` | `50/50` | `prompt-router-v4` + zero-error unique `numeric_2x2` solver fallback |
 | `prompt-router-v4` | **267/320 = 0.8344** | `31/60` | `50/50` | `50/50` | `36/60` | `50/50` | `50/50` | `prompt-router-v3` + prompt-local safe `numeric_2x2` solver fallback |
 | `prompt-router-v3` | **260/320 = 0.8125** | `31/60` | `50/50` | `50/50` | `29/60` | `50/50` | `50/50` | deterministic solver for `gravity/roman/text/unit` + `focus_v1_full` for `binary/symbol` |
@@ -50,6 +51,19 @@ single-adapter は `v40` が best のままだが、**single-file multi-adapter 
 - `prompt-router-v5` gate24 も **`24/24 = 1.0000`**
   - initial slot は `solver 16`, `specialist 8`
   - gate24 fallback は **1 行** (`symbol_numeric_zero_error_solver`)
+- `prompt-router-v6` gate24 も **`24/24 = 1.0000`**
+  - initial slot は `solver 16`, `specialist 8`
+  - gate24 fallback は **2 行**（`binary_formula_consensus_solver 1`, `symbol_numeric_zero_error_solver 1`）
+- `prompt-router-v6` full320 は **`293/320 = 0.9156`**
+  - `v5` 比 **gain 23 / loss 0**
+  - fallback は **47 行すべて `solver`**
+    - `binary_formula_consensus_solver = 35`
+    - `symbol_numeric_zero_error_solver = 12`
+  - `binary` は **`31/60 -> 54/60`**
+    - `bit_other = 40/46`
+    - `bit_structured_byte_formula = 14/14`
+  - binary gain 内訳は `answer_only_keep +10`, `manual_audit_priority +8`, `verified_trace_ready +5`
+  - `numeric_2x2` は **`39/40`** を維持
 - `prompt-router-v5` full320 は **`270/320 = 0.8438`**
   - `v4` 比 **gain 3 / loss 0**
   - fallback は **12 行すべて `symbol -> solver`**
@@ -68,13 +82,15 @@ single-adapter は `v40` が best のままだが、**single-file multi-adapter 
 - `prompt-router-v2` は actual full320 で **fallback 10 行**（`text 9`, `roman 1`）を base へ再実行し、`v1` に対して **gain 7 / loss 0**
   - recovered rows: `08bc3a02`, `3daf5caa`, `487528d5`, `b9e045e8`, `e45a4109`, `f66415c0`, `f7f9ba17`
 - current `v2` miss のうち、**base が既に救える text 3 行**（`dc10ca9b`, `dd24b691`, `e05908dd`）が残っている
-- old 4-model family-wise oracle **`259/320 = 0.8094`** は、`prompt-router-v5` actual により **+11** 上回った
+- old 4-model family-wise oracle **`259/320 = 0.8094`** は、`prompt-router-v6` actual により **+34** 上回った
 - actual `prompt-router-v2` は external strong baseline reference **`249/320 = 0.7781`** も上回った
 - actual `prompt-router-v3` は external strong baseline reference **`249/320 = 0.7781`** を **+11** 上回った
 - actual `prompt-router-v4` は external strong baseline reference **`249/320 = 0.7781`** を **+18** 上回った
 - actual `prompt-router-v5` は external strong baseline reference **`249/320 = 0.7781`** を **+21** 上回った
-- 残差は **binary / symbol のみ**
-  - `bit_structured_byte_formula = 6/14` official
+- actual `prompt-router-v6` は external strong baseline reference **`249/320 = 0.7781`** を **+44** 上回った
+- 現在の残差は **`binary 6` + `symbol 21`**
+  - `bit_other = 40/46`
+  - `bit_structured_byte_formula = 14/14`
   - `numeric_2x2 = 39/40`
   - `glyph_len5 = 0/20`
 - したがって、現段階の最有力改善方向は **single-adapter 追加学習ではなく deterministic solver + hard-family specialist pipeline** である
