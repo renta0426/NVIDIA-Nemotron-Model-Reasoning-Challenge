@@ -163,3 +163,66 @@ manual prompt-local branch が formatting を壊したため、次は **verified
 artifact source of truth:
 
 - `mac_workspace/v1/outputs/eval_single_adapter_v124_full320_shard2/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+
+### epoch sweep (`v124` / `v125` / `v126` / `v127`)
+
+`v124` と同一 profile / 同一 base / 同一 LR / 同一 batch / 同一 layers のまま、**epoch だけ**を `0.25 / 0.5 / 1.0 / 2.0` に振った 1 回限りの controlled comparison を実施した。
+
+- control: `v124 = 0.25 epoch`
+- `v125 = 0.5 epoch`
+- `v126 = 1.0 epoch`
+- `v127 = 2.0 epoch`
+
+train は以下で完了した。
+
+| version | epoch | train | note |
+| --- | ---: | --- | --- |
+| `v124` | `0.25` | `final val 0.311 -> 0.309`, `33 iters` | control |
+| `v125` | `0.5` | `final val 0.311 -> 0.304`, `67 iters` | gate24 / slices 実測済み |
+| `v126` | `1.0` | `final val 0.311 -> 0.290`, `135 iters` | gate24 実測済み |
+| `v127` | `2.0` | `final val 0.311 -> 0.273`, `271 iters` | gate24 実測済み |
+
+まず README 条件寄りの gate24 で足切りした。
+
+| version | gate24 | family breakdown | decision |
+| --- | ---: | --- | --- |
+| `v124` | `21/24` | `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 3/4`, `text 4/4`, `unit 4/4` | control |
+| `v125` | `21/24` | `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 3/4`, `text 4/4`, `unit 4/4` | 残留 |
+| `v126` | `19/24` | `binary 2/4`, `gravity 4/4`, `roman 4/4`, `symbol 1/4`, `text 4/4`, `unit 4/4` | 脱落 |
+| `v127` | `19/24` | `binary 1/4`, `gravity 4/4`, `roman 4/4`, `symbol 2/4`, `text 4/4`, `unit 4/4` | 脱落 |
+
+したがって deeper slice は `v124` vs `v125` だけに絞った。
+
+| slice | `v124` (`0.25`) | `v125` (`0.5`) | delta (`v125 - v124`) |
+| --- | ---: | ---: | ---: |
+| `general200` | `176/200` | `175/200` | `-1` |
+| `binary60` | `4/60` | `5/60` | `+1` |
+| `unit50` | `44/50` | `47/50` | `+3` |
+
+`v125 general200` の内訳:
+
+- `gravity 49/50`
+- `roman 48/50`
+- `text 34/50`
+- `unit 44/50`
+
+解釈:
+
+- `1.0` / `2.0` は **gate24 の時点で明確に regress** したため、今後の default epoch から外す
+- `0.5` は `0.25` と **gate24 tie**
+- deeper slice では `general200 -1` だったが、**`binary +1` と `unit +3`** がそれを上回った
+- 特に `unit50 = 47/50` は、`v124` の `44/50` に対して **明確な改善**
+
+結論:
+
+- **次の `v1` single-adapter 実験の default epoch は `0.5` を採用する**
+- 以後は毎回 sweep せず、明確な regress が出たときだけ再比較する
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/eval_single_adapter_v125_gate24/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v126_gate24/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v127_gate24/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v125_general200/eval_single_adapter_v125_general200/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v125_unit50/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v125_binary60/phase0_offline_eval/artifacts/phase0_eval_summary.json`
