@@ -5,6 +5,7 @@ import csv
 import importlib.util
 import json
 import random
+import sys
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -109,6 +110,7 @@ def load_module(module_path: Path, module_name: str) -> Any:
     if spec is None or spec.loader is None:
         raise RuntimeError(f'Failed to import module from {module_path}')
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -255,6 +257,64 @@ def build_answer_only_cot(route_label: str) -> str:
     return '\n'.join(lines)
 
 
+def build_sanitized_exact_cot(
+    helper_module: Any,
+    analysis_module: Any,
+    seed_config: Any,
+    support_examples: list[tuple[str, str]],
+    query_bits: str,
+    answer: str,
+) -> str:
+    _, rule_lines, query_lines = helper_module.render_trace_segments(
+        analysis_module,
+        seed_config.strong_group,
+        seed_config.exact_rule,
+        seed_config.rule_payload,
+        support_examples,
+        query_bits,
+    )
+    lines = [
+        '<think>',
+        'Check ex1 and ex2: the same exact rule is verified.',
+    ]
+    for line in rule_lines:
+        if answer not in line:
+            lines.append(line)
+    for line in query_lines:
+        if line.startswith('Query x = '):
+            break
+        if answer not in line:
+            lines.append(line)
+    lines.append('Apply the exact rule to the query byte and keep the resulting 8-bit output for the final box only.')
+    lines.append('Constraints: exact_8bit, leading_zeros, box_only_final.')
+    lines.append('</think>')
+    return '\n'.join(lines)
+
+
+def validate_sanitized_exact_cot(
+    helper_module: Any,
+    analysis_module: Any,
+    seed_config: Any,
+    query_bits: str,
+    answer: str,
+    generated_cot: str,
+) -> tuple[bool, str]:
+    if not generated_cot.startswith('<think>') or not generated_cot.endswith('</think>'):
+        return False, 'bad_think_wrapper'
+    if answer in generated_cot:
+        return False, 'answer_leak_in_generated_cot'
+    teacher_response = f'{generated_cot}\n\n\\boxed{{{answer}}}'
+    if helper_module.count_non_empty_boxed(teacher_response) != 1:
+        return False, 'bad_boxed_count'
+    if not teacher_response.rstrip().endswith(f'\\boxed{{{answer}}}'):
+        return False, 'final_box_not_terminal'
+    if helper_module.extract_final_answer(teacher_response) != answer:
+        return False, 'metric_extraction_mismatch'
+    if helper_module.apply_seed_rule(analysis_module, seed_config, query_bits) != answer:
+        return False, 'forward_answer_mismatch'
+    return True, 'accepted'
+
+
 def normalize_exact_row(
     row: dict[str, str],
     helper_module: Any,
@@ -289,10 +349,32 @@ def normalize_exact_row(
         canonical_cot,
         set(),
     )
+    assistant_style = 'route_trace_full'
+    normalized_cot = canonical_cot
+    if not ok and reason == 'answer_leak_in_generated_cot':
+        sanitized_cot = build_sanitized_exact_cot(
+            helper_module,
+            analysis_module,
+            seed_config,
+            support_examples,
+            query_bits,
+            answer,
+        )
+        ok, reason = validate_sanitized_exact_cot(
+            helper_module,
+            analysis_module,
+            seed_config,
+            query_bits,
+            answer,
+            sanitized_cot,
+        )
+        if ok:
+            normalized_cot = sanitized_cot
+            assistant_style = 'route_trace_sanitized'
     if not ok:
         return None, reason
     routed_cot = inject_route_lines(
-        canonical_cot,
+        normalized_cot,
         route_label=f'bit_manipulation.{seed_config.strong_group}',
         route_granularity='exact',
     )
@@ -306,7 +388,7 @@ def normalize_exact_row(
         'generated_cot': routed_cot,
         'route_label': f'bit_manipulation.{seed_config.strong_group}',
         'route_granularity': 'exact',
-        'assistant_style': 'route_trace_full',
+        'assistant_style': assistant_style,
         'source_selection_tier': row['selection_tier'],
         'analysis_notes': row.get('analysis_notes', ''),
         'teacher_solver_candidate': row.get('teacher_solver_candidate', ''),
@@ -421,12 +503,14 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
         'accepted_exact_rows': sum(1 for row in delta_rows if row['route_granularity'] == 'exact'),
         'accepted_answer_only_rows': sum(1 for row in delta_rows if row['route_granularity'] == 'coarse'),
         'route_label_counts': dict(Counter(row['route_label'] for row in delta_rows)),
+        'assistant_style_counts': dict(Counter(row['assistant_style'] for row in delta_rows)),
         'analysis_notes_counts': dict(Counter(row['analysis_notes'] for row in delta_rows)),
         'template_subtype_counts': dict(Counter(row['template_subtype'] for row in delta_rows)),
         'rejected_reasons': dict(rejected_reasons),
         'notes': [
             'Implementation files and generated artifacts stay under proof_first_solver_factory_routing.',
             'Exact-route rows use verified_trace_ready plus canonical rule recovery from the existing bit_synth exact-trace helper.',
+            'If the canonical exact trace repeats the final answer inside <think>, a sanitized exact-rule trace is emitted instead.',
             'Answer-only rows stay coarse-route only and intentionally avoid plain-text final answer leakage in generated_cot.',
             'The merged CSV keeps the baseline v2 5-column schema so the existing notebook path remains usable.',
         ],
