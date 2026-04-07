@@ -2,45 +2,39 @@
 
 ## Overall
 
-- rows: `4`
-- correct: `3`
-- accuracy: `0.7500`
+- rows: `0`
+- correct: `0`
+- accuracy: `0.0000`
 
 ## Family accuracy
 
 | family_short | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `symbol` | 4 | 3 | 0.7500 |
 
 ## Template subtype accuracy
 
 | template_subtype | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `numeric_2x2` | 4 | 3 | 0.7500 |
 
 ## Answer type accuracy
 
 | answer_type | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `numeric` | 4 | 3 | 0.7500 |
 
 ## Prompt length buckets
 
 | prompt_len_bucket | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `<300` | 4 | 3 | 0.7500 |
 
 ## Num examples
 
 | num_examples | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `5` | 4 | 3 | 0.7500 |
 
 ## Selection tier accuracy
 
 | selection_tier | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `verified_trace_ready` | 4 | 3 | 0.7500 |
 
 ## Binary metrics
 

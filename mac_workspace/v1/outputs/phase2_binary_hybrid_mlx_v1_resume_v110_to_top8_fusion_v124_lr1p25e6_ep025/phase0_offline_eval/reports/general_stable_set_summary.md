@@ -2,53 +2,45 @@
 
 ## Overall
 
-- rows: `16`
-- correct: `15`
-- accuracy: `0.9375`
+- rows: `50`
+- correct: `44`
+- accuracy: `0.8800`
 
 ## Family accuracy
 
 | family_short | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `gravity` | 4 | 4 | 1.0000 |
-| `roman` | 4 | 4 | 1.0000 |
-| `text` | 4 | 4 | 1.0000 |
-| `unit` | 4 | 3 | 0.7500 |
+| `unit` | 50 | 44 | 0.8800 |
 
 ## Template subtype accuracy
 
 | template_subtype | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `gravity_half_g_t2` | 4 | 4 | 1.0000 |
-| `roman_standard` | 4 | 4 | 1.0000 |
-| `text_monoalphabetic` | 4 | 4 | 1.0000 |
-| `unit_fixed_ratio` | 4 | 3 | 0.7500 |
+| `unit_fixed_ratio` | 50 | 44 | 0.8800 |
 
 ## Answer type accuracy
 
 | answer_type | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `numeric` | 8 | 7 | 0.8750 |
-| `roman` | 4 | 4 | 1.0000 |
-| `text_phrase` | 4 | 4 | 1.0000 |
+| `numeric` | 50 | 44 | 0.8800 |
 
 ## Prompt length buckets
 
 | prompt_len_bucket | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `<300` | 16 | 15 | 0.9375 |
+| `<300` | 50 | 44 | 0.8800 |
 
 ## Num examples
 
 | num_examples | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `3` | 16 | 15 | 0.9375 |
+| `3` | 50 | 44 | 0.8800 |
 
 ## Selection tier accuracy
 
 | selection_tier | rows | correct | accuracy |
 | --- | ---: | ---: | ---: |
-| `verified_trace_ready` | 16 | 15 | 0.9375 |
+| `verified_trace_ready` | 50 | 44 | 0.8800 |
 
 ## Binary metrics
 
