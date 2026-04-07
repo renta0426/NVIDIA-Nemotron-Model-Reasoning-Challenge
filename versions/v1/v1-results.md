@@ -206,17 +206,50 @@ train は以下で完了した。
 - `text 34/50`
 - `unit 44/50`
 
+slice 時点の解釈:
+
+- `1.0` / `2.0` は **gate24 の時点で明確に regress** したため、候補から外した
+- `0.5` は `0.25` と **gate24 tie**
+- deeper slice では `general200 -1` だったが、**`binary +1` と `unit +3`** がそれを上回って見えた
+- 特に `unit50 = 47/50` は、`v124` の `44/50` に対して **明確な改善**だった
+
+### v125 full320 actual
+
+slice-based decision が README 条件 actual full320 に乗るかを確認するため、`v125` を separate root (`eval_single_adapter_v125_full320_shard2`) で実測した。
+
+| version | full320 actual | family breakdown | delta vs `v124` |
+| --- | ---: | --- | ---: |
+| `v124` | `194/320` | `binary 5/60`, `gravity 49/50`, `roman 47/50`, `symbol 13/60`, `text 35/50`, `unit 45/50` | control |
+| `v125` | `187/320` | `binary 4/60`, `gravity 49/50`, `roman 48/50`, `symbol 10/60`, `text 32/50`, `unit 44/50` | `-7` |
+
+family delta (`v125 - v124`):
+
+- `binary -1`
+- `gravity ±0`
+- `roman +1`
+- `symbol -3`
+- `text -3`
+- `unit -1`
+
+binary metric delta (`v125 - v124`):
+
+- `boxed_extraction_success_rate`: `0.0833 -> 0.1333`
+- `regex_exact_rate`: `0.2167 -> 0.0833`
+- `leading_zero_retention_rate`: `0.2000 -> 0.1333`
+- `format_failure_rate`: `0.9333 -> 0.9667`
+
 解釈:
 
-- `1.0` / `2.0` は **gate24 の時点で明確に regress** したため、今後の default epoch から外す
-- `0.5` は `0.25` と **gate24 tie**
-- deeper slice では `general200 -1` だったが、**`binary +1` と `unit +3`** がそれを上回った
-- 特に `unit50 = 47/50` は、`v124` の `44/50` に対して **明確な改善**
+- `0.5 epoch` の slice gain は **actual full320 では再現しなかった**
+- `boxed` 抽出率だけは少し上がったが、**exactness と leading-zero 保持が落ち、format failure も悪化**した
+- ユーザーが重視している **`\boxed{}` 最終回答の安定性**という観点でも、`v125` は `v124` より悪い
 
 結論:
 
-- **次の `v1` single-adapter 実験の default epoch は `0.5` を採用する**
-- 以後は毎回 sweep せず、明確な regress が出たときだけ再比較する
+- `1.0` / `2.0` は継続して不採用
+- `0.5` は slice triage では有望だったが、**README actual full320 で棄却**
+- 現在の `single-adapter-fusion-v124` 系 mainline では、**`0.25 epoch` を safer control として維持**する
+- 次の枝は epoch ではなく、**`boxed_only` / `boxed_only_done` の fidelity を壊さずに binary / symbol を伸ばすデータ設計**を優先する
 
 artifact source of truth:
 
@@ -226,3 +259,4 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/eval_single_adapter_v125_general200/eval_single_adapter_v125_general200/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v125_unit50/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v125_binary60/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v125_full320_shard2/eval_single_adapter_v125_full320_shard2/phase0_offline_eval/artifacts/phase0_eval_summary.json`
