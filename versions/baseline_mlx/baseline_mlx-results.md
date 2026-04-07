@@ -28,9 +28,10 @@
 | version | run_name | scope | sampled_rows | train_rows | valid_rows | total_iters | max_seq | measured | status | artifacts |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
 | `baseline-mlx-smoke-v1` | `nemotron_sft_lora_with_cot_v2_mlx_smoke_v1` | smoke | `24` | `24` | `4` | `1` | `1024` | `val_loss=0.607`, `train_loss=0.565`, `peak_mem=64.835 GB` | adapter 生成まで完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_smoke_v1/training_result.json` |
-| `baseline-mlx-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v1` | full notebook-equivalent | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter200 val_loss=0.382`; `iter400 val_loss=0.299`; `iter570 train_loss=0.200`; `peak_mem=67.133 GB` | 実行中 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_v1/prepare_manifest.json` |
+| `baseline-mlx-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v1` | full notebook-equivalent | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter5600 val_loss=0.186`; `iter5800 val_loss=0.180`; `iter5814 val_loss=0.181`; `iter5814 train_loss=0.272`; `peak_mem=68.581 GB` | 完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_v1/training_result.json` |
 
 ## Notes
 
 - LoRA target は MLX Nemotron の module 名に合わせて `mixer.in_proj`, `mixer.out_proj`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj` に固定した。これは HF notebook の `in_proj|out_proj|up_proj|down_proj` を MLX 側へ最も近く写した設定。
 - warmup 中の `Learning Rate` 表示は iter 10 付近で見た目が不自然だったが、schedule 単体検証と以後の train log では non-zero で立ち上がっていることを確認済み。
+- 今回の full run は **`train_split_with_cot.csv` の元 baseline 再現**であり、Bit Manipulation は `607` 行 sampling のまま。IDE 上で見えていた `1021` 行設定は別 notebook 変更で、今回の完走 run には使っていない。
