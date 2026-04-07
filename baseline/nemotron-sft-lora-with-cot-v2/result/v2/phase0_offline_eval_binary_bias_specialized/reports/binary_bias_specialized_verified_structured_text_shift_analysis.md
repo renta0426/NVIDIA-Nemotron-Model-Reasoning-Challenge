@@ -379,11 +379,11 @@ v3 で採るべき方針は次の 5 つ。
 `binary_structured_byte_not_formula` は現状 `0/25`。  
 ここは safe formula と同じ teacher にせず、
 
-1. `No single fixed byte formula fits all examples.` のように formula 仮定を先に否定
-2. verified support / counterexample を短く明示
-3. query ではその support に従って決める
+1. **既存データにない内輪語や taxonomy 語を避ける**
+2. **examples に合う verified byte rule を短く明示する**
+3. query ではその verified rule に従って決める
 
-という **counterexample-first / exclusion-first** teacher に切り替える。
+という **natural rule-match-first** teacher に切り替える。
 
 #### D. closure 補助は低比率でのみ追加
 
@@ -421,6 +421,10 @@ v3 で採るべき方針は次の 5 つ。
 6. **`v3d-hardmined-regression-fix`**  
    最後に row-level regressed set を補修する。
 
+高コスト環境で 1 run が長時間かかる場合は、この優先順位をそのまま使わず、**期待値最大の first shot として `v3f-safe-plus-notformula` を先に採用する**のが合理的である。  
+理由は、`v3c-notformula-special` は診断価値は高いが、現在の notebook sampling では **`23/3321 = 0.69%`** しか変わらず、8 時間級 run の first shot としては軽すぎるため。  
+そのため本作業では、safe 281 行 + not-formula 23 行を差し替える **`train_split_with_cot_v3f_safe_plus_notformula.csv`** を実装し、notebook もその CSV を読む設定に切り替えた。
+
 ### 10.5 teacher 具体案
 
 #### safe formula 向け
@@ -437,9 +441,9 @@ v3 で採るべき方針は次の 5 つ。
 
 #### not-formula 向け
 
-1. `No single fixed byte formula fits all examples.`
-2. `The verified support is: ...`
-3. `So for the query, follow that same verified support and keep the exact 8-bit result with leading zeros for the final boxed answer.`
+1. `We infer the rule from the examples.`
+2. `The verified byte rule that matches the examples is: ...`
+3. `For the query, apply that same verified rule directly and keep the exact 8-bit result with leading zeros for the final boxed answer.`
 
 ### 10.6 v3 の評価軸
 
