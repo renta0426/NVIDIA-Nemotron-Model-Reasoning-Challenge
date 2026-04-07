@@ -1,4 +1,5 @@
 # phase0_eval_overall
+0.70 のベースライン
 
 ## Overall
 
