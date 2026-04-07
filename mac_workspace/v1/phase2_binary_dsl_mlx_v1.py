@@ -294,6 +294,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v122",
     "single-adapter-fusion-v123",
     "single-adapter-fusion-v124",
+    "single-adapter-fusion-v128",
+    "single-adapter-fusion-v129",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -2903,6 +2905,8 @@ FUSION_V122_AUGMENT_QUOTAS = {
         "auto_solver_match": "True",
     },
 }
+FUSION_V128_AUGMENT_QUOTAS = dict(FUSION_V67_AUGMENT_QUOTAS)
+FUSION_V129_AUGMENT_QUOTAS = dict(FUSION_V79_AUGMENT_QUOTAS)
 HOLDOUT_FOLDS = 5
 BOXED_PATTERN = __import__("re").compile(r"\\boxed\{([^}]*)(?:\}|$)")
 FINAL_ANSWER_PATTERNS = (
@@ -6219,6 +6223,28 @@ def build_single_adapter_fusion_v124_rows(
     )
 
 
+def build_single_adapter_fusion_v128_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v128",
+        quotas=FUSION_V128_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v124",
+    )
+
+
+def build_single_adapter_fusion_v129_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v129",
+        quotas=FUSION_V129_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v124",
+    )
+
+
 def build_strong_baseline_cot_v2_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -6588,6 +6614,10 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v123_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v124":
         return build_single_adapter_fusion_v124_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v128":
+        return build_single_adapter_fusion_v128_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v129":
+        return build_single_adapter_fusion_v129_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
