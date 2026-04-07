@@ -309,6 +309,7 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v142",
     "single-adapter-fusion-v143",
     "single-adapter-fusion-v144",
+    "single-adapter-fusion-v145",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -5314,6 +5315,17 @@ def build_single_adapter_fusion_v144_rows(
     )
 
 
+def build_single_adapter_fusion_v145_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_external_rows(
+        rows,
+        profile_name="single-adapter-fusion-v145",
+        quotas=FUSION_V75_AUGMENT_QUOTAS,
+        base_profile="single-adapter-fusion-v40",
+    )
+
+
 def build_single_adapter_fusion_v32_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -6649,6 +6661,8 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v143_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v144":
         return build_single_adapter_fusion_v144_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v145":
+        return build_single_adapter_fusion_v145_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v32":
         return build_single_adapter_fusion_v32_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v33":

@@ -501,3 +501,34 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v95_lr2p5e6_ep025/prepare_manifest.json`
 - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v95_lr2p5e6_ep025/training_result.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v95_gate24/gate24_top8_fusion_v95_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+
+### v143-v144 corrected trace-twin route
+
+`v73 / v74` は tracked profile としては **exact-trace + same-prompt boxed twin** の intended idea を持っていたが、plain rerun は `base_profile = single-adapter-fusion-v10` の recipe mismatch だった。  
+`v143 / v144` はその quotas を **`single-adapter-fusion-v40` base に固定**し直した clean corrected branch。
+
+| version | design | prepare/train | README判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v143` | corrected `v73` = `exact_trace_formula + boxed_twin` / `exact_trace_abstract + boxed_twin` | `2048 rows`, `128 iters`; `final val 0.322 -> 0.319` | binary60 **`6/60` official, `3/60` exact**。`bit_structured_byte_formula` は **`1/14` official, `0/14` exact**。完走 **4384.6s** | 不採用 |
+| `v144` | corrected `v74` = `v143 + binary_candidates 8 + exact_trace_not_formula 4 + boxed_twin 4` | `2056 rows`, `128 iters`; `final val 0.322 -> 0.318` | binary60 **`5/60` official, `2/60` exact**。`bit_structured_byte_formula` は **`0/14` official/exact**。完走 **4374.3s** | 不採用 |
+
+解釈:
+
+- train loss / final val だけ見ると `v143 / v144` はかなり良かったが、README binary60 では **両方とも `v40` binary branch を全く更新できなかった**。
+- failure mode はほぼ同一で、format bucket は
+  - `v143`: **`numeric_fallback 55 / boxed 5`**
+  - `v144`: **`numeric_fallback 54 / boxed 6`**
+  だった。平均 raw output 長も **約 1.94 万文字**まで伸び、README decode としては遅すぎる。
+- `v143` の唯一の structured official hit は **`5f29ae58: 00000000 -> 0`** で、**leading-zero collapse** のため exact ではない。`v144` は structured official も 0。
+- したがって **corrected trace-twin route (`v73/v74` intended idea)** は、recipe mismatch を直しても **actual score / exactness / runtime の 3 点で不採用**。
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v143_lr2p5e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v143_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v143_binary60/binary60_top8_fusion_v143_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v143_binary60/binary60_top8_fusion_v143_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v144_lr2p5e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v144_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v144_binary60/binary60_top8_fusion_v144_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v144_binary60/binary60_top8_fusion_v144_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
