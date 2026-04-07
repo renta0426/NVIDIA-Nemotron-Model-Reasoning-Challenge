@@ -1,0 +1,642 @@
+id,prompt,answer,family,subfamily,answer_type,parse_ok,parse_confidence,num_examples,query_raw,group_signature,hard_score,risk_bin,prompt_len_chars,prompt_len_words,answer_len,contains_right_brace,contains_backslash,contains_backtick,is_public_test_overlap,special_chars,query_value_float,estimated_g,estimated_ratio,roman_query_value,bit_query_binary,fit_family,query_hamming_bin,g_bin,answer_decimal_style,ratio_bin,query_bin,near_round_boundary,answer_word_count,token_len_signature,char_overlap_bin,rare_token_flag,unique_char_ratio,token_length_pattern_rare,query_charset_rarity,boxed_safe,template_main,template_main_label,template_subtype,teacher_solver_candidate,auto_solver_predicted_answer,auto_solver_match,verified_trace_ready,example_consistency_ok,selection_tier,audit_priority_score,audit_reasons,analysis_notes,family_analysis_json,suspect_label,bit_simple_family,bit_candidate_signature,bit_independent_unique,bit_bijection_unique,bit_bijection_solution_count,bit_boolean2_unique,bit_boolean3_unique,bit_boolean4_unique,bit_affine_unique,bit_byte_transform_unique,bit_no_candidate_positions,bit_multi_candidate_positions,bit_byte_transform_names,bit_hybrid_consensus_ready,bit_hybrid_consensus_varset,bit_hybrid_consensus_match_count,bit_hybrid_consensus_prediction_count,bit_structured_formula_name,bit_structured_formula_prediction,bit_structured_formula_names,bit_structured_formula_predictions,bit_structured_formula_matches_gold,bit_structured_formula_match_count,bit_structured_formula_prediction_count,bit_structured_formula_safe_support,bit_structured_formula_safe,bit_not_structured_formula_name,bit_not_structured_formula_prediction,bit_not_structured_formula_names,bit_not_structured_formula_predictions,bit_not_structured_formula_matches_gold,bit_not_structured_formula_match_count,bit_not_structured_formula_prediction_count,bit_not_structured_formula_safe_support,bit_not_structured_formula_safe,text_wordmap_predicted_answer,text_unknown_char_count,text_unknown_chars,text_answer_completion_new_pair_count,text_answer_completion_pairs,symbol_query_operator,symbol_same_operator_example_count,symbol_numeric_formula_name,symbol_numeric_candidate_prediction_count,glyph_multiset_possible,glyph_order_acyclic,bit_structured_formula_abstract_family,bit_structured_formula_abstract_support,bit_structured_formula_abstract_error_rows,bit_structured_formula_abstract_distinct_exact,bit_structured_formula_abstract_safe,answer_only_ready,bit_not_structured_formula_abstract_family,bit_not_structured_formula_abstract_support,bit_not_structured_formula_abstract_error_rows,bit_not_structured_formula_abstract_distinct_exact,bit_not_structured_formula_abstract_safe
+084a4496,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011101 -> 10110010
+00001010 -> 01000001
+00010001 -> 00100010
+00011011 -> 01100011
+01111010 -> 01001111
+10000001 -> 00110001
+11000100 -> 10011001
+10011110 -> 11010010
+10111001 -> 00110110
+
+Now, determine the output for: 00111110",11000111,bit_manipulation,unknown,binary8,True,0.99,9,00111110,unknown__ex9__qhwmid,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",62.0,,,,00111110,unknown,mid,,0,unknown,6.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,11000111,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""affine_low_gap_mismatch"": true, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [71], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 8, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i5)"", ""xor(i1^,i5^)"", ""eq(i1,i5^)"", ""eq(i1^,i5)"", ""neq(i1,i5)"", ""neq(i1^,i5^)""], ""hybrid_consensus_varset"": ""i1,i5"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 2, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": ""11000111"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""choose(not(shr7),ror3,not(nibble_swap))"", ""xor(not(ror3),not(shr7))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(ror3,shr7)"", ""structured_formula_prediction"": ""11000111"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(ror3,shr7)""]}",False,unknown,o1=[i6] o2=[i7] o3=[i8] o4=[i1] o5=[i2] o6=[i3] o7=[i4] o8=[none],False,False,0,False,False,False,True,False,1,0,,True,"i1,i5",6,1,"xor(ror3,shr7)",11000111,"xor(ror3,shr7)",11000111,True,1,1,1,False,,11000111,"choose(not(shr7),ror3,not(nibble_swap))|xor(not(ror3),not(shr7))",11000111,True,2,1,0,False,,0,,0,,,0,,0,False,False,"xor(ror,shr)",20,0,12,True,True,,0,0,0,False
+48db5ccf,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01110111 -> 01111110
+01110011 -> 00111110
+11111001 -> 10001111
+01110100 -> 01001110
+01011101 -> 11011011
+00001111 -> 11110001
+01011100 -> 11001011
+10110111 -> 01100110
+01101011 -> 10111101
+10101001 -> 10000101
+
+Now, determine the output for: 01110110",01101110,bit_manipulation,unknown,binary8,True,0.99,10,01110110,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",118.0,,,,01110110,unknown,mid,,0,unknown,11.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,01101110,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22, 22, 20], ""boolean2_value_counts"": [1, 1, 2], ""boolean3_support_counts"": [54, 57, 58], ""boolean3_value_counts"": [1, 1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 8, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""and(i1^,i8)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)"", ""nor(i1,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""01101110"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""01101110"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",8,1,"xor(shl4,shr3)",01101110,"xor(shl4,shr3)",01101110,True,1,1,16,True,"xor(not(shl4),not(shr3))",01101110,"xor(not(shl4),not(shr3))",01101110,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl4),not(shr3))",16,0,1,False
+4c237bf3,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10010010 -> 01001100
+11010011 -> 01001010
+11111000 -> 11100111
+11110111 -> 11011011
+00110001 -> 11000101
+10110001 -> 11000001
+10000000 -> 00000100
+
+Now, determine the output for: 11100001",10000011,bit_manipulation,unknown,binary8,True,0.99,7,11100001,unknown__ex7__qhwmid,3.0,risk_low,447,65,8,False,False,False,False,"',-.:>",225.0,,,,11100001,unknown,mid,,0,unknown,22.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,10000011,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [2], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [26], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [111], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 7, ""hybrid_consensus_match_count"": 8, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""or(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)"", ""nand(i1,i8)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""10000011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""10000011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",8,1,"xor(shl2,shr5)",10000011,"xor(shl2,shr5)",10000011,True,1,1,10,True,"xor(not(shl2),not(shr5))",10000011,"xor(not(shl2),not(shr5))",10000011,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl2),not(shr5))",10,0,1,False
+a8887238,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01101111 -> 01111110
+11110110 -> 10111111
+00100111 -> 00111010
+01011111 -> 11111101
+00000111 -> 00111000
+10010011 -> 10010001
+11111101 -> 11100111
+00010011 -> 10011001
+10010111 -> 10110001
+
+Now, determine the output for: 10000100",00101000,bit_manipulation,unknown,binary8,True,0.99,9,10000100,unknown__ex9__qhwlow,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",132.0,,,,10000100,unknown,low,,0,unknown,13.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,00101000,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [26], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [80], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 8, ""hybrid_consensus_missing_position"": 5, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""or(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)"", ""nand(i1,i8)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl3),not(shr4))"", ""not_structured_formula_prediction"": ""00101000"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl3),not(shr4))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl3,shr4)"", ""structured_formula_prediction"": ""00101000"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl3,shr4)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[none] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",8,1,"xor(shl3,shr4)",00101000,"xor(shl3,shr4)",00101000,True,1,1,11,True,"xor(not(shl3),not(shr4))",00101000,"xor(not(shl3),not(shr4))",00101000,True,1,1,11,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl3),not(shr4))",11,0,1,False
+07434d56,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10100010 -> 00110100
+00110110 -> 01100110
+01000101 -> 01011000
+10100101 -> 01000100
+10101110 -> 11110101
+11110100 -> 01011110
+11110101 -> 01001110
+11101110 -> 11111101
+
+Now, determine the output for: 01001101",11011001,bit_manipulation,unknown,binary8,True,0.99,8,01001101,unknown__ex8__qhwmid,3.0,risk_low,468,68,8,False,False,False,False,"',-.:>",77.0,,,,01001101,unknown,mid,,0,unknown,7.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,11011001,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [30], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [80], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 8, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""11011001"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""11011001"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",11011001,"xor(shl4,shr3)",11011001,True,1,1,16,True,"xor(not(shl4),not(shr3))",11011001,"xor(not(shl4),not(shr3))",11011001,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl4),not(shr3))",16,0,1,False
+1c7c1246,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01101110 -> 10110111
+10111001 -> 00011100
+01010010 -> 10101001
+11111110 -> 11111111
+01011001 -> 01101100
+11101101 -> 00110110
+10100000 -> 01010000
+10101010 -> 11010101
+
+Now, determine the output for: 01001100",00100110,bit_manipulation,unknown,binary8,True,0.99,8,01001100,unknown__ex8__qhwmid,3.0,risk_low,468,68,8,False,False,False,False,"',-.:>",76.0,,,,01001100,unknown,mid,,0,unknown,7.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,00100110,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [2], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 2, 30], ""boolean2_value_counts"": [1, 1, 2], ""boolean3_support_counts"": [54, 0], ""boolean3_value_counts"": [1, 0], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 8, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 2, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 2, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": ""00100110"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""choose(not(shl6),shr1,not(ror1))"", ""xor(not(shl6),not(shr1))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl6,shr1)"", ""structured_formula_prediction"": ""00100110"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl6,shr1)""]}",False,unknown,o1=[i7] o2=[none] o3=[i2] o4=[i3] o5=[i4] o6=[i5] o7=[i6] o8=[i7],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl6,shr1)",00100110,"xor(shl6,shr1)",00100110,True,1,1,5,True,,00100110,"choose(not(shl6),shr1,not(ror1))|xor(not(shl6),not(shr1))",00100110,True,2,1,0,False,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,,0,0,0,False
+368f20dd,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00000100 -> 00100000
+11100110 -> 00111110
+11000101 -> 00100100
+00111101 -> 11101011
+00101110 -> 01110010
+10110111 -> 10110011
+11101111 -> 01110110
+00110111 -> 10111011
+11111010 -> 11011111
+
+Now, determine the output for: 01010000",10000101,bit_manipulation,unknown,binary8,True,0.99,9,01010000,unknown__ex9__qhwlow,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",80.0,,,,01010000,unknown,low,,0,unknown,8.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,10000101,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [65], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 5, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl3),not(shr4))"", ""not_structured_formula_prediction"": ""10000101"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl3),not(shr4))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl3,shr4)"", ""structured_formula_prediction"": ""10000101"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl3,shr4)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[none] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl3,shr4)",10000101,"xor(shl3,shr4)",10000101,True,1,1,11,True,"xor(not(shl3),not(shr4))",10000101,"xor(not(shl3),not(shr4))",10000101,True,1,1,11,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl3),not(shr4))",11,0,1,False
+41beb86c,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00011111 -> 01111100
+11001001 -> 00100010
+11011100 -> 01110110
+00110011 -> 11001101
+01000010 -> 00001010
+11010011 -> 01001010
+00100110 -> 10011001
+10110011 -> 11001001
+
+Now, determine the output for: 10010101",01010000,bit_manipulation,unknown,binary8,True,0.99,8,10010101,unknown__ex8__qhwmid,3.0,risk_low,468,68,8,False,False,False,False,"',-.:>",149.0,,,,10010101,unknown,mid,,0,unknown,14.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,01010000,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [2], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [26], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [61, 85], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 8, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""01010000"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""01010000"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl2,shr5)",01010000,"xor(shl2,shr5)",01010000,True,1,1,10,True,"xor(not(shl2),not(shr5))",01010000,"xor(not(shl2),not(shr5))",01010000,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl2),not(shr5))",10,0,1,False
+5a0c141c,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01100111 -> 01111100
+11001111 -> 11101001
+00111000 -> 10000111
+00001000 -> 10000001
+11111100 -> 11011111
+01001010 -> 10101001
+00111011 -> 10110111
+01101111 -> 11111101
+01110111 -> 01111110
+
+Now, determine the output for: 10000100",01010000,bit_manipulation,unknown,binary8,True,0.99,9,10000100,unknown__ex9__qhwlow,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",132.0,,,,10000100,unknown,low,,0,unknown,13.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,01010000,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""affine_low_gap_mismatch"": true, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [30], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [56], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""01010000"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""01010000"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",01010000,"xor(shl4,shr3)",01010000,True,1,1,16,True,"xor(not(shl4),not(shr3))",01010000,"xor(not(shl4),not(shr3))",01010000,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl4),not(shr3))",16,0,1,False
+62dba403,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11110111 -> 10110111
+00101001 -> 01001010
+00010100 -> 10100001
+11011000 -> 11001101
+10011001 -> 11000001
+00001100 -> 01100000
+01110000 -> 10000111
+11101011 -> 01010110
+11010111 -> 10110101
+00101101 -> 01101010
+
+Now, determine the output for: 00010011",10011001,bit_manipulation,unknown,binary8,True,0.99,10,00010011,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",19.0,,,,00010011,unknown,mid,,0,unknown,1.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,10011001,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 20, 18, 26], ""boolean2_value_counts"": [1, 1, 1, 2], ""boolean3_support_counts"": [53], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 5, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl3),not(shr4))"", ""not_structured_formula_prediction"": ""10011001"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl3),not(shr4))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl3,shr4)"", ""structured_formula_prediction"": ""10011001"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl3,shr4)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[none] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl3,shr4)",10011001,"xor(shl3,shr4)",10011001,True,1,1,11,True,"xor(not(shl3),not(shr4))",10011001,"xor(not(shl3),not(shr4))",10011001,True,1,1,11,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl3),not(shr4))",11,0,1,False
+6686f0de,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11110110 -> 01111110
+01111001 -> 10011111
+01110001 -> 00011110
+11001001 -> 10001001
+11100010 -> 00111100
+11011100 -> 11011011
+00101101 -> 11010101
+00111000 -> 10000111
+11111111 -> 11101111
+11010110 -> 01111010
+
+Now, determine the output for: 00111011",10110111,bit_manipulation,unknown,binary8,True,0.99,10,00111011,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",59.0,,,,00111011,unknown,mid,,0,unknown,5.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,10110111,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 20, 22], ""boolean2_value_counts"": [1, 1, 2], ""boolean3_support_counts"": [55, 63], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""10110111"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""10110111"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",10110111,"xor(shl4,shr3)",10110111,True,1,1,16,True,"xor(not(shl4),not(shr3))",10110111,"xor(not(shl4),not(shr3))",10110111,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl4),not(shr3))",16,0,1,False
+7a5d00a7,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00010000 -> 01000000
+11011010 -> 01101110
+01111011 -> 11101111
+00001010 -> 00101000
+10100100 -> 10010101
+00110111 -> 11011101
+01111001 -> 11100111
+10011011 -> 01101000
+01101000 -> 10100011
+00001110 -> 00111000
+
+Now, determine the output for: 11111101",11110011,bit_manipulation,unknown,binary8,True,0.99,10,11111101,unknown__ex10__qhwhigh,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",253.0,,,,11111101,unknown,high,,0,unknown,25.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,11110011,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 20, 20, 20], ""boolean2_value_counts"": [1, 1, 1, 2], ""boolean3_support_counts"": [60, 58], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""11110011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""11110011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl2,shr5)",11110011,"xor(shl2,shr5)",11110011,True,1,1,10,True,"xor(not(shl2),not(shr5))",11110011,"xor(not(shl2),not(shr5))",11110011,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl2),not(shr5))",10,0,1,False
+d4e29ed7,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10101101 -> 10001011
+11101011 -> 01011010
+11001110 -> 11110011
+10110100 -> 10101101
+00010001 -> 00100100
+00011011 -> 01100110
+00101011 -> 01101010
+10011010 -> 01100110
+01110010 -> 01011100
+
+Now, determine the output for: 01101111",11111011,bit_manipulation,unknown,binary8,True,0.99,9,01101111,unknown__ex9__qhwhigh,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",111.0,,,,01101111,unknown,high,,0,unknown,11.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,11111011,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [58], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""11111011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""11111011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",11111011,"xor(shl5,shr2)",11111011,True,1,1,16,True,"xor(not(shl5),not(shr2))",11111011,"xor(not(shl5),not(shr2))",11111011,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl5),not(shr2))",15,0,1,False
+d8ef1dae,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11010011 -> 00101010
+01110000 -> 00001110
+11000000 -> 00011000
+00000110 -> 01100000
+11110011 -> 00101110
+10101111 -> 11100101
+01001111 -> 11111001
+10111001 -> 10000111
+10110110 -> 01110110
+
+Now, determine the output for: 01011101",11011011,bit_manipulation,unknown,binary8,True,0.99,9,01011101,unknown__ex9__qhwmid,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",93.0,,,,01011101,unknown,mid,,0,unknown,9.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,11011011,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 20], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [73], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""11011011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""11011011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",11011011,"xor(shl4,shr3)",11011011,True,1,1,16,True,"xor(not(shl4),not(shr3))",11011011,"xor(not(shl4),not(shr3))",11011011,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl4),not(shr3))",16,0,1,False
+e16e7f6d,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11001101 -> 01100100
+00110111 -> 10111011
+10101111 -> 01110010
+01010100 -> 10100101
+10000000 -> 00001000
+11110000 -> 10001111
+10101001 -> 01000010
+
+Now, determine the output for: 01001110",01110100,bit_manipulation,unknown,binary8,True,0.99,7,01001110,unknown__ex7__qhwmid,3.0,risk_mid,447,65,8,False,False,False,False,"',-.:>",78.0,,,,01001110,unknown,mid,,0,unknown,7.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,01110100,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [2], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [67], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 7, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 5, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl3),not(shr4))"", ""not_structured_formula_prediction"": ""01110100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl3),not(shr4))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl3,shr4)"", ""structured_formula_prediction"": ""01110100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl3,shr4)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[none] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl3,shr4)",01110100,"xor(shl3,shr4)",01110100,True,1,1,11,True,"xor(not(shl3),not(shr4))",01110100,"xor(not(shl3),not(shr4))",01110100,True,1,1,11,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,True,"xor(not(shl3),not(shr4))",11,0,1,False
+934a2c55,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11001101 -> 00011011
+01011000 -> 10110000
+00001100 -> 00011000
+10110000 -> 01100001
+01111100 -> 11111000
+10110111 -> 11101111
+10100000 -> 01000001
+00111000 -> 01110000
+00000111 -> 10001110
+
+Now, determine the output for: 11010101",00101011,bit_manipulation,unknown,binary8,True,0.99,9,11010101,unknown__ex9__qhwmid,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",213.0,,,,11010101,unknown,mid,,0,unknown,21.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,00101011,True,False,True,answer_only_keep,0.0,,bit_prompt_local_nested_support3_or_abstract_answer_only,"{""affine_free_var_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""affine_low_gap_mismatch"": true, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 18, 18, 22], ""boolean2_value_counts"": [1, 1, 1, 2], ""boolean3_support_counts"": [3], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i2,i8)"", ""xor(i2^,i8^)"", ""eq(i2,i8^)"", ""eq(i2^,i8)"", ""neq(i2,i8)"", ""neq(i2^,i8^)""], ""hybrid_consensus_varset"": ""i2,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 3, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": """", ""not_structured_formula_prediction_count"": 2, ""not_structured_formula_sample_matches"": [""choose(not(shl7),rol1,not(nibble_swap))"", ""choose(not(shl7),rol1,ror2)"", ""xor(not(rol1),not(shl7))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 2, ""structured_formula_name"": """", ""structured_formula_prediction"": ""00101011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""choose(shl7,ror2,rol1)"", ""xor(rol1,shl7)""]}",False,unknown,o1=[none] o2=[i3] o3=[i4] o4=[i5] o5=[i6] o6=[i7] o7=[i8] o8=[i1],False,False,0,False,False,False,True,False,1,0,,True,"i2,i8",6,1,,00101011,"choose(shl7,ror2,rol1)|xor(rol1,shl7)",00101011,True,2,1,0,False,,,"choose(not(shl7),rol1,not(nibble_swap))|choose(not(shl7),rol1,ror2)|xor(not(rol1),not(shl7))",00101011|10101011,False,3,2,0,False,,0,,0,,,0,,0,False,False,,0,0,0,False,True,,0,0,0,False
+1deaf759,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00111111 -> 01111001
+01111010 -> 11010011
+11011110 -> 11110110
+10010110 -> 10110100
+00000111 -> 00111000
+10100110 -> 00110101
+11001111 -> 01111110
+11010110 -> 10110110
+11111001 -> 01001111
+11111111 -> 01111111
+
+Now, determine the output for: 11110100",10100111,bit_manipulation,unknown,binary8,True,0.99,10,11110100,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",244.0,,,,11110100,unknown,mid,,0,unknown,24.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,10100111,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 22], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [0], ""boolean3_value_counts"": [0], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 2, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""and(i4,i8^)"", ""nor(i4^,i8)""], ""hybrid_consensus_varset"": ""i4,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""and(not(shl7),rol3)"", ""not_structured_formula_prediction"": ""10100111"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""and(not(shl7),rol3)""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""choose(shl7,shr1,rol3)"", ""structured_formula_prediction"": ""10100111"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""choose(shl7,shr1,rol3)""]}",False,unknown,o1=[none] o2=[i5] o3=[i6] o4=[i7] o5=[i8] o6=[i1] o7=[i2] o8=[i3],False,False,0,False,False,False,False,False,1,0,,True,"i4,i8",2,1,"choose(shl7,shr1,rol3)",10100111,"choose(shl7,shr1,rol3)",10100111,True,1,1,2,True,"and(not(shl7),rol3)",10100111,"and(not(shl7),rol3)",10100111,True,1,1,1,False,,0,,0,,,0,,0,False,False,"choose(shl,shr,rol)",59,0,39,True,True,"and(not(shl7),rol)",3,0,2,False
+a41a3626,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00011111 -> 01110001
+01110100 -> 01000111
+11000010 -> 00101100
+00001001 -> 00010000
+10001100 -> 11001000
+11110000 -> 00001111
+01001000 -> 10000100
+11100101 -> 11011110
+10010110 -> 01101001
+
+Now, determine the output for: 10110011",10111011,bit_manipulation,unknown,binary8,True,0.99,9,10110011,unknown__ex9__qhwmid,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",179.0,,,,10110011,unknown,mid,,0,unknown,17.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,10111011,True,False,False,answer_only_keep,10.5,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_hybrid_consensus,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 18, 20], ""boolean2_value_counts"": [1, 1, 2], ""boolean3_support_counts"": [3], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i5,i8)"", ""xor(i5^,i8^)"", ""eq(i5,i8^)"", ""eq(i5^,i8)"", ""neq(i5,i8)"", ""neq(i5^,i8^)""], ""hybrid_consensus_varset"": ""i5,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 4, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": """", ""not_structured_formula_prediction_count"": 2, ""not_structured_formula_sample_matches"": [""choose(not(shl7),nibble_swap,rol1)"", ""choose(not(shl7),nibble_swap,rol2)"", ""choose(not(shl7),nibble_swap,x)"", ""xor(nibble_swap,shl7)""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 4, ""structured_formula_name"": """", ""structured_formula_prediction"": """", ""structured_formula_prediction_count"": 2, ""structured_formula_sample_matches"": [""choose(shl7,rol1,nibble_swap)"", ""choose(shl7,rol2,nibble_swap)"", ""choose(shl7,x,nibble_swap)"", ""xor(nibble_swap,shl7)""]}",False,unknown,o1=[none] o2=[i6] o3=[i7] o4=[i8] o5=[i1] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,False,False,1,0,,True,"i5,i8",6,1,,,"choose(shl7,rol1,nibble_swap)|choose(shl7,rol2,nibble_swap)|choose(shl7,x,nibble_swap)|xor(nibble_swap,shl7)",00111011|10111011,False,4,2,0,False,,,"choose(not(shl7),nibble_swap,rol1)|choose(not(shl7),nibble_swap,rol2)|choose(not(shl7),nibble_swap,x)|xor(nibble_swap,shl7)",00111011|10111011,False,4,2,0,False,,0,,0,,,0,,0,False,False,,0,0,0,False,,,0,0,0,False
+eeb60061,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11011110 -> 11101101
+00011000 -> 10000001
+11100011 -> 10111110
+11001011 -> 00111100
+10011001 -> 00011001
+11101101 -> 01011110
+11000110 -> 01101100
+11100110 -> 01101110
+01000100 -> 01000100
+
+Now, determine the output for: 01010000",00000101,bit_manipulation,unknown,binary8,True,0.99,9,01010000,unknown__ex9__qhwlow,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",80.0,,,,01010000,unknown,low,,0,unknown,8.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,00000101,True,False,True,answer_only_keep,0.0,,bit_prompt_local_current_consensus_answer_only,"{""affine_free_var_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""affine_low_gap_mismatch"": true, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 20, 22, 20, 26, 34], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 2], ""boolean3_support_counts"": [0], ""boolean3_value_counts"": [0], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i5,i8)"", ""xor(i5^,i8^)"", ""eq(i5,i8^)"", ""eq(i5^,i8)"", ""neq(i5,i8)"", ""neq(i5^,i8^)""], ""hybrid_consensus_varset"": ""i5,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(nibble_swap,shl7)"", ""not_structured_formula_prediction"": ""00000101"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(nibble_swap,shl7)""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(nibble_swap,shl7)"", ""structured_formula_prediction"": ""00000101"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(nibble_swap,shl7)""]}",False,unknown,o1=[none] o2=[i6] o3=[i7] o4=[i8] o5=[i1] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,True,False,1,0,,True,"i5,i8",6,1,"xor(nibble_swap,shl7)",00000101,"xor(nibble_swap,shl7)",00000101,True,1,1,1,False,"xor(nibble_swap,shl7)",00000101,"xor(nibble_swap,shl7)",00000101,True,1,1,1,False,,0,,0,,,0,,0,False,False,"xor(nibble_swap,shl)",9,0,6,False,True,"xor(nibble_swap,shl)",6,0,5,False
+3ebd80e6,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01111111 -> 10010000
+00001001 -> 01011110
+10010011 -> 00001101
+01001011 -> 00010110
+10001001 -> 01001111
+11100001 -> 01000011
+11101000 -> 11100011
+11100111 -> 10000011
+01011110 -> 00110100
+
+Now, determine the output for: 00101011",00011010,bit_manipulation,unknown,binary8,True,0.99,9,00101011,unknown__ex9__qhwmid,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",43.0,,,,00101011,unknown,mid,,0,unknown,4.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,,00011010,True,False,False,answer_only_keep,10.5,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_hybrid_consensus,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 22, 22, 20, 24], ""boolean2_value_counts"": [1, 1, 1, 1, 2], ""boolean3_support_counts"": [3], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i6,i8^)"", ""xor(i6^,i8)"", ""eq(i6,i8)"", ""eq(i6^,i8^)"", ""neq(i6,i8^)"", ""neq(i6^,i8)""], ""hybrid_consensus_varset"": ""i6,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 0, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": """", ""not_structured_formula_prediction_count"": 0, ""not_structured_formula_sample_matches"": [], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 0, ""structured_formula_name"": """", ""structured_formula_prediction"": """", ""structured_formula_prediction_count"": 0, ""structured_formula_sample_matches"": []}",False,unknown,o1=[none] o2=[i7^] o3=[i8^] o4=[i1^] o5=[i2^] o6=[i3^] o7=[i4^] o8=[i1],False,False,0,False,False,False,False,False,1,0,,True,"i6,i8",6,1,,,,,False,0,0,0,False,,,,,False,0,0,0,False,,0,,0,,,0,,0,False,False,,0,0,0,False,,,0,0,0,False
+57b03b2b,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00100110 -> 10011000
+11010000 -> 01000011
+01010010 -> 01001001
+01010111 -> 01011101
+10110001 -> 11000111
+10101110 -> 10111011
+10001011 -> 00101111
+01100100 -> 10010001
+00111101 -> 11110100
+01101110 -> 10111001
+
+Now, determine the output for: 10100000",10000011,bit_manipulation,unknown,binary8,True,0.99,10,10100000,unknown__ex10__qhwlow,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",160.0,,,,10100000,unknown,low,,0,unknown,16.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,10000011,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 18, 18, 18, 18, 18, 18, 2], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [61], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 2, ""hybrid_consensus_missing_position"": 8, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""or(i1,i2)"", ""nand(i1^,i2^)""], ""hybrid_consensus_varset"": ""i1,i2"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""or(rol2,shr7)"", ""not_structured_formula_prediction"": ""10000011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""or(rol2,shr7)""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""or(rol2,shr7)"", ""structured_formula_prediction"": ""10000011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""or(rol2,shr7)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[i8] o7=[i1] o8=[none],False,False,0,True,False,False,False,False,1,0,,True,"i1,i2",2,1,"or(rol2,shr7)",10000011,"or(rol2,shr7)",10000011,True,1,1,1,False,"or(rol2,shr7)",10000011,"or(rol2,shr7)",10000011,True,1,1,1,False,,0,,0,,,0,,0,False,False,"or(rol,shr)",31,0,13,True,,"or(rol,shr)",23,0,13,True
+3d24aef4,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00111001 -> 11001001
+00101000 -> 01000001
+01111001 -> 11001011
+10000011 -> 00011101
+11011111 -> 11111111
+11110000 -> 10000110
+01110011 -> 10011011
+00001000 -> 01000000
+01101100 -> 01100011
+
+Now, determine the output for: 10010100",10100101,bit_manipulation,unknown,binary8,True,0.99,9,10010100,unknown__ex9__qhwmid,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",148.0,,,,10010100,unknown,mid,,0,unknown,14.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,10100101,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 20], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [91], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 8, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i3)"", ""xor(i1^,i3^)"", ""eq(i1,i3^)"", ""eq(i1^,i3)"", ""neq(i1,i3)"", ""neq(i1^,i3^)""], ""hybrid_consensus_varset"": ""i1,i3"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 3, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": """", ""not_structured_formula_prediction_count"": 2, ""not_structured_formula_sample_matches"": [""choose(not(shr7),rol3,ror1)"", ""choose(not(shr7),rol3,x)"", ""xor(not(rol3),not(shr7))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 3, ""structured_formula_name"": """", ""structured_formula_prediction"": """", ""structured_formula_prediction_count"": 2, ""structured_formula_sample_matches"": [""choose(shr7,ror1,rol3)"", ""choose(shr7,x,rol3)"", ""xor(rol3,shr7)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[i8] o6=[i1] o7=[i2] o8=[none],False,False,0,False,False,False,True,False,1,0,,True,"i1,i3",6,1,,,"choose(shr7,ror1,rol3)|choose(shr7,x,rol3)|xor(rol3,shr7)",10100100|10100101,False,3,2,0,False,,,"choose(not(shr7),rol3,ror1)|choose(not(shr7),rol3,x)|xor(not(rol3),not(shr7))",10100100|10100101,False,3,2,0,False,,0,,0,,,0,,0,False,False,,0,0,0,False,,,0,0,0,False
+016c474c,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11000011 -> 00001010
+01100100 -> 10010011
+01110000 -> 11000011
+00001010 -> 00101000
+01010100 -> 01010010
+01111101 -> 11110111
+10110111 -> 11011001
+11001100 -> 00110110
+10110100 -> 11010101
+10000111 -> 00011000
+
+Now, determine the output for: 00000001",00000100,bit_manipulation,unknown,binary8,True,0.99,10,00000001,unknown__ex10__qhwlow,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",1.0,,,,00000001,unknown,low,,0,unknown,0.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,00000100,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 18, 18, 18, 18, 2, 18, 18], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [59, 59, 52, 54, 55], ""boolean3_value_counts"": [1, 1, 1, 1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""00000100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""00000100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,True,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl2,shr5)",00000100,"xor(shl2,shr5)",00000100,True,1,1,10,True,"xor(not(shl2),not(shr5))",00000100,"xor(not(shl2),not(shr5))",00000100,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl2),not(shr5))",10,0,1,False
+14742dd8,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01010110 -> 10101101
+11111000 -> 11110011
+10111110 -> 01111110
+11000000 -> 10000011
+01111011 -> 11110111
+11100111 -> 11001101
+00101110 -> 01011100
+01010001 -> 10100011
+10110011 -> 01100100
+
+Now, determine the output for: 10111011",01110100,bit_manipulation,unknown,binary8,True,0.99,9,10111011,unknown__ex9__qhwhigh,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",187.0,,,,10111011,unknown,high,,0,unknown,18.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,01110100,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22, 22, 18, 20, 20, 22, 2, 22], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [54, 92, 54, 58], ""boolean3_value_counts"": [1, 1, 1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 7, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl1),not(shr6))"", ""not_structured_formula_prediction"": ""01110100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl1),not(shr6))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl1,shr6)"", ""structured_formula_prediction"": ""01110100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl1,shr6)""]}",False,unknown,o1=[i2] o2=[i3] o3=[i4] o4=[i5] o5=[i6] o6=[i7] o7=[none] o8=[i2],False,False,0,True,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl1,shr6)",01110100,"xor(shl1,shr6)",01110100,True,1,1,8,True,"xor(not(shl1),not(shr6))",01110100,"xor(not(shl1),not(shr6))",01110100,True,1,1,6,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl1),not(shr6))",6,0,1,False
+201b150e,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10010000 -> 00100010
+10011111 -> 00111100
+10101000 -> 01010010
+11010111 -> 10101101
+01011000 -> 10110001
+10001000 -> 00010010
+01110110 -> 11101101
+00111011 -> 01110110
+10001010 -> 00010110
+10000001 -> 00000000
+
+Now, determine the output for: 01100101",11001011,bit_manipulation,unknown,binary8,True,0.99,10,01100101,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",101.0,,,,01100101,unknown,mid,,0,unknown,10.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,11001011,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [58], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 7, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl1),not(shr6))"", ""not_structured_formula_prediction"": ""11001011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl1),not(shr6))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl1,shr6)"", ""structured_formula_prediction"": ""11001011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl1,shr6)""]}",False,unknown,o1=[i2] o2=[i3] o3=[i4] o4=[i5] o5=[i6] o6=[i7] o7=[none] o8=[i2],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl1,shr6)",11001011,"xor(shl1,shr6)",11001011,True,1,1,8,True,"xor(not(shl1),not(shr6))",11001011,"xor(not(shl1),not(shr6))",11001011,True,1,1,6,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl1),not(shr6))",6,0,1,False
+3bd56850,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00111010 -> 11101001
+00110010 -> 11001001
+01110010 -> 11001011
+00100101 -> 10010101
+00011000 -> 01100000
+10100101 -> 10010001
+01111111 -> 11111111
+00110110 -> 11011001
+01011010 -> 01101010
+10000010 -> 00001100
+
+Now, determine the output for: 00010001",01000100,bit_manipulation,unknown,binary8,True,0.99,10,00010001,unknown__ex10__qhwlow,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",17.0,,,,00010001,unknown,low,,0,unknown,1.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,01000100,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [87], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""01000100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""01000100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl2,shr5)",01000100,"xor(shl2,shr5)",01000100,True,1,1,10,True,"xor(not(shl2),not(shr5))",01000100,"xor(not(shl2),not(shr5))",01000100,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl2),not(shr5))",10,0,1,False
+413086bc,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011010 -> 00110110
+00100111 -> 01001110
+11011111 -> 10111101
+11010100 -> 10101011
+01010001 -> 10100011
+01011111 -> 10111111
+11001011 -> 10010101
+00110110 -> 01101100
+11100011 -> 11000101
+01101011 -> 11010111
+
+Now, determine the output for: 01011001",10110011,bit_manipulation,unknown,binary8,True,0.99,10,01011001,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",89.0,,,,01011001,unknown,mid,,0,unknown,8.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,10110011,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 20, 22, 20], ""boolean2_value_counts"": [1, 1, 1, 2], ""boolean3_support_counts"": [67, 57], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 7, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl1),not(shr6))"", ""not_structured_formula_prediction"": ""10110011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl1),not(shr6))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl1,shr6)"", ""structured_formula_prediction"": ""10110011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl1,shr6)""]}",False,unknown,o1=[i2] o2=[i3] o3=[i4] o4=[i5] o5=[i6] o6=[i7] o7=[none] o8=[i2],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl1,shr6)",10110011,"xor(shl1,shr6)",10110011,True,1,1,8,True,"xor(not(shl1),not(shr6))",10110011,"xor(not(shl1),not(shr6))",10110011,True,1,1,6,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl1),not(shr6))",6,0,1,False
+585f2ff6,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00011001 -> 10010011
+10100100 -> 01010100
+01110110 -> 01101110
+01110001 -> 00011110
+10101011 -> 10100101
+01010000 -> 00001010
+11011000 -> 10011011
+01111011 -> 10111111
+
+Now, determine the output for: 00100100",01000100,bit_manipulation,unknown,binary8,True,0.99,8,00100100,unknown__ex8__qhwlow,3.0,risk_low,468,68,8,False,False,False,False,"',-.:>",36.0,,,,00100100,unknown,low,,0,unknown,3.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,01000100,True,True,False,verified_trace_ready,6.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 26, 20, 2, 20, 24, 30], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 2], ""boolean3_support_counts"": [69, 56, 79, 1, 85, 66], ""boolean3_value_counts"": [1, 1, 1, 1, 1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 8, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""01000100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""01000100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",01000100,"xor(shl4,shr3)",01000100,True,1,1,16,True,"xor(not(shl4),not(shr3))",01000100,"xor(not(shl4),not(shr3))",01000100,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl4),not(shr3))",16,0,1,False
+6deb3d5e,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10110010 -> 00110110
+01000110 -> 01101000
+01101111 -> 11111101
+11111111 -> 11101111
+01100100 -> 01001100
+10001000 -> 10010001
+00011111 -> 11110011
+00001001 -> 10010001
+00100100 -> 01000100
+10111001 -> 10000111
+
+Now, determine the output for: 10011101",11000011,bit_manipulation,unknown,binary8,True,0.99,10,10011101,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",157.0,,,,10011101,unknown,mid,,0,unknown,15.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,11000011,True,True,False,verified_trace_ready,8.5,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 20, 18, 2, 20, 18, 18, 20], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [66, 58], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""11000011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""11000011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,True,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",11000011,"xor(shl4,shr3)",11000011,True,1,1,16,True,"xor(not(shl4),not(shr3))",11000011,"xor(not(shl4),not(shr3))",11000011,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl4),not(shr3))",16,0,1,False
+710cf035,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00000110 -> 00001100
+11111111 -> 11111101
+01000110 -> 10001101
+00000011 -> 00000110
+00011000 -> 00110000
+11110000 -> 11100011
+00100000 -> 01000000
+10101000 -> 01010010
+11101001 -> 11010001
+01101010 -> 11010101
+
+Now, determine the output for: 11000000",10000011,bit_manipulation,unknown,binary8,True,0.99,10,11000000,unknown__ex10__qhwlow,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",192.0,,,,11000000,unknown,low,,0,unknown,19.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,10000011,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 20], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [75], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 7, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl1),not(shr6))"", ""not_structured_formula_prediction"": ""10000011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl1),not(shr6))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl1,shr6)"", ""structured_formula_prediction"": ""10000011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl1,shr6)""]}",False,unknown,o1=[i2] o2=[i3] o3=[i4] o4=[i5] o5=[i6] o6=[i7] o7=[none] o8=[i2],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl1,shr6)",10000011,"xor(shl1,shr6)",10000011,True,1,1,8,True,"xor(not(shl1),not(shr6))",10000011,"xor(not(shl1),not(shr6))",10000011,True,1,1,6,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl1),not(shr6))",6,0,1,False
+71a661f7,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10110010 -> 01101100
+00001011 -> 01100010
+11011011 -> 01010110
+00011001 -> 00100110
+11010101 -> 10010101
+10100110 -> 11101001
+10011011 -> 01000110
+01010101 -> 10110101
+01011010 -> 01010110
+
+Now, determine the output for: 10000111",11000001,bit_manipulation,unknown,binary8,True,0.99,9,10000111,unknown__ex9__qhwmid,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",135.0,,,,10000111,unknown,mid,,0,unknown,13.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,11000001,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 24, 2, 22, 38], ""boolean2_value_counts"": [1, 1, 1, 1, 2], ""boolean3_support_counts"": [68], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""11000001"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""11000001"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",11000001,"xor(shl5,shr2)",11000001,True,1,1,16,True,"xor(not(shl5),not(shr2))",11000001,"xor(not(shl5),not(shr2))",11000001,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl5),not(shr2))",15,0,1,False
+738f7c2d,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10101011 -> 10101001
+11111001 -> 11100011
+10100111 -> 10011001
+11010001 -> 01000010
+11101001 -> 10100011
+10110110 -> 11011101
+10111111 -> 11111001
+11110111 -> 11011011
+00001101 -> 00110100
+00110010 -> 11001001
+
+Now, determine the output for: 11101101",10110011,bit_manipulation,unknown,binary8,True,0.99,10,11101101,unknown__ex10__qhwhigh,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",237.0,,,,11101101,unknown,high,,0,unknown,23.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,10110011,True,True,False,verified_trace_ready,8.5,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22, 20, 20, 18, 22, 2, 22, 22], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [89], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""10110011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""10110011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,True,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl2,shr5)",10110011,"xor(shl2,shr5)",10110011,True,1,1,10,True,"xor(not(shl2),not(shr5))",10110011,"xor(not(shl2),not(shr5))",10110011,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl2),not(shr5))",10,0,1,False
+76fbfa25,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01010001 -> 00110100
+00101001 -> 00101010
+10000110 -> 11100001
+10010011 -> 01000100
+10101100 -> 10101011
+10011100 -> 10100111
+00110110 -> 11001101
+10111101 -> 10001111
+11011001 -> 00010110
+
+Now, determine the output for: 10110100",10101101,bit_manipulation,unknown,binary8,True,0.99,9,10110100,unknown__ex9__qhwmid,5.0,risk_mid,489,71,8,False,False,False,False,"',-.:>",180.0,,,,10110100,unknown,mid,,0,unknown,18.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,10101101,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22, 24], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [68], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""10101101"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""10101101"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",10101101,"xor(shl5,shr2)",10101101,True,1,1,16,True,"xor(not(shl5),not(shr2))",10101101,"xor(not(shl5),not(shr2))",10101101,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl5),not(shr2))",15,0,1,False
+823be38e,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00100001 -> 00010100
+11000111 -> 01101000
+10001111 -> 11100001
+10011111 -> 11100011
+11100001 -> 00001100
+10110000 -> 00010110
+00101111 -> 11110101
+11111111 -> 11101111
+11010010 -> 00111010
+01101000 -> 10001101
+
+Now, determine the output for: 10100110",01110100,bit_manipulation,unknown,binary8,True,0.99,10,10100110,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",166.0,,,,10100110,unknown,mid,,0,unknown,16.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,01110100,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 24], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [68], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""01110100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""01110100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",01110100,"xor(shl4,shr3)",01110100,True,1,1,16,True,"xor(not(shl4),not(shr3))",01110100,"xor(not(shl4),not(shr3))",01110100,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl4),not(shr3))",16,0,1,False
+99ff46bb,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11111101 -> 10011111
+00010001 -> 00100100
+00001001 -> 00100010
+11010001 -> 00010100
+01100101 -> 10111001
+10011011 -> 01000110
+01001000 -> 00010010
+00001010 -> 01000010
+11000001 -> 00010000
+10111010 -> 01101110
+
+Now, determine the output for: 00010111",11100101,bit_manipulation,unknown,binary8,True,0.99,10,00010111,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",23.0,,,,00010111,unknown,mid,,0,unknown,2.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,11100101,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [32], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [90], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""11100101"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""11100101"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",11100101,"xor(shl5,shr2)",11100101,True,1,1,16,True,"xor(not(shl5),not(shr2))",11100101,"xor(not(shl5),not(shr2))",11100101,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl5),not(shr2))",15,0,1,False
+a6d00147,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10110110 -> 01110110
+00100110 -> 01100100
+11000000 -> 00011000
+10000000 -> 00010000
+00110100 -> 01000110
+00110111 -> 01110110
+10101001 -> 10000101
+01001000 -> 10001001
+01000000 -> 00001000
+
+Now, determine the output for: 01101110",11101101,bit_manipulation,unknown,binary8,True,0.99,9,01101110,unknown__ex9__qhwmid,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",110.0,,,,01101110,unknown,mid,,0,unknown,11.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,11101101,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [24], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [69, 120], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 4, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl4),not(shr3))"", ""not_structured_formula_prediction"": ""11101101"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl4),not(shr3))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl4,shr3)"", ""structured_formula_prediction"": ""11101101"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl4,shr3)""]}",False,unknown,o1=[i5] o2=[i6] o3=[i7] o4=[none] o5=[i2] o6=[i3] o7=[i4] o8=[i5],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl4,shr3)",11101101,"xor(shl4,shr3)",11101101,True,1,1,16,True,"xor(not(shl4),not(shr3))",11101101,"xor(not(shl4),not(shr3))",11101101,True,1,1,16,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl4),not(shr3))",16,0,1,False
+c180cdec,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00000000 -> 00000000
+11100010 -> 01111000
+00111011 -> 01101110
+11111011 -> 01011110
+10111110 -> 11101111
+10101000 -> 00101010
+01011010 -> 01010110
+10011111 -> 11000111
+00110011 -> 01101100
+01011110 -> 11010111
+
+Now, determine the output for: 00010000",00000100,bit_manipulation,unknown,binary8,True,0.99,10,00010000,unknown__ex10__qhwlow,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",16.0,,,,00010000,unknown,low,,0,unknown,1.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,00000100,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [24, 28], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [62], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""00000100"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""00000100"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",00000100,"xor(shl5,shr2)",00000100,True,1,1,16,True,"xor(not(shl5),not(shr2))",00000100,"xor(not(shl5),not(shr2))",00000100,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl5),not(shr2))",15,0,1,False
+d2ac699b,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10000010 -> 00011000
+10111111 -> 11110011
+01001110 -> 01110100
+11110010 -> 10011111
+00100010 -> 00010010
+00101110 -> 01110010
+00101011 -> 01011010
+00101111 -> 01111010
+11011101 -> 11100101
+
+Now, determine the output for: 00110001",10001011,bit_manipulation,unknown,binary8,True,0.99,9,00110001,unknown__ex9__qhwmid,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",49.0,,,,00110001,unknown,mid,,0,unknown,4.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,10001011,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [22], ""boolean2_value_counts"": [2], ""boolean3_support_counts"": [124], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 5, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl3),not(shr4))"", ""not_structured_formula_prediction"": ""10001011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl3),not(shr4))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl3,shr4)"", ""structured_formula_prediction"": ""10001011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl3,shr4)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[none] o6=[i2] o7=[i3] o8=[i4],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl3,shr4)",10001011,"xor(shl3,shr4)",10001011,True,1,1,11,True,"xor(not(shl3),not(shr4))",10001011,"xor(not(shl3),not(shr4))",10001011,True,1,1,11,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl3),not(shr4))",11,0,1,False
+d452141e,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11001101 -> 10011001
+01111010 -> 11110101
+00101000 -> 01010000
+01101101 -> 11011011
+11011100 -> 10111011
+00110010 -> 01100100
+01001101 -> 10011011
+11100010 -> 11000111
+11110001 -> 11100001
+
+Now, determine the output for: 01111101",11111011,bit_manipulation,unknown,binary8,True,0.99,9,01111101,unknown__ex9__qhwhigh,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",125.0,,,,01111101,unknown,high,,0,unknown,12.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,11111011,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [26, 26, 18, 22, 26, 24, 2, 26], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [74, 54, 54], ""boolean3_value_counts"": [1, 1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 7, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 2, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": ""11111011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""choose(not(shr6),rol1,not(shl1))"", ""xor(not(shl1),not(shr6))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl1,shr6)"", ""structured_formula_prediction"": ""11111011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl1,shr6)""]}",False,unknown,o1=[i2] o2=[i3] o3=[i4] o4=[i5] o5=[i6] o6=[i7] o7=[none] o8=[i2],False,False,0,True,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl1,shr6)",11111011,"xor(shl1,shr6)",11111011,True,1,1,8,True,,11111011,"choose(not(shr6),rol1,not(shl1))|xor(not(shl1),not(shr6))",11111011,True,2,1,0,False,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,,0,0,0,False
+d9cd73c2,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00101101 -> 10101011
+00011000 -> 00000110
+10001011 -> 01000010
+01110110 -> 11011101
+10000000 -> 00100000
+11101010 -> 01111010
+10001101 -> 10000011
+11000111 -> 11010001
+
+Now, determine the output for: 10100111",11001001,bit_manipulation,unknown,binary8,True,0.99,8,10100111,unknown__ex8__qhwmid,3.0,risk_mid,468,68,8,False,False,False,False,"',-.:>",167.0,,,,10100111,unknown,mid,,0,unknown,16.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,11001001,True,True,False,verified_trace_ready,6.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_affine_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [1], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 20, 2, 20, 18, 24, 18, 18], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [77], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 8, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""11001001"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""11001001"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,True,False,False,False,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",11001001,"xor(shl5,shr2)",11001001,True,1,1,16,True,"xor(not(shl5),not(shr2))",11001001,"xor(not(shl5),not(shr2))",11001001,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl5),not(shr2))",15,0,1,False
+e810591c,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01111100 -> 10011111
+11111100 -> 10111111
+01101010 -> 01011010
+10000011 -> 01000000
+10011110 -> 11100111
+11101001 -> 00011010
+01010010 -> 01010100
+00110010 -> 01001100
+00011001 -> 00100110
+
+Now, determine the output for: 01011011",01110110,bit_manipulation,unknown,binary8,True,0.99,9,01011011,unknown__ex9__qhwmid,5.0,risk_high,489,71,8,False,False,False,False,"',-.:>",91.0,,,,01011011,unknown,mid,,0,unknown,9.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,01110110,True,True,False,verified_trace_ready,7.5,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [24, 20, 2, 18, 18, 20, 22, 24], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [63, 52, 3, 60], ""boolean3_value_counts"": [1, 1, 1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 9, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 3, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl5),not(shr2))"", ""not_structured_formula_prediction"": ""01110110"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl5),not(shr2))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl5,shr2)"", ""structured_formula_prediction"": ""01110110"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl5,shr2)""]}",False,unknown,o1=[i6] o2=[i7] o3=[none] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,True,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl5,shr2)",01110110,"xor(shl5,shr2)",01110110,True,1,1,16,True,"xor(not(shl5),not(shr2))",01110110,"xor(not(shl5),not(shr2))",01110110,True,1,1,15,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl5),not(shr2))",15,0,1,False
+e928acf8,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11100110 -> 00111110
+01011101 -> 11101101
+11000001 -> 00000100
+01100001 -> 00001110
+00110010 -> 10010011
+01010000 -> 10000101
+01011000 -> 11000101
+10111111 -> 11110011
+10110001 -> 10000011
+00000010 -> 00010000
+
+Now, determine the output for: 01110001",10001111,bit_manipulation,unknown,binary8,True,0.99,10,01110001,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",113.0,,,,01110001,unknown,mid,,0,unknown,11.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_two_bit_boolean,10001111,True,True,False,verified_trace_ready,8.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [20, 20, 18, 18, 2, 18, 18, 20], ""boolean2_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean3_support_counts"": [57, 65, 89, 57, 1, 52, 63, 57], ""boolean3_value_counts"": [1, 1, 1, 1, 1, 1, 1, 1], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 5, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl3),not(shr4))"", ""not_structured_formula_prediction"": ""10001111"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl3),not(shr4))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl3,shr4)"", ""structured_formula_prediction"": ""10001111"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl3,shr4)""]}",False,unknown,o1=[i4] o2=[i5] o3=[i6] o4=[i7] o5=[none] o6=[i2] o7=[i3] o8=[i4],False,False,0,True,True,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl3,shr4)",10001111,"xor(shl3,shr4)",10001111,True,1,1,11,True,"xor(not(shl3),not(shr4))",10001111,"xor(not(shl3),not(shr4))",10001111,True,1,1,11,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl3),not(shr4))",11,0,1,False
+eeda9bd9,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01101101 -> 10110111
+01000100 -> 00010010
+10000000 -> 00000100
+01101010 -> 10101011
+11110010 -> 11001111
+00011011 -> 01101100
+10100010 -> 10001101
+01011001 -> 01100110
+10101011 -> 10101001
+10011100 -> 01110100
+
+Now, determine the output for: 01111110",11111011,bit_manipulation,unknown,binary8,True,0.99,10,01111110,unknown__ex10__qhwhigh,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",126.0,,,,01111110,unknown,high,,0,unknown,12.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,11111011,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [18, 18, 20, 20], ""boolean2_value_counts"": [1, 1, 1, 2], ""boolean3_support_counts"": [74], ""boolean3_value_counts"": [2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 6, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i1,i8)"", ""xor(i1^,i8^)"", ""eq(i1,i8^)"", ""eq(i1^,i8)"", ""neq(i1,i8)"", ""neq(i1^,i8^)""], ""hybrid_consensus_varset"": ""i1,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(shl2),not(shr5))"", ""not_structured_formula_prediction"": ""11111011"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(shl2),not(shr5))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(shl2,shr5)"", ""structured_formula_prediction"": ""11111011"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(shl2,shr5)""]}",False,unknown,o1=[i3] o2=[i4] o3=[i5] o4=[i6] o5=[i7] o6=[none] o7=[i2] o8=[i3],False,False,0,False,False,False,True,False,1,0,,True,"i1,i8",6,1,"xor(shl2,shr5)",11111011,"xor(shl2,shr5)",11111011,True,1,1,10,True,"xor(not(shl2),not(shr5))",11111011,"xor(not(shl2),not(shr5))",11111011,True,1,1,10,True,,0,,0,,,0,,0,False,False,"xor(shl,shr)",322,0,36,True,,"xor(not(shl2),not(shr5))",10,0,1,False
+2395d6df,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00010000 -> 10000000
+01101000 -> 01000011
+11011001 -> 01001110
+00100110 -> 00110001
+01111010 -> 11010011
+00001101 -> 01101000
+01101110 -> 01110011
+01111001 -> 01001011
+10101101 -> 01101101
+00001100 -> 01100000
+
+Now, determine the output for: 01000011",00011010,bit_manipulation,unknown,binary8,True,0.99,10,01000011,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",67.0,,,,01000011,unknown,mid,,0,unknown,6.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,00011010,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 24], ""boolean2_value_counts"": [1, 2], ""boolean3_support_counts"": [1, 68], ""boolean3_value_counts"": [1, 2], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 2, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""and(i4,i8^)"", ""nor(i4^,i8)""], ""hybrid_consensus_varset"": ""i4,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 3, ""not_structured_formula_name"": """", ""not_structured_formula_prediction"": """", ""not_structured_formula_prediction_count"": 2, ""not_structured_formula_sample_matches"": [""and(not(shl7),rol3)"", ""choose(not(shl7),rol3,not(nibble_swap))"", ""choose(not(shl7),rol3,ror2)""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 2, ""structured_formula_name"": """", ""structured_formula_prediction"": """", ""structured_formula_prediction_count"": 2, ""structured_formula_sample_matches"": [""choose(shl7,ror2,rol3)"", ""choose(shl7,shr1,rol3)""]}",False,unknown,o1=[none] o2=[i5] o3=[i6] o4=[i7] o5=[i8] o6=[i1] o7=[i2] o8=[i3],False,False,0,False,False,False,True,False,1,0,,True,"i4,i8",2,1,,,"choose(shl7,ror2,rol3)|choose(shl7,shr1,rol3)",00011010|10011010,False,2,2,0,False,,,"and(not(shl7),rol3)|choose(not(shl7),rol3,not(nibble_swap))|choose(not(shl7),rol3,ror2)",00011010|10011010,False,3,2,0,False,,0,,0,,,0,,0,False,False,,0,0,0,False,,,0,0,0,False
+82acc609,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10000111 -> 01100001
+01001011 -> 01010010
+01101010 -> 10011010
+10001000 -> 00100010
+01111110 -> 10011111
+11010000 -> 00110100
+00000001 -> 11000000
+10000110 -> 10100001
+11001110 -> 10110011
+01011001 -> 11010110
+
+Now, determine the output for: 11101010",10111010,bit_manipulation,unknown,binary8,True,0.99,10,11101010,unknown__ex10__qhwmid,6.0,risk_high,510,74,8,False,False,False,False,"',-.:>",234.0,,,,11101010,unknown,mid,,0,unknown,23.0,False,1,8,high,True,0.25,True,low,True,bit_manipulation,binary,bit_other,binary_affine_xor,10111010,True,True,False,verified_trace_ready,9.0,bit_no_candidate|bit_independent_ambiguous|bit_bijection_ambiguous|bit_boolean2_ambiguous|bit_boolean3_ambiguous|bit_byte_transform_ambiguous,bit_exact,"{""affine_free_var_counts"": [0, 0, 0, 0, 0, 0, 0, 0], ""affine_low_gap_mismatch"": false, ""bijection_answer_count"": 0, ""bijection_search_explored"": 0, ""boolean2_support_counts"": [2, 20, 20], ""boolean2_value_counts"": [1, 1, 2], ""boolean3_support_counts"": [0], ""boolean3_value_counts"": [0], ""boolean4_support_counts"": [], ""boolean4_value_counts"": [], ""byte_transform_names"": [], ""example_count"": 10, ""hybrid_consensus_match_count"": 6, ""hybrid_consensus_missing_position"": 1, ""hybrid_consensus_prediction_count"": 1, ""hybrid_consensus_sample_matches"": [""xor(i7,i8)"", ""xor(i7^,i8^)"", ""eq(i7,i8^)"", ""eq(i7^,i8)"", ""neq(i7,i8)"", ""neq(i7^,i8^)""], ""hybrid_consensus_varset"": ""i7,i8"", ""independent_choice_counts"": [], ""multi_candidate_positions"": 0, ""no_candidate_positions"": 1, ""not_structured_formula_match_count"": 1, ""not_structured_formula_name"": ""xor(not(ror2),not(shl7))"", ""not_structured_formula_prediction"": ""10111010"", ""not_structured_formula_prediction_count"": 1, ""not_structured_formula_sample_matches"": [""xor(not(ror2),not(shl7))""], ""simple_family"": ""unknown"", ""structured_formula_match_count"": 1, ""structured_formula_name"": ""xor(ror2,shl7)"", ""structured_formula_prediction"": ""10111010"", ""structured_formula_prediction_count"": 1, ""structured_formula_sample_matches"": [""xor(ror2,shl7)""]}",False,unknown,o1=[none] o2=[i8] o3=[i1] o4=[i2] o5=[i3] o6=[i4] o7=[i5] o8=[i6],False,False,0,False,False,False,True,False,1,0,,True,"i7,i8",6,1,"xor(ror2,shl7)",10111010,"xor(ror2,shl7)",10111010,True,1,1,1,False,"xor(not(ror2),not(shl7))",10111010,"xor(not(ror2),not(shl7))",10111010,True,1,1,1,False,,0,,0,,,0,,0,False,False,"xor(ror,shl)",33,0,16,True,,"xor(not(ror2),not(shl7))",1,0,1,False
