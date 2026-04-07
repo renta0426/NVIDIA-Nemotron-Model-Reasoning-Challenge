@@ -25,6 +25,11 @@ metric は **`\boxed{}` 優先抽出 → heuristic fallback → last numeric fal
   - `cuda-train-data-analysis-v1/artifacts/` の prompt-local / symbol solver / benchmark build に必要な CSV 群
 - reproduced eval outputs: `mac_workspace/v1/outputs/eval_prompt_router_v6_repro/`
 
+## Submission compatibility
+
+> 重要: `prompt-router-v6-repro` は **single-file multi-adapter local pipeline** の再現であり、README の Submitting 節が要求する **「1 つの rank<=32 LoRA adapter を `submission.zip` に入れて提出する形」** をそのまま満たすものではない。  
+> `v1` で再現したのは **local best pipeline** であって、**submission-compatible single adapter** ではない。
+
 ## Current best local pipeline
 
 | pipeline | local320 | gate24 | binary | gravity | roman | symbol | text | unit | note |

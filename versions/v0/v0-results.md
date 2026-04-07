@@ -25,6 +25,8 @@
 
 single-adapter は `v40` が best のままだが、**single-file multi-adapter pipeline** は actual README full320 実測でさらに大きく上回った。
 
+> 重要: ここでいう `prompt-router-v3` 以降の **single-file multi-adapter pipeline** は、複数 adapter の切替と custom solver / routing code を使う **local pipeline** であり、README の Submitting 節が要求する **「1 つの rank<=32 LoRA adapter を `submission.zip` に入れて提出する形」** をそのまま満たすものではない。したがって、**local best と submission-compatible best は別物**として扱う。
+
 | pipeline | local320 | binary | gravity | roman | symbol | text | unit | note |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `prompt-router-v6` | **293/320 = 0.9156** | `54/60` | `50/50` | `50/50` | `39/60` | `50/50` | `50/50` | `prompt-router-v5` + prompt-local binary formula-consensus fallback (`structured_formula` / `not_formula` / `prompt_stage2`) |
