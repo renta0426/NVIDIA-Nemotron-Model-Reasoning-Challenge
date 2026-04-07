@@ -292,6 +292,8 @@ TRAIN_PROFILE_CHOICES = (
     "single-adapter-fusion-v120",
     "single-adapter-fusion-v121",
     "single-adapter-fusion-v122",
+    "single-adapter-fusion-v123",
+    "single-adapter-fusion-v124",
     "general-stable-focus-v1",
     "general-stable-focus-v2",
     "general-stable-focus-v3",
@@ -612,6 +614,54 @@ STRONG_BASELINE_V2_SAMPLE_FUSION_V91_SPECS = (
         "allowed_tiers": ("answer_only_keep",),
         "assistant_style": "boxed_only",
         "quota": 8,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V123_SPECS = (
+    {
+        "source_name": "strong_sample_binary_other_verified_short_done_v123",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 24,
+        "group_keys": ("selection_tier", "teacher_solver_candidate", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_verified_short_done_v123",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 8,
+        "group_keys": ("selection_tier", "num_examples"),
+    },
+)
+STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS = (
+    {
+        "source_name": "strong_sample_binary_other_verified_short_done_v124",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "bit_manipulation",
+        "label": "binary",
+        "template_subtype": "bit_other",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 48,
+        "group_keys": ("selection_tier", "teacher_solver_candidate", "num_examples"),
+    },
+    {
+        "source_name": "strong_sample_symbol_numeric_verified_short_done_v124",
+        "metadata_path": AUGMENT_TRAIN_RECOMMENDED_CSV,
+        "family": "symbol_equation",
+        "label": "symbol",
+        "template_subtype": "numeric_2x2",
+        "allowed_tiers": ("verified_trace_ready",),
+        "assistant_style": "boxed_only_done",
+        "quota": 16,
         "group_keys": ("selection_tier", "num_examples"),
     },
 )
@@ -5678,8 +5728,9 @@ def build_single_adapter_fusion_strong_sample_rows(
     *,
     profile_name: str,
     augmentation_specs: Sequence[dict[str, Any]],
+    base_profile: str = "single-adapter-fusion-v40",
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
-    base_rows, base_summary = apply_phase2_train_profile(rows, profile="single-adapter-fusion-v40")
+    base_rows, base_summary = apply_phase2_train_profile(rows, profile=base_profile)
     profiled_rows = [clone_phase2_row(row) for row in base_rows]
     existing_ids = {
         str(row.get("id", "")).strip()
@@ -5772,6 +5823,10 @@ def build_single_adapter_fusion_strong_sample_rows(
     return profiled_rows, {
         "profile": profile_name,
         "input": base_summary.get("input", summarize_phase2_rows(rows)),
+        "base_profile": {
+            "profile": base_summary.get("profile", base_profile),
+            "output": base_summary.get("output", summarize_phase2_rows(base_rows)),
+        },
         "base": base_summary.get("output", summarize_phase2_rows(base_rows)),
         "output": summarize_phase2_rows(profiled_rows),
         "transform_counts": {
@@ -6142,6 +6197,28 @@ def build_single_adapter_fusion_v122_rows(
     )
 
 
+def build_single_adapter_fusion_v123_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v123",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V123_SPECS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
+def build_single_adapter_fusion_v124_rows(
+    rows: Sequence[dict[str, str]],
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    return build_single_adapter_fusion_strong_sample_rows(
+        rows,
+        profile_name="single-adapter-fusion-v124",
+        augmentation_specs=STRONG_BASELINE_V2_SAMPLE_FUSION_V124_SPECS,
+        base_profile="single-adapter-fusion-v110",
+    )
+
+
 def build_strong_baseline_cot_v2_rows(
     rows: Sequence[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -6507,6 +6584,10 @@ def apply_phase2_train_profile(
         return build_single_adapter_fusion_v121_rows(input_rows)
     if normalized_profile == "single-adapter-fusion-v122":
         return build_single_adapter_fusion_v122_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v123":
+        return build_single_adapter_fusion_v123_rows(input_rows)
+    if normalized_profile == "single-adapter-fusion-v124":
+        return build_single_adapter_fusion_v124_rows(input_rows)
     if normalized_profile not in TRAIN_PROFILE_CHOICES:
         raise ValueError(f"Unsupported train profile: {profile}")
 
