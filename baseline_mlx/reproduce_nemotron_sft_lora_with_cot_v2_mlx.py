@@ -4,6 +4,7 @@ import argparse
 import copy
 import importlib.metadata as importlib_metadata
 import json
+import math
 import os
 import random
 import re
@@ -330,6 +331,15 @@ DEFAULT_PROXY_V2_FOCUS_BUCKETS = (
     "supported_affine_xor",
     "supported_bijection",
 )
+BOXED_PATTERN = re.compile(r"\\boxed\{([^}]*)(?:\}|$)")
+FINAL_ANSWER_PATTERNS = (
+    r"The final answer is:\s*([^\n]+)",
+    r"Final answer is:\s*([^\n]+)",
+    r"Final answer\s*[:：]\s*([^\n]+)",
+    r"final answer\s*[:：]\s*([^\n]+)",
+)
+NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
+BIT8_PATTERN = re.compile(r"^[01]{8}$")
 
 
 def utc_now() -> str:
@@ -1021,6 +1031,245 @@ def build_corrective_stage2_dataframe(
     return combined, summary
 
 
+def encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
+    bos_token = getattr(tokenizer, "bos_token", None)
+    add_special_tokens = bos_token is None or not str(prompt).startswith(str(bos_token))
+    encoded = tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
+    return list(encoded)
+
+
+def build_eval_prompts(
+    tokenizer: Any,
+    prompt_series: Sequence[str],
+    *,
+    enable_thinking: bool,
+) -> list[str]:
+    prompts: list[str] = []
+    for prompt_text in prompt_series:
+        user_content = build_user_message(str(prompt_text))
+        prompts.append(
+            apply_chat_template_safe(
+                tokenizer,
+                [{"role": "user", "content": user_content}],
+                add_generation_prompt=True,
+                enable_thinking=enable_thinking,
+            )
+        )
+    return prompts
+
+
+def extract_final_answer(text: str | None) -> str:
+    if text is None:
+        return "NOT_FOUND"
+    boxed_matches = BOXED_PATTERN.findall(text)
+    if boxed_matches:
+        non_empty = [match.strip() for match in boxed_matches if match.strip()]
+        if non_empty:
+            return non_empty[-1]
+        return boxed_matches[-1].strip()
+    for pattern in FINAL_ANSWER_PATTERNS:
+        matched = re.findall(pattern, text, re.IGNORECASE)
+        if matched:
+            return matched[-1].strip()
+    numeric_matches = NUMBER_PATTERN.findall(text)
+    if numeric_matches:
+        return numeric_matches[-1]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines[-1] if lines else "NOT_FOUND"
+
+
+def analyze_raw_output(text: str | None) -> dict[str, Any]:
+    if text is None:
+        return {
+            "extracted_answer": "NOT_FOUND",
+            "fallback_type": "not_found",
+            "format_bucket": "not_found",
+            "has_boxed": False,
+            "boxed_count": 0,
+        }
+    boxed_matches = BOXED_PATTERN.findall(text)
+    numeric_matches = NUMBER_PATTERN.findall(text)
+    if boxed_matches:
+        non_empty = [match.strip() for match in boxed_matches if match.strip()]
+        if non_empty:
+            return {
+                "extracted_answer": non_empty[-1],
+                "fallback_type": "boxed_non_empty",
+                "format_bucket": "boxed",
+                "has_boxed": True,
+                "boxed_count": len(boxed_matches),
+            }
+        return {
+            "extracted_answer": boxed_matches[-1].strip(),
+            "fallback_type": "boxed_empty",
+            "format_bucket": "boxed_empty",
+            "has_boxed": True,
+            "boxed_count": len(boxed_matches),
+        }
+    for pattern in FINAL_ANSWER_PATTERNS:
+        matched = re.findall(pattern, text, re.IGNORECASE)
+        if matched:
+            return {
+                "extracted_answer": matched[-1].strip(),
+                "fallback_type": "final_answer_phrase",
+                "format_bucket": "final_answer",
+                "has_boxed": False,
+                "boxed_count": 0,
+            }
+    if numeric_matches:
+        return {
+            "extracted_answer": numeric_matches[-1],
+            "fallback_type": "last_number",
+            "format_bucket": "numeric_fallback",
+            "has_boxed": False,
+            "boxed_count": 0,
+        }
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return {
+        "extracted_answer": lines[-1] if lines else "NOT_FOUND",
+        "fallback_type": "last_line" if lines else "not_found",
+        "format_bucket": "line_fallback" if lines else "not_found",
+        "has_boxed": False,
+        "boxed_count": 0,
+    }
+
+
+def verify_answer(gold: str, predicted: str) -> bool:
+    gold_text = str(gold).strip()
+    predicted_text = str(predicted).strip()
+    try:
+        return math.isclose(float(gold_text), float(predicted_text), rel_tol=1e-2, abs_tol=1e-5)
+    except Exception:
+        return predicted_text.lower() == gold_text.lower()
+
+
+def safe_div(numerator: int, denominator: int) -> float:
+    if denominator == 0:
+        return 0.0
+    return numerator / denominator
+
+
+def aggregate_counts(rows: Sequence[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    buckets: dict[str, dict[str, int]] = {}
+    for row in rows:
+        bucket_key = str(row.get(key, "")).strip()
+        bucket = buckets.setdefault(bucket_key, {"rows": 0, "correct": 0})
+        bucket["rows"] += 1
+        bucket["correct"] += int(bool(row.get("is_correct")))
+    summary: list[dict[str, Any]] = []
+    for bucket_key, stats in sorted(buckets.items()):
+        summary.append(
+            {
+                key: bucket_key,
+                "rows": stats["rows"],
+                "correct": stats["correct"],
+                "accuracy": round(safe_div(stats["correct"], stats["rows"]), 4),
+            }
+        )
+    return summary
+
+
+def build_binary_metrics(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    binary_rows = [row for row in rows if str(row.get("family_short", "")).strip() == "binary"]
+    regex_ok = [row for row in binary_rows if BIT8_PATTERN.fullmatch(str(row.get("prediction", "")))]
+    gold_leading_zero_rows = [
+        row for row in binary_rows if str(row.get("gold_answer", "")).startswith("0")
+    ]
+    leading_zero_ok = [
+        row
+        for row in gold_leading_zero_rows
+        if BIT8_PATTERN.fullmatch(str(row.get("prediction", "")))
+        and str(row.get("prediction", "")).startswith("0")
+    ]
+    format_ok = [
+        row
+        for row in binary_rows
+        if row.get("has_boxed") and BIT8_PATTERN.fullmatch(str(row.get("prediction", "")))
+    ]
+    format_fail = [row for row in binary_rows if row not in format_ok]
+    format_ok_but_wrong = [row for row in format_ok if not row.get("is_correct")]
+    return {
+        "rows": len(binary_rows),
+        "boxed_extraction_success_rate": round(
+            safe_div(
+                sum(int(row.get("fallback_type") == "boxed_non_empty") for row in binary_rows),
+                len(binary_rows),
+            ),
+            4,
+        ),
+        "regex_exact_rate": round(safe_div(len(regex_ok), len(binary_rows)), 4),
+        "leading_zero_retention_rate": round(
+            safe_div(len(leading_zero_ok), len(gold_leading_zero_rows)),
+            4,
+        ),
+        "format_failure_rate": round(safe_div(len(format_fail), len(binary_rows)), 4),
+        "format_ok_content_wrong_rate": round(
+            safe_div(len(format_ok_but_wrong), len(format_ok)),
+            4,
+        ),
+        "solver_family_accuracy": aggregate_counts(binary_rows, "teacher_solver_candidate"),
+    }
+
+
+def summarize_benchmark_scores(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    correct = sum(int(bool(row.get("is_correct"))) for row in rows)
+    return {
+        "overall": {
+            "rows": len(rows),
+            "correct": correct,
+            "accuracy": round(safe_div(correct, len(rows)), 4),
+        },
+        "by_family": aggregate_counts(rows, "family_short"),
+        "by_template_subtype": aggregate_counts(rows, "template_subtype"),
+        "by_selection_tier": aggregate_counts(rows, "selection_tier"),
+        "by_teacher_solver_candidate": aggregate_counts(rows, "teacher_solver_candidate"),
+        "binary_metrics": build_binary_metrics(rows),
+    }
+
+
+def render_eval_markdown_summary(name: str, summary: dict[str, Any]) -> str:
+    lines = [f"# {name}", "", "## Overall", ""]
+    overall = summary["overall"]
+    lines.append(f"- rows: `{overall['rows']}`")
+    lines.append(f"- correct: `{overall['correct']}`")
+    lines.append(f"- accuracy: `{overall['accuracy']:.4f}`")
+    lines.append("")
+
+    def add_table(title: str, key_name: str, rows: Sequence[dict[str, Any]]) -> None:
+        lines.append(f"## {title}")
+        lines.append("")
+        lines.append(f"| {key_name} | rows | correct | accuracy |")
+        lines.append("| --- | ---: | ---: | ---: |")
+        for row in rows:
+            lines.append(
+                f"| `{row[key_name]}` | {row['rows']} | {row['correct']} | {row['accuracy']:.4f} |"
+            )
+        lines.append("")
+
+    add_table("By family", "family_short", summary["by_family"])
+    add_table("By template subtype", "template_subtype", summary["by_template_subtype"])
+    add_table("By selection tier", "selection_tier", summary["by_selection_tier"])
+    add_table(
+        "By teacher solver candidate",
+        "teacher_solver_candidate",
+        summary["by_teacher_solver_candidate"],
+    )
+    binary_metrics = summary["binary_metrics"]
+    lines.append("## Binary metrics")
+    lines.append("")
+    for key, value in binary_metrics.items():
+        if key == "solver_family_accuracy":
+            continue
+        lines.append(f"- {key}: `{value}`")
+    lines.append("")
+    add_table(
+        "Binary solver family accuracy",
+        "teacher_solver_candidate",
+        binary_metrics["solver_family_accuracy"],
+    )
+    return "\n".join(lines)
+
+
 def build_leaderboard_proxy_v2_dataframe(
     *,
     proxy_v1_df: pd.DataFrame,
@@ -1159,6 +1408,170 @@ def build_leaderboard_proxy_v2_dataframe(
         },
     }
     return combined, summary
+
+
+def run_eval_benchmark_csv(args: argparse.Namespace) -> None:
+    from mlx_lm import batch_generate, generate, load
+    from mlx_lm.sample_utils import make_sampler
+
+    benchmark_csv = Path(args.benchmark_csv).resolve()
+    output_root = Path(args.output_root).resolve()
+    ensure_dir(output_root)
+
+    benchmark_df = pd.read_csv(benchmark_csv)
+    require_columns(benchmark_df, benchmark_csv, ["id", "prompt", "answer"])
+    for optional_column in (
+        "benchmark_name",
+        "benchmark_role",
+        "family",
+        "family_short",
+        "template_subtype",
+        "selection_tier",
+        "teacher_solver_candidate",
+        "answer_type",
+        "num_examples",
+        "prompt_len_chars",
+    ):
+        if optional_column not in benchmark_df.columns:
+            benchmark_df[optional_column] = ""
+    if not benchmark_df["benchmark_name"].astype(str).str.strip().any():
+        benchmark_df["benchmark_name"] = benchmark_csv.stem
+    if not benchmark_df["prompt_len_chars"].astype(str).str.strip().any():
+        benchmark_df["prompt_len_chars"] = benchmark_df["prompt"].astype(str).map(len)
+    benchmark_rows = benchmark_df.to_dict(orient="records")
+
+    load_kwargs: dict[str, Any] = {"lazy": bool(args.lazy_load)}
+    if args.adapter_dir is not None:
+        load_kwargs["adapter_path"] = str(Path(args.adapter_dir).resolve())
+    model, tokenizer = load(str(Path(args.model_root).resolve()), **load_kwargs)
+    normalize_tokenizer_for_hf_parity(tokenizer)
+    prompts = build_eval_prompts(
+        tokenizer,
+        [str(row["prompt"]) for row in benchmark_rows],
+        enable_thinking=bool(args.eval_enable_thinking),
+    )
+    prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
+    sampler = make_sampler(
+        temp=float(args.temperature),
+        top_p=float(args.top_p) if 0.0 < float(args.top_p) < 1.0 else 0.0,
+    )
+
+    max_num_seqs = max(1, int(args.max_num_seqs))
+    chunk_size = min(max_num_seqs, max(1, int(args.prompt_chunk_size)))
+    prefill_batch_size = min(max_num_seqs, max(1, int(args.prefill_batch_size)))
+    completion_batch_size = min(max_num_seqs, max(1, int(args.completion_batch_size)))
+    force_single_generate = bool(args.force_single_generate)
+
+    records: list[dict[str, Any]] = []
+    total_prompts = len(prompt_tokens)
+    for chunk_start in range(0, total_prompts, chunk_size):
+        chunk_prompts = prompt_tokens[chunk_start : chunk_start + chunk_size]
+        chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompts)]
+        chunk_rendered_prompts = prompts[chunk_start : chunk_start + len(chunk_prompts)]
+        try:
+            if force_single_generate:
+                raise RuntimeError("force_single_generate")
+            batch_response = batch_generate(
+                model,
+                tokenizer,
+                chunk_prompts,
+                max_tokens=int(args.max_tokens),
+                sampler=sampler,
+                verbose=False,
+                prefill_batch_size=min(prefill_batch_size, len(chunk_prompts)),
+                completion_batch_size=min(completion_batch_size, len(chunk_prompts)),
+            )
+            chunk_outputs = list(batch_response.texts)
+        except (AttributeError, RuntimeError):
+            chunk_outputs = [
+                generate(
+                    model,
+                    tokenizer,
+                    prompt=prompt_tokens_single,
+                    verbose=False,
+                    max_tokens=int(args.max_tokens),
+                    sampler=sampler,
+                )
+                for prompt_tokens_single in chunk_prompts
+            ]
+        for row, rendered_prompt, raw_output in zip(chunk_rows, chunk_rendered_prompts, chunk_outputs):
+            records.append(
+                {
+                    "benchmark_name": str(row.get("benchmark_name", benchmark_csv.stem)),
+                    "benchmark_role": str(row.get("benchmark_role", "")),
+                    "id": str(row["id"]),
+                    "family": str(row.get("family", "")),
+                    "family_short": str(row.get("family_short", "")),
+                    "template_subtype": str(row.get("template_subtype", "")),
+                    "selection_tier": str(row.get("selection_tier", "")),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")),
+                    "answer_type": str(row.get("answer_type", "")),
+                    "num_examples": str(row.get("num_examples", "")),
+                    "prompt_len_chars": str(row.get("prompt_len_chars", "")),
+                    "expected_answer": str(row["answer"]),
+                    "rendered_prompt": rendered_prompt,
+                    "raw_output": str(raw_output),
+                    "extracted_answer": extract_final_answer(str(raw_output)),
+                }
+            )
+
+    scored_rows: list[dict[str, Any]] = []
+    for row in records:
+        derived = analyze_raw_output(row["raw_output"])
+        prediction = str(derived["extracted_answer"])
+        scored_rows.append(
+            {
+                "benchmark_name": row["benchmark_name"],
+                "benchmark_role": row["benchmark_role"],
+                "id": row["id"],
+                "gold_answer": row["expected_answer"],
+                "prediction": prediction,
+                "is_correct": verify_answer(row["expected_answer"], prediction),
+                "family": row["family"],
+                "family_short": row["family_short"],
+                "template_subtype": row["template_subtype"],
+                "selection_tier": row["selection_tier"],
+                "teacher_solver_candidate": row["teacher_solver_candidate"],
+                "answer_type": row["answer_type"],
+                "num_examples": row["num_examples"],
+                "prompt_len_chars": row["prompt_len_chars"],
+                "fallback_type": derived["fallback_type"],
+                "format_bucket": derived["format_bucket"],
+                "has_boxed": derived["has_boxed"],
+                "boxed_count": derived["boxed_count"],
+                "raw_output": row["raw_output"],
+            }
+        )
+
+    summary = summarize_benchmark_scores(scored_rows)
+    payload = {
+        "created_at": utc_now(),
+        "benchmark_csv": str(benchmark_csv),
+        "model_root": str(Path(args.model_root).resolve()),
+        "adapter_dir": str(Path(args.adapter_dir).resolve()) if args.adapter_dir else "",
+        "readme_eval_assumptions": {
+            "metric": "accuracy",
+            "temperature": float(args.temperature),
+            "top_p": float(args.top_p),
+            "max_tokens": int(args.max_tokens),
+            "max_num_seqs": int(args.max_num_seqs),
+            "max_model_len": int(args.max_model_len),
+            "boxed_first_extraction": True,
+            "numeric_relative_tolerance": 1e-2,
+            "eval_enable_thinking": bool(args.eval_enable_thinking),
+        },
+        **summary,
+    }
+
+    raw_outputs_path = output_root / "benchmark_eval_raw_outputs.csv"
+    row_level_path = output_root / "benchmark_eval_row_level.csv"
+    summary_json_path = output_root / "benchmark_eval_summary.json"
+    summary_md_path = output_root / "benchmark_eval_summary.md"
+    pd.DataFrame.from_records(records).to_csv(raw_outputs_path, index=False)
+    pd.DataFrame.from_records(scored_rows).to_csv(row_level_path, index=False)
+    write_json(summary_json_path, payload)
+    write_text(summary_md_path, render_eval_markdown_summary(benchmark_csv.stem, payload))
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 def select_shadow_validation_records(
@@ -3000,6 +3413,35 @@ def build_parser() -> argparse.ArgumentParser:
     build_leaderboard_proxy_v2.add_argument("--output-csv", type=Path, required=True)
     build_leaderboard_proxy_v2.add_argument("--summary-json", type=Path, default=None)
     build_leaderboard_proxy_v2.set_defaults(func=run_build_leaderboard_proxy_v2)
+
+    eval_benchmark_csv = subparsers.add_parser(
+        "eval-benchmark-csv",
+        help="Run deterministic README-style MLX evaluation against a benchmark CSV with prompt/answer rows.",
+    )
+    eval_benchmark_csv.add_argument("--model-root", type=Path, required=True)
+    eval_benchmark_csv.add_argument("--adapter-dir", type=Path, default=None)
+    eval_benchmark_csv.add_argument("--benchmark-csv", type=Path, required=True)
+    eval_benchmark_csv.add_argument("--output-root", type=Path, required=True)
+    eval_benchmark_csv.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
+    eval_benchmark_csv.add_argument("--temperature", type=float, default=README_TEMPERATURE)
+    eval_benchmark_csv.add_argument("--top-p", type=float, default=README_TOP_P)
+    eval_benchmark_csv.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    eval_benchmark_csv.add_argument("--max-model-len", type=int, default=README_MAX_MODEL_LEN)
+    eval_benchmark_csv.add_argument("--prompt-chunk-size", type=int, default=16)
+    eval_benchmark_csv.add_argument("--prefill-batch-size", type=int, default=16)
+    eval_benchmark_csv.add_argument("--completion-batch-size", type=int, default=16)
+    eval_benchmark_csv.add_argument(
+        "--eval-enable-thinking",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    eval_benchmark_csv.add_argument(
+        "--lazy-load",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    eval_benchmark_csv.add_argument("--force-single-generate", action="store_true")
+    eval_benchmark_csv.set_defaults(func=run_eval_benchmark_csv)
 
     return parser
 
