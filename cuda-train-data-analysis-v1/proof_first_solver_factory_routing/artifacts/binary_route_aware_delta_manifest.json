@@ -13,51 +13,66 @@
   },
   "seed": 20260407,
   "requested_exact_quota": 240,
-  "requested_answer_only_quota": 80,
+  "requested_answer_only_quota": 56,
   "available_exact_candidates": 117,
+  "available_blocked_exact_clone_candidates": 621,
   "available_answer_only_candidates": 310,
   "selected_exact_before_validation": 117,
-  "selected_answer_only_before_validation": 80,
-  "accepted_delta_rows": 197,
-  "accepted_exact_rows": 117,
-  "accepted_answer_only_rows": 80,
+  "selected_blocked_exact_clone_rows": 123,
+  "selected_answer_only_before_validation": 56,
+  "accepted_delta_rows": 296,
+  "accepted_exact_rows": 240,
+  "accepted_blocked_exact_clone_rows": 123,
+  "accepted_answer_only_rows": 56,
   "route_label_counts": {
-    "bit_manipulation": 80,
     "bit_manipulation.binary_affine_xor": 54,
     "bit_manipulation.binary_bit_permutation_bijection": 30,
     "bit_manipulation.binary_bit_permutation_independent": 1,
     "bit_manipulation.binary_byte_transform": 6,
-    "bit_manipulation.binary_structured_byte_formula_abstract": 2,
+    "bit_manipulation.binary_structured_byte_formula": 49,
+    "bit_manipulation.binary_structured_byte_formula_abstract": 51,
+    "bit_manipulation.binary_structured_byte_not_formula": 25,
     "bit_manipulation.binary_three_bit_boolean": 4,
-    "bit_manipulation.binary_two_bit_boolean": 20
+    "bit_manipulation.binary_two_bit_boolean": 20,
+    "bit_manipulation.bit_other": 34,
+    "bit_manipulation.bit_structured_byte_formula": 22
   },
   "assistant_style_counts": {
-    "route_closure_only": 80,
-    "route_trace_full": 106,
-    "route_trace_sanitized": 11
+    "route_trace_full": 188,
+    "route_trace_sanitized": 52,
+    "route_closure_only": 56
+  },
+  "row_reuse_mode_counts": {
+    "new_unique_exact": 117,
+    "blocked_exact_clone": 123,
+    "new_unique_answer_only": 56
   },
   "analysis_notes_counts": {
-    "bit_prompt_local_current_consensus_answer_only": 37,
-    "bit_prompt_local_nested_support3_or_abstract_answer_only": 36,
-    "bit_prompt_local_extended_support3_answer_only": 7,
     "bit_exact": 115,
-    "bit_structured_byte_abstract_exact": 2
+    "bit_structured_byte_exact": 49,
+    "bit_structured_byte_abstract_exact": 51,
+    "bit_not_structured_byte_exact": 25,
+    "bit_prompt_local_nested_support3_or_abstract_answer_only": 24,
+    "bit_prompt_local_extended_support3_answer_only": 7,
+    "bit_prompt_local_current_consensus_answer_only": 25
   },
   "template_subtype_counts": {
-    "bit_structured_byte_formula": 33,
-    "bit_other": 132,
-    "bit_permutation_inversion": 32
+    "bit_other": 117,
+    "bit_permutation_inversion": 32,
+    "bit_structured_byte_formula": 147
   },
   "rejected_reasons": {},
   "notes": [
     "Implementation files and generated artifacts stay under proof_first_solver_factory_routing.",
     "Exact-route rows use verified_trace_ready plus canonical rule recovery from the existing bit_synth exact-trace helper.",
+    "When v2 already contains the strongest structured exact rows, bounded blocked exact clones are emitted with new IDs so route supervision reaches the bottleneck without replacing the base rows.",
     "If the canonical exact trace repeats the final answer inside <think>, a sanitized exact-rule trace is emitted instead.",
-    "Answer-only rows stay coarse-route only and intentionally avoid plain-text final answer leakage in generated_cot.",
+    "Answer-only rows stay bounded low-ratio coarse-route support and intentionally avoid plain-text final answer leakage in generated_cot.",
+    "Coarse answer-only rows use template-subtype-aware route labels so the routing signal is stronger than family-only bit_manipulation.",
     "The merged CSV keeps the baseline v2 5-column schema so the existing notebook path remains usable."
   ],
   "delta_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/binary_route_aware_delta.csv",
   "merged_csv": "/home/renta0426/kaggle/NVIDIA-Nemotron-Model-Reasoning-Challenge/cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/train_split_with_cot_v2_plus_binary_route_aware.csv",
   "base_rows": 6972,
-  "merged_rows": 7169
+  "merged_rows": 7268
 }

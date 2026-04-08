@@ -58,6 +58,12 @@ EXACT_SOLVER_ALLOWLIST = {
     'binary_bit_permutation_independent',
 }
 
+BLOCKED_EXACT_CLONE_ALLOWLIST = {
+    'binary_structured_byte_formula',
+    'binary_structured_byte_formula_abstract',
+    'binary_structured_byte_not_formula',
+}
+
 ANSWER_ONLY_ANALYSIS_ALLOWLIST = {
     'bit_prompt_local_current_consensus_answer_only',
     'bit_prompt_local_nested_support3_or_abstract_answer_only',
@@ -70,6 +76,8 @@ DELTA_OUTPUT_COLUMNS = CORE_OUTPUT_COLUMNS + [
     'route_granularity',
     'assistant_style',
     'source_selection_tier',
+    'source_origin_id',
+    'row_reuse_mode',
     'analysis_notes',
     'teacher_solver_candidate',
     'template_subtype',
@@ -100,7 +108,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--manifest-json', type=Path, default=DEFAULT_MANIFEST_JSON)
     parser.add_argument('--seed', type=int, default=20260407)
     parser.add_argument('--exact-quota', type=int, default=240)
-    parser.add_argument('--answer-only-quota', type=int, default=80)
+    parser.add_argument('--answer-only-quota', type=int, default=56)
     parser.add_argument('--preview-rows', type=int, default=5)
     return parser.parse_args()
 
@@ -245,16 +253,36 @@ def inject_route_lines(generated_cot: str, route_label: str, route_granularity: 
 
 
 def build_answer_only_cot(route_label: str) -> str:
+    family_hint = {
+        'bit_manipulation.bit_structured_byte_formula': 'Stay within the same structured byte rule family supported by the examples.',
+        'bit_manipulation.bit_permutation_inversion': 'Stay within the same bit-permutation family supported by the examples.',
+        'bit_manipulation.bit_other': 'Stay within the same bit transformation family supported by the examples.',
+    }.get(route_label, 'Stay within the same bit-manipulation family supported by the examples.')
     lines = [
         '<think>',
         f'Route: {route_label}',
         'Route granularity: coarse',
-        'Use the same hidden bit rule that is consistent with the given examples.',
-        'Apply it to the query byte and keep the exact 8-bit output with leading zeros for the final box only.',
+        family_hint,
+        'Commit only the exact 8-bit query output that stays consistent with the examples.',
         'Constraints: exact_8bit, leading_zeros, box_only_final.',
         '</think>',
     ]
     return '\n'.join(lines)
+
+
+def coarse_route_label(row: dict[str, str]) -> str:
+    template_subtype = row.get('template_subtype', '')
+    if template_subtype == 'bit_structured_byte_formula':
+        return 'bit_manipulation.bit_structured_byte_formula'
+    if template_subtype == 'bit_permutation_inversion':
+        return 'bit_manipulation.bit_permutation_inversion'
+    if template_subtype == 'bit_other':
+        return 'bit_manipulation.bit_other'
+    return 'bit_manipulation'
+
+
+def blocked_exact_clone_id(row_id: str) -> str:
+    return f'{row_id}__pfsf_exactclone'
 
 
 def build_sanitized_exact_cot(
@@ -320,6 +348,8 @@ def normalize_exact_row(
     helper_module: Any,
     analysis_module: Any,
     seed_config: Any,
+    output_id: str | None = None,
+    row_reuse_mode: str = 'new_unique_exact',
 ) -> tuple[dict[str, Any] | None, str]:
     prompt = row['prompt']
     answer = row['answer']
@@ -381,7 +411,7 @@ def normalize_exact_row(
     if answer in routed_cot:
         return None, 'answer_leak_after_route_injection'
     return {
-        'id': row['id'],
+        'id': output_id or row['id'],
         'prompt': prompt,
         'answer': answer,
         'type': 'Bit Manipulation',
@@ -390,6 +420,8 @@ def normalize_exact_row(
         'route_granularity': 'exact',
         'assistant_style': assistant_style,
         'source_selection_tier': row['selection_tier'],
+        'source_origin_id': row['id'],
+        'row_reuse_mode': row_reuse_mode,
         'analysis_notes': row.get('analysis_notes', ''),
         'teacher_solver_candidate': row.get('teacher_solver_candidate', ''),
         'template_subtype': row.get('template_subtype', ''),
@@ -405,7 +437,8 @@ def normalize_answer_only_row(row: dict[str, str], helper_module: Any) -> tuple[
         helper_module.parse_binary_prompt(prompt)
     except Exception:
         return None, 'parse_binary_prompt_failed'
-    generated_cot = build_answer_only_cot('bit_manipulation')
+    route_label = coarse_route_label(row)
+    generated_cot = build_answer_only_cot(route_label)
     if answer in generated_cot:
         return None, 'answer_leak_in_answer_only_cot'
     return {
@@ -414,10 +447,12 @@ def normalize_answer_only_row(row: dict[str, str], helper_module: Any) -> tuple[
         'answer': answer,
         'type': 'Bit Manipulation',
         'generated_cot': generated_cot,
-        'route_label': 'bit_manipulation',
+        'route_label': route_label,
         'route_granularity': 'coarse',
         'assistant_style': 'route_closure_only',
         'source_selection_tier': row['selection_tier'],
+        'source_origin_id': row['id'],
+        'row_reuse_mode': 'new_unique_answer_only',
         'analysis_notes': row.get('analysis_notes', ''),
         'teacher_solver_candidate': row.get('teacher_solver_candidate', ''),
         'template_subtype': row.get('template_subtype', ''),
@@ -445,6 +480,15 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
         and row.get('id') not in blocked_ids
         and row.get('id') in seed_configs
     ]
+    blocked_exact_clone_candidates = [
+        row
+        for row in source_rows
+        if row.get('family') == 'bit_manipulation'
+        and row.get('selection_tier') == 'verified_trace_ready'
+        and row.get('teacher_solver_candidate') in BLOCKED_EXACT_CLONE_ALLOWLIST
+        and row.get('id') in blocked_ids
+        and row.get('id') in seed_configs
+    ]
     answer_only_candidates = [
         row
         for row in source_rows
@@ -458,6 +502,13 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
         make_selected(exact_candidates, rank_exact_row),
         args.exact_quota,
         args.seed,
+        key_fn=lambda item: item.row.get('teacher_solver_candidate', 'unknown'),
+    )
+    remaining_exact_quota = max(0, args.exact_quota - len(selected_exact_rows))
+    selected_blocked_exact_clone_rows = round_robin_select(
+        make_selected(blocked_exact_clone_candidates, rank_exact_row),
+        remaining_exact_quota,
+        args.seed + 17,
         key_fn=lambda item: item.row.get('teacher_solver_candidate', 'unknown'),
     )
     selected_answer_only_rows = round_robin_select(
@@ -477,6 +528,20 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
             continue
         delta_rows.append(normalized)
 
+    for row in selected_blocked_exact_clone_rows:
+        normalized, reason = normalize_exact_row(
+            row,
+            helper_module,
+            analysis_module,
+            seed_configs[row['id']],
+            output_id=blocked_exact_clone_id(row['id']),
+            row_reuse_mode='blocked_exact_clone',
+        )
+        if normalized is None:
+            rejected_reasons[reason] += 1
+            continue
+        delta_rows.append(normalized)
+
     for row in selected_answer_only_rows:
         normalized, reason = normalize_answer_only_row(row, helper_module)
         if normalized is None:
@@ -484,7 +549,8 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
             continue
         delta_rows.append(normalized)
 
-    delta_rows.sort(key=lambda row: (row['route_granularity'], row['route_label'], row['id']))
+    granularity_order = {'exact': 0, 'coarse': 1}
+    delta_rows.sort(key=lambda row: (granularity_order.get(row['route_granularity'], 9), row['route_label'], row['id']))
 
     manifest = {
         'created_from': str(args.analysis_csv),
@@ -496,22 +562,28 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
         'requested_exact_quota': args.exact_quota,
         'requested_answer_only_quota': args.answer_only_quota,
         'available_exact_candidates': len(exact_candidates),
+        'available_blocked_exact_clone_candidates': len(blocked_exact_clone_candidates),
         'available_answer_only_candidates': len(answer_only_candidates),
         'selected_exact_before_validation': len(selected_exact_rows),
+        'selected_blocked_exact_clone_rows': len(selected_blocked_exact_clone_rows),
         'selected_answer_only_before_validation': len(selected_answer_only_rows),
         'accepted_delta_rows': len(delta_rows),
         'accepted_exact_rows': sum(1 for row in delta_rows if row['route_granularity'] == 'exact'),
+        'accepted_blocked_exact_clone_rows': sum(1 for row in delta_rows if row.get('row_reuse_mode') == 'blocked_exact_clone'),
         'accepted_answer_only_rows': sum(1 for row in delta_rows if row['route_granularity'] == 'coarse'),
         'route_label_counts': dict(Counter(row['route_label'] for row in delta_rows)),
         'assistant_style_counts': dict(Counter(row['assistant_style'] for row in delta_rows)),
+        'row_reuse_mode_counts': dict(Counter(row['row_reuse_mode'] for row in delta_rows)),
         'analysis_notes_counts': dict(Counter(row['analysis_notes'] for row in delta_rows)),
         'template_subtype_counts': dict(Counter(row['template_subtype'] for row in delta_rows)),
         'rejected_reasons': dict(rejected_reasons),
         'notes': [
             'Implementation files and generated artifacts stay under proof_first_solver_factory_routing.',
             'Exact-route rows use verified_trace_ready plus canonical rule recovery from the existing bit_synth exact-trace helper.',
+            'When v2 already contains the strongest structured exact rows, bounded blocked exact clones are emitted with new IDs so route supervision reaches the bottleneck without replacing the base rows.',
             'If the canonical exact trace repeats the final answer inside <think>, a sanitized exact-rule trace is emitted instead.',
-            'Answer-only rows stay coarse-route only and intentionally avoid plain-text final answer leakage in generated_cot.',
+            'Answer-only rows stay bounded low-ratio coarse-route support and intentionally avoid plain-text final answer leakage in generated_cot.',
+            'Coarse answer-only rows use template-subtype-aware route labels so the routing signal is stronger than family-only bit_manipulation.',
             'The merged CSV keeps the baseline v2 5-column schema so the existing notebook path remains usable.',
         ],
     }
