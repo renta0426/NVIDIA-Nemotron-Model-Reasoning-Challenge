@@ -211,3 +211,12 @@ row-level overlap:
 - HF / Transformers の cosine warmup を `num_training_steps=728`, `num_warmup_steps=36` で直接回すと、optimizer 側の LR は **initial `0.0` → step1 `2.778e-06` → step2 `5.556e-06` → step10 `2.500e-05`** となる。partial diagnostic run の MLX 実測も **`Opt1=0`, `Opt2=2.778e-06`, `Opt3=5.556e-06`, `Opt10=2.500e-05`** で一致し、**LR scheduler の予期しない不一致は解消**したと判断する。
 - 一方で loss の絶対値は HF notebook と一致しない。HF notebook HTML table の **`Step 10 = 10.750076`** は「最初の 10 optimizer steps の平均 loss」なので、単点の `Opt 10 = 0.599` ではなく、MLX 側も **`Opt1-10 mean = 0.9282`** で揃えて比較した。それでも桁が大きく離れており、現時点では **LR parity は取れたが、loss magnitude は HF と MLX の proxy 比較指標として使えない**。この差は base model / runtime / loss reporting semantics を含む複合差として扱う。
 - 旧 `prepare` 記録の **original `727` / current `831`** は、この epoch-boundary flush 修正前の値であり、loss/LR parity の観点では **`prepare-v2` / `prepare-v3` が正**である。
+
+## Running full MLX reproduction baseline
+
+| version | command | profile | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| `baseline-mlx-notebook-original-fullrun-v1` | `train --profile notebook-original --force-prepare` | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `trainable=880.138M`; `Iter1 val=1.220`; `runtime_free=98%`; detached fullrun active | in_progress | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1/console.log` |
+
+- 2026-04-08 時点で、parity-hardened single-file baseline の **FULLRUN** を `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1` として起動した。run は detached で継続中で、`console.log` を継続追記している。
+- detached 実行では runtime preflight が wrapper shell を「other MLX/Nemotron train process」として列挙するが、これは **同一 detached job の bash/uv/tee ラッパ**であり、実競合ではないことを ps で確認した。したがって fullrun 本体はそのまま継続させている。
