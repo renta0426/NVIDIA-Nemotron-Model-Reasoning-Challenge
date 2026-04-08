@@ -563,6 +563,13 @@ artifact source of truth:
 - 一方で、**metric notebook 整合の `enable_thinking=True`** では MLX local eval が長尺 decode 化し、GPU 使用率も低いままになった。
   - `v146` thinking-on 8-row probe は chunk 完了前に数分張り付き
   - control `v40` thinking-on 8-row probe も同じ傾向
+- `v146` の notebook-aligned capped probe (`enable_thinking=True`, `max_tokens=256`, 1 row) も **35.4s / generation_tps 7.77** で終わったが、出力は
+  - free-form reasoning 656 chars
+  - extracted prediction **`1111111`**
+  - `boxed_extraction_success_rate = 0.0`
+  - `format_failure_rate = 1.0`
+  だった。つまり local MLX 側の問題というより、**thinking-on path で token budget を reasoning が食い、boxed final answer に届く前に切れる**のが主因。
+- runtime tokenizer は `eos_token_id = 11` に対して `eos_token_ids = {2}` で読み込まれていたが、既存の `maybe_fix_tokenizer_eos_ids()` が **`{11}`** に補正しているのを確認した。したがって、今回の low-util / long-decode は **既知の EOS-ID mismatch そのものではない**。
 - したがって、`thinking off` で得た `19/60`, `20/60` は **route 診断には有効**だが、**README + metric notebook contract 上の authoritative score ではない**。
 - 現時点の結論は、
   1. prompt-local structured closure 自体には signal がある
@@ -579,3 +586,5 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v147_lr2p5e6_ep025/training_result.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v147_binary60_thinkingoff/binary60_top8_fusion_v147_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v147_binary60_thinkingoff/binary60_top8_fusion_v147_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
+- `mac_workspace/v1/outputs/eval_single_adapter_v146_binary1_thinkingon_tok256/binary1_top8_fusion_v146_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v146_binary1_thinkingon_tok256/binary1_top8_fusion_v146_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_raw_outputs.csv`
