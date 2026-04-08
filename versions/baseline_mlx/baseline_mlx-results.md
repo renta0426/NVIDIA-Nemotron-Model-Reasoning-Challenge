@@ -156,3 +156,26 @@ row-level overlap:
 - row-level で origin reference と突き合わせると `HF-only 65`, `MLX-only 12`, `both_wrong 59`, `both_correct 184`。HF-only loss は `text 29`, `binary 16`, `gravity 11`, `symbol 9` が中心で、特に text は **HF が取れて MLX だけ落とす**再現差が支配的。
 - notebook 現在版の学習セルは `train_split_with_cot_v3f_safe_plus_notformula.csv` と `Bit Manipulation = 1021` を指している。したがって、今回の `train_split_with_cot.csv` / `607` 再現は「元 CSV baseline」の記録として保持しつつ、次段では **notebook current config の MLX 再現**も別 run として切り分ける。
 - 2026-04-07 の現タスクでは、ユーザー指示により **並列学習は禁止**。LoRA target fix の full retrain 1 本だけを継続し、追加の並列再学習やアブレーション起動は保留にした。
+
+## Default BF16 base-model inference probe
+
+| version | model | prompt | measured | status | artifacts |
+| --- | --- | --- | --- | --- | --- |
+| `baseline-mlx-default-model-root-infer-probe-v1` | `DEFAULT_MODEL_ROOT` BF16 base, no adapter | `data/test.csv` row `00066667`, `enable_thinking=true`, boxed instruction, `max_tokens=128` | `load=3.223s`; `prompt=259 tok`; `prompt_tps=176.74`; `gen128=12.53s`; `gen_tps=11.78`; `MLX peak=59.318 GB`; `process RSS peak=59.563 GB`; `GPU in-use peak=61.193 GB`; `GPU device util peak=97%`; `generate avg device util=42.75%` | completed | `baseline_mlx/outputs/nemotron_default_model_root_infer_probe_v1/inference_probe/summary.json` |
+
+- system telemetry (`IOAccelerator`) では `t≈4.26s` に `gpu in-use system memory` が **`~1.09 GB -> ~52.90 GB`** へ急増し、`t≈5.35s` で **`device util 97%`, `renderer 83%`, `in-use ~60.29 GB`** を記録した。
+- `generation_complete` 後の cooldown では `gpu in-use system memory` が一度 **`61.19 GB`** まで残り、その後 `t≈17.55s` で **`~1.09 GB`** へ戻った。したがって、この BF16 base の単発推論は **ロード後常駐 ~59 GB級 / 生成中 system-GPU ~55-61 GB級** を見込む。
+- `load_complete` 時点で tokenizer は `eos_token_id=11`, `eos_token_ids={11}` に揃っており、shadow model 経由のロードで推論は成功した。
+
+## Notebook-current parity foundation
+
+| version | command | profile | train_csv | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
+| --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| `baseline-mlx-notebook-current-audit-v1` | `audit-notebook-current` | `notebook-current` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `3321` | `n/a` | `n/a` | `score=n/a`; `clear_omissions=0`; `records=3321`; `bit=1021`; `lora generic coverage=ok` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_audit_v1/notebook_current_audit_summary.json` |
+| `baseline-mlx-notebook-current-prepare-v1` | `prepare-train --profile notebook-current` | `notebook-current` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `3321` | `6642` | `831` | `score=n/a`; `clear_omissions=0`; `valid_rows=1`; `steps_per_eval_requested=0`; `steps_per_eval_resolved=6642`; `save_every=6642` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_prepare_v1/prepare_manifest.json` |
+
+- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` に **`--profile notebook-current`** を追加し、現行 notebook training cell の `train_csv=v3f_safe_plus_notformula`, `Bit Manipulation=1021`, `epochs=2`, `batch=1`, `grad_accum=8`, `lr=1e-4`, `max_seq=4096`, `logging_steps=10`, `save_strategy=no`, `warmup_ratio=0.05` を明示的に解決できるようにした。
+- profile 監査は `notebook_current_parity_report.{json,md}` として永続化され、**`status=no_clear_omissions`** を返す。これにより、現時点の MLX 単一ファイル基板では **明確な設定漏れが残っていない**ことを機械的に確認できる。
+- notebook の `target_modules=r".*\.(in_proj|out_proj|up_proj|down_proj)$"` に対して、MLX 側は `mixer.in/out/up/down_proj` を必須 generic key として監査しつつ、`switch_mlp.fc1/fc2` と `shared_experts.up/down_proj` を **Nemotron-H MoE の構造差を埋める追加 key** として保持する。
+- HF notebook には validation loop が無いため、MLX profile では **`valid_shadow_rows=1` + `steps_per_eval=0`** を notebook-friendly scaffolding とした。内部では `steps_per_eval<=0 -> total_iters` に解決されるため、**中間 validation 無し / iter1 と final のみ**の最小監視になる。
+- packaging については、現スクリプトは引き続き **local MLX bundle (`adapter_config.json` + `adapters.safetensors`)** を出すだけで、notebook の PEFT/vLLM 提出互換 (`adapter_model.safetensors`, `submission.zip`) は **意図的に未主張**。今回の parity 判定は training 設定面に限定している。
