@@ -35,11 +35,17 @@ DEFAULT_TRAIN_CSV = (
 DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "nemotron_sft_lora_with_cot_v2_mlx_v1"
 BASE_MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
-DEFAULT_NOTEBOOK_PATH = (
+NOTEBOOK_CURRENT_PATH = (
     REPO_ROOT
     / "baseline"
     / "nemotron-sft-lora-with-cot-v2"
     / "nemotron-sft-lora-with-cot-v2.ipynb"
+)
+NOTEBOOK_ORIGINAL_PATH = (
+    REPO_ROOT
+    / "baseline"
+    / "nemotron-sft-lora-with-cot-v2"
+    / "nemotron-sft-lora-with-cot-v2-original.ipynb"
 )
 NOTEBOOK_CURRENT_TRAIN_CSV = (
     REPO_ROOT
@@ -48,8 +54,10 @@ NOTEBOOK_CURRENT_TRAIN_CSV = (
     / "artifacts"
     / "train_split_with_cot_v3f_safe_plus_notformula.csv"
 )
+NOTEBOOK_ORIGINAL_TRAIN_CSV = DEFAULT_TRAIN_CSV
 NOTEBOOK_CURRENT_RUN_NAME = "nemotron_sft_lora_with_cot_v2_mlx_notebook_current_v1"
-TRAINING_PROFILES = ("baseline-original", "notebook-current")
+NOTEBOOK_ORIGINAL_RUN_NAME = "nemotron_sft_lora_with_cot_v2_mlx_notebook_original_v1"
+TRAINING_PROFILES = ("baseline-original", "notebook-original", "notebook-current")
 
 README_MAX_LORA_RANK = 32
 README_MAX_TOKENS = 7680
@@ -88,6 +96,7 @@ DEFAULT_LORA_KEYS = [
 ]
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 LR_SCHEDULE_STEP_UNITS = ("optimizer", "micro")
+REPORT_STEP_UNITS = ("optimizer", "micro")
 PROFILE_OPTION_FLAGS = {
     "train_csv": ("--train-csv",),
     "run_name": ("--run-name",),
@@ -106,6 +115,7 @@ PROFILE_OPTION_FLAGS = {
     "lora_dropout": ("--lora-dropout",),
     "num_layers": ("--num-layers",),
     "steps_per_report": ("--steps-per-report",),
+    "steps_per_report_step_unit": ("--steps-per-report-step-unit",),
     "steps_per_eval": ("--steps-per-eval",),
     "save_every": ("--save-every",),
     "lr_schedule_name": ("--lr-schedule-name",),
@@ -113,24 +123,23 @@ PROFILE_OPTION_FLAGS = {
     "lr_warmup_ratio": ("--lr-warmup-ratio",),
     "lr_schedule_step_unit": ("--lr-schedule-step-unit",),
 }
-NOTEBOOK_CURRENT_PROFILE_DEFAULTS: dict[str, Any] = {
-    "train_csv": NOTEBOOK_CURRENT_TRAIN_CSV,
-    "run_name": NOTEBOOK_CURRENT_RUN_NAME,
+
+COMMON_NOTEBOOK_PROFILE_DEFAULTS: dict[str, Any] = {
     "seed": DEFAULT_SEED,
-    "type_sample": [f"{key}={value}" for key, value in NOTEBOOK_CURRENT_TYPE_SAMPLES.items()],
     "valid_shadow_rows": 1,
     "batch_size": 1,
     "grad_accumulation_steps": 8,
     "num_epochs": 2.0,
     "learning_rate": 1e-4,
     "max_seq_length": 4096,
-    "mask_prompt": True,
+    "mask_prompt": False,
     "enable_thinking": True,
     "lora_rank": 32,
     "lora_alpha": 32.0,
     "lora_dropout": 0.05,
     "num_layers": -1,
     "steps_per_report": 10,
+    "steps_per_report_step_unit": "optimizer",
     "steps_per_eval": 0,
     "save_every": 0,
     "lr_schedule_name": "cosine_decay",
@@ -138,15 +147,41 @@ NOTEBOOK_CURRENT_PROFILE_DEFAULTS: dict[str, Any] = {
     "lr_warmup_ratio": 0.05,
     "lr_schedule_step_unit": "optimizer",
 }
-NOTEBOOK_CURRENT_REFERENCE: dict[str, Any] = {
-    "source_notebook": str(DEFAULT_NOTEBOOK_PATH),
+NOTEBOOK_ORIGINAL_PROFILE_DEFAULTS: dict[str, Any] = {
+    **COMMON_NOTEBOOK_PROFILE_DEFAULTS,
+    "train_csv": NOTEBOOK_ORIGINAL_TRAIN_CSV,
+    "run_name": NOTEBOOK_ORIGINAL_RUN_NAME,
+    "type_sample": [f"{key}={value}" for key, value in DEFAULT_TYPE_SAMPLES.items()],
+}
+NOTEBOOK_CURRENT_PROFILE_DEFAULTS: dict[str, Any] = {
+    **COMMON_NOTEBOOK_PROFILE_DEFAULTS,
+    "train_csv": NOTEBOOK_CURRENT_TRAIN_CSV,
+    "run_name": NOTEBOOK_CURRENT_RUN_NAME,
+    "type_sample": [f"{key}={value}" for key, value in NOTEBOOK_CURRENT_TYPE_SAMPLES.items()],
+}
+NOTEBOOK_ORIGINAL_REFERENCE: dict[str, Any] = {
+    "source_notebook": str(NOTEBOOK_ORIGINAL_PATH),
     "source_cells": {
         "lora": 8,
         "training": 10,
+        "pretrained_check": 12,
         "packaging": 14,
     },
-    "train_csv": str(NOTEBOOK_CURRENT_TRAIN_CSV),
-    "type_samples": dict(NOTEBOOK_CURRENT_TYPE_SAMPLES),
+    "train_csv": str(NOTEBOOK_ORIGINAL_TRAIN_CSV),
+    "type_samples": dict(DEFAULT_TYPE_SAMPLES),
+    "observed_log": {
+        "full_dataset_rows": 6558,
+        "sampled_rows": 2907,
+        "sft_records": 2907,
+        "trainable_params": 880_138_240,
+        "all_params": 32_458_075_584,
+        "trainable_percent": 2.7116,
+        "training_minutes": 405.7,
+        "tokenizer_updates": {
+            "eos_token_id": 11,
+            "pad_token_id": 11,
+        },
+    },
     "training": {
         "seed": 123,
         "batch_size": 1,
@@ -157,7 +192,9 @@ NOTEBOOK_CURRENT_REFERENCE: dict[str, Any] = {
         "warmup_ratio": 0.05,
         "max_seq_length": 4096,
         "logging_steps": 10,
+        "logging_step_unit": "optimizer",
         "save_strategy": "no",
+        "mask_prompt": False,
         "bf16": True,
         "gradient_checkpointing": True,
         "gradient_checkpointing_kwargs": {"use_reentrant": False},
@@ -177,6 +214,63 @@ NOTEBOOK_CURRENT_REFERENCE: dict[str, Any] = {
         "base_model_name_or_path": BASE_MODEL_NAME,
         "inference_mode": True,
         "lora_dropout": 0.0,
+    },
+}
+NOTEBOOK_CURRENT_REFERENCE: dict[str, Any] = {
+    "source_notebook": str(NOTEBOOK_CURRENT_PATH),
+    "source_cells": {
+        "lora": 8,
+        "training": 10,
+        "packaging": 14,
+    },
+    "train_csv": str(NOTEBOOK_CURRENT_TRAIN_CSV),
+    "type_samples": dict(NOTEBOOK_CURRENT_TYPE_SAMPLES),
+    "training": {
+        "seed": 123,
+        "batch_size": 1,
+        "grad_accumulation_steps": 8,
+        "num_epochs": 2.0,
+        "learning_rate": 1e-4,
+        "lr_scheduler_type": "cosine",
+        "warmup_ratio": 0.05,
+        "max_seq_length": 4096,
+        "logging_steps": 10,
+        "logging_step_unit": "optimizer",
+        "save_strategy": "no",
+        "mask_prompt": False,
+        "bf16": True,
+        "gradient_checkpointing": True,
+        "gradient_checkpointing_kwargs": {"use_reentrant": False},
+        "dataloader_num_workers": 2,
+        "remove_unused_columns": False,
+        "report_to": "none",
+        "packing": False,
+    },
+    "lora": {
+        "rank": 32,
+        "alpha": 32.0,
+        "dropout": 0.05,
+        "target_modules_regex": r".*\.(in_proj|out_proj|up_proj|down_proj)$",
+    },
+    "packaging": {
+        "required_files": ["adapter_config.json", "adapter_model.safetensors"],
+        "base_model_name_or_path": BASE_MODEL_NAME,
+        "inference_mode": True,
+        "lora_dropout": 0.0,
+    },
+}
+NOTEBOOK_PROFILE_SPECS: dict[str, dict[str, Any]] = {
+    "notebook-original": {
+        "defaults": NOTEBOOK_ORIGINAL_PROFILE_DEFAULTS,
+        "reference": NOTEBOOK_ORIGINAL_REFERENCE,
+        "artifact_prefix": "notebook_original",
+        "audit_summary_name": "notebook_original_audit_summary.json",
+    },
+    "notebook-current": {
+        "defaults": NOTEBOOK_CURRENT_PROFILE_DEFAULTS,
+        "reference": NOTEBOOK_CURRENT_REFERENCE,
+        "artifact_prefix": "notebook_current",
+        "audit_summary_name": "notebook_current_audit_summary.json",
     },
 }
 
@@ -220,6 +314,12 @@ def argv_has_any_flag(raw_argv: Sequence[str], flags: Sequence[str]) -> bool:
     return False
 
 
+def get_notebook_profile_spec(profile_name: str | None) -> dict[str, Any] | None:
+    if profile_name is None:
+        return None
+    return NOTEBOOK_PROFILE_SPECS.get(str(profile_name).strip().lower())
+
+
 def apply_training_profile(args: argparse.Namespace, *, raw_argv: Sequence[str]) -> dict[str, Any] | None:
     profile_name = getattr(args, "profile", None)
     if profile_name is None:
@@ -230,7 +330,10 @@ def apply_training_profile(args: argparse.Namespace, *, raw_argv: Sequence[str])
     if resolved_profile == "baseline-original":
         return {"name": resolved_profile, "applied_fields": [], "explicit_fields": []}
 
-    profile_defaults = NOTEBOOK_CURRENT_PROFILE_DEFAULTS
+    profile_spec = get_notebook_profile_spec(resolved_profile)
+    if profile_spec is None:
+        raise ValueError(f"Missing notebook profile spec for: {resolved_profile}")
+    profile_defaults = profile_spec["defaults"]
     applied_fields: list[str] = []
     explicit_fields: list[str] = []
     for field_name, value in profile_defaults.items():
@@ -508,6 +611,40 @@ def resolve_lora_keys(entries: Sequence[str]) -> list[str]:
     return keys or list(DEFAULT_LORA_KEYS)
 
 
+def maybe_fix_tokenizer_eos_ids(tokenizer: Any) -> None:
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    eos_token = getattr(tokenizer, "eos_token", None)
+    eos_token_ids = getattr(tokenizer, "eos_token_ids", None)
+    if eos_token_id is None or eos_token != "<|im_end|>":
+        return
+    normalized_ids: set[int] = set()
+    if eos_token_ids is not None:
+        try:
+            normalized_ids = {int(token_id) for token_id in eos_token_ids}
+        except TypeError:
+            normalized_ids = {int(eos_token_ids)}
+    expected_id = int(eos_token_id)
+    if normalized_ids == {expected_id}:
+        return
+    tokenizer.eos_token_ids = {expected_id}
+
+
+def normalize_tokenizer_for_hf_parity(tokenizer: Any) -> None:
+    maybe_fix_tokenizer_eos_ids(tokenizer)
+    eos_token = getattr(tokenizer, "eos_token", None)
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    if getattr(tokenizer, "pad_token", None) is None and eos_token is not None:
+        try:
+            tokenizer.pad_token = eos_token
+        except (AttributeError, TypeError, ValueError):
+            pass
+    if getattr(tokenizer, "pad_token_id", None) is None and eos_token_id is not None:
+        try:
+            tokenizer.pad_token_id = int(eos_token_id)
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+
 def resolve_steps_per_eval(*, total_iters: int, steps_per_eval: int) -> int:
     if total_iters <= 0:
         raise ValueError(f"total_iters must be > 0, got {total_iters}")
@@ -664,17 +801,23 @@ def compute_final_optimizer_step_microbatches(
     return min(total_iters, grad_accumulation_steps)
 
 
-def build_notebook_current_parity_report(
+def build_notebook_parity_report(
     *,
     args: argparse.Namespace,
     train_csv: Path,
     type_samples: dict[str, int],
     lora_keys: Sequence[str],
 ) -> dict[str, Any]:
-    notebook_training = NOTEBOOK_CURRENT_REFERENCE["training"]
-    notebook_lora = NOTEBOOK_CURRENT_REFERENCE["lora"]
-    train_csv_matches = train_csv.resolve() == NOTEBOOK_CURRENT_TRAIN_CSV.resolve()
-    type_sample_matches = type_samples == NOTEBOOK_CURRENT_TYPE_SAMPLES
+    profile_spec = get_notebook_profile_spec(str(getattr(args, "profile", "")))
+    if profile_spec is None:
+        raise ValueError(f"Profile does not have notebook parity metadata: {getattr(args, 'profile', '')}")
+    reference = profile_spec["reference"]
+    notebook_training = reference["training"]
+    notebook_lora = reference["lora"]
+    expected_train_csv = Path(reference["train_csv"]).resolve()
+    expected_type_samples = dict(reference["type_samples"])
+    train_csv_matches = train_csv.resolve() == expected_train_csv
+    type_sample_matches = type_samples == expected_type_samples
     lora_key_set = set(str(key) for key in lora_keys)
     required_generic_keys = {
         "mixer.in_proj",
@@ -688,13 +831,13 @@ def build_notebook_current_parity_report(
     core_checks = [
         {
             "name": "train_csv",
-            "expected": str(NOTEBOOK_CURRENT_TRAIN_CSV),
+            "expected": str(expected_train_csv),
             "actual": str(train_csv),
             "status": "aligned" if train_csv_matches else "mismatch",
         },
         {
             "name": "type_samples",
-            "expected": dict(NOTEBOOK_CURRENT_TYPE_SAMPLES),
+            "expected": dict(expected_type_samples),
             "actual": dict(type_samples),
             "status": "aligned" if type_sample_matches else "mismatch",
         },
@@ -761,11 +904,16 @@ def build_notebook_current_parity_report(
         },
         {
             "name": "logging_steps",
-            "expected": notebook_training["logging_steps"],
-            "actual": int(args.steps_per_report),
+            "expected": f"{notebook_training['logging_steps']} {notebook_training['logging_step_unit']}",
+            "actual": f"{int(args.steps_per_report)} {str(getattr(args, 'steps_per_report_step_unit', 'micro'))}",
             "status": "aligned"
-            if int(args.steps_per_report) == notebook_training["logging_steps"]
+            if (
+                int(args.steps_per_report) == notebook_training["logging_steps"]
+                and str(getattr(args, "steps_per_report_step_unit", "micro"))
+                == notebook_training["logging_step_unit"]
+            )
             else "mismatch",
+            "note": "HF logging_steps counts optimizer updates, not raw microsteps.",
         },
         {
             "name": "save_strategy",
@@ -773,6 +921,18 @@ def build_notebook_current_parity_report(
             "actual": int(args.save_every),
             "status": "aligned" if int(args.save_every) <= 0 else "mismatch",
             "note": "MLX save_every<=0 means final-only save, matching save_strategy='no'.",
+        },
+        {
+            "name": "mask_prompt",
+            "expected": bool(notebook_training["mask_prompt"]),
+            "actual": bool(args.mask_prompt),
+            "status": "aligned"
+            if bool(args.mask_prompt) == bool(notebook_training["mask_prompt"])
+            else "mismatch",
+            "note": (
+                "HF notebook does not enable assistant_only_loss/completion_only_loss here; "
+                "MLX parity should therefore keep mask_prompt=False."
+            ),
         },
         {
             "name": "lora_rank",
@@ -819,6 +979,14 @@ def build_notebook_current_parity_report(
             "mlx": "build_mlx_lora_config forces grad_checkpoint=True.",
         },
         {
+            "notebook": "logging_steps=10 optimizer updates",
+            "mlx": "steps_per_report=10 with steps_per_report_step_unit=optimizer for comparable loss/LR checkpoints.",
+        },
+        {
+            "notebook": "messages dataset without assistant_only_loss/completion_only_loss",
+            "mlx": "Use mask_prompt=False for parity with full-sequence loss.",
+        },
+        {
             "notebook": "dataloader_num_workers=2",
             "mlx": "No equivalent knob in mlx_lm LoRA config.",
         },
@@ -852,13 +1020,21 @@ def build_notebook_current_parity_report(
             "note": "MLX load path uses a patched shadow_model to avoid tokenizer/runtime mismatches.",
         },
         {
+            "name": "tokenizer_special_tokens",
+            "actual": True,
+            "note": (
+                "MLX training load normalizes eos_token_ids and sets pad_token=eos_token when absent, "
+                "matching the HF log alignment to eos/pad token id 11."
+            ),
+        },
+        {
             "name": "final_grad_accumulation_flush",
             "actual": True,
             "note": "MLX trainer is patched so the final partial accumulation matches notebook optimizer-step count.",
         },
     ]
     packaging_note = {
-        "notebook": dict(NOTEBOOK_CURRENT_REFERENCE["packaging"]),
+        "notebook": dict(reference["packaging"]),
         "mlx_current": {
             "required_files": ["adapter_config.json", "adapters.safetensors"],
             "bundle": "mlx_adapter_bundle.zip",
@@ -872,21 +1048,22 @@ def build_notebook_current_parity_report(
         clear_omissions.append("lora_target_coverage")
     return {
         "status": "no_clear_omissions" if not clear_omissions else "mismatches_found",
-        "source_notebook": NOTEBOOK_CURRENT_REFERENCE["source_notebook"],
-        "source_cells": dict(NOTEBOOK_CURRENT_REFERENCE["source_cells"]),
+        "source_notebook": reference["source_notebook"],
+        "source_cells": dict(reference["source_cells"]),
         "profile": str(getattr(args, "profile", "")),
+        "observed_log": dict(reference["observed_log"]) if "observed_log" in reference else None,
         "core_checks": core_checks,
         "lora_target_mapping": lora_target_mapping,
         "framework_specific_mappings": framework_specific_mappings,
         "mlx_scaffolding": mlx_scaffolding,
         "packaging_note": packaging_note,
         "clear_omissions": clear_omissions,
-    }
+}
 
 
-def render_notebook_current_parity_markdown(report: dict[str, Any]) -> str:
+def render_notebook_parity_markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# Notebook current parity report",
+        "# Notebook parity report",
         "",
         f"- status: **{report['status']}**",
         f"- notebook: `{report['source_notebook']}`",
@@ -925,6 +1102,17 @@ def render_notebook_current_parity_markdown(report: dict[str, Any]) -> str:
     )
     for row in report["mlx_scaffolding"]:
         lines.append(f"- `{row['name']}`: {row['note']}")
+    observed_log = report.get("observed_log")
+    if observed_log:
+        lines.extend(
+            [
+                "",
+                "## Observed notebook log",
+                "",
+            ]
+        )
+        for key, value in observed_log.items():
+            lines.append(f"- `{key}`: `{value}`")
     if report["clear_omissions"]:
         lines.extend(
             [
@@ -946,7 +1134,7 @@ def render_notebook_current_parity_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_notebook_current_parity_artifacts(
+def write_notebook_parity_artifacts(
     *,
     run_root: Path,
     args: argparse.Namespace,
@@ -954,21 +1142,24 @@ def write_notebook_current_parity_artifacts(
     type_samples: dict[str, int],
     lora_keys: Sequence[str],
 ) -> dict[str, Any] | None:
-    if str(getattr(args, "profile", "")).strip().lower() != "notebook-current":
+    profile_spec = get_notebook_profile_spec(str(getattr(args, "profile", "")))
+    if profile_spec is None:
         return None
-    report = build_notebook_current_parity_report(
+    report = build_notebook_parity_report(
         args=args,
         train_csv=train_csv,
         type_samples=type_samples,
         lora_keys=lora_keys,
     )
-    json_path = run_root / "notebook_current_parity_report.json"
-    markdown_path = run_root / "notebook_current_parity_report.md"
+    artifact_prefix = str(profile_spec["artifact_prefix"])
+    json_path = run_root / f"{artifact_prefix}_parity_report.json"
+    markdown_path = run_root / f"{artifact_prefix}_parity_report.md"
     write_json(json_path, report)
-    write_text(markdown_path, render_notebook_current_parity_markdown(report))
+    write_text(markdown_path, render_notebook_parity_markdown(report))
     return {
         "status": report["status"],
         "clear_omissions": list(report["clear_omissions"]),
+        "artifact_prefix": artifact_prefix,
         "json_path": str(json_path),
         "markdown_path": str(markdown_path),
     }
@@ -993,6 +1184,7 @@ def build_mlx_lora_config(
     lora_keys: Sequence[str],
     num_layers: int,
     steps_per_report: int,
+    steps_per_report_step_unit: str,
     steps_per_eval: int,
     save_every: int,
     seed: int,
@@ -1035,6 +1227,7 @@ def build_mlx_lora_config(
         "val_batches": -1,
         "learning_rate": learning_rate,
         "steps_per_report": steps_per_report,
+        "steps_per_report_step_unit": steps_per_report_step_unit,
         "steps_per_eval": resolved_steps_per_eval,
         "grad_accumulation_steps": grad_accumulation_steps,
         "adapter_path": str(adapter_dir),
@@ -1310,6 +1503,11 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
         grad_accum_steps = args.grad_accumulation_steps
         if grad_accum_steps < 1:
             raise ValueError("grad_accumulation_steps must be at least 1")
+        report_step_unit = str(getattr(args, "steps_per_report_step_unit", "micro")).strip().lower()
+        if report_step_unit not in REPORT_STEP_UNITS:
+            raise ValueError(
+                f"steps_per_report_step_unit must be one of {REPORT_STEP_UNITS}, got {report_step_unit!r}"
+            )
 
         state = [model.state, optimizer.state, mx.random.state]
 
@@ -1337,6 +1535,7 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
         train_time = 0
         grad_accum = None
         pending_micro_steps = 0
+        optimizer_updates = 0
 
         for it, batch in zip(
             range(1, args.iters + 1),
@@ -1386,6 +1585,7 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
             lvalue, toks, grad_accum = step(batch, grad_accum, do_update, grad_divisor)
             if do_update:
                 pending_micro_steps = 0
+                optimizer_updates += 1
 
             losses += lvalue
             n_tokens += toks
@@ -1393,18 +1593,29 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
             mx.eval(state, losses, n_tokens, grad_accum)
             train_time += time.perf_counter() - tic
 
-            if it % args.steps_per_report == 0 or it == args.iters:
+            report_due = False
+            if report_step_unit == "micro":
+                report_due = it % args.steps_per_report == 0 or it == args.iters
+            else:
+                report_due = do_update and (
+                    optimizer_updates % args.steps_per_report == 0 or it == args.iters
+                )
+
+            if report_due:
                 train_loss = mx.distributed.all_sum(losses, stream=mx.cpu).item()
                 train_loss /= steps * world_size
                 n_tokens = mx.distributed.all_sum(n_tokens, stream=mx.cpu).item()
                 learning_rate = optimizer.learning_rate.item()
-                it_sec = args.steps_per_report / train_time
+                it_sec = steps / train_time
                 tokens_sec = float(n_tokens) / train_time
                 trained_tokens += n_tokens
                 peak_mem = mx.get_peak_memory() / 1e9
                 if rank == 0:
+                    prefix = f"Iter {it}"
+                    if report_step_unit == "optimizer":
+                        prefix += f" (Opt {optimizer_updates})"
                     print(
-                        f"Iter {it}: Train loss {train_loss:.3f}, "
+                        f"{prefix}: Train loss {train_loss:.3f}, "
                         f"Learning Rate {learning_rate:.3e}, "
                         f"It/sec {it_sec:.3f}, "
                         f"Tokens/sec {tokens_sec:.3f}, "
@@ -1416,12 +1627,14 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
                 if training_callback is not None:
                     train_info = {
                         "iteration": it,
+                        "optimizer_step": optimizer_updates,
                         "train_loss": train_loss,
                         "learning_rate": learning_rate,
                         "iterations_per_second": it_sec,
                         "tokens_per_second": tokens_sec,
                         "trained_tokens": trained_tokens,
                         "peak_memory": peak_mem,
+                        "steps_per_report_step_unit": report_step_unit,
                     }
                     training_callback.on_train_loss_report(train_info)
 
@@ -1504,6 +1717,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         lora_keys=lora_keys,
         num_layers=int(args.num_layers),
         steps_per_report=int(args.steps_per_report),
+        steps_per_report_step_unit=str(args.steps_per_report_step_unit),
         steps_per_eval=int(args.steps_per_eval),
         save_every=int(args.save_every),
         seed=int(args.seed),
@@ -1512,7 +1726,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         lr_warmup_ratio=float(args.lr_warmup_ratio),
         lr_schedule_step_unit=str(args.lr_schedule_step_unit),
     )
-    notebook_parity_artifacts = write_notebook_current_parity_artifacts(
+    notebook_parity_artifacts = write_notebook_parity_artifacts(
         run_root=run_root,
         args=args,
         train_csv=train_csv,
@@ -1595,6 +1809,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "lora_keys": list(lora_keys),
             "num_layers": int(args.num_layers),
             "steps_per_report": int(args.steps_per_report),
+            "steps_per_report_step_unit": str(args.steps_per_report_step_unit),
             "steps_per_eval_requested": int(args.steps_per_eval),
             "steps_per_eval": int(config["steps_per_eval"]),
             "save_every": int(config["save_every"]),
@@ -1617,16 +1832,16 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "command_path": str(command_path),
             "adapter_dir": str(adapter_dir),
             "sampled_train_csv": str((run_root / "sampled_train_split_with_cot.csv").resolve()),
-            "notebook_current_parity_json": (
+            "notebook_parity_json": (
                 notebook_parity_artifacts["json_path"] if notebook_parity_artifacts else ""
             ),
-            "notebook_current_parity_markdown": (
+            "notebook_parity_markdown": (
                 notebook_parity_artifacts["markdown_path"] if notebook_parity_artifacts else ""
             ),
         },
     }
     if notebook_parity_artifacts is not None:
-        manifest["notebook_current_parity"] = notebook_parity_artifacts
+        manifest["notebook_parity"] = notebook_parity_artifacts
     write_json(run_root / "prepare_manifest.json", manifest)
     return manifest
 
@@ -1670,12 +1885,67 @@ def bundle_local_mlx_adapter(run_root: Path, adapter_dir: Path) -> dict[str, Any
     return bundle_manifest
 
 
+def maybe_patch_mlx_lora_tokenizer_special_tokens() -> None:
+    import mlx_lm.lora as mlx_lora
+
+    if getattr(mlx_lora, "_nemotron_tokenizer_special_tokens_patch", False):
+        return
+
+    original_load = mlx_lora.load
+
+    def patched_load(*args: Any, **kwargs: Any) -> Any:
+        result = original_load(*args, **kwargs)
+        if isinstance(result, tuple):
+            values = list(result)
+            if len(values) >= 2:
+                normalize_tokenizer_for_hf_parity(values[1])
+            return tuple(values)
+        return result
+
+    mlx_lora.load = patched_load
+    mlx_lora._nemotron_tokenizer_special_tokens_patch = True
+
+
+def maybe_patch_mlx_lora_train_model_reporting_unit() -> None:
+    import mlx_lm.lora as mlx_lora
+
+    if getattr(mlx_lora, "_nemotron_train_model_reporting_unit_patch", False):
+        return
+
+    original_train_model = mlx_lora.train_model
+
+    def patched_train_model(
+        args: Any,
+        model: Any,
+        train_set: Any,
+        valid_set: Any,
+        training_callback: Any = None,
+    ) -> Any:
+        report_step_unit = str(getattr(args, "steps_per_report_step_unit", "micro")).strip().lower()
+        original_train = mlx_lora.train
+
+        def patched_train(*, args: Any, **kwargs: Any) -> Any:
+            setattr(args, "steps_per_report_step_unit", report_step_unit)
+            return original_train(args=args, **kwargs)
+
+        mlx_lora.train = patched_train
+        try:
+            return original_train_model(args, model, train_set, valid_set, training_callback)
+        finally:
+            mlx_lora.train = original_train
+
+    mlx_lora.train_model = patched_train_model
+    mlx_lora._nemotron_train_model_reporting_unit_patch = True
+
+
 def run_mlx_lora_training_from_config(config_path: Path) -> None:
     import mlx_lm.lora as mlx_lora
 
     os.environ["TOKENIZERS_PARALLELISM"] = "true"
     maybe_patch_mlx_chat_dataset_enable_thinking()
     maybe_patch_mlx_trainer_final_accumulation_flush()
+    maybe_patch_mlx_lora_tokenizer_special_tokens()
+    maybe_patch_mlx_lora_train_model_reporting_unit()
     with config_path.open("r", encoding="utf-8") as handle:
         config = yaml.load(handle, Loader=mlx_lora.yaml_loader) or {}
     for key, value in mlx_lora.CONFIG_DEFAULTS.items():
@@ -1735,7 +2005,7 @@ def run_train_mlx_config(args: argparse.Namespace) -> None:
     run_mlx_lora_training_from_config(Path(args.config).resolve())
 
 
-def run_audit_notebook_current(args: argparse.Namespace) -> None:
+def run_audit_notebook_profile(args: argparse.Namespace) -> None:
     run_root = Path(args.output_root).resolve() / args.run_name
     ensure_dir(run_root)
     train_csv = Path(args.train_csv).resolve()
@@ -1749,13 +2019,16 @@ def run_audit_notebook_current(args: argparse.Namespace) -> None:
     )
     train_records, record_summary = build_chat_records(sampled_train_df)
     lora_keys = resolve_lora_keys(args.lora_key or [])
-    notebook_parity_artifacts = write_notebook_current_parity_artifacts(
+    notebook_parity_artifacts = write_notebook_parity_artifacts(
         run_root=run_root,
         args=args,
         train_csv=train_csv,
         type_samples=type_samples,
         lora_keys=lora_keys,
     )
+    profile_spec = get_notebook_profile_spec(str(getattr(args, "profile", "")))
+    if profile_spec is None:
+        raise ValueError(f"Audit requires a notebook profile, got {getattr(args, 'profile', '')!r}")
     audit_summary = {
         "created_at": utc_now(),
         "run_root": str(run_root),
@@ -1767,9 +2040,9 @@ def run_audit_notebook_current(args: argparse.Namespace) -> None:
         "sampled_rows": int(len(sampled_train_df)),
         "record_summary": record_summary,
         "lora_keys": list(lora_keys),
-        "notebook_current_parity": notebook_parity_artifacts,
+        "notebook_parity": notebook_parity_artifacts,
     }
-    write_json(run_root / "notebook_current_audit_summary.json", audit_summary)
+    write_json(run_root / str(profile_spec["audit_summary_name"]), audit_summary)
     print(json.dumps(audit_summary, ensure_ascii=False, indent=2))
 
 
@@ -1788,8 +2061,9 @@ def build_parser() -> argparse.ArgumentParser:
             choices=TRAINING_PROFILES,
             default="baseline-original",
             help=(
-                "Keep baseline-original defaults, or apply notebook-current defaults "
-                "from baseline/nemotron-sft-lora-with-cot-v2.ipynb before explicit CLI overrides."
+                "Keep legacy baseline-original defaults, or apply notebook-original / "
+                "notebook-current defaults from the tracked baseline notebooks before "
+                "explicit CLI overrides."
             ),
         )
         target.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
@@ -1808,7 +2082,10 @@ def build_parser() -> argparse.ArgumentParser:
             "--mask-prompt",
             action=argparse.BooleanOptionalAction,
             default=True,
-            help="Mask prompt tokens from the loss. Use --no-mask-prompt for HF-style ablations.",
+            help=(
+                "Mask prompt tokens from the loss. Legacy baseline-original keeps this on; "
+                "use notebook-original/current profiles or --no-mask-prompt for HF notebook parity."
+            ),
         )
         target.add_argument(
             "--enable-thinking",
@@ -1832,6 +2109,12 @@ def build_parser() -> argparse.ArgumentParser:
             help="Use -1 to LoRA-wrap all layers, matching the baseline notebook intent.",
         )
         target.add_argument("--steps-per-report", type=int, default=10)
+        target.add_argument(
+            "--steps-per-report-step-unit",
+            choices=REPORT_STEP_UNITS,
+            default="micro",
+            help="Interpret steps_per_report in optimizer updates (HF logging semantics) or raw microsteps.",
+        )
         target.add_argument("--steps-per-eval", type=int, default=200)
         target.add_argument(
             "--save-every",
@@ -1878,13 +2161,23 @@ def build_parser() -> argparse.ArgumentParser:
     train_mlx_config.add_argument("--config", type=Path, required=True)
     train_mlx_config.set_defaults(func=run_train_mlx_config)
 
+    audit_notebook_original = subparsers.add_parser(
+        "audit-notebook-original",
+        help="Audit original notebook parity without launching MLX training.",
+    )
+    add_shared_train_args(audit_notebook_original)
+    audit_notebook_original.set_defaults(
+        func=run_audit_notebook_profile,
+        profile="notebook-original",
+    )
+
     audit_notebook_current = subparsers.add_parser(
         "audit-notebook-current",
         help="Audit notebook-current parity without launching MLX training.",
     )
     add_shared_train_args(audit_notebook_current)
     audit_notebook_current.set_defaults(
-        func=run_audit_notebook_current,
+        func=run_audit_notebook_profile,
         profile="notebook-current",
     )
 
