@@ -543,3 +543,39 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v145_lr2p5e6_ep025/training_result.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v145_binary60/binary60_top8_fusion_v145_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v145_binary60/binary60_top8_fusion_v145_from_v40_lr2p5e6_ep025/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
+
+### v146-v147 prompt-local structured closure diagnostic
+
+`v146 / v147` は、まだ corrected 化していなかった `v76 / v77` の **prompt-local structured closure** を `single-adapter-fusion-v40` base に載せ直した branch。  
+ただし、この family は **README の次に `nvidia-nemotron-metric.ipynb` を評価契約として扱う**必要があり、metric notebook は `tokenizer.apply_chat_template(..., enable_thinking=True)` を使う。
+
+| version | design | prepare/train | diagnostic判定 | decision |
+| --- | --- | --- | --- | --- |
+| `v146` | corrected `v76` = prompt-local current structured closure | `2016 rows`, `126 iters`; `final val 0.356 -> 0.351` | **thinking-off diagnostic** binary60 **`19/60` official, `11/60` exact**。`bit_structured_byte_formula` は **`5/14` official, `3/14` exact**。完走 **192.3s** | signal はあるが非公式 |
+| `v147` | corrected `v77` = `v146` + same-row `boxed_only_done` twin | `2032 rows`, `127 iters`; `final val 0.356 -> 0.348` | **thinking-off diagnostic** binary60 **`20/60` official, `10/60` exact**。`bit_structured_byte_formula` は **`6/14` official, `3/14` exact**。完走 **193.5s** | family best diagnostic だが非公式 |
+
+解釈:
+
+- `v143-v145` trace-twin family と違い、`v146 / v147` は **short boxed answer path に乗せたときは明確に signal がある**。
+  - `boxed_extraction_success_rate = 1.0`
+  - `format_failure_rate = 0.0`
+  - average raw output length は **約 16 chars**
+- 一方で、**metric notebook 整合の `enable_thinking=True`** では MLX local eval が長尺 decode 化し、GPU 使用率も低いままになった。
+  - `v146` thinking-on 8-row probe は chunk 完了前に数分張り付き
+  - control `v40` thinking-on 8-row probe も同じ傾向
+- したがって、`thinking off` で得た `19/60`, `20/60` は **route 診断には有効**だが、**README + metric notebook contract 上の authoritative score ではない**。
+- 現時点の結論は、
+  1. prompt-local structured closure 自体には signal がある
+  2. ただし **thinking-on / notebook-aligned inference** でその signal をそのまま使える状態にはまだなっていない
+  3. よって `v146 / v147` は **本採用保留**。次は thinking-on 側の throughput / stop 条件を直すか、prompt contract に合う continuation を作る必要がある
+
+artifact source of truth:
+
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v146_lr2p5e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v146_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v146_binary60_thinkingoff/binary60_top8_fusion_v146_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v146_binary60_thinkingoff/binary60_top8_fusion_v146_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v147_lr2p5e6_ep025/prepare_manifest.json`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v147_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v147_binary60_thinkingoff/binary60_top8_fusion_v147_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v147_binary60_thinkingoff/binary60_top8_fusion_v147_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`

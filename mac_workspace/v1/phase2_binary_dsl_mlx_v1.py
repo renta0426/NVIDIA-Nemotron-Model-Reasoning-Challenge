@@ -9680,6 +9680,7 @@ def generate_phase0_records_batched(
     progress_every: int,
     worker_label: str,
     eval_thinking: str,
+    force_single_generate: bool,
 ) -> list[dict[str, Any]]:
     import mlx.core as mx  # type: ignore
     from mlx_lm import batch_generate, generate, load  # type: ignore
@@ -9761,6 +9762,8 @@ def generate_phase0_records_batched(
 
         try:
             try:
+                if force_single_generate:
+                    raise RuntimeError("force_single_generate")
                 batch_response = batch_generate(
                     model,
                     tokenizer,
@@ -9772,9 +9775,9 @@ def generate_phase0_records_batched(
                     completion_batch_size=min(completion_size, len(chunk_prompts)),
                 )
                 chunk_outputs = list(batch_response.texts)
-            except AttributeError as exc:
+            except (AttributeError, RuntimeError) as exc:
                 error_text = f"{type(exc).__name__}: {exc}"
-                if "MambaCache" not in error_text or "extract" not in error_text:
+                if not force_single_generate and ("MambaCache" not in error_text or "extract" not in error_text):
                     raise
                 print(
                     f"[phase0-eval:{worker_label}] "
@@ -10012,6 +10015,7 @@ def run_phase0_eval_parallel(
             progress_every=int(args.progress_every),
             worker_label="main",
             eval_thinking=str(getattr(args, "eval_thinking", "auto")),
+            force_single_generate=bool(getattr(args, "force_single_generate", False)),
         )
 
     shard_root = eval_root / "_parallel"
@@ -10066,6 +10070,8 @@ def run_phase0_eval_parallel(
                 "--eval-thinking",
                 str(getattr(args, "eval_thinking", "auto")),
             ]
+            if bool(getattr(args, "force_single_generate", False)):
+                command.append("--force-single-generate")
             if adapter_dir is not None:
                 command.extend(["--adapter-path", str(adapter_dir)])
             if args.lazy_load:
@@ -10243,6 +10249,14 @@ def run_phase0_eval(args: argparse.Namespace) -> None:
         holdout_rows=holdout_rows,
         manifest=manifest,
     )
+    summary_payload["runtime"] = {
+        "eval_thinking": str(getattr(args, "eval_thinking", "on")),
+        "prompt_chunk_size": int(args.prompt_chunk_size),
+        "prefill_batch_size": int(args.prefill_batch_size),
+        "completion_batch_size": int(args.completion_batch_size),
+        "num_shards": int(args.num_shards),
+        "force_single_generate": bool(getattr(args, "force_single_generate", False)),
+    }
     write_phase0_eval_outputs(
         artifact_root=artifact_root,
         report_root=report_root,
@@ -10450,6 +10464,15 @@ def run_phase0_eval_router(args: argparse.Namespace) -> None:
         holdout_rows=holdout_rows,
         manifest=manifest,
     )
+    summary_payload["runtime"] = {
+        "eval_thinking": str(getattr(args, "eval_thinking", "on")),
+        "prompt_chunk_size": int(args.prompt_chunk_size),
+        "prefill_batch_size": int(args.prefill_batch_size),
+        "completion_batch_size": int(args.completion_batch_size),
+        "num_shards": int(args.num_shards),
+        "force_single_generate": bool(getattr(args, "force_single_generate", False)),
+        "router_profile": str(args.router_profile),
+    }
     summary_payload["router"] = build_phase0_router_summary(
         router_profile=str(args.router_profile),
         assignments=router_assignments,
@@ -10519,6 +10542,7 @@ def run_phase0_eval_worker(args: argparse.Namespace) -> None:
         progress_every=int(args.progress_every),
         worker_label=str(args.worker_label),
         eval_thinking=str(getattr(args, "eval_thinking", "auto")),
+        force_single_generate=bool(getattr(args, "force_single_generate", False)),
     )
     write_jsonl_records(Path(args.output_jsonl), records)
     print(
@@ -10627,7 +10651,8 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval.add_argument("--prefill-batch-size", type=int, default=32)
     phase0_eval.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval.add_argument("--progress-every", type=int, default=10)
-    phase0_eval.add_argument("--eval-thinking", type=str, default="auto")
+    phase0_eval.add_argument("--eval-thinking", type=str, default="on")
+    phase0_eval.add_argument("--force-single-generate", action="store_true")
     phase0_eval.add_argument("--lazy-load", action="store_true")
     phase0_eval.add_argument("--force-shadow-model", action="store_true")
     phase0_eval.set_defaults(func=run_phase0_eval)
@@ -10657,7 +10682,8 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_router_eval.add_argument("--prefill-batch-size", type=int, default=32)
     phase0_router_eval.add_argument("--completion-batch-size", type=int, default=32)
     phase0_router_eval.add_argument("--progress-every", type=int, default=10)
-    phase0_router_eval.add_argument("--eval-thinking", type=str, default="auto")
+    phase0_router_eval.add_argument("--eval-thinking", type=str, default="on")
+    phase0_router_eval.add_argument("--force-single-generate", action="store_true")
     phase0_router_eval.add_argument("--lazy-load", action="store_true")
     phase0_router_eval.add_argument("--force-shadow-model", action="store_true")
     phase0_router_eval.add_argument(
@@ -10688,7 +10714,8 @@ def build_parser() -> argparse.ArgumentParser:
     phase0_eval_worker.add_argument("--completion-batch-size", type=int, default=32)
     phase0_eval_worker.add_argument("--progress-every", type=int, default=10)
     phase0_eval_worker.add_argument("--worker-label", type=str, default="worker")
-    phase0_eval_worker.add_argument("--eval-thinking", type=str, default="auto")
+    phase0_eval_worker.add_argument("--eval-thinking", type=str, default="on")
+    phase0_eval_worker.add_argument("--force-single-generate", action="store_true")
     phase0_eval_worker.add_argument("--lazy-load", action="store_true")
     phase0_eval_worker.set_defaults(func=run_phase0_eval_worker)
 
