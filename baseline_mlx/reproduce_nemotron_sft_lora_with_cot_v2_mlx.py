@@ -281,6 +281,56 @@ NOTEBOOK_PROFILE_SPECS: dict[str, dict[str, Any]] = {
     },
 }
 
+PROOF_FIRST_ROUTING_ROOT = (
+    REPO_ROOT / "cuda-train-data-analysis-v1" / "proof_first_solver_factory_routing"
+)
+ROUTE_AWARE_TRAIN_CSV = (
+    PROOF_FIRST_ROUTING_ROOT / "artifacts" / "train_split_with_cot_v2_plus_binary_route_aware.csv"
+)
+BINARY_ROUTE_AWARE_DELTA_CSV = PROOF_FIRST_ROUTING_ROOT / "artifacts" / "binary_route_aware_delta.csv"
+PHASE0_OFFLINE_EVAL_ARTIFACT_ROOT = PROOF_FIRST_ROUTING_ROOT / "result" / "phase0_offline_eval" / "artifacts"
+LEADERBOARD_PROXY_V1_SET_CSV = (
+    PROOF_FIRST_ROUTING_ROOT / "result" / "leaderboard_proxy_v1" / "artifacts" / "leaderboard_proxy_v1_set.csv"
+)
+BINARY_HARD_SET_CSV = PHASE0_OFFLINE_EVAL_ARTIFACT_ROOT / "binary_hard_set.csv"
+GENERAL_STABLE_SET_CSV = PHASE0_OFFLINE_EVAL_ARTIFACT_ROOT / "general_stable_set.csv"
+SYMBOL_WATCH_SET_CSV = PHASE0_OFFLINE_EVAL_ARTIFACT_ROOT / "symbol_watch_set.csv"
+ATTENTION_LORA_KEYS = [
+    "mixer.q_proj",
+    "mixer.k_proj",
+    "mixer.v_proj",
+    "mixer.o_proj",
+]
+NEMOTRON_STAGE_BROAD_LORA_KEYS = [
+    "mixer.in_proj",
+    "mixer.out_proj",
+    "mixer.switch_mlp.fc1",
+    "mixer.switch_mlp.fc2",
+    "mixer.shared_experts.up_proj",
+    "mixer.shared_experts.down_proj",
+]
+NEMOTRON_STAGE_UNION_LORA_KEYS = list(
+    dict.fromkeys(NEMOTRON_STAGE_BROAD_LORA_KEYS + ATTENTION_LORA_KEYS)
+)
+LORA_KEY_GROUPS: dict[str, list[str]] = {
+    "broad": list(NEMOTRON_STAGE_BROAD_LORA_KEYS),
+    "attention": list(ATTENTION_LORA_KEYS),
+    "attention-vo": ["mixer.v_proj", "mixer.o_proj"],
+    "stage-union": list(NEMOTRON_STAGE_UNION_LORA_KEYS),
+}
+DEFAULT_STAGE2_BINARY_SOLVERS = (
+    "binary_affine_xor",
+    "binary_bit_permutation_bijection",
+    "binary_structured_byte_formula",
+    "binary_structured_byte_formula_abstract",
+    "binary_structured_byte_not_formula",
+)
+DEFAULT_PROXY_V2_FOCUS_BUCKETS = (
+    "dominant_structured_safe",
+    "supported_affine_xor",
+    "supported_bijection",
+)
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -630,6 +680,12 @@ def validate_training_frame(df: pd.DataFrame, path: Path) -> None:
         raise ValueError(f"Missing expected columns in {path}: {missing}")
 
 
+def require_columns(df: pd.DataFrame, path: Path, columns: Sequence[str]) -> None:
+    missing = [column for column in columns if column not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns in {path}: {missing}")
+
+
 def parse_type_sample_overrides(entries: Sequence[str]) -> dict[str, int]:
     overrides: dict[str, int] = {}
     for entry in entries:
@@ -658,9 +714,73 @@ def resolve_type_samples(args: argparse.Namespace) -> dict[str, int]:
     return type_samples
 
 
-def resolve_lora_keys(entries: Sequence[str]) -> list[str]:
-    keys = [entry.strip() for entry in entries if entry.strip()]
+def dedupe_strings(entries: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for entry in entries:
+        value = str(entry).strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
+
+
+def coerce_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return dedupe_strings(value.split(","))
+    if isinstance(value, Sequence):
+        return dedupe_strings([str(item) for item in value])
+    return dedupe_strings([str(value)])
+
+
+def resolve_grouped_string_values(
+    *,
+    explicit_entries: Sequence[str],
+    group_entries: Sequence[str],
+    group_map: dict[str, Sequence[str]],
+    value_name: str,
+) -> list[str]:
+    resolved: list[str] = []
+    unknown_groups = sorted(set(str(entry).strip() for entry in group_entries if str(entry).strip()) - set(group_map))
+    if unknown_groups:
+        raise ValueError(f"Unsupported {value_name} groups: {unknown_groups}")
+    for group_name in group_entries:
+        resolved.extend(group_map[str(group_name).strip()])
+    resolved.extend(str(entry).strip() for entry in explicit_entries if str(entry).strip())
+    return dedupe_strings(resolved)
+
+
+def resolve_lora_keys(entries: Sequence[str], group_entries: Sequence[str] = ()) -> list[str]:
+    keys = resolve_grouped_string_values(
+        explicit_entries=entries,
+        group_entries=group_entries,
+        group_map=LORA_KEY_GROUPS,
+        value_name="LoRA key",
+    )
     return keys or list(DEFAULT_LORA_KEYS)
+
+
+def resolve_trainable_lora_suffixes(
+    entries: Sequence[str],
+    group_entries: Sequence[str] = (),
+) -> list[str]:
+    return resolve_grouped_string_values(
+        explicit_entries=entries,
+        group_entries=group_entries,
+        group_map=LORA_KEY_GROUPS,
+        value_name="trainable LoRA suffix",
+    )
+
+
+def sample_dataframe_rows(df: pd.DataFrame, *, max_rows: int, seed: int) -> pd.DataFrame:
+    if max_rows == 0:
+        return df.head(0).copy().reset_index(drop=True)
+    if max_rows < 0 or len(df) <= max_rows:
+        return df.copy().reset_index(drop=True)
+    return df.sample(n=max_rows, random_state=seed).reset_index(drop=True)
 
 
 def maybe_fix_tokenizer_eos_ids(tokenizer: Any) -> None:
@@ -788,6 +908,257 @@ def build_chat_records(train_df: pd.DataFrame) -> tuple[list[dict[str, Any]], di
         ),
     }
     return records, summary
+
+
+def build_corrective_stage2_dataframe(
+    *,
+    binary_delta_df: pd.DataFrame,
+    symbol_source_df: pd.DataFrame,
+    symbol_watch_df: pd.DataFrame,
+    proxy_v1_df: pd.DataFrame,
+    binary_solvers: Sequence[str],
+    max_symbol_rows: int,
+    max_answer_only_ratio: float,
+    seed: int,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    if max_answer_only_ratio < 0.0 or max_answer_only_ratio > 0.5:
+        raise ValueError(f"max_answer_only_ratio must be in [0, 0.5], got {max_answer_only_ratio}")
+
+    solver_set = set(dedupe_strings(binary_solvers))
+    if not solver_set:
+        raise ValueError("At least one binary solver must be selected for the corrective Stage 2 dataset.")
+
+    binary_verified = binary_delta_df[
+        binary_delta_df["source_selection_tier"].astype(str).eq("verified_trace_ready")
+        & binary_delta_df["teacher_solver_candidate"].astype(str).isin(solver_set)
+    ].copy()
+    if binary_verified.empty:
+        raise ValueError("Binary corrective dataset resolved to zero verified rows.")
+
+    max_answer_only_rows = int(len(binary_verified) * max_answer_only_ratio)
+    if max_answer_only_ratio > 0.0 and max_answer_only_rows <= 0:
+        max_answer_only_rows = 1
+    answer_only_pool = binary_delta_df[
+        binary_delta_df["source_selection_tier"].astype(str).eq("answer_only_keep")
+        & binary_delta_df["template_subtype"].astype(str).isin(
+            ["bit_other", "bit_permutation_inversion", "bit_structured_byte_formula"]
+        )
+    ].copy()
+    binary_answer_only = sample_dataframe_rows(
+        answer_only_pool,
+        max_rows=max_answer_only_rows,
+        seed=seed,
+    )
+
+    symbol_watch_ids = set(
+        symbol_watch_df[
+            symbol_watch_df["template_subtype"].astype(str).eq("numeric_2x2")
+            & symbol_watch_df["selection_tier"].astype(str).eq("verified_trace_ready")
+        ]["id"].astype(str)
+    )
+    proxy_symbol_ids = set(
+        proxy_v1_df[
+            proxy_v1_df["family_short"].astype(str).eq("symbol")
+            & proxy_v1_df["template_subtype"].astype(str).eq("numeric_2x2")
+            & proxy_v1_df["selection_tier"].astype(str).eq("verified_trace_ready")
+        ]["id"].astype(str)
+    )
+    symbol_candidate_ids = symbol_watch_ids | proxy_symbol_ids
+    symbol_rows = symbol_source_df[
+        symbol_source_df["id"].astype(str).isin(symbol_candidate_ids)
+        & symbol_source_df["type"].astype(str).eq("Equation Transformation")
+    ].copy()
+    symbol_rows = sample_dataframe_rows(symbol_rows, max_rows=max_symbol_rows, seed=seed)
+
+    frames = [
+        binary_verified.loc[:, EXPECTED_COLUMNS],
+        binary_answer_only.loc[:, EXPECTED_COLUMNS],
+        symbol_rows.loc[:, EXPECTED_COLUMNS],
+    ]
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined.drop_duplicates(subset="id", keep="first")
+    combined = combined.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    summary = {
+        "created_at": utc_now(),
+        "seed": int(seed),
+        "binary_solvers": list(solver_set),
+        "max_symbol_rows": int(max_symbol_rows),
+        "max_answer_only_ratio": float(max_answer_only_ratio),
+        "rows": int(len(combined)),
+        "binary_verified_rows": int(len(binary_verified)),
+        "binary_answer_only_rows": int(len(binary_answer_only)),
+        "symbol_rows": int(len(symbol_rows)),
+        "type_counts": {
+            str(key): int(value)
+            for key, value in combined["type"].astype(str).value_counts().sort_index().items()
+        },
+        "binary_solver_counts": {
+            str(key): int(value)
+            for key, value in binary_verified["teacher_solver_candidate"].astype(str).value_counts().sort_index().items()
+        },
+        "binary_selection_tier_counts": {
+            str(key): int(value)
+            for key, value in pd.concat([binary_verified, binary_answer_only], ignore_index=True)[
+                "source_selection_tier"
+            ]
+            .astype(str)
+            .value_counts()
+            .sort_index()
+            .items()
+        },
+        "binary_assistant_style_counts": {
+            str(key): int(value)
+            for key, value in pd.concat([binary_verified, binary_answer_only], ignore_index=True)[
+                "assistant_style"
+            ]
+            .astype(str)
+            .value_counts()
+            .sort_index()
+            .items()
+        },
+        "symbol_candidate_overlap_rows": int(len(symbol_candidate_ids & set(symbol_source_df["id"].astype(str)))),
+    }
+    return combined, summary
+
+
+def build_leaderboard_proxy_v2_dataframe(
+    *,
+    proxy_v1_df: pd.DataFrame,
+    binary_hard_df: pd.DataFrame,
+    symbol_watch_df: pd.DataFrame,
+    focus_buckets: Sequence[str],
+    binary_solvers: Sequence[str],
+    max_binary_hard_rows: int,
+    max_symbol_rows: int,
+    seed: int,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    focus_bucket_set = set(dedupe_strings(focus_buckets))
+    solver_set = set(dedupe_strings(binary_solvers))
+    if not focus_bucket_set:
+        raise ValueError("At least one proxy focus bucket must be selected.")
+    if not solver_set:
+        raise ValueError("At least one binary solver must be selected for proxy v2.")
+
+    proxy_focus = proxy_v1_df[
+        proxy_v1_df["leaderboard_proxy_bucket"].astype(str).isin(focus_bucket_set)
+        | proxy_v1_df["teacher_solver_candidate"].astype(str).isin(solver_set)
+    ].copy()
+    proxy_focus["proxy_v2_source"] = "leaderboard_proxy_v1_focus"
+
+    binary_hard_topup = binary_hard_df[
+        binary_hard_df["teacher_solver_candidate"].astype(str).isin(solver_set)
+    ].copy()
+    binary_hard_topup = binary_hard_topup.sort_values(
+        by=["hard_score", "num_examples", "id"],
+        ascending=[False, False, True],
+    )
+    binary_hard_topup = sample_dataframe_rows(
+        binary_hard_topup,
+        max_rows=max_binary_hard_rows,
+        seed=seed,
+    )
+    binary_hard_topup["proxy_v2_source"] = "binary_hard_topup"
+
+    proxy_symbol = proxy_v1_df[
+        proxy_v1_df["family_short"].astype(str).eq("symbol")
+        & proxy_v1_df["template_subtype"].astype(str).eq("numeric_2x2")
+        & proxy_v1_df["selection_tier"].astype(str).eq("verified_trace_ready")
+    ].copy()
+    symbol_watch = symbol_watch_df[
+        symbol_watch_df["template_subtype"].astype(str).eq("numeric_2x2")
+        & symbol_watch_df["selection_tier"].astype(str).eq("verified_trace_ready")
+    ].copy()
+    symbol_focus = pd.concat([proxy_symbol, symbol_watch], ignore_index=True, sort=False)
+    if not symbol_focus.empty:
+        symbol_focus = symbol_focus.sort_values(
+            by=["hard_score", "num_examples", "id"],
+            ascending=[False, False, True],
+        )
+        symbol_focus = sample_dataframe_rows(symbol_focus, max_rows=max_symbol_rows, seed=seed)
+        symbol_focus["proxy_v2_source"] = "symbol_numeric_watch"
+
+    combined = pd.concat(
+        [proxy_focus, binary_hard_topup, symbol_focus],
+        ignore_index=True,
+        sort=False,
+    )
+    combined = combined.drop_duplicates(subset="id", keep="first").reset_index(drop=True)
+    combined["benchmark_name"] = "leaderboard_proxy_v2_set"
+    combined["benchmark_role"] = "leaderboard_proxy_v2"
+    combined["benchmark_index"] = list(range(1, len(combined) + 1))
+
+    def resolve_proxy_v2_focus_bucket(row: pd.Series) -> str:
+        for field_name in ("leaderboard_proxy_bucket", "teacher_solver_candidate"):
+            value = row.get(field_name, "")
+            if pd.notna(value):
+                text = str(value).strip()
+                if text and text.lower() != "nan":
+                    return text
+        family_short = str(row.get("family_short", "")).strip()
+        template_subtype = str(row.get("template_subtype", "")).strip()
+        return f"{family_short}:{template_subtype}".strip(":")
+
+    combined["proxy_v2_focus_bucket"] = combined.apply(
+        resolve_proxy_v2_focus_bucket,
+        axis=1,
+    )
+    combined["proxy_v2_note"] = combined["proxy_v2_source"].map(
+        {
+            "leaderboard_proxy_v1_focus": "Focused hidden-gap slices from leaderboard_proxy_v1.",
+            "binary_hard_topup": "Hard binary top-up for safe/bijection/structured-formula solvers.",
+            "symbol_numeric_watch": "Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.",
+        }
+    )
+
+    preferred_columns = [
+        "benchmark_name",
+        "benchmark_role",
+        "benchmark_index",
+        "id",
+        "prompt",
+        "answer",
+        "family",
+        "family_short",
+        "template_subtype",
+        "selection_tier",
+        "teacher_solver_candidate",
+        "answer_type",
+        "num_examples",
+        "prompt_len_chars",
+        "hard_score",
+        "group_signature",
+        "query_raw",
+        "leaderboard_proxy_bucket",
+        "proxy_v2_source",
+        "proxy_v2_focus_bucket",
+        "proxy_v2_note",
+    ]
+    ordered_columns = dedupe_strings(preferred_columns + list(combined.columns))
+    combined = combined.loc[:, ordered_columns]
+    summary = {
+        "created_at": utc_now(),
+        "seed": int(seed),
+        "focus_buckets": list(focus_bucket_set),
+        "binary_solvers": list(solver_set),
+        "rows": int(len(combined)),
+        "rows_by_source": {
+            str(key): int(value)
+            for key, value in combined["proxy_v2_source"].astype(str).value_counts().sort_index().items()
+        },
+        "rows_by_focus_bucket": {
+            str(key): int(value)
+            for key, value in combined["proxy_v2_focus_bucket"].astype(str).value_counts().sort_index().items()
+        },
+        "rows_by_family": {
+            str(key): int(value)
+            for key, value in combined["family_short"].astype(str).value_counts().sort_index().items()
+        },
+        "rows_by_solver": {
+            str(key): int(value)
+            for key, value in combined["teacher_solver_candidate"].astype(str).value_counts().sort_index().items()
+        },
+    }
+    return combined, summary
 
 
 def select_shadow_validation_records(
@@ -1311,6 +1682,7 @@ def build_mlx_lora_config(
     lora_alpha: float,
     lora_dropout: float,
     lora_keys: Sequence[str],
+    trainable_lora_suffixes: Sequence[str],
     num_layers: int,
     steps_per_report: int,
     steps_per_report_step_unit: str,
@@ -1383,6 +1755,8 @@ def build_mlx_lora_config(
     }
     if resume_adapter_file is not None:
         config["resume_adapter_file"] = str(resume_adapter_file)
+    if trainable_lora_suffixes:
+        config["trainable_lora_suffixes"] = list(trainable_lora_suffixes)
     schedule_name = str(lr_schedule_name or "").strip()
     if schedule_name:
         if schedule_name != "cosine_decay":
@@ -1829,7 +2203,11 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
     df = pd.read_csv(train_csv)
     validate_training_frame(df, train_csv)
     type_samples = resolve_type_samples(args)
-    lora_keys = resolve_lora_keys(args.lora_key or [])
+    lora_keys = resolve_lora_keys(args.lora_key or [], args.lora_key_group or [])
+    trainable_lora_suffixes = resolve_trainable_lora_suffixes(
+        args.trainable_lora_suffix or [],
+        args.trainable_lora_suffix_group or [],
+    )
     sampled_train_df = sample_training_df(
         df,
         type_samples=type_samples,
@@ -1867,6 +2245,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         lora_alpha=float(args.lora_alpha),
         lora_dropout=float(args.lora_dropout),
         lora_keys=lora_keys,
+        trainable_lora_suffixes=trainable_lora_suffixes,
         num_layers=int(args.num_layers),
         steps_per_report=int(args.steps_per_report),
         steps_per_report_step_unit=str(args.steps_per_report_step_unit),
@@ -1966,6 +2345,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "lora_alpha": float(args.lora_alpha),
             "lora_dropout": float(args.lora_dropout),
             "lora_keys": list(lora_keys),
+            "trainable_lora_suffixes": list(trainable_lora_suffixes),
             "num_layers": int(args.num_layers),
             "steps_per_report": int(args.steps_per_report),
             "steps_per_report_step_unit": str(args.steps_per_report_step_unit),
@@ -2068,12 +2448,15 @@ def maybe_patch_mlx_lora_tokenizer_special_tokens() -> None:
 
 
 def maybe_patch_mlx_lora_train_model_runtime_args() -> None:
+    import mlx.core as mx
+    import mlx.optimizers as optim
     import mlx_lm.lora as mlx_lora
+    from mlx_lm.tuner.datasets import CacheDataset
+    from mlx_lm.tuner.trainer import TrainingArgs
+    from mlx_lm.tuner.utils import build_schedule, linear_to_lora_layers, print_trainable_parameters
 
     if getattr(mlx_lora, "_nemotron_train_model_runtime_args_patch", False):
         return
-
-    original_train_model = mlx_lora.train_model
 
     def patched_train_model(
         args: Any,
@@ -2085,22 +2468,236 @@ def maybe_patch_mlx_lora_train_model_runtime_args() -> None:
         report_step_unit = str(getattr(args, "steps_per_report_step_unit", "micro")).strip().lower()
         flush_on_epoch_boundary = bool(getattr(args, "flush_on_epoch_boundary", False))
         microsteps_per_epoch = int(getattr(args, "microsteps_per_epoch", 0) or 0)
-        original_train = mlx_lora.train
 
-        def patched_train(*, args: Any, **kwargs: Any) -> Any:
-            setattr(args, "steps_per_report_step_unit", report_step_unit)
-            setattr(args, "flush_on_epoch_boundary", flush_on_epoch_boundary)
-            setattr(args, "microsteps_per_epoch", microsteps_per_epoch)
-            return original_train(args=args, **kwargs)
+        mx.random.seed(args.seed)
+        model.freeze()
+        if args.num_layers > len(model.layers):
+            raise ValueError(
+                f"Requested to train {args.num_layers} layers but the model only has {len(model.layers)} layers."
+            )
 
-        mlx_lora.train = patched_train
-        try:
-            return original_train_model(args, model, train_set, valid_set, training_callback)
-        finally:
-            mlx_lora.train = original_train
+        if args.fine_tune_type == "full":
+            for layer in model.layers[-max(args.num_layers, 0) :]:
+                layer.unfreeze()
+            args.lora_parameters = None
+        elif args.fine_tune_type in ["lora", "dora"]:
+            linear_to_lora_layers(
+                model,
+                args.num_layers,
+                args.lora_parameters,
+                use_dora=(args.fine_tune_type == "dora"),
+            )
+            trainable_lora_suffixes = coerce_string_list(getattr(args, "trainable_lora_suffixes", None))
+            if trainable_lora_suffixes:
+                matched_by_suffix: Counter[str] = Counter()
+                total_lora_modules = 0
+                for name, module in model.named_modules():
+                    if not hasattr(module, "lora_a") or not hasattr(module, "lora_b"):
+                        continue
+                    total_lora_modules += 1
+                    module.freeze(keys=["lora_a", "lora_b"])
+                    for suffix in trainable_lora_suffixes:
+                        if name.endswith(suffix):
+                            module.unfreeze(keys=["lora_a", "lora_b"])
+                            matched_by_suffix[suffix] += 1
+                            break
+                unmatched_suffixes = [
+                    suffix for suffix in trainable_lora_suffixes if matched_by_suffix.get(suffix, 0) <= 0
+                ]
+                if unmatched_suffixes:
+                    raise ValueError(
+                        "trainable_lora_suffixes did not match any LoRA modules: "
+                        + ", ".join(unmatched_suffixes)
+                    )
+                print(
+                    "LoRA suffix filter: "
+                    + json.dumps(
+                        {
+                            "total_lora_modules": total_lora_modules,
+                            "matched_by_suffix": {
+                                key: int(value) for key, value in sorted(matched_by_suffix.items())
+                            },
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+        else:
+            raise ValueError(f"Received unknown fine-tune-type {args.fine_tune_type}")
+
+        if args.resume_adapter_file is not None:
+            print(f"Loading fine-tuned weights from {args.resume_adapter_file}")
+            model.load_weights(args.resume_adapter_file, strict=False)
+
+        print_trainable_parameters(model)
+
+        adapter_path = Path(args.adapter_path)
+        adapter_path.mkdir(parents=True, exist_ok=True)
+        adapter_file = adapter_path / "adapters.safetensors"
+        mlx_lora.save_config(vars(args), adapter_path / "adapter_config.json")
+
+        training_args = TrainingArgs(
+            batch_size=args.batch_size,
+            iters=args.iters,
+            val_batches=args.val_batches,
+            steps_per_report=args.steps_per_report,
+            steps_per_eval=args.steps_per_eval,
+            steps_per_save=args.save_every,
+            adapter_file=adapter_file,
+            max_seq_length=args.max_seq_length,
+            grad_checkpoint=args.grad_checkpoint,
+            grad_accumulation_steps=args.grad_accumulation_steps,
+        )
+        setattr(training_args, "steps_per_report_step_unit", report_step_unit)
+        setattr(training_args, "flush_on_epoch_boundary", flush_on_epoch_boundary)
+        setattr(training_args, "microsteps_per_epoch", microsteps_per_epoch)
+
+        learning_rate = build_schedule(args.lr_schedule) if args.lr_schedule else args.learning_rate
+        optimizer_name = args.optimizer.lower()
+        optimizer_config = args.optimizer_config.get(optimizer_name, {})
+        if optimizer_name == "adam":
+            optimizer_class = optim.Adam
+        elif optimizer_name == "adamw":
+            optimizer_class = optim.AdamW
+        elif optimizer_name == "muon":
+            optimizer_class = optim.Muon
+        elif optimizer_name == "sgd":
+            optimizer_class = optim.SGD
+        elif optimizer_name == "adafactor":
+            optimizer_class = optim.Adafactor
+        else:
+            raise ValueError(f"Unsupported optimizer: {optimizer_name}")
+
+        optimizer = optimizer_class(learning_rate=learning_rate, **optimizer_config)
+        mlx_lora.train(
+            model=model,
+            args=training_args,
+            optimizer=optimizer,
+            train_dataset=CacheDataset(train_set),
+            val_dataset=CacheDataset(valid_set),
+            training_callback=training_callback,
+        )
 
     mlx_lora.train_model = patched_train_model
     mlx_lora._nemotron_train_model_runtime_args_patch = True
+
+
+def run_build_corrective_stage2_csv(args: argparse.Namespace) -> None:
+    binary_delta_path = Path(args.binary_delta_csv).resolve()
+    symbol_train_path = Path(args.symbol_train_csv).resolve()
+    symbol_watch_path = Path(args.symbol_watch_csv).resolve()
+    proxy_v1_path = Path(args.proxy_v1_csv).resolve()
+    output_csv = Path(args.output_csv).resolve()
+    summary_json = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else output_csv.with_name(f"{output_csv.stem}_summary.json")
+    )
+
+    binary_delta_df = pd.read_csv(binary_delta_path)
+    validate_training_frame(binary_delta_df, binary_delta_path)
+    require_columns(
+        binary_delta_df,
+        binary_delta_path,
+        ["teacher_solver_candidate", "template_subtype", "source_selection_tier", "assistant_style"],
+    )
+    symbol_source_df = pd.read_csv(symbol_train_path)
+    validate_training_frame(symbol_source_df, symbol_train_path)
+    symbol_watch_df = pd.read_csv(symbol_watch_path)
+    require_columns(symbol_watch_df, symbol_watch_path, ["id", "template_subtype", "selection_tier"])
+    proxy_v1_df = pd.read_csv(proxy_v1_path)
+    require_columns(
+        proxy_v1_df,
+        proxy_v1_path,
+        ["id", "family_short", "template_subtype", "selection_tier", "leaderboard_proxy_bucket"],
+    )
+
+    binary_solvers = args.binary_solver or list(DEFAULT_STAGE2_BINARY_SOLVERS)
+    combined_df, summary = build_corrective_stage2_dataframe(
+        binary_delta_df=binary_delta_df,
+        symbol_source_df=symbol_source_df,
+        symbol_watch_df=symbol_watch_df,
+        proxy_v1_df=proxy_v1_df,
+        binary_solvers=binary_solvers,
+        max_symbol_rows=int(args.max_symbol_rows),
+        max_answer_only_ratio=float(args.max_answer_only_ratio),
+        seed=int(args.seed),
+    )
+    ensure_dir(output_csv.parent)
+    combined_df.to_csv(output_csv, index=False)
+    summary["output_csv"] = str(output_csv)
+    summary["summary_json"] = str(summary_json)
+    summary["source_paths"] = {
+        "binary_delta_csv": str(binary_delta_path),
+        "symbol_train_csv": str(symbol_train_path),
+        "symbol_watch_csv": str(symbol_watch_path),
+        "proxy_v1_csv": str(proxy_v1_path),
+    }
+    write_json(summary_json, summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
+def run_build_leaderboard_proxy_v2(args: argparse.Namespace) -> None:
+    proxy_v1_path = Path(args.proxy_v1_csv).resolve()
+    binary_hard_path = Path(args.binary_hard_csv).resolve()
+    symbol_watch_path = Path(args.symbol_watch_csv).resolve()
+    output_csv = Path(args.output_csv).resolve()
+    summary_json = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else output_csv.with_name(f"{output_csv.stem}_summary.json")
+    )
+
+    proxy_v1_df = pd.read_csv(proxy_v1_path)
+    require_columns(
+        proxy_v1_df,
+        proxy_v1_path,
+        [
+            "id",
+            "prompt",
+            "answer",
+            "family_short",
+            "template_subtype",
+            "selection_tier",
+            "teacher_solver_candidate",
+            "leaderboard_proxy_bucket",
+        ],
+    )
+    binary_hard_df = pd.read_csv(binary_hard_path)
+    require_columns(
+        binary_hard_df,
+        binary_hard_path,
+        ["id", "prompt", "answer", "family_short", "template_subtype", "selection_tier", "teacher_solver_candidate"],
+    )
+    symbol_watch_df = pd.read_csv(symbol_watch_path)
+    require_columns(
+        symbol_watch_df,
+        symbol_watch_path,
+        ["id", "prompt", "answer", "family_short", "template_subtype", "selection_tier"],
+    )
+
+    focus_buckets = args.focus_bucket or list(DEFAULT_PROXY_V2_FOCUS_BUCKETS)
+    binary_solvers = args.binary_solver or list(DEFAULT_STAGE2_BINARY_SOLVERS)
+    combined_df, summary = build_leaderboard_proxy_v2_dataframe(
+        proxy_v1_df=proxy_v1_df,
+        binary_hard_df=binary_hard_df,
+        symbol_watch_df=symbol_watch_df,
+        focus_buckets=focus_buckets,
+        binary_solvers=binary_solvers,
+        max_binary_hard_rows=int(args.max_binary_hard_rows),
+        max_symbol_rows=int(args.max_symbol_rows),
+        seed=int(args.seed),
+    )
+    ensure_dir(output_csv.parent)
+    combined_df.to_csv(output_csv, index=False)
+    summary["output_csv"] = str(output_csv)
+    summary["summary_json"] = str(summary_json)
+    summary["source_paths"] = {
+        "proxy_v1_csv": str(proxy_v1_path),
+        "binary_hard_csv": str(binary_hard_path),
+        "symbol_watch_csv": str(symbol_watch_path),
+    }
+    write_json(summary_json, summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def run_mlx_lora_training_from_config(config_path: Path) -> None:
@@ -2183,7 +2780,7 @@ def run_audit_notebook_profile(args: argparse.Namespace) -> None:
         seed=int(args.seed),
     )
     train_records, record_summary = build_chat_records(sampled_train_df)
-    lora_keys = resolve_lora_keys(args.lora_key or [])
+    lora_keys = resolve_lora_keys(args.lora_key or [], args.lora_key_group or [])
     notebook_parity_artifacts = write_notebook_parity_artifacts(
         run_root=run_root,
         args=args,
@@ -2262,10 +2859,30 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument("--lora-alpha", type=float, default=32.0)
         target.add_argument("--lora-dropout", type=float, default=0.05)
         target.add_argument(
+            "--lora-key-group",
+            action="append",
+            choices=sorted(LORA_KEY_GROUPS),
+            default=[],
+            help="Add a predefined Nemotron LoRA key group such as broad, attention, or stage-union.",
+        )
+        target.add_argument(
             "--lora-key",
             action="append",
             default=[],
             help="Override LoRA target keys. Repeat the flag to provide multiple keys.",
+        )
+        target.add_argument(
+            "--trainable-lora-suffix-group",
+            action="append",
+            choices=sorted(LORA_KEY_GROUPS),
+            default=[],
+            help="Freeze all LoRA adapter params, then unfreeze only modules in this predefined suffix group.",
+        )
+        target.add_argument(
+            "--trainable-lora-suffix",
+            action="append",
+            default=[],
+            help="Freeze all LoRA adapter params, then unfreeze only modules whose names end with these suffixes.",
         )
         target.add_argument(
             "--num-layers",
@@ -2351,6 +2968,38 @@ def build_parser() -> argparse.ArgumentParser:
         func=run_audit_notebook_profile,
         profile="notebook-current",
     )
+
+    build_corrective_stage2_csv = subparsers.add_parser(
+        "build-corrective-stage2-csv",
+        help="Build a narrow Stage 2 corrective training CSV from route-aware binary delta and verified numeric_2x2 symbol rows.",
+    )
+    build_corrective_stage2_csv.add_argument("--binary-delta-csv", type=Path, default=BINARY_ROUTE_AWARE_DELTA_CSV)
+    build_corrective_stage2_csv.add_argument("--symbol-train-csv", type=Path, default=NOTEBOOK_CURRENT_TRAIN_CSV)
+    build_corrective_stage2_csv.add_argument("--symbol-watch-csv", type=Path, default=SYMBOL_WATCH_SET_CSV)
+    build_corrective_stage2_csv.add_argument("--proxy-v1-csv", type=Path, default=LEADERBOARD_PROXY_V1_SET_CSV)
+    build_corrective_stage2_csv.add_argument("--binary-solver", action="append", default=[])
+    build_corrective_stage2_csv.add_argument("--max-symbol-rows", type=int, default=24)
+    build_corrective_stage2_csv.add_argument("--max-answer-only-ratio", type=float, default=0.0)
+    build_corrective_stage2_csv.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    build_corrective_stage2_csv.add_argument("--output-csv", type=Path, required=True)
+    build_corrective_stage2_csv.add_argument("--summary-json", type=Path, default=None)
+    build_corrective_stage2_csv.set_defaults(func=run_build_corrective_stage2_csv)
+
+    build_leaderboard_proxy_v2 = subparsers.add_parser(
+        "build-leaderboard-proxy-v2",
+        help="Build a hidden-gap watch set focused on safe/bijection/structured-formula regression slices.",
+    )
+    build_leaderboard_proxy_v2.add_argument("--proxy-v1-csv", type=Path, default=LEADERBOARD_PROXY_V1_SET_CSV)
+    build_leaderboard_proxy_v2.add_argument("--binary-hard-csv", type=Path, default=BINARY_HARD_SET_CSV)
+    build_leaderboard_proxy_v2.add_argument("--symbol-watch-csv", type=Path, default=SYMBOL_WATCH_SET_CSV)
+    build_leaderboard_proxy_v2.add_argument("--focus-bucket", action="append", default=[])
+    build_leaderboard_proxy_v2.add_argument("--binary-solver", action="append", default=[])
+    build_leaderboard_proxy_v2.add_argument("--max-binary-hard-rows", type=int, default=24)
+    build_leaderboard_proxy_v2.add_argument("--max-symbol-rows", type=int, default=12)
+    build_leaderboard_proxy_v2.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    build_leaderboard_proxy_v2.add_argument("--output-csv", type=Path, required=True)
+    build_leaderboard_proxy_v2.add_argument("--summary-json", type=Path, default=None)
+    build_leaderboard_proxy_v2.set_defaults(func=run_build_leaderboard_proxy_v2)
 
     return parser
 
