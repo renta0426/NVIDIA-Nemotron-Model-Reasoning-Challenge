@@ -52,6 +52,7 @@
 | `baseline-mlx-eval-full320-lora-fix-schedopt-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_schedopt_v1` | README local320 | `189/320 = 0.5906` | `15/60` | `49/50` | `50/50` | `18/60` | `10/50` | `47/50` | one-shard rerun。`lora-fix-v2` と manifest は同一だが `-5` rows。binary boxed extraction `1.0`; format failure `0.0`; peak_memory_gb `77.49` |
 | `baseline-mlx-notebook-original-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_fullrun_v2` | README local320 | `215/320 = 0.6719` | `26/60` | `50/50` | `50/50` | `15/60` | `25/50` | `49/50` | 2-shard eval。旧 MLX best `196/320` を更新。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
 | `baseline-mlx-notebook-original-routeaware-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_routeaware_fullrun_v2` | README local320 | `170/320 = 0.5312` | `33/60` | `15/50` | `40/50` | `5/60` | `29/50` | `48/50` | 2-shard eval。binary/text は改善したが、gravity/roman/symbol が大きく regress。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
+| `baseline-mlx-resume-routeaware-bit1317-lr2p5e5-ep1-eval-v1` | `baseline_mlx_notebook_original_resume_routeaware_bit1317_lr2p5e5_ep1` | README local320 | `142/320 = 0.4437` | `27/60` | `17/50` | `40/50` | `7/60` | `7/50` | `44/50` | baseline adapter resume + constrained route-aware mix。baseline `0.6719` を大きく下回ったため specialized gate は通さず |
 
 ## Binary bias specialized eval
 
@@ -66,6 +67,7 @@
 - binary bias specialized は baseline **`286/563 = 0.5080`** に対して route-aware **`348/563 = 0.6181`** で、**`+62 rows / +0.1101`**。subtype では `bit_permutation_inversion` **`40 -> 60`**, `bit_other` **`118 -> 136`**, `bit_structured_byte_formula` **`128 -> 152`** と全部改善した。
 - focus / exposure では `supported_bijection` **`33/50 -> 50/50`**, `rare_byte_transform` **`9/11 -> 11/11`**, `dominant_structured_safe` **`64/120 -> 74/120`**, `dominant` **`105/210 -> 127/210`**, `supported` **`126/225 -> 153/225`** が改善した。一方で `supported_not_structured` は **`15/55 -> 14/55`** と微減で、boolean_family は **`47/60`** のまま横ばいだった。
 - したがって今回の route-aware retrain は **binary-specialized 強化には有効**だが、README local320 の総合ベースライン置換には不適。現時点の総合候補は依然として **`baseline_mlx_notebook_original_fullrun_v2`**。
+- continuation の **bit1317 / lr2.5e-5 / ep1** も README local320 では **`142/320 = 0.4437`** に沈み、baseline **`215/320`** どころか route-aware full retrain **`170/320`** よりも下だった。family 別では `binary 27/60`, `gravity 17/50`, `roman 40/50`, `symbol 7/60`, `text 7/50`, `unit 44/50` で、local320 gate 未達のため binary-specialized は **未実行** とした。
 
 ## Wait-state diagnosis probes
 
@@ -294,3 +296,4 @@ row-level overlap:
 - さらに 45 分後の定点では **bit1317 / lr2.5e-5 / ep1** が **`Opt360 loss=0.281 / itps=0.747 / peak=82.603 GB`** まで到達した。残りは **`737` microsteps / `93` optimizer steps** で、単純 ETA は **約 0.27h**。完走後は README local320 を即時に流す待機ジョブを別 shell で仕掛けた。
 - bit1317 continuation は **`Iter 3617 (Opt 453 / 453)`** で完走した。最終 validation は **`Val loss 0.455 (0.583s)`**、最終 train report は **`Train loss 0.329 / LR 1.727e-07 / It/sec 0.727 / Tokens/sec 454.649 / Trained Tokens 2,164,850 / Peak mem 82.603 GB`**。全 train report 平均 throughput は **`0.698 it/s`**、bundle zip は **`3,246,047,318 bytes`**。
 - 完走直後に README local320 の screen を自動起動した。さらに、この score が baseline **`0.6719`** を超えた場合だけ binary-specialized を続行する待機ジョブも追加した。したがって以後の continuation 分岐は **local320 score** で自動的に絞られる。
+- screen 結果は **`142/320 = 0.4437`** で、baseline gate **`0.6719`** を大きく下回った。binary は **`27/60`** と baseline **`26/60`** をわずかに上回ったが、`text 7/50`, `gravity 17/50`, `symbol 7/60` が重く、general 保持には失敗した。このため conditional specialized shell は **`skip_specialized_below_baseline`** で終了した。
