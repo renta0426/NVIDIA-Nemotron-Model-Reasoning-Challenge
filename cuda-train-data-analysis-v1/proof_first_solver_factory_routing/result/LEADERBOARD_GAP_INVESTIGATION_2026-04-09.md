@@ -304,6 +304,238 @@ Phase0 320 は `general_stable_set 200` を含むため、hidden の hard-family
 
 に近い可能性が高い。
 
+## 11A. leaderboard proxy 実測で追加確認できたこと
+
+README.md の Evaluation 契約に合わせて構成した `leaderboard_proxy_v1` を実際に再推論すると、設計時の期待値そのものからは少し下振れしたが、**v3f と current の明確な順位差そのものは維持された**。
+
+### 11A.1 proxy 設計値と今回実測値
+
+| run | proxy 設計値 | 今回実測 | drift |
+| --- | ---: | ---: | ---: |
+| `v3f` | `143/200 = 0.7150` | `133/200 = 0.6650` | `-0.0500` |
+| `current` | `112/200 = 0.5600` | `98/200 = 0.4900` | `-0.0700` |
+
+この rerun では両者とも下振れしているが、差分は
+
+1. 設計値では `0.1550`
+2. 今回実測では `0.1750`
+
+であり、**current の不利はむしろ拡大している**。
+
+### 11A.2 実現した row-level 役割分解
+
+今回実測の row-level 内訳は次の通りだった。
+
+| realized role | rows |
+| --- | ---: |
+| `v3f_only` | `40` |
+| `current_only` | `5` |
+| `both_correct` | `93` |
+| `both_wrong` | `62` |
+
+つまり、current は proxy 200 問のうち
+
+1. v3f に対して `40` 問負け
+2. 取り返せたのは `5` 問のみ
+
+であり、今回の差は偶然ではなく **row-level でも明確な敗北** といえる。
+
+### 11A.3 差分寄与の主因
+
+family 単位の差分寄与は次の通りである。
+
+| family_short | rows | v3f correct | current correct | delta correct |
+| --- | ---: | ---: | ---: | ---: |
+| `binary` | `92` | `42` | `22` | `-20` |
+| `text` | `20` | `17` | `5` | `-12` |
+| `symbol` | `32` | `19` | `15` | `-4` |
+| `unit` | `18` | `17` | `18` | `+1` |
+| `gravity` | `19` | `19` | `19` | `0` |
+| `roman` | `19` | `19` | `19` | `0` |
+
+35 問差の内訳は、ほぼ
+
+1. `binary -20`
+2. `text -12`
+3. `symbol -4`
+
+で説明できる。
+
+subtype / solver で見ると、current の主な regressions は次に集中している。
+
+| bucket | delta correct |
+| --- | ---: |
+| `text_monoalphabetic` | `-12` |
+| `bit_structured_byte_formula` | `-9` |
+| `bit_other` | `-6` |
+| `bit_permutation_inversion` | `-5` |
+| `numeric_2x2` | `-4` |
+
+| teacher_solver_candidate | delta correct |
+| --- | ---: |
+| `text_char_substitution` | `-12` |
+| `binary_structured_byte_formula` | `-5` |
+| `binary_bit_permutation_bijection` | `-5` |
+| `symbol_numeric_operator_formula` | `-4` |
+| `binary_affine_xor` | `-3` |
+| `binary_structured_byte_formula_abstract` | `-2` |
+| `binary_two_bit_boolean` | `-2` |
+
+特に binary 側では、以前から疑っていた
+
+1. `bit_permutation_inversion`
+2. `structured_byte_formula`
+3. `affine_xor`
+
+が今回もそのまま主因に出ている。
+
+### 11A.4 source split で見ると specialized 側の崩れがより大きい
+
+proxy source split 別の実測は次の通り。
+
+| source_split | rows | v3f correct | current correct | delta correct |
+| --- | ---: | ---: | ---: | ---: |
+| `phase0` | `110` | `92` | `77` | `-15` |
+| `specialized` | `90` | `41` | `21` | `-20` |
+
+したがって、絶対差で見ると current の失点は
+
+1. `phase0` 側でも大きい
+2. しかし `specialized` 側でさらに大きい
+
+となる。これは、これまでの `supported_bijection` / `dominant_structured_safe` / `structured formula` 系弱点仮説をさらに補強する。
+
+### 11A.5 text 激減の解釈は修正が必要
+
+ここで重要なのは、今回観測された `text 17/20 -> 5/20` の激減を、そのまま hidden weakness と断定してはいけないことである。
+
+追加の実験文脈として、**この current run は使用データ量を `550` まで下げたため、text 系精度低下は既知のトレードオフ** であることが分かっている。
+
+したがって、今回の proxy 差分は次の 2 層に分けて解釈する必要がある。
+
+1. `text -12` は、学習データ縮小に伴う意図的な capacity trade-off の影響を強く受けている
+2. それを差し引いても、`binary -20` が最大寄与であり、hidden gap の主因としては依然 binary 側が第一候補である
+
+つまり、**text 激減は今回 run 固有の学習データ削減でかなり説明できるが、それでも leaderboard gap の主要因が binary 側にあるという結論は変わらない**。
+
+### 11A.6 rerun drift そのものから分かること
+
+今回の rerun は、proxy 構築時に保存した `v3f_is_correct` / `current_is_correct` よりも両モデルとも下振れした。下振れの中身は次の通りである。
+
+1. `v3f` は `-10` 問で、主に `bit_other`, `text_monoalphabetic`, `numeric_2x2`
+2. `current` は `-14` 問で、主に `text_monoalphabetic 14`, `numeric_2x2 7`
+
+このため、proxy は依然として useful だが、**固定スコア再現器というより hidden-gap を増幅して観測する watch set** として扱う方が正確である。
+
+## 11B. このモデルの弱点は何か
+
+README.md の契約では、最終的に評価されるのは `\boxed{}` 優先抽出後の **最終 answer の Accuracy** である。したがって、今回モデルの弱点も「説明が長い」「style が違う」といった表面差ではなく、**最終 answer を外しやすい構造的弱点** として定義する必要がある。
+
+現時点で最も妥当なのは、弱点を次の 3 層に分ける整理である。
+
+### 11B.1 第1弱点: safe / bijection / structured-formula 系 binary での generalization 不足
+
+最重要の弱点はここである。
+
+根拠は次の通り。
+
+1. specialized563 で current は `supported_bijection` で `-0.1000`
+2. `dominant_structured_safe` でも `-0.0417`
+3. proxy 実測の差分寄与でも `binary -20` が最大
+4. subtype では `bit_structured_byte_formula -9`, `bit_permutation_inversion -5`, `bit_other -6`
+5. solver では `binary_structured_byte_formula -5`, `binary_bit_permutation_bijection -5`, `binary_affine_xor -3`
+
+したがって、このモデルの本当の弱点は「binary 全般が弱い」ではなく、**hidden が厚く含んでいると推定される safe / bijection / structured-formula 系 binary で答えを外しやすい**ことである。
+
+### 11B.2 第2弱点: route-aware な早すぎる solver lock
+
+current の specialized 出力は
+
+1. `Route: ...`
+2. `So the rule is ...`
+3. `Constraints: exact_8bit, leading_zeros, box_only_final.`
+
+という形式にほぼ完全に寄っている。これは route-aware teacher の表面様式まで強く学習したことを示す。
+
+この性質自体が常に悪いわけではないが、unseen binary family に入った時に
+
+1. family 判定
+2. rule 仮説
+3. final answer
+
+を早い段階で固定しすぎると、途中で軌道修正できず **solver mislock のまま最終 answer を外す**。今回の current は、まさにこの failure mode を起こしやすい run とみるのが妥当である。
+
+### 11B.3 第3弱点: text は下がっているが、hidden 主因とは分けて扱うべき
+
+proxy 実測では `text 17/20 -> 5/20` と大きく落ちている。しかしこれは、追加の実験文脈として **学習データ量を `550` まで下げた既知トレードオフ** の影響を強く受けている。
+
+したがって、text 低下は current run の欠点ではあるが、今回の leaderboard gap の第一原因としては扱わない方が正確である。hidden 主因として優先すべきは、依然として binary 側である。
+
+## 11C. なぜ binary specialized ベンチで検出できなかったのか
+
+正確には、「検出できなかった」というより **topline だけでは危険信号が埋もれた** と表現する方が正しい。
+
+### 11C.1 specialized563 は負ける bucket と勝つ bucket が相殺された
+
+specialized563 では current は確かに
+
+1. `supported_bijection`
+2. `dominant_structured_safe`
+3. `supported_affine_xor`
+
+で負けていた。
+
+しかし同時に
+
+1. `rare_perm_independent`
+2. `supported_not_structured`
+3. `dominant_structured_abstract`
+
+では勝っていた。
+
+その結果、overall は
+
+1. `v3f = 0.4227`
+2. `current = 0.4156`
+
+という小差に見え、**hidden に効く危険 bucket の負けが topline で薄まった**。
+
+### 11C.2 specialized563 の分布重みが hidden と違った
+
+specialized563 は binary family の診断には有効だったが、hidden の重み付けそのものを再現してはいなかった。
+
+レポート全体で見えているのは、hidden が current の弱い
+
+1. `supported_bijection`
+2. `dominant_structured_safe`
+3. `structured formula` 寄りの unseen variant
+
+を、local watch set より強く含んでいる可能性である。
+
+つまり specialized563 は **方向性は当てたが、重みが違った**。そのため bucket レベルでは signal が出ていても、leaderboard `0.56` を直接予告するほどの topline 差にはならなかった。
+
+### 11C.3 current の improvements が topline を偽装した
+
+もう一つ重要なのは、current が specialized563 で改善していた bucket が、弱点隠しとして働いたことである。
+
+今回モデルは
+
+1. `abstract`
+2. `not_structured`
+3. `rare_perm_independent`
+
+のような slice では v3f より良かった。したがって、specialized563 全体を 1 本の accuracy に畳むと、「弱点がない」のではなく **弱点と改善が同時に載って相殺された run** に見えてしまう。
+
+### 11C.4 だから topline ではなく bucket / row-level を見る必要があった
+
+実際、specialized563 の bucket 差分と row-level diff を見ると、危険信号自体はすでに出ていた。
+
+1. regressions は `dominant_structured_safe 13`, `supported_bijection 7` に集中
+2. style は `route_rate=1.0`, `so_rule_rate=1.0`, `constraints_rate=1.0`
+3. 設計メモでも `route_closure_only` の増やしすぎが危険と警告済み
+
+したがって、binary specialized ベンチが完全に無力だったわけではない。**topline だけ見ていたため、hidden に直結する failure slice を見落とした**、がより正確な結論である。
+
 ## 12. 実務上の次アクション
 
 この調査結果に基づく next action は次の順が妥当である。
@@ -328,7 +560,8 @@ Phase0 320 は `general_stable_set 200` を含むため、hidden の hard-family
 2. specialized563 でも小差でしかない
 3. したがって hidden `0.56` は local benchmark の単純外挿では説明できない
 4. current の弱点は `supported_bijection` / `dominant_structured_safe` と route-conditioned exact commitment の脆さに寄っている可能性が高い
-5. packaging failure より、**hidden binary distributionに対する generalization failure** とみるのが妥当である
+5. 今回の proxy 実測では `text` の大幅低下も見えているが、これは学習データを `550` まで削った current run の既知トレードオフを強く含む
+6. それを踏まえても、最大寄与は依然 `binary -20` であり、packaging failure より **hidden binary distribution に対する generalization failure** とみるのが妥当である
 
 要するに、今回の大きな発見は次の一文に尽きる。
 
