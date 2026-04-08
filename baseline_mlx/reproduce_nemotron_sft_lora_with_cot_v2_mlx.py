@@ -340,6 +340,11 @@ FINAL_ANSWER_PATTERNS = (
 )
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 BIT8_PATTERN = re.compile(r"^[01]{8}$")
+REFERENCE_PHASE0_BENCHMARK_FILES = (
+    "general_stable_set.csv",
+    "binary_hard_set.csv",
+    "symbol_watch_set.csv",
+)
 
 
 def utc_now() -> str:
@@ -1219,6 +1224,7 @@ def summarize_benchmark_scores(rows: Sequence[dict[str, Any]]) -> dict[str, Any]
             "correct": correct,
             "accuracy": round(safe_div(correct, len(rows)), 4),
         },
+        "by_benchmark": aggregate_counts(rows, "benchmark_name"),
         "by_family": aggregate_counts(rows, "family_short"),
         "by_template_subtype": aggregate_counts(rows, "template_subtype"),
         "by_selection_tier": aggregate_counts(rows, "selection_tier"),
@@ -1246,6 +1252,7 @@ def render_eval_markdown_summary(name: str, summary: dict[str, Any]) -> str:
             )
         lines.append("")
 
+    add_table("By benchmark", "benchmark_name", summary["by_benchmark"])
     add_table("By family", "family_short", summary["by_family"])
     add_table("By template subtype", "template_subtype", summary["by_template_subtype"])
     add_table("By selection tier", "selection_tier", summary["by_selection_tier"])
@@ -1267,6 +1274,22 @@ def render_eval_markdown_summary(name: str, summary: dict[str, Any]) -> str:
         "teacher_solver_candidate",
         binary_metrics["solver_family_accuracy"],
     )
+    return "\n".join(lines)
+
+
+def render_eval_suite_markdown_summary(summary: dict[str, Any]) -> str:
+    lines = ["# benchmark_eval_suite", ""]
+    lines.append(f"- benchmark_root: `{summary['benchmark_root']}`")
+    lines.append(f"- model_root: `{summary['model_root']}`")
+    lines.append(f"- adapter_dir: `{summary['adapter_dir']}`")
+    lines.append("")
+    lines.append("| evaluation_name | rows | correct | accuracy | output_root |")
+    lines.append("| --- | ---: | ---: | ---: | --- |")
+    for row in summary["evaluations"]:
+        lines.append(
+            f"| `{row['evaluation_name']}` | {row['rows']} | {row['correct']} | {row['accuracy']:.4f} | `{row['output_root']}` |"
+        )
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -1410,16 +1433,27 @@ def build_leaderboard_proxy_v2_dataframe(
     return combined, summary
 
 
-def run_eval_benchmark_csv(args: argparse.Namespace) -> None:
-    from mlx_lm import batch_generate, generate, load
-    from mlx_lm.sample_utils import make_sampler
+def build_readme_eval_assumptions(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "metric": "accuracy",
+        "temperature": float(args.temperature),
+        "top_p": float(args.top_p),
+        "max_tokens": int(args.max_tokens),
+        "max_num_seqs": int(args.max_num_seqs),
+        "max_model_len": int(args.max_model_len),
+        "boxed_first_extraction": True,
+        "numeric_relative_tolerance": 1e-2,
+        "eval_enable_thinking": bool(args.eval_enable_thinking),
+    }
 
-    benchmark_csv = Path(args.benchmark_csv).resolve()
-    output_root = Path(args.output_root).resolve()
-    ensure_dir(output_root)
 
-    benchmark_df = pd.read_csv(benchmark_csv)
-    require_columns(benchmark_df, benchmark_csv, ["id", "prompt", "answer"])
+def prepare_benchmark_rows_for_eval(
+    benchmark_df: pd.DataFrame,
+    *,
+    benchmark_name_fallback: str,
+) -> list[dict[str, Any]]:
+    require_columns(benchmark_df, Path(benchmark_name_fallback), ["id", "prompt", "answer"])
+    normalized = benchmark_df.copy()
     for optional_column in (
         "benchmark_name",
         "benchmark_role",
@@ -1432,19 +1466,39 @@ def run_eval_benchmark_csv(args: argparse.Namespace) -> None:
         "num_examples",
         "prompt_len_chars",
     ):
-        if optional_column not in benchmark_df.columns:
-            benchmark_df[optional_column] = ""
-    if not benchmark_df["benchmark_name"].astype(str).str.strip().any():
-        benchmark_df["benchmark_name"] = benchmark_csv.stem
-    if not benchmark_df["prompt_len_chars"].astype(str).str.strip().any():
-        benchmark_df["prompt_len_chars"] = benchmark_df["prompt"].astype(str).map(len)
-    benchmark_rows = benchmark_df.to_dict(orient="records")
+        if optional_column not in normalized.columns:
+            normalized[optional_column] = ""
+    if not normalized["benchmark_name"].astype(str).str.strip().any():
+        normalized["benchmark_name"] = benchmark_name_fallback
+    prompt_len_text = normalized["prompt_len_chars"].astype(str).str.strip().str.lower()
+    missing_prompt_len_mask = prompt_len_text.isin({"", "nan"})
+    if bool(missing_prompt_len_mask.any()):
+        normalized.loc[missing_prompt_len_mask, "prompt_len_chars"] = normalized.loc[
+            missing_prompt_len_mask,
+            "prompt",
+        ].astype(str).map(len)
+    return normalized.to_dict(orient="records")
 
-    load_kwargs: dict[str, Any] = {"lazy": bool(args.lazy_load)}
-    if args.adapter_dir is not None:
-        load_kwargs["adapter_path"] = str(Path(args.adapter_dir).resolve())
-    model, tokenizer = load(str(Path(args.model_root).resolve()), **load_kwargs)
-    normalize_tokenizer_for_hf_parity(tokenizer)
+
+def load_benchmark_rows_for_eval(benchmark_csv: Path) -> list[dict[str, Any]]:
+    return prepare_benchmark_rows_for_eval(
+        pd.read_csv(benchmark_csv),
+        benchmark_name_fallback=benchmark_csv.stem,
+    )
+
+
+def evaluate_benchmark_rows(
+    *,
+    model: Any,
+    tokenizer: Any,
+    benchmark_rows: Sequence[dict[str, Any]],
+    evaluation_name: str,
+    source_paths: Sequence[Path],
+    args: argparse.Namespace,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    from mlx_lm import batch_generate, generate
+    from mlx_lm.sample_utils import make_sampler
+
     prompts = build_eval_prompts(
         tokenizer,
         [str(row["prompt"]) for row in benchmark_rows],
@@ -1546,23 +1600,26 @@ def run_eval_benchmark_csv(args: argparse.Namespace) -> None:
     summary = summarize_benchmark_scores(scored_rows)
     payload = {
         "created_at": utc_now(),
-        "benchmark_csv": str(benchmark_csv),
+        "evaluation_name": evaluation_name,
+        "benchmark_csv": str(source_paths[0]) if len(source_paths) == 1 else "",
+        "source_paths": [str(path) for path in source_paths],
         "model_root": str(Path(args.model_root).resolve()),
         "adapter_dir": str(Path(args.adapter_dir).resolve()) if args.adapter_dir else "",
-        "readme_eval_assumptions": {
-            "metric": "accuracy",
-            "temperature": float(args.temperature),
-            "top_p": float(args.top_p),
-            "max_tokens": int(args.max_tokens),
-            "max_num_seqs": int(args.max_num_seqs),
-            "max_model_len": int(args.max_model_len),
-            "boxed_first_extraction": True,
-            "numeric_relative_tolerance": 1e-2,
-            "eval_enable_thinking": bool(args.eval_enable_thinking),
-        },
+        "readme_eval_assumptions": build_readme_eval_assumptions(args),
         **summary,
     }
+    return records, scored_rows, payload
 
+
+def write_benchmark_eval_outputs(
+    *,
+    output_root: Path,
+    evaluation_name: str,
+    records: Sequence[dict[str, Any]],
+    scored_rows: Sequence[dict[str, Any]],
+    payload: dict[str, Any],
+) -> None:
+    ensure_dir(output_root)
     raw_outputs_path = output_root / "benchmark_eval_raw_outputs.csv"
     row_level_path = output_root / "benchmark_eval_row_level.csv"
     summary_json_path = output_root / "benchmark_eval_summary.json"
@@ -1570,8 +1627,121 @@ def run_eval_benchmark_csv(args: argparse.Namespace) -> None:
     pd.DataFrame.from_records(records).to_csv(raw_outputs_path, index=False)
     pd.DataFrame.from_records(scored_rows).to_csv(row_level_path, index=False)
     write_json(summary_json_path, payload)
-    write_text(summary_md_path, render_eval_markdown_summary(benchmark_csv.stem, payload))
+    write_text(summary_md_path, render_eval_markdown_summary(evaluation_name, payload))
+
+
+def run_eval_benchmark_csv(args: argparse.Namespace) -> None:
+    from mlx_lm import load
+
+    benchmark_csv = Path(args.benchmark_csv).resolve()
+    output_root = Path(args.output_root).resolve()
+    benchmark_rows = load_benchmark_rows_for_eval(benchmark_csv)
+
+    load_kwargs: dict[str, Any] = {"lazy": bool(args.lazy_load)}
+    if args.adapter_dir is not None:
+        load_kwargs["adapter_path"] = str(Path(args.adapter_dir).resolve())
+    model, tokenizer = load(str(Path(args.model_root).resolve()), **load_kwargs)
+    normalize_tokenizer_for_hf_parity(tokenizer)
+
+    records, scored_rows, payload = evaluate_benchmark_rows(
+        model=model,
+        tokenizer=tokenizer,
+        benchmark_rows=benchmark_rows,
+        evaluation_name=benchmark_csv.stem,
+        source_paths=[benchmark_csv],
+        args=args,
+    )
+    write_benchmark_eval_outputs(
+        output_root=output_root,
+        evaluation_name=benchmark_csv.stem,
+        records=records,
+        scored_rows=scored_rows,
+        payload=payload,
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
+    from mlx_lm import load
+
+    benchmark_root = Path(args.benchmark_root).resolve()
+    output_root = Path(args.output_root).resolve()
+    ensure_dir(output_root)
+
+    phase0_paths = [benchmark_root / filename for filename in REFERENCE_PHASE0_BENCHMARK_FILES]
+    missing_paths = [str(path) for path in phase0_paths if not path.exists()]
+    if missing_paths:
+        raise FileNotFoundError(
+            "Missing benchmark suite inputs: " + ", ".join(missing_paths)
+        )
+
+    local320_df = pd.concat([pd.read_csv(path) for path in phase0_paths], ignore_index=True)
+    benchmark_specs: list[tuple[str, list[dict[str, Any]], list[Path]]] = [
+        (
+            "readme_local320",
+            prepare_benchmark_rows_for_eval(local320_df, benchmark_name_fallback="readme_local320"),
+            phase0_paths,
+        )
+    ]
+    for extra_csv in args.extra_benchmark_csv or []:
+        extra_path = Path(extra_csv).resolve()
+        benchmark_specs.append(
+            (
+                extra_path.stem,
+                load_benchmark_rows_for_eval(extra_path),
+                [extra_path],
+            )
+        )
+
+    load_kwargs: dict[str, Any] = {"lazy": bool(args.lazy_load)}
+    if args.adapter_dir is not None:
+        load_kwargs["adapter_path"] = str(Path(args.adapter_dir).resolve())
+    model, tokenizer = load(str(Path(args.model_root).resolve()), **load_kwargs)
+    normalize_tokenizer_for_hf_parity(tokenizer)
+
+    suite_rows: list[dict[str, Any]] = []
+    for evaluation_name, benchmark_rows, source_paths in benchmark_specs:
+        eval_root = output_root / evaluation_name
+        records, scored_rows, payload = evaluate_benchmark_rows(
+            model=model,
+            tokenizer=tokenizer,
+            benchmark_rows=benchmark_rows,
+            evaluation_name=evaluation_name,
+            source_paths=source_paths,
+            args=args,
+        )
+        write_benchmark_eval_outputs(
+            output_root=eval_root,
+            evaluation_name=evaluation_name,
+            records=records,
+            scored_rows=scored_rows,
+            payload=payload,
+        )
+        suite_rows.append(
+            {
+                "evaluation_name": evaluation_name,
+                "rows": int(payload["overall"]["rows"]),
+                "correct": int(payload["overall"]["correct"]),
+                "accuracy": float(payload["overall"]["accuracy"]),
+                "output_root": str(eval_root),
+                "source_paths": [str(path) for path in source_paths],
+            }
+        )
+
+    suite_payload = {
+        "created_at": utc_now(),
+        "benchmark_root": str(benchmark_root),
+        "model_root": str(Path(args.model_root).resolve()),
+        "adapter_dir": str(Path(args.adapter_dir).resolve()) if args.adapter_dir else "",
+        "readme_eval_assumptions": build_readme_eval_assumptions(args),
+        "evaluations": suite_rows,
+    }
+    write_json(output_root / "benchmark_eval_suite_summary.json", suite_payload)
+    write_text(
+        output_root / "benchmark_eval_suite_summary.md",
+        render_eval_suite_markdown_summary(suite_payload),
+    )
+    print(json.dumps(suite_payload, ensure_ascii=False, indent=2))
 
 
 def select_shadow_validation_records(
@@ -3442,6 +3612,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eval_benchmark_csv.add_argument("--force-single-generate", action="store_true")
     eval_benchmark_csv.set_defaults(func=run_eval_benchmark_csv)
+
+    eval_benchmark_suite = subparsers.add_parser(
+        "eval-benchmark-suite",
+        help="Run README local320 plus extra benchmark CSVs in one MLX model load.",
+    )
+    eval_benchmark_suite.add_argument("--model-root", type=Path, required=True)
+    eval_benchmark_suite.add_argument("--adapter-dir", type=Path, default=None)
+    eval_benchmark_suite.add_argument("--benchmark-root", type=Path, required=True)
+    eval_benchmark_suite.add_argument("--extra-benchmark-csv", type=Path, action="append", default=None)
+    eval_benchmark_suite.add_argument("--output-root", type=Path, required=True)
+    eval_benchmark_suite.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
+    eval_benchmark_suite.add_argument("--temperature", type=float, default=README_TEMPERATURE)
+    eval_benchmark_suite.add_argument("--top-p", type=float, default=README_TOP_P)
+    eval_benchmark_suite.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    eval_benchmark_suite.add_argument("--max-model-len", type=int, default=README_MAX_MODEL_LEN)
+    eval_benchmark_suite.add_argument("--prompt-chunk-size", type=int, default=16)
+    eval_benchmark_suite.add_argument("--prefill-batch-size", type=int, default=16)
+    eval_benchmark_suite.add_argument("--completion-batch-size", type=int, default=16)
+    eval_benchmark_suite.add_argument(
+        "--eval-enable-thinking",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    eval_benchmark_suite.add_argument(
+        "--lazy-load",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    eval_benchmark_suite.add_argument("--force-single-generate", action="store_true")
+    eval_benchmark_suite.set_defaults(func=run_eval_benchmark_suite)
 
     return parser
 
