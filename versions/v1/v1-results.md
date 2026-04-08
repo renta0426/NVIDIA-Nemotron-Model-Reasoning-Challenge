@@ -601,3 +601,22 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v147_chat_lr2p5e6_ep025/training_result.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v147_chat_binary1_thinkingon_tok256/binary1_top8_fusion_v147_chat_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v147_chat_binary1_thinkingon_tok256/binary1_top8_fusion_v147_chat_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_raw_outputs.csv`
+
+follow-up launched (pending measured score):
+
+- `v147_chat` で **train-side hang ではなく inference-side final-format retention** が blocker と確定したので、notebook-aligned chat/thinking 条件の closure-heavy continuation sweep を起動した。
+- launched runs:
+  - `resume_v40_to_top8_fusion_v82_chat_lr2p5e6_ep025`
+  - `resume_v40_to_top8_fusion_v83_chat_lr2p5e6_ep025`
+  - `resume_v40_to_top8_fusion_v121_chat_lr2p5e6_ep025`
+  - `resume_v147chat_to_top8_fusion_v147_chat_lr5e6_ep025`
+- intent:
+  - `v82`: structured `boxed_done + boxed_only_twin`
+  - `v83`: structured `boxed_done` 増量
+  - `v121`: `bit_other` manual `boxed_done + boxed_only_twin`
+  - `v147_chat` continuation: same notebook-aligned dataset で higher-LR continuation
+- pending source of truth:
+  - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v82_chat_lr2p5e6_ep025/prepare_manifest.json`
+  - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v83_chat_lr2p5e6_ep025/prepare_manifest.json`
+  - `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v121_chat_lr2p5e6_ep025/prepare_manifest.json`
+  - `mac_workspace/v1/outputs/resume_v147chat_to_top8_fusion_v147_chat_lr5e6_ep025/prepare_manifest.json`
