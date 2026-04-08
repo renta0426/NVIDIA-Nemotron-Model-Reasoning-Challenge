@@ -118,6 +118,10 @@ PROFILE_OPTION_FLAGS = {
     "steps_per_report_step_unit": ("--steps-per-report-step-unit",),
     "steps_per_eval": ("--steps-per-eval",),
     "save_every": ("--save-every",),
+    "flush_on_epoch_boundary": (
+        "--flush-on-epoch-boundary",
+        "--no-flush-on-epoch-boundary",
+    ),
     "lr_schedule_name": ("--lr-schedule-name",),
     "lr_schedule_end": ("--lr-schedule-end",),
     "lr_warmup_ratio": ("--lr-warmup-ratio",),
@@ -142,6 +146,7 @@ COMMON_NOTEBOOK_PROFILE_DEFAULTS: dict[str, Any] = {
     "steps_per_report_step_unit": "optimizer",
     "steps_per_eval": 0,
     "save_every": 0,
+    "flush_on_epoch_boundary": True,
     "lr_schedule_name": "cosine_decay",
     "lr_schedule_end": 0.0,
     "lr_warmup_ratio": 0.05,
@@ -190,6 +195,7 @@ NOTEBOOK_ORIGINAL_REFERENCE: dict[str, Any] = {
         "learning_rate": 1e-4,
         "lr_scheduler_type": "cosine",
         "warmup_ratio": 0.05,
+        "optimizer_steps": 728,
         "max_seq_length": 4096,
         "logging_steps": 10,
         "logging_step_unit": "optimizer",
@@ -233,6 +239,7 @@ NOTEBOOK_CURRENT_REFERENCE: dict[str, Any] = {
         "learning_rate": 1e-4,
         "lr_scheduler_type": "cosine",
         "warmup_ratio": 0.05,
+        "optimizer_steps": 832,
         "max_seq_length": 4096,
         "logging_steps": 10,
         "logging_step_unit": "optimizer",
@@ -760,10 +767,48 @@ def compute_total_iters(*, num_rows: int, num_epochs: float, batch_size: int) ->
     return max(1, int(max(1, num_rows) * num_epochs // batch_size))
 
 
+def compute_microsteps_per_epoch(*, num_rows: int, batch_size: int) -> int:
+    if batch_size <= 0:
+        raise ValueError(f"batch_size must be > 0, got {batch_size}")
+    if num_rows <= 0:
+        raise ValueError(f"num_rows must be > 0, got {num_rows}")
+    # Match mlx_lm.tuner.trainer.iterate_batches(), which drops an incomplete tail batch.
+    return max(1, num_rows // batch_size)
+
+
+def compute_optimizer_steps(
+    *,
+    total_iters: int,
+    grad_accumulation_steps: int,
+    microsteps_per_epoch: int,
+    flush_on_epoch_boundary: bool,
+) -> int:
+    if total_iters <= 0:
+        raise ValueError(f"total_iters must be > 0, got {total_iters}")
+    if grad_accumulation_steps <= 0:
+        raise ValueError(
+            f"grad_accumulation_steps must be > 0, got {grad_accumulation_steps}"
+        )
+    if microsteps_per_epoch <= 0:
+        raise ValueError(f"microsteps_per_epoch must be > 0, got {microsteps_per_epoch}")
+    if not flush_on_epoch_boundary:
+        return max(1, (total_iters + grad_accumulation_steps - 1) // grad_accumulation_steps)
+
+    remaining = total_iters
+    optimizer_steps = 0
+    while remaining > 0:
+        chunk = min(microsteps_per_epoch, remaining)
+        optimizer_steps += max(1, (chunk + grad_accumulation_steps - 1) // grad_accumulation_steps)
+        remaining -= chunk
+    return optimizer_steps
+
+
 def compute_schedule_steps(
     *,
     total_iters: int,
     grad_accumulation_steps: int,
+    microsteps_per_epoch: int,
+    flush_on_epoch_boundary: bool,
     schedule_step_unit: str,
 ) -> int:
     if total_iters <= 0:
@@ -781,13 +826,20 @@ def compute_schedule_steps(
         return total_iters
     # mlx_lm advances the optimizer and its learning-rate schedule only when an
     # accumulated update is applied, so notebook parity requires optimizer-step units.
-    return max(1, (total_iters + grad_accumulation_steps - 1) // grad_accumulation_steps)
+    return compute_optimizer_steps(
+        total_iters=total_iters,
+        grad_accumulation_steps=grad_accumulation_steps,
+        microsteps_per_epoch=microsteps_per_epoch,
+        flush_on_epoch_boundary=flush_on_epoch_boundary,
+    )
 
 
 def compute_final_optimizer_step_microbatches(
     *,
     total_iters: int,
     grad_accumulation_steps: int,
+    microsteps_per_epoch: int | None = None,
+    flush_on_epoch_boundary: bool = False,
 ) -> int:
     if total_iters <= 0:
         raise ValueError(f"total_iters must be > 0, got {total_iters}")
@@ -795,10 +847,17 @@ def compute_final_optimizer_step_microbatches(
         raise ValueError(
             f"grad_accumulation_steps must be > 0, got {grad_accumulation_steps}"
         )
-    remainder = total_iters % grad_accumulation_steps
+    scoped_total_iters = total_iters
+    if flush_on_epoch_boundary:
+        if microsteps_per_epoch is None or microsteps_per_epoch <= 0:
+            raise ValueError(
+                f"microsteps_per_epoch must be > 0 when flush_on_epoch_boundary=True, got {microsteps_per_epoch}"
+            )
+        scoped_total_iters = total_iters % microsteps_per_epoch or microsteps_per_epoch
+    remainder = scoped_total_iters % grad_accumulation_steps
     if remainder:
         return remainder
-    return min(total_iters, grad_accumulation_steps)
+    return min(scoped_total_iters, grad_accumulation_steps)
 
 
 def build_notebook_parity_report(
@@ -818,6 +877,22 @@ def build_notebook_parity_report(
     expected_type_samples = dict(reference["type_samples"])
     train_csv_matches = train_csv.resolve() == expected_train_csv
     type_sample_matches = type_samples == expected_type_samples
+    sampled_rows = int(sum(type_samples.values()))
+    total_iters = compute_total_iters(
+        num_rows=sampled_rows,
+        num_epochs=float(args.num_epochs),
+        batch_size=int(args.batch_size),
+    )
+    microsteps_per_epoch = compute_microsteps_per_epoch(
+        num_rows=sampled_rows,
+        batch_size=int(args.batch_size),
+    )
+    resolved_optimizer_steps = compute_optimizer_steps(
+        total_iters=total_iters,
+        grad_accumulation_steps=int(args.grad_accumulation_steps),
+        microsteps_per_epoch=microsteps_per_epoch,
+        flush_on_epoch_boundary=bool(getattr(args, "flush_on_epoch_boundary", False)),
+    )
     lora_key_set = set(str(key) for key in lora_keys)
     required_generic_keys = {
         "mixer.in_proj",
@@ -893,6 +968,15 @@ def build_notebook_parity_report(
             "status": "aligned"
             if float(args.lr_warmup_ratio) == notebook_training["warmup_ratio"]
             else "mismatch",
+        },
+        {
+            "name": "optimizer_steps",
+            "expected": notebook_training["optimizer_steps"],
+            "actual": resolved_optimizer_steps,
+            "status": "aligned"
+            if int(resolved_optimizer_steps) == int(notebook_training["optimizer_steps"])
+            else "mismatch",
+            "note": "Notebook parity requires flushing grad accumulation at each epoch boundary, not only at the final global remainder.",
         },
         {
             "name": "max_seq_length",
@@ -1187,6 +1271,7 @@ def build_mlx_lora_config(
     steps_per_report_step_unit: str,
     steps_per_eval: int,
     save_every: int,
+    flush_on_epoch_boundary: bool,
     seed: int,
     lr_schedule_name: str | None,
     lr_schedule_end: float,
@@ -1199,9 +1284,14 @@ def build_mlx_lora_config(
         )
     if lr_warmup_ratio < 0.0 or lr_warmup_ratio >= 1.0:
         raise ValueError(f"lr_warmup_ratio must be in [0, 1), got {lr_warmup_ratio}")
+    num_train_rows = sum(1 for _ in (dataset_dir / "train.jsonl").open("r", encoding="utf-8"))
     total_iters = compute_total_iters(
-        num_rows=sum(1 for _ in (dataset_dir / "train.jsonl").open("r", encoding="utf-8")),
+        num_rows=num_train_rows,
         num_epochs=num_epochs,
+        batch_size=batch_size,
+    )
+    microsteps_per_epoch = compute_microsteps_per_epoch(
+        num_rows=num_train_rows,
         batch_size=batch_size,
     )
     resolved_steps_per_eval = resolve_steps_per_eval(
@@ -1211,6 +1301,8 @@ def build_mlx_lora_config(
     schedule_steps = compute_schedule_steps(
         total_iters=total_iters,
         grad_accumulation_steps=grad_accumulation_steps,
+        microsteps_per_epoch=microsteps_per_epoch,
+        flush_on_epoch_boundary=flush_on_epoch_boundary,
         schedule_step_unit=lr_schedule_step_unit,
     )
     config: dict[str, Any] = {
@@ -1230,6 +1322,8 @@ def build_mlx_lora_config(
         "steps_per_report_step_unit": steps_per_report_step_unit,
         "steps_per_eval": resolved_steps_per_eval,
         "grad_accumulation_steps": grad_accumulation_steps,
+        "flush_on_epoch_boundary": flush_on_epoch_boundary,
+        "microsteps_per_epoch": microsteps_per_epoch,
         "adapter_path": str(adapter_dir),
         "save_every": total_iters if save_every <= 0 else save_every,
         "max_seq_length": max_seq_length,
@@ -1508,6 +1602,16 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
             raise ValueError(
                 f"steps_per_report_step_unit must be one of {REPORT_STEP_UNITS}, got {report_step_unit!r}"
             )
+        flush_on_epoch_boundary = bool(getattr(args, "flush_on_epoch_boundary", False))
+        microsteps_per_epoch = int(getattr(args, "microsteps_per_epoch", 0) or 0)
+        if flush_on_epoch_boundary:
+            if microsteps_per_epoch <= 0:
+                microsteps_per_epoch = compute_microsteps_per_epoch(
+                    num_rows=len(train_dataset),
+                    batch_size=args.batch_size,
+                )
+        else:
+            microsteps_per_epoch = 0
 
         state = [model.state, optimizer.state, mx.random.state]
 
@@ -1580,7 +1684,10 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
                 tic = time.perf_counter()
 
             pending_micro_steps += 1
-            do_update = pending_micro_steps == grad_accum_steps or it == args.iters
+            epoch_boundary = flush_on_epoch_boundary and microsteps_per_epoch > 0 and (
+                it % microsteps_per_epoch == 0
+            )
+            do_update = pending_micro_steps == grad_accum_steps or epoch_boundary or it == args.iters
             grad_divisor = pending_micro_steps if do_update else grad_accum_steps
             lvalue, toks, grad_accum = step(batch, grad_accum, do_update, grad_divisor)
             if do_update:
@@ -1720,6 +1827,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         steps_per_report_step_unit=str(args.steps_per_report_step_unit),
         steps_per_eval=int(args.steps_per_eval),
         save_every=int(args.save_every),
+        flush_on_epoch_boundary=bool(getattr(args, "flush_on_epoch_boundary", False)),
         seed=int(args.seed),
         lr_schedule_name=args.lr_schedule_name,
         lr_schedule_end=float(args.lr_schedule_end),
@@ -1741,16 +1849,22 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
     total_optimizer_steps = compute_schedule_steps(
         total_iters=int(config["iters"]),
         grad_accumulation_steps=int(args.grad_accumulation_steps),
+        microsteps_per_epoch=int(config.get("microsteps_per_epoch", 0) or 0),
+        flush_on_epoch_boundary=bool(config.get("flush_on_epoch_boundary", False)),
         schedule_step_unit="optimizer",
     )
     effective_schedule_steps = compute_schedule_steps(
         total_iters=int(config["iters"]),
         grad_accumulation_steps=int(args.grad_accumulation_steps),
+        microsteps_per_epoch=int(config.get("microsteps_per_epoch", 0) or 0),
+        flush_on_epoch_boundary=bool(config.get("flush_on_epoch_boundary", False)),
         schedule_step_unit=str(args.lr_schedule_step_unit),
     )
     final_optimizer_step_microbatches = compute_final_optimizer_step_microbatches(
         total_iters=int(config["iters"]),
         grad_accumulation_steps=int(args.grad_accumulation_steps),
+        microsteps_per_epoch=int(config.get("microsteps_per_epoch", 0) or 0),
+        flush_on_epoch_boundary=bool(config.get("flush_on_epoch_boundary", False)),
     )
 
     manifest = {
@@ -1813,6 +1927,8 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "steps_per_eval_requested": int(args.steps_per_eval),
             "steps_per_eval": int(config["steps_per_eval"]),
             "save_every": int(config["save_every"]),
+            "flush_on_epoch_boundary": bool(config.get("flush_on_epoch_boundary", False)),
+            "microsteps_per_epoch": int(config.get("microsteps_per_epoch", 0) or 0),
             "lr_schedule_name": str(args.lr_schedule_name or ""),
             "lr_schedule_end": float(args.lr_schedule_end),
             "lr_warmup_ratio": float(args.lr_warmup_ratio),
@@ -1906,10 +2022,10 @@ def maybe_patch_mlx_lora_tokenizer_special_tokens() -> None:
     mlx_lora._nemotron_tokenizer_special_tokens_patch = True
 
 
-def maybe_patch_mlx_lora_train_model_reporting_unit() -> None:
+def maybe_patch_mlx_lora_train_model_runtime_args() -> None:
     import mlx_lm.lora as mlx_lora
 
-    if getattr(mlx_lora, "_nemotron_train_model_reporting_unit_patch", False):
+    if getattr(mlx_lora, "_nemotron_train_model_runtime_args_patch", False):
         return
 
     original_train_model = mlx_lora.train_model
@@ -1922,10 +2038,14 @@ def maybe_patch_mlx_lora_train_model_reporting_unit() -> None:
         training_callback: Any = None,
     ) -> Any:
         report_step_unit = str(getattr(args, "steps_per_report_step_unit", "micro")).strip().lower()
+        flush_on_epoch_boundary = bool(getattr(args, "flush_on_epoch_boundary", False))
+        microsteps_per_epoch = int(getattr(args, "microsteps_per_epoch", 0) or 0)
         original_train = mlx_lora.train
 
         def patched_train(*, args: Any, **kwargs: Any) -> Any:
             setattr(args, "steps_per_report_step_unit", report_step_unit)
+            setattr(args, "flush_on_epoch_boundary", flush_on_epoch_boundary)
+            setattr(args, "microsteps_per_epoch", microsteps_per_epoch)
             return original_train(args=args, **kwargs)
 
         mlx_lora.train = patched_train
@@ -1935,7 +2055,7 @@ def maybe_patch_mlx_lora_train_model_reporting_unit() -> None:
             mlx_lora.train = original_train
 
     mlx_lora.train_model = patched_train_model
-    mlx_lora._nemotron_train_model_reporting_unit_patch = True
+    mlx_lora._nemotron_train_model_runtime_args_patch = True
 
 
 def run_mlx_lora_training_from_config(config_path: Path) -> None:
@@ -1945,7 +2065,7 @@ def run_mlx_lora_training_from_config(config_path: Path) -> None:
     maybe_patch_mlx_chat_dataset_enable_thinking()
     maybe_patch_mlx_trainer_final_accumulation_flush()
     maybe_patch_mlx_lora_tokenizer_special_tokens()
-    maybe_patch_mlx_lora_train_model_reporting_unit()
+    maybe_patch_mlx_lora_train_model_runtime_args()
     with config_path.open("r", encoding="utf-8") as handle:
         config = yaml.load(handle, Loader=mlx_lora.yaml_loader) or {}
     for key, value in mlx_lora.CONFIG_DEFAULTS.items():
@@ -2121,6 +2241,12 @@ def build_parser() -> argparse.ArgumentParser:
             type=int,
             default=0,
             help="Save intermediate adapter checkpoints every N microsteps; 0 keeps final-only behavior.",
+        )
+        target.add_argument(
+            "--flush-on-epoch-boundary",
+            action=argparse.BooleanOptionalAction,
+            default=False,
+            help="Flush grad accumulation at each epoch boundary before continuing the next epoch.",
         )
         target.add_argument("--lr-schedule-name", type=str, default="cosine_decay")
         target.add_argument("--lr-schedule-end", type=float, default=0.0)
