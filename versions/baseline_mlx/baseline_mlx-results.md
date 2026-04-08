@@ -50,6 +50,13 @@
 | `baseline-mlx-eval-symbol60-lora-fix-v2` | `baseline_mlx_eval_symbol60_lora_fix_v2` | README symbol60 | `13/60 = 0.2167` | `0/0` | `0/0` | `0/0` | `13/60` | `0/0` | `0/0` | `numeric_2x2 13/40`, `glyph_len5 0/20`; isolated rerun1 も `13/60` を **60/60 row-level identical** で再現。same 60 ids の full320 内 symbol は `20/60` で、MLX eval は batch composition-sensitive |
 | `baseline-mlx-eval-full320-lora-fix-v2` | `baseline_mlx_eval_full320_lora_fix_v2` | README local320 | `194/320 = 0.6062` | `18/60` | `49/50` | `50/50` | `20/60` | `9/50` | `48/50` | shard parallel。`lora-fix-v1 6/320` からは大幅回復したが、旧 MLX v1 `196/320` は未更新。gravity/symbol は改善、text が大きく regress |
 | `baseline-mlx-eval-full320-lora-fix-schedopt-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_schedopt_v1` | README local320 | `189/320 = 0.5906` | `15/60` | `49/50` | `50/50` | `18/60` | `10/50` | `47/50` | one-shard rerun。`lora-fix-v2` と manifest は同一だが `-5` rows。binary boxed extraction `1.0`; format failure `0.0`; peak_memory_gb `77.49` |
+| `baseline-mlx-notebook-original-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_fullrun_v2` | README local320 | `215/320 = 0.6719` | `26/60` | `50/50` | `50/50` | `15/60` | `25/50` | `49/50` | 2-shard eval。旧 MLX best `196/320` を更新。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
+
+## Binary bias specialized eval
+
+| version | eval_name | rows | accuracy | bit_other | byte_formula | permutation | boolean_family | notes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `baseline-mlx-notebook-original-fullrun-v2-binary-specialized-v1` | `baseline_mlx_notebook_original_fullrun_v2/phase0_binary_bias_specialized_eval` | `563` | `286/563 = 0.5080` | `118/218` | `128/283` | `40/62` | `47/60` | `boxed=1.0`; `regex_exact=1.0`; `leading_zero=0.8494`; `supported_bijection=33/50`; `supported_not_structured=15/55`; `rare_byte_transform=9/11` |
 
 ## Wait-state diagnosis probes
 
