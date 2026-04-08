@@ -7,6 +7,7 @@ import os
 import random
 import re
 import shutil
+import subprocess
 import sys
 import zipfile
 from collections import Counter
@@ -119,6 +120,139 @@ def load_versions() -> dict[str, str]:
         except importlib_metadata.PackageNotFoundError:
             versions[name] = "not-installed"
     return versions
+
+
+def _run_text_command(command: Sequence[str]) -> tuple[int, str]:
+    try:
+        completed = subprocess.run(
+            list(command),
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as exc:
+        return 127, str(exc)
+    return completed.returncode, completed.stdout or completed.stderr
+
+
+def collect_memory_pressure_snapshot() -> dict[str, Any]:
+    returncode, output = _run_text_command(("memory_pressure",))
+    snapshot: dict[str, Any] = {
+        "returncode": returncode,
+        "head": output.splitlines()[:20],
+    }
+    match = re.search(r"System-wide memory free percentage:\s*([0-9]+)%", output)
+    if match:
+        snapshot["system_free_percent"] = int(match.group(1))
+    return snapshot
+
+
+def collect_gpu_snapshot() -> dict[str, Any]:
+    returncode, output = _run_text_command(
+        ("ioreg", "-r", "-d1", "-c", "IOAccelerator", "-w0", "-l")
+    )
+    snapshot: dict[str, Any] = {
+        "returncode": returncode,
+        "head": output.splitlines()[:20],
+    }
+    for key, field in (
+        ("Device Utilization %", "device_util_percent"),
+        ("Renderer Utilization %", "renderer_util_percent"),
+        ("Tiler Utilization %", "tiler_util_percent"),
+        ("Alloc system memory", "alloc_system_memory_bytes"),
+        ("In use system memory", "in_use_system_memory_bytes"),
+    ):
+        match = re.search(rf'"{re.escape(key)}"=([0-9]+)', output)
+        if match:
+            snapshot[field] = int(match.group(1))
+    return snapshot
+
+
+def collect_competing_mlx_train_processes(*, current_pid: int) -> list[dict[str, Any]]:
+    returncode, output = _run_text_command(
+        ("ps", "-Ao", "pid=,ppid=,rss=,pcpu=,etime=,command=")
+    )
+    if returncode != 0:
+        return [{"error": output.strip() or f"ps failed with code {returncode}"}]
+
+    rows: list[dict[str, Any]] = []
+    for line in output.splitlines():
+        parts = line.strip().split(None, 5)
+        if len(parts) != 6:
+            continue
+        pid_text, ppid_text, rss_text, pcpu_text, etime, command = parts
+        try:
+            pid = int(pid_text)
+            ppid = int(ppid_text)
+            rss_kb = int(rss_text)
+            pcpu = float(pcpu_text)
+        except ValueError:
+            continue
+        if pid == current_pid:
+            continue
+        lowered = command.lower()
+        if lowered.startswith("uv run python "):
+            continue
+        if "python" not in lowered or " train" not in lowered:
+            continue
+        if not any(token in lowered for token in ("mlx", "nemotron", "phase2_binary_dsl", "lora")):
+            continue
+        rows.append(
+            {
+                "pid": pid,
+                "ppid": ppid,
+                "rss_kb": rss_kb,
+                "pcpu": pcpu,
+                "etime": etime,
+                "command": command,
+            }
+        )
+    rows.sort(key=lambda row: row["rss_kb"], reverse=True)
+    return rows
+
+
+def collect_runtime_preflight(*, current_pid: int) -> dict[str, Any]:
+    return {
+        "captured_at": utc_now(),
+        "current_pid": current_pid,
+        "memory_pressure": collect_memory_pressure_snapshot(),
+        "gpu_snapshot": collect_gpu_snapshot(),
+        "competing_mlx_train_processes": collect_competing_mlx_train_processes(
+            current_pid=current_pid
+        ),
+    }
+
+
+def print_runtime_preflight(preflight: dict[str, Any]) -> None:
+    memory_pressure = preflight.get("memory_pressure", {})
+    gpu_snapshot = preflight.get("gpu_snapshot", {})
+    competing = preflight.get("competing_mlx_train_processes", [])
+    free_percent = memory_pressure.get("system_free_percent")
+    if free_percent is not None:
+        print(f"Runtime preflight: system_free_memory={free_percent}%", flush=True)
+    if "device_util_percent" in gpu_snapshot:
+        print(
+            "Runtime preflight: "
+            f"gpu_device_util={gpu_snapshot.get('device_util_percent', 'n/a')}% "
+            f"renderer={gpu_snapshot.get('renderer_util_percent', 'n/a')}% "
+            f"tiler={gpu_snapshot.get('tiler_util_percent', 'n/a')}%",
+            flush=True,
+        )
+    if competing:
+        print(
+            f"Runtime preflight: detected {len(competing)} other MLX/Nemotron train process(es).",
+            flush=True,
+        )
+        for row in competing[:8]:
+            print(
+                "  "
+                f"pid={row.get('pid')} rss_gb={row.get('rss_kb', 0) / 1_000_000:.3f} "
+                f"pcpu={row.get('pcpu')} etime={row.get('etime')} "
+                f"cmd={row.get('command')}",
+                flush=True,
+            )
 
 
 def resolve_hf_snapshot(model_root: Path) -> Path:
@@ -988,6 +1122,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
             "optimizer_steps": int(total_optimizer_steps),
             "final_optimizer_step_microbatches": int(final_optimizer_step_microbatches),
             "final_grad_accumulation_flush": True,
+            "fail_on_runtime_contention": bool(args.fail_on_runtime_contention),
             "resume_adapter_file": str(Path(args.resume_adapter_file).resolve())
             if args.resume_adapter_file
             else "",
@@ -1076,6 +1211,19 @@ def run_train(args: argparse.Namespace) -> None:
         run_root = Path(manifest["run_root"])
     config_path = Path(manifest["artifacts"]["config_path"]).resolve()
     adapter_dir = Path(manifest["artifacts"]["adapter_dir"]).resolve()
+    runtime_preflight = collect_runtime_preflight(current_pid=os.getpid())
+    write_json(run_root / "runtime_preflight.json", runtime_preflight)
+    print_runtime_preflight(runtime_preflight)
+    competing = [
+        row
+        for row in runtime_preflight.get("competing_mlx_train_processes", [])
+        if isinstance(row, dict) and "pid" in row
+    ]
+    if args.fail_on_runtime_contention and competing:
+        raise RuntimeError(
+            "Runtime preflight detected competing MLX/Nemotron train processes. "
+            f"Refusing to start {args.run_name} while {len(competing)} other train process(es) are active."
+        )
     run_mlx_lora_training_from_config(config_path)
     verify_training_outputs(adapter_dir)
     bundle_manifest = bundle_local_mlx_adapter(run_root, adapter_dir)
@@ -1084,6 +1232,7 @@ def run_train(args: argparse.Namespace) -> None:
         "run_root": str(run_root),
         "adapter_dir": str(adapter_dir),
         "adapter_files": summarize_directory(adapter_dir),
+        "runtime_preflight_path": str((run_root / "runtime_preflight.json").resolve()),
         "mlx_bundle": bundle_manifest,
     }
     write_json(run_root / "training_result.json", training_result)
@@ -1163,6 +1312,11 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument("--resume-adapter-file", type=Path, default=None)
         target.add_argument("--force-shadow-model", action="store_true")
         target.add_argument("--force-prepare", action="store_true")
+        target.add_argument(
+            "--fail-on-runtime-contention",
+            action="store_true",
+            help="Abort if other MLX/Nemotron train processes are already active on this machine.",
+        )
 
     prepare_train = subparsers.add_parser(
         "prepare-train",

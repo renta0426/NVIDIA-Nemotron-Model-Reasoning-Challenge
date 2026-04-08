@@ -51,6 +51,14 @@
 | `baseline-mlx-eval-full320-lora-fix-v2` | `baseline_mlx_eval_full320_lora_fix_v2` | README local320 | `194/320 = 0.6062` | `18/60` | `49/50` | `50/50` | `20/60` | `9/50` | `48/50` | shard parallel。`lora-fix-v1 6/320` からは大幅回復したが、旧 MLX v1 `196/320` は未更新。gravity/symbol は改善、text が大きく regress |
 | `baseline-mlx-eval-full320-lora-fix-schedopt-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_schedopt_v1` | README local320 | `189/320 = 0.5906` | `15/60` | `49/50` | `50/50` | `18/60` | `10/50` | `47/50` | one-shard rerun。`lora-fix-v2` と manifest は同一だが `-5` rows。binary boxed extraction `1.0`; format failure `0.0`; peak_memory_gb `77.49` |
 
+## Wait-state diagnosis probes
+
+| version | runner | scope | valid_rows | total_iters | measured | status | artifacts |
+| --- | --- | --- | ---: | ---: | --- | --- | --- |
+| `baseline-mlx-narrow-rawprobe-v1` | raw `mlx_lm.lora.run` + chat patch only | narrow schedopt probe | `4` | `14` | `iter1 val_loss=0.577`; `iter1 val_took=17.457s`; `iter10 train_loss=0.837`, `it/sec=0.048`; `iter14 val_loss=0.658`; `iter14 train_loss=0.897`, `it/sec=0.163`; `peak_mem=65.632 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_rawprobe_v1/train.log` |
+| `baseline-mlx-narrow-patchprobe-v1` | current single-file patched trainer | narrow schedopt probe | `4` | `14` | `iter1 val_loss=0.577`; `iter1 val_took=17.057s`; `iter10 train_loss=0.837`, `it/sec=0.057`; `iter14 val_loss=0.656`; `iter14 train_loss=0.894`, `it/sec=0.160`; `peak_mem=65.632 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_patchprobe_v1/training_result.json` |
+| `baseline-mlx-narrow-asyncprobe-v1` | current single-file patched trainer via async shell | narrow schedopt probe | `4` | `14` | `iter1 val_loss=0.577`; `iter1 val_took=20.217s`; `iter10 train_loss=0.837`, `it/sec=0.057`; `iter14 val_loss=0.655`; `iter14 train_loss=0.898`, `it/sec=0.165`; `peak_mem=65.632 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_asyncprobe_v1/train.log` |
+
 ## In-flight follow-up batch
 
 | version | run_name | train_csv | bit_rows | mask_prompt | lr | status |
@@ -139,6 +147,10 @@ row-level overlap:
 - ただし同じ `valid_shadow_rows=4` でも、**detached 背景 run (`v5`) は `iter1` 直後に終了**し、**async-attached run (`v7`) は `iter30` まで進行**した。今の環境では長時間 MLX train を detached で投げるより、attached な shell で監視した方が挙動が安定する。
 - `v7` 実行中の process sample では main thread の大半が `mlx::core::eval_impl -> std::condition_variable::wait` に入りつつ、`steel_matmul` / `binary_op_gpu` / Metal dispatch も見えていた。つまり current slowdown は **GPU 未使用ではなく、GPU を使いながら wait が多い状態** と見るのが妥当。
 - shared environment 側では別系統の MLX train (`phase2_binary_dsl_mlx_v1.py train`) が **RSS 約 63 GB**、さらに Flutter/Dart test 群が CPU を大きく消費していた。一方で system memory free は **約 80%**, swap 0 のため、現時点のボトルネックは RAM 枯渇ではなく **GPU/Metal 実行待ちと shared runtime contention** である。
+- raw / patched / async の **14-step probe 3 本**はすべて近い速度 (`iter10 it/sec = 0.048 ~ 0.057`) で収束した。したがって、今回の重い wait は **final accumulation flush patch そのもの**でも **async shell そのもの**でも説明しにくい。
+- 2026-04-08 の追加修正として、`baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` に **runtime preflight** を入れた。train 開始前に `memory_pressure`, `IOAccelerator`, competing MLX train process を記録し、`--fail-on-runtime-contention` を付ければ **同時 MLX train がいる状態で明示的に abort** できる。
+- 実測では `nemotron_sft_lora_with_cot_v2_mlx_preflightcheck_v2` が **system_free_memory=45%**, `gpu_device_util=35%`, `renderer=23%`, `tiler=19%`, **4 本の外部 MLX train** を検知して即時 abort した。今後の full rerun は、この preflight が clean なタイミングで再開する。
+- さらに `nemotron_sft_lora_with_cot_v2_mlx_preflightwarnprobe_v1` では、同じ **4 本の外部 MLX train** がいる状態で warn-only の tiny train を開始したところ、**2-step probe の `iter1` validation だけで `168.147s`** を要した。`runtime_preflight.json` でも `system_free_memory=41%`, `gpu alloc system memory ≈ 317 GB`, `gpu in-use system memory ≈ 315 GB` を記録しており、wait の主因が shared MLX contention であることを補強している。
 - `symbol60` の isolated score は **初回 `13/60` / rerun1 `13/60`** で完全一致し、row-level も **60/60 identical**。一方で同じ 60 symbol ids を含む `full320` では **`20/60`** となり、raw output は **54/60 rows** で変化、**9 rows** で correctness が反転した。したがって MLX 系の family slice 判定は batch composition に敏感で、mainline 採用判断は **README actual full320** を優先する。
 - 一方で `roman 50/50`, `unit 50/50` は README 条件下でも完全再現できており、baseline notebook 由来の知識は family ごとに保持率が大きく異なる。
 - row-level で origin reference と突き合わせると `HF-only 65`, `MLX-only 12`, `both_wrong 59`, `both_correct 184`。HF-only loss は `text 29`, `binary 16`, `gravity 11`, `symbol 9` が中心で、特に text は **HF が取れて MLX だけ落とす**再現差が支配的。
