@@ -229,3 +229,4 @@ row-level overlap:
 - probe 停止後の fullrun は **`Iter 320 (Opt 40): It/sec 0.051, Tokens/sec 32.276, Peak mem 81.271 GB`** まで回復した。したがって `Opt30` の落ち込みは常時劣化というより **並走干渉の一過性影響** とみなす。
 - その後さらに **`Iter 400 (Opt 50): It/sec 0.058, Tokens/sec 37.452, Peak mem 81.271 GB`** を観測し、throughput はほぼ `Opt20` 水準まで戻った。fullrun は low-throughput ではあるが、**probe 停止後は clean baseline に概ね復帰**して継続している。
 - 現在位置は **`Iter 480 (Opt 60 / 728)`**。最新 report は **`Train loss 1.018 / LR 9.977e-05 / It/sec 0.058 / Tokens/sec 37.479 / Peak mem 81.271 GB`** で、残りは **`5334` microsteps / `668` optimizer steps**。直近 throughput をそのまま使う単純見積もりでは、終了まで **約 25.55 時間**。
+- 次の節目 **`Iter 560 (Opt 70 / 728)`** では **`Train loss 1.530 / LR 9.952e-05 / It/sec 0.053 / Tokens/sec 32.838 / Peak mem 81.271 GB`**。残りは **`5254` microsteps / `658` optimizer steps** で、最新速度ベースの単純見積もりは **約 27.54 時間**。`Opt50-70` の clean 区間を見る限り、現在の sustained throughput はおおむね **`0.053-0.058 it/s`** の帯にある。
