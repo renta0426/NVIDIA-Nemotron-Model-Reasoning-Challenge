@@ -227,3 +227,4 @@ row-level overlap:
 - 上の理由により、**batch-size 系の速度比較は fullrun と同時には行わない**。必要なら isolated window で再実行する。なお今回の probe は `tee` が run dir 作成前に開いたため `console.log` を残せず、shell 出力と生成 artifact のみを証跡とした。
 - detached 起動で `--fail-on-runtime-contention` が wrapper bash を「other train process」と誤認していたので、single-file 基板の process scan を修正し、**current train process の ancestor PID** と **`bash/sh/zsh -c` shell wrapper** を除外するようにした。live 検証では `collect_competing_mlx_train_processes(current_pid=55490) == []` を確認し、別プロセスからの CLI probe では **実競合の fullrun 本体 `pid=55490` だけを 1 件**拾って期待どおり abort した。
 - probe 停止後の fullrun は **`Iter 320 (Opt 40): It/sec 0.051, Tokens/sec 32.276, Peak mem 81.271 GB`** まで回復した。したがって `Opt30` の落ち込みは常時劣化というより **並走干渉の一過性影響** とみなす。
+- その後さらに **`Iter 400 (Opt 50): It/sec 0.058, Tokens/sec 37.452, Peak mem 81.271 GB`** を観測し、throughput はほぼ `Opt20` 水準まで戻った。fullrun は low-throughput ではあるが、**probe 停止後は clean baseline に概ね復帰**して継続している。
