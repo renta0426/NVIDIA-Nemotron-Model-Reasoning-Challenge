@@ -216,7 +216,8 @@ row-level overlap:
 
 | version | command | profile | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
 | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-notebook-original-fullrun-v1` | `train --profile notebook-original --force-prepare` | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `trainable=880.138M`; `Iter1 val=1.220`; `runtime_free=98%`; detached fullrun active | in_progress | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1/console.log` |
+| `baseline-mlx-notebook-original-fullrun-v1` | `train --profile notebook-original --force-prepare` | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `trainable=880.138M`; `Iter1 val=1.220`; `Opt10 loss=0.931 lr=2.500e-05`; `it_per_sec=0.061`; `tokens_per_sec=36.667`; `peak_mem=80.230 GB`; detached fullrun active | in_progress | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1/console.log` |
 
 - 2026-04-08 時点で、parity-hardened single-file baseline の **FULLRUN** を `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1` として起動した。run は detached で継続中で、`console.log` を継続追記している。
 - detached 実行では runtime preflight が wrapper shell を「other MLX/Nemotron train process」として列挙するが、これは **同一 detached job の bash/uv/tee ラッパ**であり、実競合ではないことを ps で確認した。したがって fullrun 本体はそのまま継続させている。
+- 最初の train report は **`Iter 80 (Opt 10)`** で、**`Train loss 0.931 / LR 2.500e-05 / It/sec 0.061 / Tokens/sec 36.667 / Peak mem 80.230 GB`**。この時点の単純見積もりでは残り **約 26.1 時間**で、run は「停止」ではなく **低速だが前進中** と判断している。
