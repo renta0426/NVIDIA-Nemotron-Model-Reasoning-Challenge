@@ -1,0 +1,9 @@
+benchmark_name,benchmark_role,benchmark_index,id,gold_answer,prediction,is_correct,family,family_short,template_subtype,answer_type,teacher_solver_candidate,selection_tier,num_examples,prompt_len_chars,prompt_len_bucket,fallback_type,format_bucket,has_boxed,boxed_count,raw_output
+binary_hard_set,hard_binary_watch,1,c625ba91,11111111,1111111,False,bit_manipulation,binary,bit_other,binary8,binary_affine_xor,verified_trace_ready,10,510,500-599,last_number,numeric_fallback,False,0,"We need to infer the binary rule. Input -> output always 11111111 for many examples. Some examples are given. All examples output 11111111. So the query is to determine output for: 10100000. Likely also 11111111. But maybe some inputs might not map to all ones. Let's examine examples: They are all 8-bit binary numbers. Many map to 11111111. Possibly the rule is: if any condition is met, output all ones. Maybe the rule is: if the number has at least one 1 in some positions, or some majority or choice function. Let's try to deduce.
+
+Given examples:
+11010011 -> 11111111
+11010111 -> 11111111
+01110101 -> 11111111
+00000000 -> 11111111
+11110110 -> 1111111"
