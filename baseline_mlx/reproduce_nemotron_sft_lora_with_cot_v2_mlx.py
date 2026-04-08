@@ -430,12 +430,12 @@ def collect_gpu_snapshot() -> dict[str, Any]:
     return snapshot
 
 
-def collect_competing_mlx_train_processes(*, current_pid: int) -> list[dict[str, Any]]:
+def _collect_process_rows() -> list[dict[str, Any]] | None:
     returncode, output = _run_text_command(
         ("ps", "-Ao", "pid=,ppid=,rss=,pcpu=,etime=,command=")
     )
     if returncode != 0:
-        return [{"error": output.strip() or f"ps failed with code {returncode}"}]
+        return None
 
     rows: list[dict[str, Any]] = []
     for line in output.splitlines():
@@ -450,10 +450,55 @@ def collect_competing_mlx_train_processes(*, current_pid: int) -> list[dict[str,
             pcpu = float(pcpu_text)
         except ValueError:
             continue
+        rows.append(
+            {
+                "pid": pid,
+                "ppid": ppid,
+                "rss_kb": rss_kb,
+                "pcpu": pcpu,
+                "etime": etime,
+                "command": command,
+            }
+        )
+    return rows
+
+
+def _collect_process_ancestors(process_rows: Sequence[dict[str, Any]], *, pid: int) -> set[int]:
+    pid_to_ppid = {
+        int(row["pid"]): int(row["ppid"])
+        for row in process_rows
+        if "pid" in row and "ppid" in row
+    }
+    ancestors: set[int] = set()
+    current = pid_to_ppid.get(pid)
+    while current is not None and current > 0 and current not in ancestors:
+        ancestors.add(current)
+        current = pid_to_ppid.get(current)
+    return ancestors
+
+
+def collect_competing_mlx_train_processes(*, current_pid: int) -> list[dict[str, Any]]:
+    process_rows = _collect_process_rows()
+    if process_rows is None:
+        return [{"error": "ps failed"}]
+
+    ignored_related_pids = _collect_process_ancestors(process_rows, pid=current_pid)
+    rows: list[dict[str, Any]] = []
+    for row in process_rows:
+        pid = int(row["pid"])
+        ppid = int(row["ppid"])
+        rss_kb = int(row["rss_kb"])
+        pcpu = float(row["pcpu"])
+        etime = str(row["etime"])
+        command = str(row["command"])
         if pid == current_pid:
+            continue
+        if pid in ignored_related_pids:
             continue
         lowered = command.lower()
         if lowered.startswith("uv run python "):
+            continue
+        if lowered.startswith(("bash -c ", "sh -c ", "zsh -c ")):
             continue
         if "python" not in lowered or " train" not in lowered:
             continue
