@@ -1293,6 +1293,64 @@ def render_eval_suite_markdown_summary(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_submission_compat_markdown_summary(summary: dict[str, Any]) -> str:
+    lines = ["# submission_compat_audit", ""]
+    lines.append(f"- adapter_dir: `{summary['adapter_dir']}`")
+    lines.append(f"- audit_status: `{summary['audit_status']}`")
+    lines.append(f"- peft_export_ready: `{summary['peft_export_ready']}`")
+    lines.append(f"- base_model_name_or_path: `{summary['base_model_name_or_path']}`")
+    lines.append("")
+    if summary["blocked_reasons"]:
+        lines.append("## Blocked reasons")
+        lines.append("")
+        for reason in summary["blocked_reasons"]:
+            lines.append(f"- {reason}")
+        lines.append("")
+    lines.append("## Tensor rank counts")
+    lines.append("")
+    lines.append("| tensor_rank | tensor_count |")
+    lines.append("| ---: | ---: |")
+    for row in summary["tensor_rank_counts"]:
+        lines.append(f"| {row['tensor_rank']} | {row['tensor_count']} |")
+    lines.append("")
+    lines.append("## Module family counts")
+    lines.append("")
+    lines.append("| module_family | tensor_count |")
+    lines.append("| --- | ---: |")
+    for row in summary["module_family_counts"]:
+        lines.append(f"| `{row['module_family']}` | {row['tensor_count']} |")
+    lines.append("")
+    if summary["unsupported_tensor_examples"]:
+        lines.append("## Unsupported tensor examples")
+        lines.append("")
+        lines.append("| key | shape |")
+        lines.append("| --- | --- |")
+        for row in summary["unsupported_tensor_examples"]:
+            lines.append(f"| `{row['key']}` | `{row['shape']}` |")
+        lines.append("")
+    preview = summary.get("peft_adapter_config_preview") or {}
+    if preview:
+        lines.append("## PEFT adapter_config preview")
+        lines.append("")
+        for key in (
+            "peft_type",
+            "base_model_name_or_path",
+            "r",
+            "lora_alpha",
+            "lora_dropout",
+            "bias",
+            "use_dora",
+            "modules_to_save",
+            "inference_mode",
+        ):
+            if key in preview:
+                lines.append(f"- {key}: `{preview[key]}`")
+        if "target_modules" in preview:
+            lines.append(f"- target_modules: `{preview['target_modules']}`")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def build_leaderboard_proxy_v2_dataframe(
     *,
     proxy_v1_df: pd.DataFrame,
@@ -1742,6 +1800,137 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
         render_eval_suite_markdown_summary(suite_payload),
     )
     print(json.dumps(suite_payload, ensure_ascii=False, indent=2))
+
+
+def classify_adapter_module_family(key: str) -> str:
+    if ".mixer.switch_mlp." in key:
+        return "switch_mlp"
+    if ".mixer.shared_experts." in key:
+        return "shared_experts"
+    if ".mixer.q_proj." in key or ".mixer.k_proj." in key or ".mixer.v_proj." in key or ".mixer.o_proj." in key:
+        return "attention"
+    if ".mixer.in_proj." in key or ".mixer.out_proj." in key:
+        return "mamba"
+    return "other"
+
+
+def summarize_count_mapping(counts: dict[Any, int], key_name: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for key, value in sorted(counts.items(), key=lambda item: str(item[0])):
+        rows.append({key_name: key, "tensor_count": int(value)})
+    return rows
+
+
+def run_audit_submission_compat(args: argparse.Namespace) -> None:
+    from safetensors.numpy import load_file
+
+    adapter_dir = Path(args.adapter_dir).resolve()
+    output_root = Path(args.output_root).resolve()
+    ensure_dir(output_root)
+    verify_training_outputs(adapter_dir)
+
+    adapter_config = load_json(adapter_dir / "adapter_config.json", default=None)
+    if not isinstance(adapter_config, dict):
+        raise ValueError(f"Invalid adapter_config.json: {adapter_dir / 'adapter_config.json'}")
+    tensors = load_file(str(adapter_dir / "adapters.safetensors"))
+    if not tensors:
+        raise ValueError(f"No tensors found in {adapter_dir / 'adapters.safetensors'}")
+
+    rank_counts: dict[int, int] = {}
+    family_counts: dict[str, int] = {}
+    unsupported_tensor_examples: list[dict[str, Any]] = []
+    blocked_reasons: list[str] = []
+    unsupported_keys: list[str] = []
+    for key, value in tensors.items():
+        tensor_rank = len(value.shape)
+        rank_counts[tensor_rank] = rank_counts.get(tensor_rank, 0) + 1
+        family = classify_adapter_module_family(key)
+        family_counts[family] = family_counts.get(family, 0) + 1
+        if tensor_rank != 2:
+            unsupported_keys.append(key)
+            if len(unsupported_tensor_examples) < 12:
+                unsupported_tensor_examples.append(
+                    {"key": key, "shape": list(value.shape)}
+                )
+
+    if unsupported_keys:
+        blocked_reasons.append(
+            "MLX adapter contains non-2D LoRA tensors; PEFT/vLLM-equivalent export is not claimed without a verified mapping."
+        )
+    if any(".mixer.switch_mlp." in key for key in unsupported_keys):
+        blocked_reasons.append(
+            "switch_mlp routed-expert tensors are 3D in this adapter, so the current single-file pipeline blocks submission export instead of guessing a PEFT layout."
+        )
+
+    lora_parameters = adapter_config.get("lora_parameters", {})
+    try:
+        rank = int(lora_parameters.get("rank", 0))
+    except Exception:
+        rank = 0
+    try:
+        alpha = float(lora_parameters.get("scale", 0.0))
+    except Exception:
+        alpha = 0.0
+    try:
+        dropout = float(lora_parameters.get("dropout", 0.0))
+    except Exception:
+        dropout = 0.0
+    raw_keys = coerce_string_list(lora_parameters.get("keys"))
+    target_modules = []
+    for key in raw_keys:
+        suffix = str(key).strip().split(".")[-1]
+        if suffix and suffix not in target_modules:
+            target_modules.append(suffix)
+
+    peft_adapter_config_preview = {
+        "peft_type": "LORA",
+        "base_model_name_or_path": str(args.base_model_name_or_path),
+        "r": rank,
+        "lora_alpha": alpha,
+        "lora_dropout": dropout,
+        "target_modules": target_modules,
+        "bias": "none",
+        "modules_to_save": None,
+        "use_dora": False,
+        "use_rslora": False,
+        "inference_mode": True,
+    }
+
+    audit_status = "blocked_routed_expert_3d_tensors" if blocked_reasons else "potentially_exportable_2d_only"
+    payload = {
+        "created_at": utc_now(),
+        "adapter_dir": str(adapter_dir),
+        "audit_status": audit_status,
+        "peft_export_ready": not blocked_reasons,
+        "blocked_reasons": blocked_reasons,
+        "base_model_name_or_path": str(args.base_model_name_or_path),
+        "tensor_count": len(tensors),
+        "tensor_rank_counts": [
+            {"tensor_rank": int(rank_key), "tensor_count": int(rank_counts[rank_key])}
+            for rank_key in sorted(rank_counts)
+        ],
+        "module_family_counts": summarize_count_mapping(family_counts, "module_family"),
+        "unsupported_tensor_count": len(unsupported_keys),
+        "unsupported_tensor_examples": unsupported_tensor_examples,
+        "mlx_adapter_config_excerpt": {
+            "fine_tune_type": adapter_config.get("fine_tune_type"),
+            "model": adapter_config.get("model"),
+            "lora_parameters": lora_parameters,
+        },
+        "peft_adapter_config_preview": peft_adapter_config_preview,
+        "readme_submission_contract": {
+            "required_files": ["adapter_config.json", "adapter_model.safetensors"],
+            "max_lora_rank": README_MAX_LORA_RANK,
+            "single_adapter_submission_zip": True,
+        },
+    }
+
+    write_json(output_root / "submission_compat_audit.json", payload)
+    write_text(
+        output_root / "submission_compat_audit.md",
+        render_submission_compat_markdown_summary(payload),
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 def select_shadow_validation_records(
@@ -3642,6 +3831,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eval_benchmark_suite.add_argument("--force-single-generate", action="store_true")
     eval_benchmark_suite.set_defaults(func=run_eval_benchmark_suite)
+
+    audit_submission_compat = subparsers.add_parser(
+        "audit-submission-compat",
+        help="Audit whether an MLX adapter is conservatively exportable to the README submission contract.",
+    )
+    audit_submission_compat.add_argument("--adapter-dir", type=Path, required=True)
+    audit_submission_compat.add_argument("--output-root", type=Path, required=True)
+    audit_submission_compat.add_argument(
+        "--base-model-name-or-path",
+        type=str,
+        default=BASE_MODEL_NAME,
+    )
+    audit_submission_compat.set_defaults(func=run_audit_submission_compat)
 
     return parser
 
