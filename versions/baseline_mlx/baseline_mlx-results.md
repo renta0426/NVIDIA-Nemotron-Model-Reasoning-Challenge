@@ -51,12 +51,21 @@
 | `baseline-mlx-eval-full320-lora-fix-v2` | `baseline_mlx_eval_full320_lora_fix_v2` | README local320 | `194/320 = 0.6062` | `18/60` | `49/50` | `50/50` | `20/60` | `9/50` | `48/50` | shard parallel。`lora-fix-v1 6/320` からは大幅回復したが、旧 MLX v1 `196/320` は未更新。gravity/symbol は改善、text が大きく regress |
 | `baseline-mlx-eval-full320-lora-fix-schedopt-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_schedopt_v1` | README local320 | `189/320 = 0.5906` | `15/60` | `49/50` | `50/50` | `18/60` | `10/50` | `47/50` | one-shard rerun。`lora-fix-v2` と manifest は同一だが `-5` rows。binary boxed extraction `1.0`; format failure `0.0`; peak_memory_gb `77.49` |
 | `baseline-mlx-notebook-original-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_fullrun_v2` | README local320 | `215/320 = 0.6719` | `26/60` | `50/50` | `50/50` | `15/60` | `25/50` | `49/50` | 2-shard eval。旧 MLX best `196/320` を更新。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
+| `baseline-mlx-notebook-original-routeaware-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_routeaware_fullrun_v2` | README local320 | `170/320 = 0.5312` | `33/60` | `15/50` | `40/50` | `5/60` | `29/50` | `48/50` | 2-shard eval。binary/text は改善したが、gravity/roman/symbol が大きく regress。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
 
 ## Binary bias specialized eval
 
 | version | eval_name | rows | accuracy | bit_other | byte_formula | permutation | boolean_family | notes |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `baseline-mlx-notebook-original-fullrun-v2-binary-specialized-v1` | `baseline_mlx_notebook_original_fullrun_v2/phase0_binary_bias_specialized_eval` | `563` | `286/563 = 0.5080` | `118/218` | `128/283` | `40/62` | `47/60` | `boxed=1.0`; `regex_exact=1.0`; `leading_zero=0.8494`; `supported_bijection=33/50`; `supported_not_structured=15/55`; `rare_byte_transform=9/11` |
+| `baseline-mlx-notebook-original-routeaware-fullrun-v2-binary-specialized-v1` | `baseline_mlx_notebook_original_routeaware_fullrun_v2/phase0_binary_bias_specialized_eval` | `563` | `348/563 = 0.6181` | `136/218` | `152/283` | `60/62` | `47/60` | `boxed=1.0`; `regex_exact=1.0`; `leading_zero=0.8946`; `supported_bijection=50/50`; `supported_not_structured=14/55`; `rare_byte_transform=11/11` |
+
+## Baseline vs route-aware comparison
+
+- README local320 は baseline **`215/320 = 0.6719`** に対して route-aware **`170/320 = 0.5312`** で、**`-45 rows / -0.1407`**。binary **`26 -> 33`** と text **`25 -> 29`** は伸びたが、gravity **`50 -> 15`**、roman **`50 -> 40`**、symbol **`15 -> 5`** の崩れが大きく、総合では明確に悪化した。
+- binary bias specialized は baseline **`286/563 = 0.5080`** に対して route-aware **`348/563 = 0.6181`** で、**`+62 rows / +0.1101`**。subtype では `bit_permutation_inversion` **`40 -> 60`**, `bit_other` **`118 -> 136`**, `bit_structured_byte_formula` **`128 -> 152`** と全部改善した。
+- focus / exposure では `supported_bijection` **`33/50 -> 50/50`**, `rare_byte_transform` **`9/11 -> 11/11`**, `dominant_structured_safe` **`64/120 -> 74/120`**, `dominant` **`105/210 -> 127/210`**, `supported` **`126/225 -> 153/225`** が改善した。一方で `supported_not_structured` は **`15/55 -> 14/55`** と微減で、boolean_family は **`47/60`** のまま横ばいだった。
+- したがって今回の route-aware retrain は **binary-specialized 強化には有効**だが、README local320 の総合ベースライン置換には不適。現時点の総合候補は依然として **`baseline_mlx_notebook_original_fullrun_v2`**。
 
 ## Wait-state diagnosis probes
 
