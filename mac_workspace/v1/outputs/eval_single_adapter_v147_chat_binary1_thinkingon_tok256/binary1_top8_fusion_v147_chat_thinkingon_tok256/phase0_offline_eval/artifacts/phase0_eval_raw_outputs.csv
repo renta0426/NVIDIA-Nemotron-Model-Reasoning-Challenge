@@ -1,0 +1,29 @@
+benchmark_name,benchmark_role,benchmark_index,family,family_short,template_subtype,selection_tier,teacher_solver_candidate,answer_type,num_examples,prompt_len_chars,id,expected_answer,rendered_prompt,raw_output,extracted_answer
+binary_hard_set,hard_binary_watch,1,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,c625ba91,11111111,"<|im_start|>system
+<|im_end|>
+<|im_start|>user
+In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11010011 -> 11111111
+11010111 -> 11111111
+01110101 -> 11111111
+00000000 -> 11111111
+11110110 -> 11111111
+00001000 -> 11111111
+10010001 -> 11111111
+11010000 -> 11111111
+01110100 -> 11111111
+11100111 -> 11111111
+
+Now, determine the output for: 10100000
+Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`<|im_end|>
+<|im_start|>assistant
+<think>
+","We need to infer the transformation rule. Many examples map to 11111111. Some inputs are varied. All examples given output 11111111. So maybe the rule is: if any condition holds, output all 1s. Perhaps the examples are all inputs that satisfy some property, and the query is to determine output for 10100000. Possibly the rule is: if the 8-bit binary number has at least 5 ones? Let's count ones in examples:
+
+11010011: ones count = 5? Let's count: 1,1,0,1,0,0,1,1 = 5? Actually count: positions: 1,2,4,7,8 => 5 ones. Yes.
+
+11010111: ones = 6? Bits: 1,1,0,1,0,1,1,1 = 6? Let's count: 1,2,4,6,7,8 = 6. Yes.
+
+01110101: ones = 5? Bits:0,1,1",1

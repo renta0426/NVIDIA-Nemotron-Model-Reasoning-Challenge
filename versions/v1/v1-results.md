@@ -569,12 +569,22 @@ artifact source of truth:
   - `boxed_extraction_success_rate = 0.0`
   - `format_failure_rate = 1.0`
   だった。つまり local MLX 側の問題というより、**thinking-on path で token budget を reasoning が食い、boxed final answer に届く前に切れる**のが主因。
+- follow-up として、`v147` quotas をそのまま **`dataset_format=chat`, `enable_thinking=true`, `mask_prompt=true`** へ載せ替えた notebook-aligned continuation **`v147_chat`** も回した。
+  - train は **`2032 rows`, `127 iters`, `final val 0.880 -> 0.351`**, peak mem **`68.210 GB`** で完走
+  - 学習末尾の「待ち」はハングではなく、**最終 validation 54.7s + adapter save + `training_result.json` 書き出し**だった
+  - ただし notebook-aligned capped probe (`enable_thinking=True`, `max_tokens=256`, 1 row) は **116.0s / prompt_tps 37.53 / generation_tps 2.37** で、出力は
+    - free-form reasoning **637 chars**
+    - extracted prediction **`1`**
+    - `boxed_extraction_success_rate = 0.0`
+    - `format_failure_rate = 1.0`
+    だった。`v146` capped probe よりも遅く、boxed final answer へは届かなかった
 - runtime tokenizer は `eos_token_id = 11` に対して `eos_token_ids = {2}` で読み込まれていたが、既存の `maybe_fix_tokenizer_eos_ids()` が **`{11}`** に補正しているのを確認した。したがって、今回の low-util / long-decode は **既知の EOS-ID mismatch そのものではない**。
 - したがって、`thinking off` で得た `19/60`, `20/60` は **route 診断には有効**だが、**README + metric notebook contract 上の authoritative score ではない**。
 - 現時点の結論は、
   1. prompt-local structured closure 自体には signal がある
   2. ただし **thinking-on / notebook-aligned inference** でその signal をそのまま使える状態にはまだなっていない
-  3. よって `v146 / v147` は **本採用保留**。次は thinking-on 側の throughput / stop 条件を直すか、prompt contract に合う continuation を作る必要がある
+  3. `v147_chat` continuation を足しても **train-side hang は否定**された一方、**thinking-on capped probe は未改善**だった
+  4. よって `v146 / v147 / v147_chat` は **本採用保留ではなく、この pivot としてはいったん closure**。次は thinking-on 側の generation contract を別方向から直す必要がある
 
 artifact source of truth:
 
@@ -588,3 +598,6 @@ artifact source of truth:
 - `mac_workspace/v1/outputs/eval_single_adapter_v147_binary60_thinkingoff/binary60_top8_fusion_v147_from_v40_lr2p5e6_ep025_thinkingoff/phase0_offline_eval/artifacts/phase0_eval_row_level.csv`
 - `mac_workspace/v1/outputs/eval_single_adapter_v146_binary1_thinkingon_tok256/binary1_top8_fusion_v146_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_summary.json`
 - `mac_workspace/v1/outputs/eval_single_adapter_v146_binary1_thinkingon_tok256/binary1_top8_fusion_v146_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_raw_outputs.csv`
+- `mac_workspace/v1/outputs/resume_v40_to_top8_fusion_v147_chat_lr2p5e6_ep025/training_result.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v147_chat_binary1_thinkingon_tok256/binary1_top8_fusion_v147_chat_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_summary.json`
+- `mac_workspace/v1/outputs/eval_single_adapter_v147_chat_binary1_thinkingon_tok256/binary1_top8_fusion_v147_chat_thinkingon_tok256/phase0_offline_eval/artifacts/phase0_eval_raw_outputs.csv`
