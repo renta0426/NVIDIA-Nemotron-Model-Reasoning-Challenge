@@ -397,6 +397,62 @@ def load_json(path: Path, *, default: Any = None) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def to_jsonable_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): to_jsonable_value(inner) for key, inner in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [to_jsonable_value(item) for item in value]
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            pass
+    if hasattr(value, "tolist"):
+        try:
+            return value.tolist()
+        except Exception:
+            pass
+    return value
+
+
+class JsonlTrainingCallback:
+    def __init__(self, log_dir: Path, wrapped_callback: Any = None):
+        self.log_dir = Path(log_dir)
+        self.wrapped_callback = wrapped_callback
+        ensure_dir(self.log_dir)
+        self.train_jsonl_path = self.log_dir / "train_report.jsonl"
+        self.val_jsonl_path = self.log_dir / "val_report.jsonl"
+        self.latest_train_path = self.log_dir / "latest_train_report.json"
+        self.latest_val_path = self.log_dir / "latest_val_report.json"
+
+    def _write_event(self, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+        serializable = {
+            "event": kind,
+            "logged_at": utc_now(),
+            **{str(key): to_jsonable_value(value) for key, value in payload.items()},
+        }
+        target_jsonl = self.train_jsonl_path if kind == "train" else self.val_jsonl_path
+        target_latest = self.latest_train_path if kind == "train" else self.latest_val_path
+        with target_jsonl.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(serializable, ensure_ascii=False) + "\n")
+        write_json(target_latest, serializable)
+        return serializable
+
+    def on_train_loss_report(self, train_info: dict[str, Any]) -> None:
+        serializable = self._write_event("train", train_info)
+        if self.wrapped_callback is not None:
+            self.wrapped_callback.on_train_loss_report(serializable)
+
+    def on_val_loss_report(self, val_info: dict[str, Any]) -> None:
+        serializable = self._write_event("val", val_info)
+        if self.wrapped_callback is not None:
+            self.wrapped_callback.on_val_loss_report(serializable)
+
+
 def argv_has_any_flag(raw_argv: Sequence[str], flags: Sequence[str]) -> bool:
     for token in raw_argv:
         for flag in flags:
@@ -4255,7 +4311,28 @@ def run_mlx_lora_training_from_config(config_path: Path) -> None:
         config = yaml.load(handle, Loader=mlx_lora.yaml_loader) or {}
     for key, value in mlx_lora.CONFIG_DEFAULTS.items():
         config.setdefault(key, value)
-    mlx_lora.run(argparse.Namespace(**config))
+    original_get_reporting_callbacks = mlx_lora.get_reporting_callbacks
+
+    def patched_get_reporting_callbacks(
+        report_to: str = None,
+        project_name: str = None,
+        log_dir: str = None,
+        config: Any = None,
+    ) -> JsonlTrainingCallback:
+        wrapped_callback = original_get_reporting_callbacks(
+            report_to,
+            project_name=project_name,
+            log_dir=log_dir,
+            config=config,
+        )
+        resolved_log_dir = Path(str(log_dir)) if log_dir is not None else Path(".")
+        return JsonlTrainingCallback(log_dir=resolved_log_dir, wrapped_callback=wrapped_callback)
+
+    mlx_lora.get_reporting_callbacks = patched_get_reporting_callbacks
+    try:
+        mlx_lora.run(argparse.Namespace(**config))
+    finally:
+        mlx_lora.get_reporting_callbacks = original_get_reporting_callbacks
 
 
 def load_existing_prepare_manifest(run_root: Path) -> dict[str, Any] | None:
@@ -4294,12 +4371,16 @@ def run_train(args: argparse.Namespace) -> None:
     run_mlx_lora_training_from_config(config_path)
     verify_training_outputs(adapter_dir)
     bundle_manifest = bundle_local_mlx_adapter(run_root, adapter_dir)
+    latest_train_report = load_json(run_root / "adapter" / "latest_train_report.json", default=None)
+    latest_val_report = load_json(run_root / "adapter" / "latest_val_report.json", default=None)
     training_result = {
         "created_at": utc_now(),
         "run_root": str(run_root),
         "adapter_dir": str(adapter_dir),
         "adapter_files": summarize_directory(adapter_dir),
         "runtime_preflight_path": str((run_root / "runtime_preflight.json").resolve()),
+        "latest_train_report": latest_train_report,
+        "latest_val_report": latest_val_report,
         "mlx_bundle": bundle_manifest,
     }
     write_json(run_root / "training_result.json", training_result)
