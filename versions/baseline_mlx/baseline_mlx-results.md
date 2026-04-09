@@ -1229,13 +1229,13 @@ row-level overlap:
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
 
-- status: `training`
+- status: `training_completed`
 - label: `export-safe-qkvo-lr3e5-ep24-len768-rerun-v1-live`
-- observed_at: `2026-04-09T20:59:00.307144+00:00`
+- observed_at: `2026-04-09T21:00:35.047370+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
 - sampled_rows: `218`
-- optimizer_progress: `60/67 = 89.55%`
+- optimizer_progress: `67/67 = 100.00%`
 - lr: `3e-05`
 - max_seq_length: `768`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
@@ -1244,20 +1244,20 @@ row-level overlap:
 
 - source: `latest_train_report`
 - source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1/adapter/latest_train_report.json`
-- iteration: `468`
-- optimizer_step: `60`
-- train_loss: `0.229965`
-- learning_rate: `2.31252e-06`
-- it_per_sec: `0.627521`
-- tokens_per_sec: `324.115`
-- trained_tokens: `247019`
+- iteration: `523`
+- optimizer_step: `67`
+- train_loss: `0.241193`
+- learning_rate: `4.10357e-07`
+- it_per_sec: `0.584084`
+- tokens_per_sec: `306.485`
+- trained_tokens: `275879`
 - peak_memory_gb: `64.8494`
 
 #### Completion markers
 
-- training_result_exists: `False`
+- training_result_exists: `True`
 - runtime_pid: `91963`
-- runtime_pid_alive: `True`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
