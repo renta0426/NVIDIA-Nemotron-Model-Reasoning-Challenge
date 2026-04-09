@@ -376,19 +376,20 @@ row-level overlap:
 - その後の live progress では、main broad `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union` が **Opt620** (`loss=0.329`, `lr=2.144e-05`, `it/sec=0.404`, `peak=82.620 GB`) まで前進し、export-safe broad `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union` も **Opt510** (`loss=0.252`, `lr=4.043e-05`, `it/sec=0.538`, `peak=68.597 GB`) まで進んだ。両 run とも `prepare_manifest.json` が示す **total_optimizer_steps=832** に対してまだ Stage1 継続中で、`training_result.json` と Stage2 qkvo の `prepare_manifest.json` は未生成だった。
 - README 契約ベースの best-submission 自動昇格も継続監視中だが、`baseline_mlx/outputs/best_submission_candidate_auto/selection_manifest.json` は **2026-04-09T02:14:46Z** 時点で依然 **`candidate_count=0` / `eligible_candidate_count=0` / `status=no_eligible_candidate`**。つまり、現時点では **README 提出互換かつ local320 / general_stable gate を満たす scored run がまだ 1 本も揃っていない**。最新 system snapshot は **`PhysMem: 475G used, 35G unused`** で、方針は引き続き **新しい heavy train/eval を足さず broad 2 本の完走を待つ**。
 - broad 2 本の完走待ち時間を遊ばせないため、single-file trainer に **`record-live-run-status`** と **`poll-live-run-status`** を追加した。`adapter/latest_train_report.json` がある run はそれを一次ソースに、無ければ **`console.log` の末尾 train progress 行**を parse して、**Git 管理下の `versions/baseline_mlx/baseline_mlx-results.md` に live progress block を upsert** できる。`poll-live-run-status` は progress signature が変わったときだけ `publish-results-md` を呼ぶため、in-flight run の進捗を **single-file CLI だけで commit/push** できる。
-- `baseline_mlx/tests/test_single_file_stage_waiters.py` には **latest JSON 優先**, **console.log fallback**, **poll + git commit** の回帰を追加した。targeted pytest は **15 passed**、`record-live-run-status --help` / `poll-live-run-status --help` / `py_compile` も通過。注意点として、**main broad は既存 shell session (`shellId 240`) 側の stdout に progress があり run root には `console.log` / `latest_train_report.json` が無いため、現時点の live progress 自動記録は export-safe broad と今後の stage2/future runs で特に有効**である。
-- ただし RAM 圧迫が強すぎたため、ユーザー判断に従って **export-safe broad lane は後ろ倒し**にした。最長 ETA 側だった `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union` を **Opt570 / Iter4553** で停止し、関連する **stage1 completion waiter / stage2 train waiters / stage2 postprocess waiters / live progress poller** も停止した。system snapshot は停止前が **`PhysMem: 475G used, 35G unused`**、停止後が **`PhysMem: 280G used, 230G unused`**、その後ユーザー観測でも **266.63 / 512.0 GB** まで低下しており、**2 本目の 30B MLX 学習 lane の増分コストは概ね 190-200GB 級の unified memory** だったと見てよい。これは trainer の `Peak mem 68.597 GB` 行とは別物で、モデル複製・optimizer/state・Metal の wired/unified memory pool まで含んだ **システム全体差分**である。
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` には **latest JSON 優先**, **console.log fallback**, **poll + git commit**, さらに **dead PID を stale `training` と誤認しない stopped 判定** の回帰を追加した。targeted pytest は **16 passed**、`record-live-run-status --help` / `poll-live-run-status --help` / `py_compile` も通過。注意点として、**main broad は既存 shell session (`shellId 240`) 側の stdout に progress があり run root には `console.log` / `latest_train_report.json` が無いため、現時点の live progress 自動記録は export-safe broad と今後の stage2/future runs で特に有効**である。
+- ただし RAM 圧迫が強すぎたため、ユーザー判断に従って **export-safe broad lane は後ろ倒し**にした。最長 ETA 側だった `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union` を **最終観測 Opt580 / Iter4633** で停止し、関連する **stage1 completion waiter / stage2 train waiters / stage2 postprocess waiters / live progress poller** も停止した。system snapshot は停止前が **`PhysMem: 475G used, 35G unused`**、停止後が **`PhysMem: 280G used, 230G unused`**、その後ユーザー観測でも **266.63 / 512.0 GB** まで低下しており、**2 本目の 30B MLX 学習 lane の増分コストは概ね 190-200GB 級の unified memory** だったと見てよい。これは trainer の `Peak mem 68.597 GB` 行とは別物で、モデル複製・optimizer/state・Metal の wired/unified memory pool まで含んだ **システム全体差分**である。
+- lane 停止後は main broad が即座に加速した。`shellId 240` の live stdout では **Opt680 で `it/sec=0.664`、Opt690 で `it/sec=0.746`** まで回復しており、dual-train contention が main broad の後半 throughput を強く削っていたことも確認できた。一方、止めた export-safe run root には **`prepare_manifest.json` / `runtime_preflight.json` / `adapter/adapter_config.json` しか残っておらず、`training_result.json` や `adapters.safetensors` は未生成**だったため、後日再開する場合は **途中再開ではなく full rerun** が前提になる。
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union`
 
-- status: `training`
+- status: `stopped`
 - label: `stagefreeze-v2-exportsafe-stage1-live`
-- observed_at: `2026-04-09T02:31:56.235073+00:00`
+- observed_at: `2026-04-09T02:34:57.692304+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
 - sampled_rows: `3321`
-- optimizer_progress: `570/832 = 68.51%`
+- optimizer_progress: `580/832 = 69.71%`
 - lr: `0.0001`
 - max_seq_length: `4096`
 - trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj']`
@@ -397,18 +398,20 @@ row-level overlap:
 
 - source: `console_log`
 - source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union/console.log`
-- iteration: `4553`
-- optimizer_step: `570`
-- train_loss: `0.328`
-- learning_rate: `2.965e-05`
-- it_per_sec: `0.518`
-- tokens_per_sec: `306.737`
-- trained_tokens: `2700530`
+- iteration: `4633`
+- optimizer_step: `580`
+- train_loss: `0.331`
+- learning_rate: `2.794e-05`
+- it_per_sec: `0.531`
+- tokens_per_sec: `303.224`
+- trained_tokens: `2746223`
 - peak_memory_gb: `68.597`
 
 #### Completion markers
 
 - training_result_exists: `False`
+- runtime_pid: `67528`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`

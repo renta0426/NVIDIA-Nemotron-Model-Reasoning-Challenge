@@ -412,6 +412,21 @@ def load_json(path: Path, *, default: Any = None) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def is_pid_running(pid: int | None) -> bool:
+    if pid is None:
+        return False
+    normalized_pid = int(pid)
+    if normalized_pid <= 0:
+        return False
+    try:
+        os.kill(normalized_pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def read_text_tail(path: Path, *, max_bytes: int = DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES) -> str:
     resolved_path = Path(path).resolve()
     if not resolved_path.exists():
@@ -2796,6 +2811,13 @@ def load_live_run_status_payload(
     latest_train_report_path = resolved_run_root / "adapter" / "latest_train_report.json"
     latest_train_report = load_json(latest_train_report_path, default=None)
     runtime_preflight_path = resolved_run_root / "runtime_preflight.json"
+    runtime_preflight = load_json(runtime_preflight_path, default=None)
+    runtime_pid = (
+        int(runtime_preflight.get("current_pid"))
+        if isinstance(runtime_preflight, dict) and runtime_preflight.get("current_pid") not in (None, "")
+        else None
+    )
+    runtime_pid_alive = is_pid_running(runtime_pid)
     live_progress = None
     if isinstance(latest_train_report, dict):
         live_progress = normalize_train_progress_payload(
@@ -2826,10 +2848,12 @@ def load_live_run_status_payload(
         status = "scored"
     elif isinstance(training_result, dict):
         status = "training_completed"
-    elif isinstance(live_progress, dict):
+    elif runtime_pid_alive and isinstance(live_progress, dict):
         status = "training"
-    elif runtime_preflight_path.exists():
+    elif runtime_pid_alive and runtime_preflight_path.exists():
         status = "running_untracked"
+    elif runtime_pid is not None:
+        status = "stopped"
     else:
         status = "prepared"
 
@@ -2864,6 +2888,8 @@ def load_live_run_status_payload(
         "live_progress": live_progress if isinstance(live_progress, dict) else None,
         "status": status,
         "status_observed_at": observed_at,
+        "runtime_pid": runtime_pid,
+        "runtime_pid_alive": runtime_pid_alive,
         "suite_summary_exists": suite_summary_path.exists(),
         "audit_summary_exists": audit_summary_path.exists(),
         "export_manifest_exists": export_manifest_path.exists(),
@@ -2921,6 +2947,8 @@ def render_live_run_status_markdown(payload: dict[str, Any]) -> str:
     lines.append("#### Completion markers")
     lines.append("")
     lines.append(f"- training_result_exists: `{payload.get('training_result_exists', False)}`")
+    lines.append(f"- runtime_pid: `{payload.get('runtime_pid')}`")
+    lines.append(f"- runtime_pid_alive: `{payload.get('runtime_pid_alive', False)}`")
     lines.append(f"- suite_summary_exists: `{payload.get('suite_summary_exists', False)}`")
     lines.append(f"- audit_summary_exists: `{payload.get('audit_summary_exists', False)}`")
     lines.append(f"- export_manifest_exists: `{payload.get('export_manifest_exists', False)}`")

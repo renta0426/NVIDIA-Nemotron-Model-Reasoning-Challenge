@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -302,11 +303,16 @@ def make_live_progress_run(
     *,
     run_name: str,
     progress_source: str = "latest_train_report",
+    runtime_pid: int | None = None,
 ) -> Path:
     run_root = parent_root / run_name
     adapter_dir = run_root / "adapter"
     adapter_dir.mkdir(parents=True, exist_ok=True)
-    (run_root / "runtime_preflight.json").write_text("{}", encoding="utf-8")
+    resolved_runtime_pid = os.getpid() if runtime_pid is None else runtime_pid
+    (run_root / "runtime_preflight.json").write_text(
+        json.dumps({"current_pid": resolved_runtime_pid}),
+        encoding="utf-8",
+    )
     (run_root / "prepare_manifest.json").write_text(
         json.dumps(
             {
@@ -723,6 +729,33 @@ def test_record_live_run_status_falls_back_to_console_log(tmp_path: Path) -> Non
     assert summary["live_progress"]["progress_source"] == "console_log"
     assert summary["live_progress"]["optimizer_step"] == 400
     assert "- source: `console_log`" in results_md.read_text(encoding="utf-8")
+
+
+def test_record_live_run_status_marks_stopped_when_runtime_pid_is_dead(tmp_path: Path) -> None:
+    run_root = make_live_progress_run(
+        tmp_path,
+        run_name="live_progress_stopped",
+        progress_source="console_log",
+        runtime_pid=999999,
+    )
+    results_md = tmp_path / "results.md"
+    summary_json = tmp_path / "record_live_stopped_summary.json"
+
+    stage_waiters.run_record_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-stopped",
+            results_md=results_md,
+            summary_json=summary_json,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "stopped"
+    ledger = results_md.read_text(encoding="utf-8")
+    assert "- status: `stopped`" in ledger
+    assert "- runtime_pid_alive: `False`" in ledger
 
 
 def test_poll_live_run_status_commits_progress_update(tmp_path: Path) -> None:
