@@ -350,6 +350,7 @@ row-level overlap:
 - この resume 元は `switch_mlp` routed-expert の **3D tensor** を含むため、**この direct lane 自体は submission 互換 lane ではない**。役割はまず **「attention corrective が baseline trunk を上積みできるか」**を stagefreeze 本線より早く読むことにある。
 - 完走後は detached waiter で **`eval-benchmark-suite` → `audit-submission-compat` → `record-run-result` → `results.md` commit/push** まで自動連結してある。
 - direct lane も 1 本で止めず、**`qkvo lr=2e-5` → `v/o lr=2e-5` → `qkvo lr=1e-5, epochs=2.4`** の順に ablation を回す detached waiters を追加した。いずれも **resume 元は同じ `baseline_mlx_notebook_original_fullrun_v2` adapter** に固定し、各 run ごとに **suite → audit → record-run-result → commit/push** まで自動連結する。
+- Stagefreeze 側を **`v/o lr2e-5` + `qkvo lr1e-5 short`** の 2 本へ切り替えた時点でも **`PhysMem 381-382G used / 129-130G unused`** を維持できたので、direct family も waiter 解放を待たず **`nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536`** を手動前倒し起動した。新 run は `prepare_manifest.json` / `runtime_preflight.json` を生成し、**`current_pid=90194`**, `system_free_memory=62%`, `gpu_device_util=100%`, trainable suffix は **`mixer.v_proj/o_proj`**, trainable params は **`1.868M`**, 初回 validation は **`Iter 1: Val loss 1.606`**。これで current search は **3 lane (`stagefreeze vo`, `stagefreeze short`, `direct fullrun_v2 vo`)** になった。
 - ただし 3 本同時 train による RAM 圧迫が強く、ユーザー指示で **direct lane 一式（train 本体 + direct waiters）を停止**した。停止直前の最終観測は **`Opt20 loss=0.426 / itps=0.336 / peak=69.297 GB`**。`training_result.json` は未生成のため、この lane は **launch probe まで**として扱う。
 - prune 後の定点では、repo 配下の live 実体は **main broad train 1 本 + export-safe broad train 1 本 + 各 resource_tracker** に整理された。`top` snapshot では **`PhysMem: 414G used, 97G unused`** まで戻っており、background count が大きく見えても **重い実プロセスは 2 本だけ**であることを確認した。
 - safe cleanup 版へ差し替えた waiter は現在 **8 本 live**、best-candidate 側も session script `best_submission_poller.sh` で稼働中で、`selection_manifest.json` は **2026-04-09 10:19:10** 更新を確認した。したがって現状は **train 2 本 + safe waiter/poller** の構成で、Stage1 完走後に Stage2 / suite / audit / export / ledger 更新まで自動で流せる状態に戻っている。
@@ -483,11 +484,11 @@ row-level overlap:
 
 - status: `training`
 - label: `stagefreeze-v1-vo-live`
-- observed_at: `2026-04-09T06:13:06.405590+00:00`
+- observed_at: `2026-04-09T06:16:06.854553+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
 - sampled_rows: `218`
-- optimizer_progress: `40/101 = 39.60%`
+- optimizer_progress: `50/101 = 49.50%`
 - lr: `2e-05`
 - max_seq_length: `1536`
 - trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
@@ -496,13 +497,13 @@ row-level overlap:
 
 - source: `latest_train_report`
 - source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536/adapter/latest_train_report.json`
-- iteration: `314`
-- optimizer_step: `40`
-- train_loss: `0.236721`
-- learning_rate: `1.51785e-05`
-- it_per_sec: `0.600841`
-- tokens_per_sec: `325.175`
-- trained_tokens: `168586`
+- iteration: `394`
+- optimizer_step: `50`
+- train_loss: `0.227658`
+- learning_rate: `1.23118e-05`
+- it_per_sec: `0.443361`
+- tokens_per_sec: `234.482`
+- trained_tokens: `210896`
 - peak_memory_gb: `71.4728`
 
 #### Completion markers
