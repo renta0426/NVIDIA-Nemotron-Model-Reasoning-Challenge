@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import zipfile
 from collections import Counter
 from datetime import datetime, timezone
@@ -395,6 +396,104 @@ def load_json(path: Path, *, default: Any = None) -> Any:
     if not path.exists():
         return default
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def path_matches_kind(path: Path, expected_kind: str) -> bool:
+    if not path.exists():
+        return False
+    if expected_kind == "any":
+        return True
+    if expected_kind == "file":
+        return path.is_file()
+    if expected_kind == "dir":
+        return path.is_dir()
+    raise ValueError(f"Unsupported path kind: {expected_kind}")
+
+
+def wait_for_path(
+    path: Path,
+    *,
+    expected_kind: str = "any",
+    poll_seconds: float = 60.0,
+    timeout_seconds: float = 0.0,
+) -> dict[str, Any]:
+    resolved_path = Path(path).resolve()
+    normalized_poll_seconds = max(float(poll_seconds), 0.1)
+    normalized_timeout_seconds = max(float(timeout_seconds), 0.0)
+    started_at = utc_now()
+    started_monotonic = time.monotonic()
+    heartbeat_every = max(1, int(math.ceil(300.0 / normalized_poll_seconds)))
+    attempts = 0
+
+    print(
+        f"Waiting for {expected_kind} at {resolved_path} "
+        f"(poll={normalized_poll_seconds:.1f}s, timeout={normalized_timeout_seconds:.1f}s)",
+        flush=True,
+    )
+    while True:
+        attempts += 1
+        elapsed_seconds = time.monotonic() - started_monotonic
+        if path_matches_kind(resolved_path, expected_kind):
+            return {
+                "started_at": started_at,
+                "observed_at": utc_now(),
+                "path": str(resolved_path),
+                "expected_kind": expected_kind,
+                "waited_seconds": elapsed_seconds,
+                "poll_seconds": normalized_poll_seconds,
+                "timeout_seconds": normalized_timeout_seconds,
+                "attempts": attempts,
+                "exists": True,
+                "is_file": resolved_path.is_file(),
+                "is_dir": resolved_path.is_dir(),
+            }
+        if normalized_timeout_seconds and elapsed_seconds >= normalized_timeout_seconds:
+            raise TimeoutError(
+                f"Timed out waiting for {expected_kind} at {resolved_path} "
+                f"after {elapsed_seconds:.1f}s"
+            )
+        if attempts == 1 or attempts % heartbeat_every == 0:
+            print(
+                f"Still waiting for {expected_kind} at {resolved_path} "
+                f"(elapsed={elapsed_seconds:.1f}s, attempts={attempts})",
+                flush=True,
+            )
+        time.sleep(normalized_poll_seconds)
+
+
+def relative_run_artifact_path(run_root: Path, artifact_path: Path) -> Path:
+    resolved_run_root = Path(run_root).resolve()
+    resolved_artifact_path = Path(artifact_path).resolve()
+    try:
+        return resolved_artifact_path.relative_to(resolved_run_root)
+    except ValueError as exc:
+        raise ValueError(
+            "Artifact path must live under run root so record/package subcommands "
+            f"can resolve it later: {resolved_artifact_path} vs {resolved_run_root}"
+        ) from exc
+
+
+def resolve_source_run_resume_paths(source_run_root: Path) -> tuple[Path, Path]:
+    resolved_source_root = Path(source_run_root).resolve()
+    prepare_manifest = load_json(resolved_source_root / "prepare_manifest.json", default=None)
+    prepare_artifacts = prepare_manifest.get("artifacts") or {} if isinstance(prepare_manifest, dict) else {}
+    shadow_model_dir = (
+        Path(prepare_manifest.get("shadow_model_dir")).resolve()
+        if isinstance(prepare_manifest, dict) and prepare_manifest.get("shadow_model_dir")
+        else (resolved_source_root / "shadow_model").resolve()
+    )
+    adapter_dir_value = prepare_artifacts.get("adapter_dir")
+    adapter_dir = (
+        Path(adapter_dir_value).resolve()
+        if adapter_dir_value
+        else (resolved_source_root / "adapter").resolve()
+    )
+    adapter_file = adapter_dir / "adapters.safetensors"
+    if not shadow_model_dir.exists():
+        raise FileNotFoundError(f"Missing source shadow model: {shadow_model_dir}")
+    if not adapter_file.exists():
+        raise FileNotFoundError(f"Missing source adapter file: {adapter_file}")
+    return shadow_model_dir, adapter_file
 
 
 def to_jsonable_value(value: Any) -> Any:
@@ -4387,6 +4486,266 @@ def run_train(args: argparse.Namespace) -> None:
     print(json.dumps(training_result, ensure_ascii=False, indent=2))
 
 
+def run_wait_for_path(args: argparse.Namespace) -> None:
+    result = wait_for_path(
+        Path(args.path),
+        expected_kind=str(args.expected_kind),
+        poll_seconds=float(args.poll_seconds),
+        timeout_seconds=float(args.timeout_seconds),
+    )
+    if args.status_json is not None:
+        write_json(Path(args.status_json).resolve(), result)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def run_resume_train_from_run(args: argparse.Namespace) -> None:
+    source_run_root = Path(args.source_run_root).resolve()
+    resolved_model_root, resolved_resume_adapter_file = resolve_source_run_resume_paths(source_run_root)
+    args.model_root = resolved_model_root
+    args.resume_adapter_file = resolved_resume_adapter_file
+    target_run_root = Path(args.output_root).resolve() / args.run_name
+    launch_manifest = {
+        "recorded_at": utc_now(),
+        "source_run_root": str(source_run_root),
+        "source_training_result_path": str((source_run_root / "training_result.json").resolve()),
+        "resolved_model_root": str(resolved_model_root),
+        "resolved_resume_adapter_file": str(resolved_resume_adapter_file),
+        "target_run_root": str(target_run_root),
+        "target_run_name": str(args.run_name),
+    }
+    write_json(target_run_root / "resume_from_run_manifest.json", launch_manifest)
+    print(json.dumps(launch_manifest, ensure_ascii=False, indent=2))
+    run_train(args)
+
+
+def run_wait_train_from_run(args: argparse.Namespace) -> None:
+    source_run_root = Path(args.source_run_root).resolve()
+    wait_result = wait_for_path(
+        source_run_root / "training_result.json",
+        expected_kind="file",
+        poll_seconds=float(args.poll_seconds),
+        timeout_seconds=float(args.timeout_seconds),
+    )
+    wait_status_path = (
+        Path(args.wait_status_json).resolve()
+        if args.wait_status_json is not None
+        else (Path(args.output_root).resolve() / args.run_name / "wait_for_source_training_result.json")
+    )
+    write_json(wait_status_path, wait_result)
+    args._source_wait_result = wait_result
+    run_resume_train_from_run(args)
+
+
+def run_postprocess_run(args: argparse.Namespace) -> None:
+    run_root = Path(args.run_root).resolve()
+    label = str(args.label).strip() if getattr(args, "label", None) else run_root.name
+    summary_path = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else (run_root / "postprocess_manifest.json")
+    )
+    summary: dict[str, Any] = {
+        "recorded_at": utc_now(),
+        "run_root": str(run_root),
+        "label": label,
+        "steps": {},
+    }
+
+    def persist_summary() -> None:
+        write_json(summary_path, summary)
+
+    persist_summary()
+    if args.wait_for_training_result:
+        wait_result = wait_for_path(
+            run_root / "training_result.json",
+            expected_kind="file",
+            poll_seconds=float(args.poll_seconds),
+            timeout_seconds=float(args.timeout_seconds),
+        )
+        summary["wait_result"] = wait_result
+        persist_summary()
+
+    training_result_path = run_root / "training_result.json"
+    if not training_result_path.exists():
+        raise FileNotFoundError(f"Missing training result: {training_result_path}")
+    prepare_manifest = load_json(run_root / "prepare_manifest.json", default=None)
+    if not isinstance(prepare_manifest, dict):
+        raise FileNotFoundError(f"Missing prepare manifest: {run_root / 'prepare_manifest.json'}")
+    artifacts = prepare_manifest.get("artifacts") or {}
+    model_root = Path(prepare_manifest.get("shadow_model_dir") or (run_root / "shadow_model")).resolve()
+    adapter_dir = Path(artifacts.get("adapter_dir") or (run_root / "adapter")).resolve()
+    if not model_root.exists():
+        raise FileNotFoundError(f"Missing model root for postprocess: {model_root}")
+    if not adapter_dir.exists():
+        raise FileNotFoundError(f"Missing adapter dir for postprocess: {adapter_dir}")
+
+    suite_output_root = (
+        Path(args.suite_output_root).resolve()
+        if args.suite_output_root is not None
+        else (run_root / DEFAULT_RUN_SUITE_SUMMARY_RELPATH.parent)
+    )
+    audit_output_root = (
+        Path(args.audit_output_root).resolve()
+        if args.audit_output_root is not None
+        else (run_root / DEFAULT_RUN_AUDIT_RELPATH.parent)
+    )
+    export_output_root = (
+        Path(args.export_output_root).resolve()
+        if args.export_output_root is not None
+        else (run_root / DEFAULT_RUN_EXPORT_RELPATH.parent)
+    )
+    suite_summary_relpath = relative_run_artifact_path(
+        run_root,
+        suite_output_root / "benchmark_eval_suite_summary.json",
+    )
+    audit_relpath = relative_run_artifact_path(
+        run_root,
+        audit_output_root / "submission_compat_audit.json",
+    )
+    export_relpath = relative_run_artifact_path(
+        run_root,
+        export_output_root / "export_manifest.json",
+    )
+
+    summary["model_root"] = str(model_root)
+    summary["adapter_dir"] = str(adapter_dir)
+    summary["suite_summary_relpath"] = str(suite_summary_relpath)
+    summary["audit_relpath"] = str(audit_relpath)
+    summary["export_relpath"] = str(export_relpath)
+    persist_summary()
+
+    if args.run_eval_suite:
+        run_eval_benchmark_suite(
+            argparse.Namespace(
+                model_root=model_root,
+                adapter_dir=adapter_dir,
+                benchmark_root=Path(args.benchmark_root).resolve(),
+                extra_benchmark_csv=[Path(path).resolve() for path in (args.extra_benchmark_csv or [])],
+                output_root=suite_output_root,
+                max_tokens=int(args.max_tokens),
+                temperature=float(args.temperature),
+                top_p=float(args.top_p),
+                max_num_seqs=int(args.max_num_seqs),
+                max_model_len=int(args.max_model_len),
+                prompt_chunk_size=int(args.prompt_chunk_size),
+                prefill_batch_size=int(args.prefill_batch_size),
+                completion_batch_size=int(args.completion_batch_size),
+                eval_enable_thinking=bool(args.eval_enable_thinking),
+                lazy_load=bool(args.lazy_load),
+                force_single_generate=bool(args.force_single_generate),
+            )
+        )
+        summary["steps"]["eval_suite"] = {
+            "status": "completed",
+            "output_root": str(suite_output_root),
+        }
+    else:
+        summary["steps"]["eval_suite"] = {"status": "skipped"}
+    persist_summary()
+
+    audit_summary = load_json(audit_output_root / "submission_compat_audit.json", default=None)
+    if args.run_audit_submission:
+        run_audit_submission_compat(
+            argparse.Namespace(
+                adapter_dir=adapter_dir,
+                output_root=audit_output_root,
+                base_model_name_or_path=str(args.base_model_name_or_path),
+            )
+        )
+        audit_summary = load_json(audit_output_root / "submission_compat_audit.json", default=None)
+        summary["steps"]["audit_submission"] = {
+            "status": "completed",
+            "output_root": str(audit_output_root),
+            "audit_status": audit_summary.get("audit_status", "") if isinstance(audit_summary, dict) else "",
+        }
+    else:
+        summary["steps"]["audit_submission"] = {"status": "skipped"}
+    persist_summary()
+
+    export_allowed = isinstance(audit_summary, dict) and bool(audit_summary.get("peft_export_ready"))
+    if args.run_export_submission and (export_allowed or not args.export_only_if_ready):
+        run_export_peft_submission(
+            argparse.Namespace(
+                adapter_dir=adapter_dir,
+                output_root=export_output_root,
+                reference_model_root=Path(args.reference_model_root).resolve()
+                if args.reference_model_root is not None
+                else None,
+                base_model_name_or_path=str(args.base_model_name_or_path),
+            )
+        )
+        export_manifest = load_json(export_output_root / "export_manifest.json", default=None)
+        summary["steps"]["export_submission"] = {
+            "status": "completed",
+            "output_root": str(export_output_root),
+            "zip_path": export_manifest.get("zip_path", "") if isinstance(export_manifest, dict) else "",
+        }
+    elif args.run_export_submission:
+        summary["steps"]["export_submission"] = {
+            "status": "skipped",
+            "reason": "submission audit is not export-ready",
+            "audit_status": audit_summary.get("audit_status", "") if isinstance(audit_summary, dict) else "",
+        }
+    else:
+        summary["steps"]["export_submission"] = {"status": "skipped"}
+    persist_summary()
+
+    if args.run_record_run_result:
+        run_record_run_result(
+            argparse.Namespace(
+                run_root=run_root,
+                results_md=Path(args.results_md).resolve(),
+                label=label,
+                suite_summary_relpath=suite_summary_relpath,
+                audit_relpath=audit_relpath,
+                export_relpath=export_relpath,
+            )
+        )
+        summary["steps"]["record_run_result"] = {
+            "status": "completed",
+            "results_md": str(Path(args.results_md).resolve()),
+        }
+    else:
+        summary["steps"]["record_run_result"] = {"status": "skipped"}
+    persist_summary()
+
+    if args.run_package_best_submission:
+        run_package_best_submission(
+            argparse.Namespace(
+                search_root=Path(args.search_root).resolve(),
+                candidate_run_root=[Path(path).resolve() for path in (args.candidate_run_root or [])]
+                or None,
+                output_root=Path(args.best_submission_output_root).resolve(),
+                results_md=Path(args.results_md).resolve(),
+                suite_summary_relpath=suite_summary_relpath,
+                audit_relpath=audit_relpath,
+                export_relpath=export_relpath,
+                min_local320_accuracy=float(args.min_local320_accuracy),
+                min_general_stable_accuracy=float(args.min_general_stable_accuracy),
+                min_proxy_v2_accuracy=float(args.min_proxy_v2_accuracy),
+                min_specialized_accuracy=float(args.min_specialized_accuracy),
+                require_exportable=bool(args.require_exportable),
+                export_if_missing=bool(args.export_if_missing),
+                update_results_md=bool(args.update_results_md),
+                base_model_name_or_path=str(args.base_model_name_or_path),
+            )
+        )
+        selection_manifest = load_json(
+            Path(args.best_submission_output_root).resolve() / "selection_manifest.json",
+            default=None,
+        )
+        summary["steps"]["package_best_submission"] = {
+            "status": "completed",
+            "output_root": str(Path(args.best_submission_output_root).resolve()),
+            "selection_status": selection_manifest.get("status", "") if isinstance(selection_manifest, dict) else "",
+            "selected_run_root": selection_manifest.get("selected_run_root", "") if isinstance(selection_manifest, dict) else "",
+        }
+    else:
+        summary["steps"]["package_best_submission"] = {"status": "skipped"}
+    persist_summary()
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def run_train_mlx_config(args: argparse.Namespace) -> None:
     run_mlx_lora_training_from_config(Path(args.config).resolve())
 
@@ -4565,6 +4924,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_shared_train_args(train)
     train.set_defaults(func=run_train)
+
+    wait_for_path_parser = subparsers.add_parser(
+        "wait-for-path",
+        help="Wait for a file or directory to appear and emit a JSON wait manifest.",
+    )
+    wait_for_path_parser.add_argument("--path", type=Path, required=True)
+    wait_for_path_parser.add_argument(
+        "--expected-kind",
+        choices=("any", "file", "dir"),
+        default="any",
+    )
+    wait_for_path_parser.add_argument("--poll-seconds", type=float, default=60.0)
+    wait_for_path_parser.add_argument("--timeout-seconds", type=float, default=0.0)
+    wait_for_path_parser.add_argument("--status-json", type=Path, default=None)
+    wait_for_path_parser.set_defaults(func=run_wait_for_path)
+
+    resume_train_from_run = subparsers.add_parser(
+        "resume-train-from-run",
+        help="Reuse a completed run's shadow model and adapter as the resume source for a new train.",
+    )
+    add_shared_train_args(resume_train_from_run)
+    resume_train_from_run.add_argument("--source-run-root", type=Path, required=True)
+    resume_train_from_run.set_defaults(func=run_resume_train_from_run)
+
+    wait_train_from_run = subparsers.add_parser(
+        "wait-train-from-run",
+        help="Wait for a source run to finish, then launch a resumed train from that run.",
+    )
+    add_shared_train_args(wait_train_from_run)
+    wait_train_from_run.add_argument("--source-run-root", type=Path, required=True)
+    wait_train_from_run.add_argument("--poll-seconds", type=float, default=60.0)
+    wait_train_from_run.add_argument("--timeout-seconds", type=float, default=0.0)
+    wait_train_from_run.add_argument("--wait-status-json", type=Path, default=None)
+    wait_train_from_run.set_defaults(func=run_wait_train_from_run)
 
     train_mlx_config = subparsers.add_parser(
         "train-mlx-config",
@@ -4799,6 +5192,121 @@ def build_parser() -> argparse.ArgumentParser:
         default=BASE_MODEL_NAME,
     )
     package_best_submission.set_defaults(func=run_package_best_submission)
+
+    postprocess_run = subparsers.add_parser(
+        "postprocess-run",
+        help="Wait/evaluate/audit/export/record a completed run in one single-file pipeline.",
+    )
+    postprocess_run.add_argument("--run-root", type=Path, required=True)
+    postprocess_run.add_argument("--label", type=str, default=None)
+    postprocess_run.add_argument(
+        "--wait-for-training-result",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    postprocess_run.add_argument("--poll-seconds", type=float, default=60.0)
+    postprocess_run.add_argument("--timeout-seconds", type=float, default=0.0)
+    postprocess_run.add_argument("--summary-json", type=Path, default=None)
+    postprocess_run.add_argument(
+        "--run-eval-suite",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument("--benchmark-root", type=Path, default=PHASE0_OFFLINE_EVAL_ARTIFACT_ROOT)
+    postprocess_run.add_argument("--extra-benchmark-csv", type=Path, action="append", default=None)
+    postprocess_run.add_argument("--suite-output-root", type=Path, default=None)
+    postprocess_run.add_argument("--max-tokens", type=int, default=README_MAX_TOKENS)
+    postprocess_run.add_argument("--temperature", type=float, default=README_TEMPERATURE)
+    postprocess_run.add_argument("--top-p", type=float, default=README_TOP_P)
+    postprocess_run.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    postprocess_run.add_argument("--max-model-len", type=int, default=README_MAX_MODEL_LEN)
+    postprocess_run.add_argument("--prompt-chunk-size", type=int, default=16)
+    postprocess_run.add_argument("--prefill-batch-size", type=int, default=16)
+    postprocess_run.add_argument("--completion-batch-size", type=int, default=16)
+    postprocess_run.add_argument(
+        "--eval-enable-thinking",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument(
+        "--lazy-load",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument("--force-single-generate", action="store_true")
+    postprocess_run.add_argument(
+        "--run-audit-submission",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument("--audit-output-root", type=Path, default=None)
+    postprocess_run.add_argument(
+        "--run-export-submission",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument("--export-output-root", type=Path, default=None)
+    postprocess_run.add_argument(
+        "--export-only-if-ready",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument("--reference-model-root", type=Path, default=None)
+    postprocess_run.add_argument(
+        "--run-record-run-result",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument(
+        "--results-md",
+        type=Path,
+        default=REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+    )
+    postprocess_run.add_argument(
+        "--run-package-best-submission",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    postprocess_run.add_argument("--search-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    postprocess_run.add_argument("--candidate-run-root", type=Path, action="append", default=None)
+    postprocess_run.add_argument(
+        "--best-submission-output-root",
+        type=Path,
+        default=DEFAULT_OUTPUT_ROOT / "best_submission_candidate_auto",
+    )
+    postprocess_run.add_argument(
+        "--min-local320-accuracy",
+        type=float,
+        default=DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+    )
+    postprocess_run.add_argument(
+        "--min-general-stable-accuracy",
+        type=float,
+        default=DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+    )
+    postprocess_run.add_argument("--min-proxy-v2-accuracy", type=float, default=0.0)
+    postprocess_run.add_argument("--min-specialized-accuracy", type=float, default=0.0)
+    postprocess_run.add_argument(
+        "--require-exportable",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument(
+        "--export-if-missing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument(
+        "--update-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument(
+        "--base-model-name-or-path",
+        type=str,
+        default=BASE_MODEL_NAME,
+    )
+    postprocess_run.set_defaults(func=run_postprocess_run)
 
     return parser
 
