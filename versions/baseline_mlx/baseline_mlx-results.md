@@ -647,15 +647,39 @@ row-level overlap:
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`
 
-- recorded_at: `2026-04-09T11:42:14.064402+00:00`
-- label: `export-safe-stage1-rerun-postprocess`
+- status: `recorded`
+- label: `export-safe-stage1-rerun-live`
+- observed_at: `2026-04-09T11:41:48.519598+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
 - sampled_rows: `3321`
-- optimizer_steps: `832`
+- optimizer_progress: `832/832 = 100.00%`
 - lr: `0.0001`
 - max_seq_length: `4096`
 - trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj']`
+
+#### Latest train progress
+
+- source: `latest_train_report`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1/adapter/latest_train_report.json`
+- iteration: `6642`
+- optimizer_step: `832`
+- train_loss: `0.396673`
+- learning_rate: `6.57615e-07`
+- it_per_sec: `0.817017`
+- tokens_per_sec: `386.812`
+- trained_tokens: `3943876`
+- peak_memory_gb: `68.5965`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `38710`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `True`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1 -->
