@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+import zipfile
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "reproduce_nemotron_sft_lora_with_cot_v2_mlx.py"
@@ -100,6 +101,143 @@ def build_postprocess_args(run_root: Path, summary_json: Path, **overrides) -> S
     return SimpleNamespace(**payload)
 
 
+def write_benchmark_eval_summary(
+    output_root: Path,
+    *,
+    rows: int,
+    correct: int,
+    by_benchmark: list[dict[str, object]] | None = None,
+) -> None:
+    output_root.mkdir(parents=True, exist_ok=True)
+    output_root.joinpath("benchmark_eval_summary.json").write_text(
+        json.dumps(
+            {
+                "overall": {
+                    "rows": rows,
+                    "correct": correct,
+                    "accuracy": correct / rows if rows else 0.0,
+                },
+                "by_benchmark": by_benchmark or [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def make_candidate_run(
+    tmp_path: Path,
+    *,
+    run_name: str,
+    local320_correct: int,
+    local320_rows: int = 320,
+    general_stable_correct: int = 96,
+    general_stable_rows: int = 100,
+    proxy_correct: int = 70,
+    proxy_rows: int = 84,
+    specialized_correct: int = 300,
+    specialized_rows: int = 563,
+    export_ready: bool = True,
+) -> Path:
+    run_root = tmp_path / run_name
+    adapter_dir = run_root / "adapter"
+    submission_dir = run_root / "submission_export" / "submission_adapter"
+    adapter_dir.mkdir(parents=True)
+    submission_dir.mkdir(parents=True)
+    (adapter_dir / "adapters.safetensors").write_bytes(b"adapter")
+    (submission_dir / "adapter_config.json").write_text("{}", encoding="utf-8")
+    (submission_dir / "adapter_model.safetensors").write_bytes(b"adapter")
+    zip_path = run_root / "submission_export" / "submission.zip"
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("adapter_config.json", "{}")
+        archive.writestr("adapter_model.safetensors", "adapter")
+
+    local320_root = run_root / "eval_suite_readme_proxy_specialized" / "readme_local320"
+    proxy_root = run_root / "eval_suite_readme_proxy_specialized" / "leaderboard_proxy_v2"
+    specialized_root = run_root / "eval_suite_readme_proxy_specialized" / "binary_bias_specialized_set"
+    write_benchmark_eval_summary(
+        local320_root,
+        rows=local320_rows,
+        correct=local320_correct,
+        by_benchmark=[
+            {
+                "benchmark_name": "general_stable_set",
+                "rows": general_stable_rows,
+                "correct": general_stable_correct,
+                "accuracy": general_stable_correct / general_stable_rows,
+            },
+            {
+                "benchmark_name": "binary_hard_set",
+                "rows": 160,
+                "correct": 80,
+                "accuracy": 0.5,
+            },
+            {
+                "benchmark_name": "symbol_watch_set",
+                "rows": 60,
+                "correct": 58,
+                "accuracy": 58 / 60,
+            },
+        ],
+    )
+    write_benchmark_eval_summary(proxy_root, rows=proxy_rows, correct=proxy_correct)
+    write_benchmark_eval_summary(specialized_root, rows=specialized_rows, correct=specialized_correct)
+
+    (run_root / "eval_suite_readme_proxy_specialized" / "benchmark_eval_suite_summary.json").write_text(
+        json.dumps(
+            {
+                "evaluations": [
+                    {"evaluation_name": "readme_local320", "output_root": str(local320_root.resolve())},
+                    {"evaluation_name": "leaderboard_proxy_v2", "output_root": str(proxy_root.resolve())},
+                    {
+                        "evaluation_name": "binary_bias_specialized_set",
+                        "output_root": str(specialized_root.resolve()),
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_root / "prepare_manifest.json").write_text(
+        json.dumps(
+            {
+                "train_csv": "train.csv",
+                "sampling": {"sampled_rows": 128},
+                "training": {
+                    "optimizer_steps": 16,
+                    "learning_rate": 2e-5,
+                    "max_seq_length": 1536,
+                    "trainable_lora_suffixes": ["mixer.q_proj", "mixer.k_proj"],
+                    "lora_keys": ["mixer.q_proj", "mixer.k_proj"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_root / "training_result.json").write_text(json.dumps({"ok": True}), encoding="utf-8")
+    (run_root / "submission_compat_audit" / "submission_compat_audit.json").parent.mkdir(parents=True, exist_ok=True)
+    (run_root / "submission_compat_audit" / "submission_compat_audit.json").write_text(
+        json.dumps(
+            {
+                "audit_status": "potentially_exportable_2d_only" if export_ready else "blocked",
+                "peft_export_ready": export_ready,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_root / "submission_export" / "export_manifest.json").write_text(
+        json.dumps(
+            {
+                "zip_path": str(zip_path.resolve()),
+                "submission_dir": str(submission_dir.resolve()),
+                "validation": {"valid": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return run_root
+
+
 def test_resolve_source_run_resume_paths_uses_prepare_manifest(tmp_path: Path) -> None:
     source_run, expected_shadow_model_dir, expected_adapter_file = make_source_run(tmp_path)
 
@@ -174,3 +312,88 @@ def test_postprocess_run_dry_run_writes_summary_without_loading_model(tmp_path: 
     assert summary["suite_summary_relpath"] == str(stage_waiters.DEFAULT_RUN_SUITE_SUMMARY_RELPATH)
     assert summary["audit_relpath"] == str(stage_waiters.DEFAULT_RUN_AUDIT_RELPATH)
     assert summary["export_relpath"] == str(stage_waiters.DEFAULT_RUN_EXPORT_RELPATH)
+
+
+def test_package_best_submission_selects_best_exportable_candidate(tmp_path: Path) -> None:
+    weaker = make_candidate_run(
+        tmp_path,
+        run_name="candidate_weaker",
+        local320_correct=216,
+        proxy_correct=50,
+        specialized_correct=280,
+    )
+    stronger = make_candidate_run(
+        tmp_path,
+        run_name="candidate_stronger",
+        local320_correct=224,
+        proxy_correct=72,
+        specialized_correct=320,
+    )
+    output_root = tmp_path / "best_submission"
+    results_md = tmp_path / "results.md"
+
+    stage_waiters.run_package_best_submission(
+        SimpleNamespace(
+            search_root=tmp_path,
+            candidate_run_root=[weaker, stronger],
+            output_root=output_root,
+            results_md=results_md,
+            suite_summary_relpath=stage_waiters.DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+            audit_relpath=stage_waiters.DEFAULT_RUN_AUDIT_RELPATH,
+            export_relpath=stage_waiters.DEFAULT_RUN_EXPORT_RELPATH,
+            min_local320_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+            min_general_stable_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+            min_proxy_v2_accuracy=0.0,
+            min_specialized_accuracy=0.0,
+            require_exportable=True,
+            export_if_missing=False,
+            update_results_md=False,
+            base_model_name_or_path=stage_waiters.BASE_MODEL_NAME,
+        )
+    )
+
+    selection = json.loads((output_root / "selection_manifest.json").read_text(encoding="utf-8"))
+    assert selection["status"] == "selected_candidate"
+    assert selection["eligible_candidate_count"] == 2
+    assert selection["selected_run_root"] == str(stronger.resolve())
+    assert (output_root / "submission.zip").exists()
+    assert (output_root / "submission_adapter" / "adapter_config.json").exists()
+    assert json.loads((output_root / "selected_suite_summary.json").read_text(encoding="utf-8"))["evaluations"][0][
+        "evaluation_name"
+    ] == "readme_local320"
+
+
+def test_package_best_submission_reports_no_eligible_candidate(tmp_path: Path) -> None:
+    make_candidate_run(
+        tmp_path,
+        run_name="candidate_blocked",
+        local320_correct=224,
+        export_ready=False,
+    )
+    output_root = tmp_path / "best_submission"
+
+    stage_waiters.run_package_best_submission(
+        SimpleNamespace(
+            search_root=tmp_path,
+            candidate_run_root=None,
+            output_root=output_root,
+            results_md=tmp_path / "results.md",
+            suite_summary_relpath=stage_waiters.DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+            audit_relpath=stage_waiters.DEFAULT_RUN_AUDIT_RELPATH,
+            export_relpath=stage_waiters.DEFAULT_RUN_EXPORT_RELPATH,
+            min_local320_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+            min_general_stable_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+            min_proxy_v2_accuracy=0.0,
+            min_specialized_accuracy=0.0,
+            require_exportable=True,
+            export_if_missing=False,
+            update_results_md=False,
+            base_model_name_or_path=stage_waiters.BASE_MODEL_NAME,
+        )
+    )
+
+    selection = json.loads((output_root / "selection_manifest.json").read_text(encoding="utf-8"))
+    assert selection["status"] == "no_eligible_candidate"
+    assert selection["eligible_candidate_count"] == 0
+    assert selection["selected_run_root"] == ""
+    assert not (output_root / "submission.zip").exists()
