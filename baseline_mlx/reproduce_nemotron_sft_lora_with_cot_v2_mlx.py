@@ -2996,6 +2996,96 @@ def run_package_best_submission(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def run_poll_best_submission(args: argparse.Namespace) -> None:
+    output_root = Path(args.output_root).resolve()
+    ensure_dir(output_root)
+    summary_path = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else (output_root / "poll_best_submission_summary.json")
+    )
+    summary: dict[str, Any] = {
+        "recorded_at": utc_now(),
+        "search_root": str(Path(args.search_root).resolve()),
+        "output_root": str(output_root),
+        "poll_seconds": float(args.poll_seconds),
+        "max_iterations": int(args.max_iterations),
+        "run_publish_results_md": bool(args.run_publish_results_md),
+        "iterations": [],
+        "status": "running",
+    }
+
+    def persist_summary() -> None:
+        write_json(summary_path, summary)
+
+    persist_summary()
+    iteration = 0
+    while True:
+        iteration += 1
+        run_package_best_submission(
+            argparse.Namespace(
+                search_root=Path(args.search_root).resolve(),
+                candidate_run_root=[Path(path).resolve() for path in (args.candidate_run_root or [])] or None,
+                output_root=output_root,
+                results_md=Path(args.results_md).resolve(),
+                suite_summary_relpath=Path(args.suite_summary_relpath),
+                audit_relpath=Path(args.audit_relpath),
+                export_relpath=Path(args.export_relpath),
+                min_local320_accuracy=float(args.min_local320_accuracy),
+                min_general_stable_accuracy=float(args.min_general_stable_accuracy),
+                min_proxy_v2_accuracy=float(args.min_proxy_v2_accuracy),
+                min_specialized_accuracy=float(args.min_specialized_accuracy),
+                require_exportable=bool(args.require_exportable),
+                export_if_missing=bool(args.export_if_missing),
+                update_results_md=bool(args.update_results_md),
+                base_model_name_or_path=str(args.base_model_name_or_path),
+            )
+        )
+        selection_manifest = load_json(output_root / "selection_manifest.json", default=None)
+        iteration_summary = {
+            "iteration": iteration,
+            "recorded_at": utc_now(),
+            "selection_status": selection_manifest.get("status", "") if isinstance(selection_manifest, dict) else "",
+            "selected_run_root": selection_manifest.get("selected_run_root", "")
+            if isinstance(selection_manifest, dict)
+            else "",
+            "eligible_candidate_count": selection_manifest.get("eligible_candidate_count", 0)
+            if isinstance(selection_manifest, dict)
+            else 0,
+        }
+        summary["iterations"].append(iteration_summary)
+        summary["selection_manifest"] = selection_manifest
+        selected_run_root = str(iteration_summary["selected_run_root"])
+        if selected_run_root:
+            summary["status"] = "selected_candidate"
+            if args.run_publish_results_md:
+                publish_commit_message = (
+                    str(args.publish_commit_message).strip()
+                    if getattr(args, "publish_commit_message", None)
+                    else "Promote best submission candidate"
+                )
+                summary["publish_results_md"] = publish_results_md_to_git(
+                    repo_root=Path(args.repo_root).resolve(),
+                    results_md=Path(args.results_md).resolve(),
+                    commit_message=publish_commit_message,
+                    push=bool(args.publish_push),
+                    lock_dir=Path(args.publish_lock_dir).resolve(),
+                    lock_poll_seconds=float(args.publish_lock_poll_seconds),
+                    lock_timeout_seconds=float(args.publish_lock_timeout_seconds),
+                    dry_run=bool(args.publish_dry_run),
+                )
+            persist_summary()
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+            return
+        if int(args.max_iterations) > 0 and iteration >= int(args.max_iterations):
+            summary["status"] = iteration_summary["selection_status"] or "max_iterations_reached"
+            persist_summary()
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+            return
+        persist_summary()
+        time.sleep(float(args.poll_seconds))
+
+
 def select_shadow_validation_records(
     records: Sequence[dict[str, Any]],
     *,
@@ -5534,6 +5624,86 @@ def build_parser() -> argparse.ArgumentParser:
         default=BASE_MODEL_NAME,
     )
     package_best_submission.set_defaults(func=run_package_best_submission)
+
+    poll_best_submission = subparsers.add_parser(
+        "poll-best-submission",
+        help="Loop package-best-submission until an eligible candidate is found, then optionally publish the results ledger.",
+    )
+    poll_best_submission.add_argument("--search-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    poll_best_submission.add_argument("--candidate-run-root", type=Path, action="append", default=None)
+    poll_best_submission.add_argument("--output-root", type=Path, required=True)
+    poll_best_submission.add_argument("--results-md", type=Path, default=DEFAULT_RESULTS_MD)
+    poll_best_submission.add_argument(
+        "--suite-summary-relpath",
+        type=Path,
+        default=DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+    )
+    poll_best_submission.add_argument(
+        "--audit-relpath",
+        type=Path,
+        default=DEFAULT_RUN_AUDIT_RELPATH,
+    )
+    poll_best_submission.add_argument(
+        "--export-relpath",
+        type=Path,
+        default=DEFAULT_RUN_EXPORT_RELPATH,
+    )
+    poll_best_submission.add_argument(
+        "--min-local320-accuracy",
+        type=float,
+        default=DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+    )
+    poll_best_submission.add_argument(
+        "--min-general-stable-accuracy",
+        type=float,
+        default=DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+    )
+    poll_best_submission.add_argument("--min-proxy-v2-accuracy", type=float, default=0.0)
+    poll_best_submission.add_argument("--min-specialized-accuracy", type=float, default=0.0)
+    poll_best_submission.add_argument(
+        "--require-exportable",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_best_submission.add_argument(
+        "--export-if-missing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_best_submission.add_argument(
+        "--update-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_best_submission.add_argument(
+        "--base-model-name-or-path",
+        type=str,
+        default=BASE_MODEL_NAME,
+    )
+    poll_best_submission.add_argument("--poll-seconds", type=float, default=60.0)
+    poll_best_submission.add_argument("--max-iterations", type=int, default=0)
+    poll_best_submission.add_argument("--summary-json", type=Path, default=None)
+    poll_best_submission.add_argument(
+        "--run-publish-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_best_submission.add_argument("--publish-commit-message", type=str, default=None)
+    poll_best_submission.add_argument(
+        "--publish-push",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_best_submission.add_argument(
+        "--publish-dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    poll_best_submission.add_argument("--repo-root", type=Path, default=REPO_ROOT)
+    poll_best_submission.add_argument("--publish-lock-dir", type=Path, default=DEFAULT_RESULTS_GIT_LOCK_DIR)
+    poll_best_submission.add_argument("--publish-lock-poll-seconds", type=float, default=5.0)
+    poll_best_submission.add_argument("--publish-lock-timeout-seconds", type=float, default=0.0)
+    poll_best_submission.set_defaults(func=run_poll_best_submission)
 
     postprocess_run = subparsers.add_parser(
         "postprocess-run",

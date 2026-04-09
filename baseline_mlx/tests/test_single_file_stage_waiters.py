@@ -621,3 +621,60 @@ def test_publish_results_md_reports_no_changes(tmp_path: Path) -> None:
         text=True,
     ).stdout.strip()
     assert commit_count == "1"
+
+
+def test_poll_best_submission_selects_candidate_and_publishes_results_md(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    selected = make_candidate_run(
+        repo_root,
+        run_name="candidate_selected",
+        local320_correct=224,
+        proxy_correct=72,
+        specialized_correct=320,
+    )
+    output_root = repo_root / "best_submission"
+    summary_json = tmp_path / "poll_summary.json"
+
+    stage_waiters.run_poll_best_submission(
+        SimpleNamespace(
+            search_root=repo_root,
+            candidate_run_root=[selected],
+            output_root=output_root,
+            results_md=results_md,
+            suite_summary_relpath=stage_waiters.DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+            audit_relpath=stage_waiters.DEFAULT_RUN_AUDIT_RELPATH,
+            export_relpath=stage_waiters.DEFAULT_RUN_EXPORT_RELPATH,
+            min_local320_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+            min_general_stable_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+            min_proxy_v2_accuracy=0.0,
+            min_specialized_accuracy=0.0,
+            require_exportable=True,
+            export_if_missing=False,
+            update_results_md=True,
+            base_model_name_or_path=stage_waiters.BASE_MODEL_NAME,
+            poll_seconds=0.1,
+            max_iterations=1,
+            summary_json=summary_json,
+            run_publish_results_md=True,
+            publish_commit_message=None,
+            publish_push=False,
+            publish_dry_run=False,
+            repo_root=repo_root,
+            publish_lock_dir=repo_root / ".git" / ".nemotron_ledger_lock",
+            publish_lock_poll_seconds=0.1,
+            publish_lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "selected_candidate"
+    assert summary["selection_manifest"]["selected_run_root"] == str(selected.resolve())
+    assert summary["publish_results_md"]["status"] == "committed"
+    latest_message = subprocess.run(
+        ["git", "log", "--format=%B", "-1"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert "Promote best submission candidate" in latest_message
