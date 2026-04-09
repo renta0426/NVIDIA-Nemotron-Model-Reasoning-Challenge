@@ -496,6 +496,23 @@ def resolve_source_run_resume_paths(source_run_root: Path) -> tuple[Path, Path]:
     return shadow_model_dir, adapter_file
 
 
+def detect_started_run_marker(run_root: Path) -> Path | None:
+    resolved_run_root = Path(run_root).resolve()
+    marker_candidates = (
+        resolved_run_root / "training_result.json",
+        resolved_run_root / "runtime_preflight.json",
+        resolved_run_root / "prepare_manifest.json",
+        resolved_run_root / "resume_from_run_manifest.json",
+        resolved_run_root / "adapter" / "train_report.jsonl",
+        resolved_run_root / "adapter" / "latest_train_report.json",
+        resolved_run_root / "adapter" / "adapters.safetensors",
+    )
+    for candidate in marker_candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def to_jsonable_value(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -4501,9 +4518,10 @@ def run_wait_for_path(args: argparse.Namespace) -> None:
 def run_resume_train_from_run(args: argparse.Namespace) -> None:
     source_run_root = Path(args.source_run_root).resolve()
     resolved_model_root, resolved_resume_adapter_file = resolve_source_run_resume_paths(source_run_root)
-    args.model_root = resolved_model_root
-    args.resume_adapter_file = resolved_resume_adapter_file
     target_run_root = Path(args.output_root).resolve() / args.run_name
+    existing_marker = (
+        detect_started_run_marker(target_run_root) if bool(args.skip_if_target_started) else None
+    )
     launch_manifest = {
         "recorded_at": utc_now(),
         "source_run_root": str(source_run_root),
@@ -4512,14 +4530,46 @@ def run_resume_train_from_run(args: argparse.Namespace) -> None:
         "resolved_resume_adapter_file": str(resolved_resume_adapter_file),
         "target_run_root": str(target_run_root),
         "target_run_name": str(args.run_name),
+        "dry_run": bool(args.dry_run),
+        "skip_if_target_started": bool(args.skip_if_target_started),
+        "target_existing_marker": str(existing_marker) if existing_marker is not None else "",
     }
+    if existing_marker is not None:
+        launch_manifest["status"] = "skipped_existing_target"
+        write_json(target_run_root / "resume_from_run_manifest.json", launch_manifest)
+        print(json.dumps(launch_manifest, ensure_ascii=False, indent=2))
+        return
     write_json(target_run_root / "resume_from_run_manifest.json", launch_manifest)
     print(json.dumps(launch_manifest, ensure_ascii=False, indent=2))
+    if args.dry_run:
+        return
+    args.model_root = resolved_model_root
+    args.resume_adapter_file = resolved_resume_adapter_file
     run_train(args)
 
 
 def run_wait_train_from_run(args: argparse.Namespace) -> None:
     source_run_root = Path(args.source_run_root).resolve()
+    target_run_root = Path(args.output_root).resolve() / args.run_name
+    existing_marker = (
+        detect_started_run_marker(target_run_root) if bool(args.skip_if_target_started) else None
+    )
+    if existing_marker is not None:
+        wait_status_path = (
+            Path(args.wait_status_json).resolve()
+            if args.wait_status_json is not None
+            else (target_run_root / "wait_for_source_training_result.json")
+        )
+        wait_result = {
+            "recorded_at": utc_now(),
+            "source_run_root": str(source_run_root),
+            "target_run_root": str(target_run_root),
+            "status": "skipped_existing_target",
+            "target_existing_marker": str(existing_marker),
+        }
+        write_json(wait_status_path, wait_result)
+        print(json.dumps(wait_result, ensure_ascii=False, indent=2))
+        return
     wait_result = wait_for_path(
         source_run_root / "training_result.json",
         expected_kind="file",
@@ -4529,7 +4579,7 @@ def run_wait_train_from_run(args: argparse.Namespace) -> None:
     wait_status_path = (
         Path(args.wait_status_json).resolve()
         if args.wait_status_json is not None
-        else (Path(args.output_root).resolve() / args.run_name / "wait_for_source_training_result.json")
+        else (target_run_root / "wait_for_source_training_result.json")
     )
     write_json(wait_status_path, wait_result)
     args._source_wait_result = wait_result
@@ -4548,6 +4598,7 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
         "recorded_at": utc_now(),
         "run_root": str(run_root),
         "label": label,
+        "dry_run": bool(args.dry_run),
         "steps": {},
     }
 
@@ -4613,6 +4664,11 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
     summary["audit_relpath"] = str(audit_relpath)
     summary["export_relpath"] = str(export_relpath)
     persist_summary()
+    if args.dry_run:
+        summary["steps"]["dry_run"] = {"status": "completed"}
+        persist_summary()
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
 
     if args.run_eval_suite:
         run_eval_benchmark_suite(
@@ -4946,6 +5002,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_shared_train_args(resume_train_from_run)
     resume_train_from_run.add_argument("--source-run-root", type=Path, required=True)
+    resume_train_from_run.add_argument(
+        "--skip-if-target-started",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    resume_train_from_run.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     resume_train_from_run.set_defaults(func=run_resume_train_from_run)
 
     wait_train_from_run = subparsers.add_parser(
@@ -4957,6 +5023,16 @@ def build_parser() -> argparse.ArgumentParser:
     wait_train_from_run.add_argument("--poll-seconds", type=float, default=60.0)
     wait_train_from_run.add_argument("--timeout-seconds", type=float, default=0.0)
     wait_train_from_run.add_argument("--wait-status-json", type=Path, default=None)
+    wait_train_from_run.add_argument(
+        "--skip-if-target-started",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    wait_train_from_run.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     wait_train_from_run.set_defaults(func=run_wait_train_from_run)
 
     train_mlx_config = subparsers.add_parser(
@@ -5207,6 +5283,11 @@ def build_parser() -> argparse.ArgumentParser:
     postprocess_run.add_argument("--poll-seconds", type=float, default=60.0)
     postprocess_run.add_argument("--timeout-seconds", type=float, default=0.0)
     postprocess_run.add_argument("--summary-json", type=Path, default=None)
+    postprocess_run.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     postprocess_run.add_argument(
         "--run-eval-suite",
         action=argparse.BooleanOptionalAction,
