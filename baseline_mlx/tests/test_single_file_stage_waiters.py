@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 import zipfile
 
 
@@ -532,6 +532,76 @@ def test_postprocess_run_skips_existing_steps_without_reinvoking_pipeline(tmp_pa
     assert summary["steps"]["export_submission"]["status"] == "skipped_existing"
     assert summary["steps"]["record_run_result"]["status"] == "skipped_existing"
     assert summary["steps"]["record_run_result"]["recorded_at"] == recorded_result["recorded_at"]
+
+
+def test_evaluate_benchmark_rows_falls_back_to_evaluation_name_for_missing_benchmark_name() -> None:
+    fake_mlx_lm = ModuleType("mlx_lm")
+    fake_sample_utils = ModuleType("mlx_lm.sample_utils")
+    original_mlx_lm = sys.modules.get("mlx_lm")
+    original_sample_utils = sys.modules.get("mlx_lm.sample_utils")
+
+    fake_mlx_lm.batch_generate = lambda *_args, **_kwargs: SimpleNamespace(texts=["reasoning... \\boxed{42}"])
+    fake_mlx_lm.generate = lambda *_args, **_kwargs: "reasoning... \\boxed{42}"
+    fake_sample_utils.make_sampler = lambda **_kwargs: object()
+
+    class FakeTokenizer:
+        bos_token = None
+
+        def apply_chat_template(
+            self,
+            messages,
+            *,
+            tokenize: bool = False,
+            add_generation_prompt: bool = True,
+            enable_thinking: bool = True,
+        ):
+            assert tokenize is False
+            assert add_generation_prompt is True
+            assert enable_thinking is True
+            return messages[0]["content"]
+
+        def encode(self, prompt: str, *, add_special_tokens: bool = True) -> list[int]:
+            assert isinstance(prompt, str)
+            assert isinstance(add_special_tokens, bool)
+            return [1, 2, 3]
+
+    sys.modules["mlx_lm"] = fake_mlx_lm
+    sys.modules["mlx_lm.sample_utils"] = fake_sample_utils
+    try:
+        records, scored_rows, summary = stage_waiters.evaluate_benchmark_rows(
+            model=object(),
+            tokenizer=FakeTokenizer(),
+            benchmark_rows=[{"id": "row-1", "prompt": "Solve 6*7", "answer": "42"}],
+            evaluation_name="stage2_suite",
+            source_paths=[Path("dummy.csv")],
+            args=SimpleNamespace(
+                eval_enable_thinking=True,
+                temperature=0.0,
+                top_p=1.0,
+                max_num_seqs=64,
+                prompt_chunk_size=16,
+                prefill_batch_size=16,
+                completion_batch_size=16,
+                force_single_generate=False,
+                max_tokens=32,
+                max_model_len=stage_waiters.README_MAX_MODEL_LEN,
+                model_root=Path("model"),
+                adapter_dir=None,
+            ),
+        )
+    finally:
+        if original_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = original_mlx_lm
+        if original_sample_utils is None:
+            sys.modules.pop("mlx_lm.sample_utils", None)
+        else:
+            sys.modules["mlx_lm.sample_utils"] = original_sample_utils
+
+    assert records[0]["benchmark_name"] == "stage2_suite"
+    assert scored_rows[0]["is_correct"] is True
+    assert summary["overall"]["accuracy"] == 1.0
 
 
 def test_package_best_submission_selects_best_exportable_candidate(tmp_path: Path) -> None:

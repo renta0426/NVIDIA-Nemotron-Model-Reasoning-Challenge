@@ -1992,7 +1992,7 @@ def evaluate_benchmark_rows(
         for row, rendered_prompt, raw_output in zip(chunk_rows, chunk_rendered_prompts, chunk_outputs):
             records.append(
                 {
-                    "benchmark_name": str(row.get("benchmark_name", benchmark_csv.stem)),
+                    "benchmark_name": str(row.get("benchmark_name") or evaluation_name),
                     "benchmark_role": str(row.get("benchmark_role", "")),
                     "id": str(row["id"]),
                     "family": str(row.get("family", "")),
