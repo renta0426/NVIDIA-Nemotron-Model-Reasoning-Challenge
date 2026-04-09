@@ -418,3 +418,17 @@ row-level overlap:
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union`
+
+- recorded_at: `2026-04-09T03:05:32.689368+00:00`
+- label: `stagefreeze-v1-stage1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
+- sampled_rows: `3321`
+- optimizer_steps: `832`
+- lr: `0.0001`
+- max_seq_length: `4096`
+- trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.switch_mlp.fc1', 'mixer.switch_mlp.fc2', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj']`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union -->
