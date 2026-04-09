@@ -733,13 +733,13 @@ row-level overlap:
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2`
 
-- status: `training`
+- status: `training_completed`
 - label: `export-safe-vo-rerun-v2-live`
-- observed_at: `2026-04-09T12:22:15.761547+00:00`
+- observed_at: `2026-04-09T12:25:30.325515+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
 - sampled_rows: `218`
-- optimizer_progress: `90/101 = 89.11%`
+- optimizer_progress: `101/101 = 100.00%`
 - lr: `2e-05`
 - max_seq_length: `1536`
 - trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
@@ -748,20 +748,20 @@ row-level overlap:
 
 - source: `latest_train_report`
 - source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `702`
-- optimizer_step: `90`
-- train_loss: `0.21397`
-- learning_rate: `1.52685e-06`
-- it_per_sec: `0.433595`
-- tokens_per_sec: `225.686`
-- trained_tokens: `374241`
+- iteration: `784`
+- optimizer_step: `101`
+- train_loss: `0.188623`
+- learning_rate: `2.36105e-07`
+- it_per_sec: `0.447069`
+- tokens_per_sec: `207.44`
+- trained_tokens: `418695`
 - peak_memory_gb: `68.0482`
 
 #### Completion markers
 
-- training_result_exists: `False`
+- training_result_exists: `True`
 - runtime_pid: `73135`
-- runtime_pid_alive: `True`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
