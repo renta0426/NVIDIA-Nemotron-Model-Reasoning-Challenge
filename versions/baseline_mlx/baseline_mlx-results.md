@@ -336,6 +336,7 @@ row-level overlap:
 - single-file trainer に **JSONL progress callback** も追加した。`mlx_lm.lora.run()` が内部で callback 引数を上書きする挙動を利用し、`get_reporting_callbacks()` を wrap して **`adapter/train_report.jsonl`**, **`adapter/val_report.jsonl`**, **`adapter/latest_train_report.json`**, **`adapter/latest_val_report.json`** を常時出す。1-step smoke `nemotron_sft_lora_with_cot_v2_mlx_progress_callback_smoke` で生成を確認した。
 - この progress callback により、**これから起動する Stage2 / export-safe ablation / future runs** は final save 前でも file artifact から optimizer step と latest loss/memory を追える。なお、すでに起動済みの Stage1 broad 2 本には retroactive には効かない。
 - `baseline_mlx/outputs/best_submission_candidate_auto/selection_manifest.json` は継続更新中で、現時点の status は **`no_eligible_candidate`**。つまり best-submission poller 自体は動いており、まだ **`local320 > 215/320` かつ exportable** な run が出ていないことが確認できている。
+- その後の live 点検で、古い detached shell waiter 群に **`trap "rmdir "`** という lock cleanup の quoting 崩れが残っていること、および旧 best-candidate poller の inline Python 判定が壊れていることを確認した。train 本体には手を触れず、**record/push waiter を safe cleanup 版へ差し替え**、best-candidate 側は **session script 化した poller** へ移した。これにより、長時間 train 完了後の **`record-run-result` → git commit/push** と best candidate 昇格の自動連結を復旧した。
 
 ## Direct corrective from baseline fullrun v2
 
