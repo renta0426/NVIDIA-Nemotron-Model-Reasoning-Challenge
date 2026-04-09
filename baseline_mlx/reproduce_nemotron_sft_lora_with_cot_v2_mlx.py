@@ -310,14 +310,25 @@ NEMOTRON_STAGE_BROAD_LORA_KEYS = [
     "mixer.shared_experts.up_proj",
     "mixer.shared_experts.down_proj",
 ]
+NEMOTRON_STAGE_BROAD_EXPORTSAFE_LORA_KEYS = [
+    "mixer.in_proj",
+    "mixer.out_proj",
+    "mixer.shared_experts.up_proj",
+    "mixer.shared_experts.down_proj",
+]
 NEMOTRON_STAGE_UNION_LORA_KEYS = list(
     dict.fromkeys(NEMOTRON_STAGE_BROAD_LORA_KEYS + ATTENTION_LORA_KEYS)
 )
+NEMOTRON_STAGE_UNION_EXPORTSAFE_LORA_KEYS = list(
+    dict.fromkeys(NEMOTRON_STAGE_BROAD_EXPORTSAFE_LORA_KEYS + ATTENTION_LORA_KEYS)
+)
 LORA_KEY_GROUPS: dict[str, list[str]] = {
     "broad": list(NEMOTRON_STAGE_BROAD_LORA_KEYS),
+    "broad-exportsafe": list(NEMOTRON_STAGE_BROAD_EXPORTSAFE_LORA_KEYS),
     "attention": list(ATTENTION_LORA_KEYS),
     "attention-vo": ["mixer.v_proj", "mixer.o_proj"],
     "stage-union": list(NEMOTRON_STAGE_UNION_LORA_KEYS),
+    "stage-union-exportsafe": list(NEMOTRON_STAGE_UNION_EXPORTSAFE_LORA_KEYS),
 }
 DEFAULT_STAGE2_BINARY_SOLVERS = (
     "binary_affine_xor",
@@ -1821,6 +1832,185 @@ def summarize_count_mapping(counts: dict[Any, int], key_name: str) -> list[dict[
     return rows
 
 
+def collect_all_lora_adapter_weights(model: Any) -> dict[str, Any]:
+    adapter_weights: dict[str, Any] = {}
+    for module_name, module in model.named_modules():
+        if not hasattr(module, "lora_a") or not hasattr(module, "lora_b"):
+            continue
+        if not module_name:
+            continue
+        adapter_weights[f"{module_name}.lora_a"] = module.lora_a
+        adapter_weights[f"{module_name}.lora_b"] = module.lora_b
+    if not adapter_weights:
+        raise ValueError("No LoRA adapter weights found on model.")
+    return adapter_weights
+
+
+def ensure_nemotron_meta_import_stubs() -> None:
+    import types
+
+    def _stub(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("Nemotron meta import stub was called at runtime.")
+
+    for module_name in ("mamba_ssm", "mamba_ssm.ops", "mamba_ssm.ops.triton"):
+        if module_name not in sys.modules:
+            sys.modules[module_name] = types.ModuleType(module_name)
+    layernorm_module = types.ModuleType("mamba_ssm.ops.triton.layernorm_gated")
+    layernorm_module.rmsnorm_fn = _stub
+    selective_module = types.ModuleType("mamba_ssm.ops.triton.selective_state_update")
+    selective_module.selective_state_update = _stub
+    ssd_module = types.ModuleType("mamba_ssm.ops.triton.ssd_combined")
+    ssd_module.mamba_chunk_scan_combined = _stub
+    ssd_module.mamba_split_conv1d_scan_combined = _stub
+    sys.modules["mamba_ssm.ops.triton.layernorm_gated"] = layernorm_module
+    sys.modules["mamba_ssm.ops.triton.selective_state_update"] = selective_module
+    sys.modules["mamba_ssm.ops.triton.ssd_combined"] = ssd_module
+
+
+def build_peft_target_modules_from_mlx_keys(keys: Sequence[str]) -> list[str]:
+    return dedupe_strings(str(key).strip() for key in keys if str(key).strip())
+
+
+def build_reference_peft_lora_shapes(
+    *,
+    reference_model_root: Path,
+    target_modules: Sequence[str],
+    rank: int,
+    alpha: float,
+    dropout: float,
+) -> dict[str, tuple[int, ...]]:
+    from accelerate import init_empty_weights
+    from peft import LoraConfig, TaskType, get_peft_model
+    from transformers import AutoConfig, AutoModelForCausalLM
+
+    ensure_nemotron_meta_import_stubs()
+    config = AutoConfig.from_pretrained(str(reference_model_root), trust_remote_code=True)
+    with init_empty_weights():
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+    peft_config = LoraConfig(
+        task_type=TaskType.CAUSAL_LM,
+        r=int(rank),
+        lora_alpha=float(alpha),
+        lora_dropout=float(dropout),
+        target_modules=list(target_modules),
+        bias="none",
+        use_dora=False,
+        modules_to_save=None,
+        inference_mode=True,
+    )
+    model = get_peft_model(model, peft_config)
+    reference_shapes: dict[str, tuple[int, ...]] = {}
+    for key, value in model.state_dict().items():
+        if "lora_A" in key or "lora_B" in key:
+            reference_shapes[str(key)] = tuple(value.shape)
+    return reference_shapes
+
+
+def build_peft_adapter_config_payload(
+    *,
+    base_model_name_or_path: str,
+    rank: int,
+    alpha: float,
+    dropout: float,
+    target_modules: Sequence[str],
+) -> dict[str, Any]:
+    return {
+        "alora_invocation_tokens": None,
+        "alpha_pattern": {},
+        "arrow_config": None,
+        "auto_mapping": None,
+        "base_model_name_or_path": str(base_model_name_or_path),
+        "bias": "none",
+        "corda_config": None,
+        "ensure_weight_tying": False,
+        "eva_config": None,
+        "exclude_modules": None,
+        "fan_in_fan_out": False,
+        "inference_mode": True,
+        "init_lora_weights": True,
+        "layer_replication": None,
+        "layers_pattern": None,
+        "layers_to_transform": None,
+        "loftq_config": {},
+        "lora_alpha": int(alpha) if float(alpha).is_integer() else float(alpha),
+        "lora_bias": False,
+        "lora_dropout": float(dropout),
+        "megatron_config": None,
+        "megatron_core": "megatron.core",
+        "modules_to_save": None,
+        "peft_type": "LORA",
+        "peft_version": str(importlib_metadata.version("peft")),
+        "qalora_group_size": 16,
+        "r": int(rank),
+        "rank_pattern": {},
+        "revision": None,
+        "target_modules": list(target_modules),
+        "target_parameters": None,
+        "task_type": "CAUSAL_LM",
+        "trainable_token_indices": None,
+        "use_dora": False,
+        "use_qalora": False,
+        "use_rslora": False,
+    }
+
+
+def convert_mlx_adapter_to_peft_tensors(
+    tensors: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    converted: dict[str, Any] = {}
+    conversion_rows: list[dict[str, Any]] = []
+    for key, value in sorted(tensors.items()):
+        if len(value.shape) != 2:
+            raise ValueError(
+                f"Only 2D LoRA tensors are supported for conservative PEFT export, got {key}: {tuple(value.shape)}"
+            )
+        if key.endswith(".lora_a"):
+            target_key = f"base_model.model.{key[:-7]}.lora_A.default.weight"
+        elif key.endswith(".lora_b"):
+            target_key = f"base_model.model.{key[:-7]}.lora_B.default.weight"
+        else:
+            raise ValueError(f"Unsupported adapter tensor key: {key}")
+        converted[target_key] = value.T
+        conversion_rows.append(
+            {
+                "source_key": key,
+                "source_shape": list(value.shape),
+                "target_key": target_key,
+                "target_shape": list(converted[target_key].shape),
+            }
+        )
+    return converted, conversion_rows
+
+
+def validate_converted_peft_tensors(
+    *,
+    converted_tensors: dict[str, Any],
+    reference_shapes: dict[str, tuple[int, ...]],
+) -> dict[str, Any]:
+    converted_keys = set(converted_tensors)
+    reference_keys = set(reference_shapes)
+    missing_keys = sorted(reference_keys - converted_keys)
+    unexpected_keys = sorted(converted_keys - reference_keys)
+    shape_mismatches: list[dict[str, Any]] = []
+    for key in sorted(converted_keys & reference_keys):
+        converted_shape = tuple(converted_tensors[key].shape)
+        reference_shape = tuple(reference_shapes[key])
+        if converted_shape != reference_shape:
+            shape_mismatches.append(
+                {
+                    "key": key,
+                    "converted_shape": list(converted_shape),
+                    "reference_shape": list(reference_shape),
+                }
+            )
+    return {
+        "missing_keys": missing_keys,
+        "unexpected_keys": unexpected_keys,
+        "shape_mismatches": shape_mismatches,
+        "valid": not missing_keys and not unexpected_keys and not shape_mismatches,
+    }
+
+
 def run_audit_submission_compat(args: argparse.Namespace) -> None:
     from safetensors.numpy import load_file
 
@@ -1876,11 +2066,7 @@ def run_audit_submission_compat(args: argparse.Namespace) -> None:
     except Exception:
         dropout = 0.0
     raw_keys = coerce_string_list(lora_parameters.get("keys"))
-    target_modules = []
-    for key in raw_keys:
-        suffix = str(key).strip().split(".")[-1]
-        if suffix and suffix not in target_modules:
-            target_modules.append(suffix)
+    target_modules = build_peft_target_modules_from_mlx_keys(raw_keys)
 
     peft_adapter_config_preview = {
         "peft_type": "LORA",
@@ -1931,6 +2117,111 @@ def run_audit_submission_compat(args: argparse.Namespace) -> None:
         render_submission_compat_markdown_summary(payload),
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def run_export_peft_submission(args: argparse.Namespace) -> None:
+    from safetensors.numpy import load_file, save_file
+
+    adapter_dir = Path(args.adapter_dir).resolve()
+    output_root = Path(args.output_root).resolve()
+    submission_dir = output_root / "submission_adapter"
+    ensure_dir(output_root)
+    ensure_dir(submission_dir)
+    verify_training_outputs(adapter_dir)
+
+    adapter_config = load_json(adapter_dir / "adapter_config.json", default=None)
+    if not isinstance(adapter_config, dict):
+        raise ValueError(f"Invalid adapter_config.json: {adapter_dir / 'adapter_config.json'}")
+    tensors = load_file(str(adapter_dir / "adapters.safetensors"))
+    if not tensors:
+        raise ValueError(f"No tensors found in {adapter_dir / 'adapters.safetensors'}")
+    non_2d_keys = [key for key, value in tensors.items() if len(value.shape) != 2]
+    if non_2d_keys:
+        raise ValueError(
+            "PEFT export is blocked because non-2D tensors are present: "
+            + ", ".join(non_2d_keys[:12])
+        )
+
+    lora_parameters = adapter_config.get("lora_parameters", {})
+    try:
+        rank = int(lora_parameters.get("rank", 0))
+    except Exception:
+        rank = 0
+    try:
+        alpha = float(lora_parameters.get("scale", 0.0))
+    except Exception:
+        alpha = 0.0
+    try:
+        dropout = float(lora_parameters.get("dropout", 0.0))
+    except Exception:
+        dropout = 0.0
+    target_modules = build_peft_target_modules_from_mlx_keys(
+        coerce_string_list(lora_parameters.get("keys"))
+    )
+    if not target_modules:
+        raise ValueError("No target_modules could be derived from MLX adapter config.")
+
+    reference_model_root = (
+        Path(args.reference_model_root).resolve()
+        if args.reference_model_root is not None
+        else Path(str(adapter_config.get("model", ""))).resolve()
+    )
+    if not reference_model_root.exists():
+        raise FileNotFoundError(f"Reference model root does not exist: {reference_model_root}")
+
+    converted_tensors, conversion_rows = convert_mlx_adapter_to_peft_tensors(tensors)
+    reference_shapes = build_reference_peft_lora_shapes(
+        reference_model_root=reference_model_root,
+        target_modules=target_modules,
+        rank=rank,
+        alpha=alpha,
+        dropout=dropout,
+    )
+    validation = validate_converted_peft_tensors(
+        converted_tensors=converted_tensors,
+        reference_shapes=reference_shapes,
+    )
+    if not validation["valid"]:
+        raise ValueError(
+            "Converted PEFT adapter tensors did not match the Nemotron meta reference. "
+            f"missing={len(validation['missing_keys'])} "
+            f"unexpected={len(validation['unexpected_keys'])} "
+            f"shape_mismatches={len(validation['shape_mismatches'])}"
+        )
+
+    peft_adapter_config = build_peft_adapter_config_payload(
+        base_model_name_or_path=str(args.base_model_name_or_path),
+        rank=rank,
+        alpha=alpha,
+        dropout=dropout,
+        target_modules=target_modules,
+    )
+    adapter_config_path = submission_dir / "adapter_config.json"
+    adapter_model_path = submission_dir / "adapter_model.safetensors"
+    write_json(adapter_config_path, peft_adapter_config)
+    save_file(converted_tensors, str(adapter_model_path))
+
+    zip_path = output_root / "submission.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.write(adapter_config_path, "adapter_config.json")
+        archive.write(adapter_model_path, "adapter_model.safetensors")
+
+    export_manifest = {
+        "created_at": utc_now(),
+        "adapter_dir": str(adapter_dir),
+        "reference_model_root": str(reference_model_root),
+        "output_root": str(output_root),
+        "submission_dir": str(submission_dir),
+        "zip_path": str(zip_path),
+        "zip_size_bytes": zip_path.stat().st_size,
+        "converted_tensor_count": len(converted_tensors),
+        "base_model_name_or_path": str(args.base_model_name_or_path),
+        "target_modules": target_modules,
+        "validation": validation,
+        "conversion_preview": conversion_rows[:24],
+    }
+    write_json(output_root / "export_manifest.json", export_manifest)
+    print(json.dumps(export_manifest, ensure_ascii=False, indent=2))
 
 
 def select_shadow_validation_records(
@@ -2942,7 +3233,7 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
                 train_time = 0
 
             if it % args.steps_per_save == 0 and rank == 0:
-                adapter_weights = dict(tree_flatten(model.trainable_parameters()))
+                adapter_weights = collect_all_lora_adapter_weights(model)
                 mx.save_safetensors(str(args.adapter_file), adapter_weights)
                 checkpoint = Path(args.adapter_file).parent / f"{it:07d}_adapters.safetensors"
                 mx.save_safetensors(str(checkpoint), adapter_weights)
@@ -2953,7 +3244,7 @@ def maybe_patch_mlx_trainer_final_accumulation_flush() -> None:
                 )
 
         if rank == 0:
-            adapter_weights = dict(tree_flatten(model.trainable_parameters()))
+            adapter_weights = collect_all_lora_adapter_weights(model)
             mx.save_safetensors(str(args.adapter_file), adapter_weights)
             print(f"Saved final weights to {args.adapter_file}.")
 
@@ -3844,6 +4135,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=BASE_MODEL_NAME,
     )
     audit_submission_compat.set_defaults(func=run_audit_submission_compat)
+
+    export_peft_submission = subparsers.add_parser(
+        "export-peft-submission",
+        help="Convert a 2D-only MLX LoRA adapter into README submission.zip files after structural validation.",
+    )
+    export_peft_submission.add_argument("--adapter-dir", type=Path, required=True)
+    export_peft_submission.add_argument("--output-root", type=Path, required=True)
+    export_peft_submission.add_argument("--reference-model-root", type=Path, default=None)
+    export_peft_submission.add_argument(
+        "--base-model-name-or-path",
+        type=str,
+        default=BASE_MODEL_NAME,
+    )
+    export_peft_submission.set_defaults(func=run_export_peft_submission)
 
     return parser
 
