@@ -1041,7 +1041,7 @@ row-level overlap:
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3`
 
 - status: `training_completed`
-- label: `export-safe-qkvo-len768-rerun-v3-live`
+- label: `export-safe-best-len768-live`
 - observed_at: `2026-04-09T16:54:28.757331+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
@@ -1193,7 +1193,7 @@ row-level overlap:
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1`
 
 - status: `training_completed`
-- label: `export-safe-qkvo-lr3e5-len1024-rerun-v1-live`
+- label: `export-safe-qkvo-lr3e5-len1024-live`
 - observed_at: `2026-04-09T20:20:40.165091+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
@@ -1231,7 +1231,7 @@ row-level overlap:
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
 
 - status: `training_completed`
-- label: `export-safe-qkvo-lr3e5-ep24-len768-rerun-v1-live`
+- label: `export-safe-qkvo-lr3e5-ep24-len768-live`
 - observed_at: `2026-04-09T21:00:35.047370+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
@@ -1269,7 +1269,7 @@ row-level overlap:
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
 
 - status: `training_completed`
-- label: `export-safe-qkvo-reanchor-len1024-from-len768-v1-live`
+- label: `export-safe-qkvo-reanchor-len1024-live`
 - observed_at: `2026-04-09T21:09:32.656244+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
