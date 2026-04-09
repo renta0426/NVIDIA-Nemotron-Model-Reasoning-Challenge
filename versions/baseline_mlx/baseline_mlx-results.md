@@ -513,3 +513,28 @@ row-level overlap:
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536`
+
+- status: `running_untracked`
+- label: `stagefreeze-v1-short-live`
+- observed_at: `2026-04-09T06:11:20.704089+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
+- sampled_rows: `218`
+- optimizer_progress: `0/67 = 0.00%`
+- lr: `1e-05`
+- max_seq_length: `1536`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Completion markers
+
+- training_result_exists: `False`
+- runtime_pid: `88859`
+- runtime_pid_alive: `True`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
