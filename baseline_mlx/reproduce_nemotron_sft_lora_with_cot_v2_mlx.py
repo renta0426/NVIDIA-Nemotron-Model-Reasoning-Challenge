@@ -66,6 +66,14 @@ README_TOP_P = 1.0
 README_TEMPERATURE = 0.0
 README_MAX_NUM_SEQS = 64
 README_MAX_MODEL_LEN = 8192
+BASELINE_MLX_NOTEBOOK_ORIGINAL_LOCAL320_ACCURACY = 215 / 320
+DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY = BASELINE_MLX_NOTEBOOK_ORIGINAL_LOCAL320_ACCURACY
+DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY = 0.96
+DEFAULT_RUN_SUITE_SUMMARY_RELPATH = Path(
+    "eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json"
+)
+DEFAULT_RUN_AUDIT_RELPATH = Path("submission_compat_audit/submission_compat_audit.json")
+DEFAULT_RUN_EXPORT_RELPATH = Path("submission_export/export_manifest.json")
 
 EXPECTED_COLUMNS = ["id", "prompt", "answer", "type", "generated_cot"]
 DEFAULT_TYPE_SAMPLES = {
@@ -2119,11 +2127,17 @@ def run_audit_submission_compat(args: argparse.Namespace) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
-def run_export_peft_submission(args: argparse.Namespace) -> None:
+def export_peft_submission_artifacts(
+    *,
+    adapter_dir: Path,
+    output_root: Path,
+    reference_model_root: Path | None,
+    base_model_name_or_path: str,
+) -> dict[str, Any]:
     from safetensors.numpy import load_file, save_file
 
-    adapter_dir = Path(args.adapter_dir).resolve()
-    output_root = Path(args.output_root).resolve()
+    adapter_dir = Path(adapter_dir).resolve()
+    output_root = Path(output_root).resolve()
     submission_dir = output_root / "submission_adapter"
     ensure_dir(output_root)
     ensure_dir(submission_dir)
@@ -2162,8 +2176,8 @@ def run_export_peft_submission(args: argparse.Namespace) -> None:
         raise ValueError("No target_modules could be derived from MLX adapter config.")
 
     reference_model_root = (
-        Path(args.reference_model_root).resolve()
-        if args.reference_model_root is not None
+        Path(reference_model_root).resolve()
+        if reference_model_root is not None
         else Path(str(adapter_config.get("model", ""))).resolve()
     )
     if not reference_model_root.exists():
@@ -2190,7 +2204,7 @@ def run_export_peft_submission(args: argparse.Namespace) -> None:
         )
 
     peft_adapter_config = build_peft_adapter_config_payload(
-        base_model_name_or_path=str(args.base_model_name_or_path),
+        base_model_name_or_path=str(base_model_name_or_path),
         rank=rank,
         alpha=alpha,
         dropout=dropout,
@@ -2215,12 +2229,24 @@ def run_export_peft_submission(args: argparse.Namespace) -> None:
         "zip_path": str(zip_path),
         "zip_size_bytes": zip_path.stat().st_size,
         "converted_tensor_count": len(converted_tensors),
-        "base_model_name_or_path": str(args.base_model_name_or_path),
+        "base_model_name_or_path": str(base_model_name_or_path),
         "target_modules": target_modules,
         "validation": validation,
         "conversion_preview": conversion_rows[:24],
     }
     write_json(output_root / "export_manifest.json", export_manifest)
+    return export_manifest
+
+
+def run_export_peft_submission(args: argparse.Namespace) -> None:
+    export_manifest = export_peft_submission_artifacts(
+        adapter_dir=Path(args.adapter_dir),
+        output_root=Path(args.output_root),
+        reference_model_root=Path(args.reference_model_root)
+        if args.reference_model_root is not None
+        else None,
+        base_model_name_or_path=str(args.base_model_name_or_path),
+    )
     print(json.dumps(export_manifest, ensure_ascii=False, indent=2))
 
 
@@ -2279,13 +2305,20 @@ def upsert_markdown_block(path: Path, block_id: str, content: str) -> None:
     write_text(path, updated)
 
 
-def build_record_run_result_payload(args: argparse.Namespace) -> dict[str, Any]:
-    run_root = Path(args.run_root).resolve()
+def load_run_result_payload(
+    *,
+    run_root: Path,
+    label: str,
+    suite_summary_relpath: Path,
+    audit_relpath: Path,
+    export_relpath: Path,
+) -> dict[str, Any]:
+    run_root = Path(run_root).resolve()
     prepare_manifest = load_json(run_root / "prepare_manifest.json", default=None)
     training_result = load_json(run_root / "training_result.json", default=None)
-    suite_summary = load_json(run_root / args.suite_summary_relpath, default=None)
-    audit_summary = load_json(run_root / args.audit_relpath, default=None)
-    export_manifest = load_json(run_root / args.export_relpath, default=None)
+    suite_summary = load_json(run_root / suite_summary_relpath, default=None)
+    audit_summary = load_json(run_root / audit_relpath, default=None)
+    export_manifest = load_json(run_root / export_relpath, default=None)
 
     if not isinstance(prepare_manifest, dict):
         raise FileNotFoundError(f"Missing prepare manifest: {run_root / 'prepare_manifest.json'}")
@@ -2305,7 +2338,7 @@ def build_record_run_result_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     payload = {
         "recorded_at": utc_now(),
-        "label": str(args.label),
+        "label": str(label),
         "run_name": run_root.name,
         "run_root": str(run_root),
         "prepare_manifest": prepare_manifest,
@@ -2317,6 +2350,16 @@ def build_record_run_result_payload(args: argparse.Namespace) -> dict[str, Any]:
         "export_manifest": export_manifest if isinstance(export_manifest, dict) else None,
     }
     return payload
+
+
+def build_record_run_result_payload(args: argparse.Namespace) -> dict[str, Any]:
+    return load_run_result_payload(
+        run_root=Path(args.run_root),
+        label=str(args.label),
+        suite_summary_relpath=Path(args.suite_summary_relpath),
+        audit_relpath=Path(args.audit_relpath),
+        export_relpath=Path(args.export_relpath),
+    )
 
 
 def render_record_run_result_markdown(payload: dict[str, Any]) -> str:
@@ -2402,6 +2445,263 @@ def run_record_run_result(args: argparse.Namespace) -> None:
     }
     write_json(Path(payload["run_root"]) / "recorded_run_result.json", record_payload)
     print(json.dumps(record_payload, ensure_ascii=False, indent=2))
+
+
+def make_empty_score_row() -> dict[str, Any]:
+    return {"rows": 0, "correct": 0, "accuracy": 0.0}
+
+
+def coerce_score_row(row: Any) -> dict[str, Any]:
+    if not isinstance(row, dict):
+        return make_empty_score_row()
+    return {
+        "rows": int(row.get("rows", 0) or 0),
+        "correct": int(row.get("correct", 0) or 0),
+        "accuracy": float(row.get("accuracy", 0.0) or 0.0),
+    }
+
+
+def build_submission_candidate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    evaluation_payloads = payload.get("evaluation_payloads", {})
+    local320_summary = evaluation_payloads.get("readme_local320")
+    local320_components = payload.get("local320_components", {})
+    audit_summary = payload.get("audit_summary")
+    export_manifest = payload.get("export_manifest")
+    training = payload["prepare_manifest"]["training"]
+    return {
+        "run_name": payload["run_name"],
+        "run_root": payload["run_root"],
+        "label": payload["label"],
+        "train_csv": payload["prepare_manifest"]["train_csv"],
+        "trainable_lora_suffixes": list(training.get("trainable_lora_suffixes", [])),
+        "lora_keys": list(training.get("lora_keys", [])),
+        "local320": coerce_score_row(
+            local320_summary.get("overall") if isinstance(local320_summary, dict) else None
+        ),
+        "general_stable": coerce_score_row(local320_components.get("general_stable_set")),
+        "binary_hard": coerce_score_row(local320_components.get("binary_hard_set")),
+        "symbol_watch": coerce_score_row(local320_components.get("symbol_watch_set")),
+        "proxy_v2": coerce_score_row(
+            evaluation_payloads.get("leaderboard_proxy_v2", {}).get("overall")
+            if isinstance(evaluation_payloads.get("leaderboard_proxy_v2"), dict)
+            else None
+        ),
+        "specialized": coerce_score_row(
+            evaluation_payloads.get("binary_bias_specialized_set", {}).get("overall")
+            if isinstance(evaluation_payloads.get("binary_bias_specialized_set"), dict)
+            else None
+        ),
+        "audit_status": str(audit_summary.get("audit_status", "")) if isinstance(audit_summary, dict) else "",
+        "peft_export_ready": bool(audit_summary.get("peft_export_ready")) if isinstance(audit_summary, dict) else False,
+        "has_export_manifest": isinstance(export_manifest, dict),
+        "export_zip_path": str(export_manifest.get("zip_path", "")) if isinstance(export_manifest, dict) else "",
+    }
+
+
+def build_submission_candidate_gates(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "min_local320_accuracy": float(args.min_local320_accuracy),
+        "min_general_stable_accuracy": float(args.min_general_stable_accuracy),
+        "min_proxy_v2_accuracy": float(args.min_proxy_v2_accuracy),
+        "min_specialized_accuracy": float(args.min_specialized_accuracy),
+        "require_exportable": bool(args.require_exportable),
+    }
+
+
+def evaluate_submission_candidate(
+    candidate: dict[str, Any],
+    *,
+    gates: dict[str, Any],
+) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    if gates["require_exportable"] and not candidate["peft_export_ready"]:
+        reasons.append("adapter is not submission-exportable under README-compatible 2D-only audit")
+    if float(candidate["local320"]["accuracy"]) < float(gates["min_local320_accuracy"]):
+        reasons.append(
+            f"readme_local320 {candidate['local320']['accuracy']:.4f} < {float(gates['min_local320_accuracy']):.4f}"
+        )
+    if float(candidate["general_stable"]["accuracy"]) < float(gates["min_general_stable_accuracy"]):
+        reasons.append(
+            "general_stable "
+            f"{candidate['general_stable']['accuracy']:.4f} < {float(gates['min_general_stable_accuracy']):.4f}"
+        )
+    if float(candidate["proxy_v2"]["accuracy"]) < float(gates["min_proxy_v2_accuracy"]):
+        reasons.append(
+            f"leaderboard_proxy_v2 {candidate['proxy_v2']['accuracy']:.4f} < {float(gates['min_proxy_v2_accuracy']):.4f}"
+        )
+    if float(candidate["specialized"]["accuracy"]) < float(gates["min_specialized_accuracy"]):
+        reasons.append(
+            "binary_bias_specialized_set "
+            f"{candidate['specialized']['accuracy']:.4f} < {float(gates['min_specialized_accuracy']):.4f}"
+        )
+    return (not reasons), reasons
+
+
+def candidate_selection_sort_key(candidate: dict[str, Any]) -> tuple[float, ...]:
+    return (
+        float(candidate["local320"]["accuracy"]),
+        float(candidate["general_stable"]["accuracy"]),
+        float(candidate["proxy_v2"]["accuracy"]),
+        float(candidate["specialized"]["accuracy"]),
+        float(candidate["binary_hard"]["accuracy"]),
+        float(candidate["symbol_watch"]["accuracy"]),
+    )
+
+
+def discover_submission_candidate_run_roots(
+    *,
+    search_root: Path,
+    candidate_run_roots: Sequence[Path],
+    suite_summary_relpath: Path,
+) -> list[Path]:
+    explicit_roots = [Path(path).resolve() for path in candidate_run_roots]
+    if explicit_roots:
+        roots = explicit_roots
+    else:
+        roots = []
+        for child in sorted(Path(search_root).resolve().iterdir()):
+            if not child.is_dir():
+                continue
+            if (child / suite_summary_relpath).exists():
+                roots.append(child.resolve())
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        root_key = str(root)
+        if root_key in seen:
+            continue
+        seen.add(root_key)
+        deduped.append(root)
+    return deduped
+
+
+def render_best_submission_markdown(summary: dict[str, Any]) -> str:
+    lines = ["### Auto best submission candidate", ""]
+    lines.append(f"- recorded_at: `{summary['recorded_at']}`")
+    lines.append(f"- status: `{summary['status']}`")
+    lines.append(f"- candidate_count: `{summary['candidate_count']}`")
+    lines.append(f"- eligible_candidate_count: `{summary['eligible_candidate_count']}`")
+    lines.append(f"- gates: `{summary['gates']}`")
+    lines.append("")
+    selected = summary.get("selected_candidate")
+    if isinstance(selected, dict):
+        lines.append(f"- selected_run: `{selected['run_name']}`")
+        lines.append(f"- local320: `{format_correct_accuracy(selected['local320'])}`")
+        lines.append(f"- general_stable: `{format_correct_accuracy(selected['general_stable'])}`")
+        lines.append(f"- leaderboard_proxy_v2: `{format_correct_accuracy(selected['proxy_v2'])}`")
+        lines.append(f"- binary_bias_specialized_set: `{format_correct_accuracy(selected['specialized'])}`")
+        lines.append(f"- audit_status: `{selected['audit_status']}`")
+        lines.append(f"- submission_zip: `{summary.get('submission_zip_path', '')}`")
+        lines.append("")
+    top_candidates = summary.get("top_candidates") or []
+    if top_candidates:
+        lines.append("| run_name | local320 | general_stable | proxy_v2 | specialized | exportable |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | --- |")
+        for row in top_candidates:
+            lines.append(
+                f"| `{row['run_name']}` | {float(row['local320']['accuracy']):.4f} | "
+                f"{float(row['general_stable']['accuracy']):.4f} | {float(row['proxy_v2']['accuracy']):.4f} | "
+                f"{float(row['specialized']['accuracy']):.4f} | `{bool(row['peft_export_ready'])}` |"
+            )
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def run_package_best_submission(args: argparse.Namespace) -> None:
+    search_root = Path(args.search_root).resolve()
+    output_root = Path(args.output_root).resolve()
+    ensure_dir(output_root)
+    gates = build_submission_candidate_gates(args)
+    run_roots = discover_submission_candidate_run_roots(
+        search_root=search_root,
+        candidate_run_roots=args.candidate_run_root or [],
+        suite_summary_relpath=Path(args.suite_summary_relpath),
+    )
+
+    candidates: list[dict[str, Any]] = []
+    skipped_runs: list[dict[str, Any]] = []
+    for run_root in run_roots:
+        try:
+            payload = load_run_result_payload(
+                run_root=run_root,
+                label=run_root.name,
+                suite_summary_relpath=Path(args.suite_summary_relpath),
+                audit_relpath=Path(args.audit_relpath),
+                export_relpath=Path(args.export_relpath),
+            )
+        except FileNotFoundError as exc:
+            skipped_runs.append({"run_root": str(run_root), "reason": str(exc)})
+            continue
+        candidate = build_submission_candidate_from_payload(payload)
+        eligible, reasons = evaluate_submission_candidate(candidate, gates=gates)
+        candidate["eligible"] = bool(eligible)
+        candidate["gate_failures"] = reasons
+        candidates.append(candidate)
+
+    candidates.sort(key=candidate_selection_sort_key, reverse=True)
+    eligible_candidates = [candidate for candidate in candidates if candidate["eligible"]]
+    selected_candidate = eligible_candidates[0] if eligible_candidates else None
+    submission_zip_path = ""
+
+    if isinstance(selected_candidate, dict):
+        selected_run_root = Path(selected_candidate["run_root"]).resolve()
+        selected_export_root = selected_run_root / "submission_export"
+        selected_export_manifest = load_json(
+            selected_run_root / Path(args.export_relpath),
+            default=None,
+        )
+        if not isinstance(selected_export_manifest, dict) and args.export_if_missing:
+            selected_export_manifest = export_peft_submission_artifacts(
+                adapter_dir=selected_run_root / "adapter",
+                output_root=selected_export_root,
+                reference_model_root=None,
+                base_model_name_or_path=str(args.base_model_name_or_path),
+            )
+        if isinstance(selected_export_manifest, dict):
+            source_zip = Path(str(selected_export_manifest.get("zip_path", ""))).resolve()
+            if source_zip.exists():
+                shutil.copy2(source_zip, output_root / "submission.zip")
+                submission_zip_path = str((output_root / "submission.zip").resolve())
+            source_submission_dir = Path(str(selected_export_manifest.get("submission_dir", ""))).resolve()
+            if source_submission_dir.exists():
+                target_submission_dir = output_root / "submission_adapter"
+                if target_submission_dir.exists():
+                    shutil.rmtree(target_submission_dir)
+                shutil.copytree(source_submission_dir, target_submission_dir)
+            write_json(output_root / "selected_prepare_manifest.json", load_json(selected_run_root / "prepare_manifest.json"))
+            write_json(output_root / "selected_training_result.json", load_json(selected_run_root / "training_result.json"))
+            write_json(
+                output_root / "selected_suite_summary.json",
+                load_json(selected_run_root / Path(args.suite_summary_relpath)),
+            )
+            write_json(
+                output_root / "selected_submission_audit.json",
+                load_json(selected_run_root / Path(args.audit_relpath)),
+            )
+            write_json(output_root / "selected_export_manifest.json", selected_export_manifest)
+
+    summary = {
+        "recorded_at": utc_now(),
+        "status": "selected_candidate" if selected_candidate else "no_eligible_candidate",
+        "search_root": str(search_root),
+        "output_root": str(output_root),
+        "gates": gates,
+        "candidate_count": len(candidates),
+        "eligible_candidate_count": len(eligible_candidates),
+        "skipped_runs": skipped_runs,
+        "selected_candidate": selected_candidate,
+        "selected_run_root": selected_candidate["run_root"] if isinstance(selected_candidate, dict) else "",
+        "submission_zip_path": submission_zip_path,
+        "top_candidates": candidates[:8],
+    }
+    write_json(output_root / "selection_manifest.json", summary)
+    if bool(args.update_results_md) and isinstance(selected_candidate, dict):
+        upsert_markdown_block(
+            Path(args.results_md).resolve(),
+            "best-submission-candidate",
+            render_best_submission_markdown(summary),
+        )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def select_shadow_validation_records(
@@ -4344,19 +4644,80 @@ def build_parser() -> argparse.ArgumentParser:
     record_run_result.add_argument(
         "--suite-summary-relpath",
         type=Path,
-        default=Path("eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json"),
+        default=DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
     )
     record_run_result.add_argument(
         "--audit-relpath",
         type=Path,
-        default=Path("submission_compat_audit/submission_compat_audit.json"),
+        default=DEFAULT_RUN_AUDIT_RELPATH,
     )
     record_run_result.add_argument(
         "--export-relpath",
         type=Path,
-        default=Path("submission_export/export_manifest.json"),
+        default=DEFAULT_RUN_EXPORT_RELPATH,
     )
     record_run_result.set_defaults(func=run_record_run_result)
+
+    package_best_submission = subparsers.add_parser(
+        "package-best-submission",
+        help="Select the best eligible exportable run, update the results ledger, and promote a canonical submission.zip.",
+    )
+    package_best_submission.add_argument("--search-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    package_best_submission.add_argument("--candidate-run-root", type=Path, action="append", default=None)
+    package_best_submission.add_argument("--output-root", type=Path, required=True)
+    package_best_submission.add_argument(
+        "--results-md",
+        type=Path,
+        default=REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+    )
+    package_best_submission.add_argument(
+        "--suite-summary-relpath",
+        type=Path,
+        default=DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+    )
+    package_best_submission.add_argument(
+        "--audit-relpath",
+        type=Path,
+        default=DEFAULT_RUN_AUDIT_RELPATH,
+    )
+    package_best_submission.add_argument(
+        "--export-relpath",
+        type=Path,
+        default=DEFAULT_RUN_EXPORT_RELPATH,
+    )
+    package_best_submission.add_argument(
+        "--min-local320-accuracy",
+        type=float,
+        default=DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+    )
+    package_best_submission.add_argument(
+        "--min-general-stable-accuracy",
+        type=float,
+        default=DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+    )
+    package_best_submission.add_argument("--min-proxy-v2-accuracy", type=float, default=0.0)
+    package_best_submission.add_argument("--min-specialized-accuracy", type=float, default=0.0)
+    package_best_submission.add_argument(
+        "--require-exportable",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    package_best_submission.add_argument(
+        "--export-if-missing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    package_best_submission.add_argument(
+        "--update-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    package_best_submission.add_argument(
+        "--base-model-name-or-path",
+        type=str,
+        default=BASE_MODEL_NAME,
+    )
+    package_best_submission.set_defaults(func=run_package_best_submission)
 
     return parser
 
