@@ -347,3 +347,4 @@ row-level overlap:
 - 設定は **`stage-union`**, **`resume=fullrun_v2 adapters.safetensors`**, **`trainable=attention(q/k/v/o)`**, **`lr=2e-5`**, **`max_seq_length=1536`**, **`train_csv=stage2_corrective_v1.csv (218 rows)`**。起動時点では **`LoRA suffix filter = 24 modules`**, **`Trainable parameters = 3.736M`**, **`Iter1 val_loss = 1.606`** を確認した。
 - この resume 元は `switch_mlp` routed-expert の **3D tensor** を含むため、**この direct lane 自体は submission 互換 lane ではない**。役割はまず **「attention corrective が baseline trunk を上積みできるか」**を stagefreeze 本線より早く読むことにある。
 - 完走後は detached waiter で **`eval-benchmark-suite` → `audit-submission-compat` → `record-run-result` → `results.md` commit/push** まで自動連結してある。
+- direct lane も 1 本で止めず、**`qkvo lr=2e-5` → `v/o lr=2e-5` → `qkvo lr=1e-5, epochs=2.4`** の順に ablation を回す detached waiters を追加した。いずれも **resume 元は同じ `baseline_mlx_notebook_original_fullrun_v2` adapter** に固定し、各 run ごとに **suite → audit → record-run-result → commit/push** まで自動連結する。
