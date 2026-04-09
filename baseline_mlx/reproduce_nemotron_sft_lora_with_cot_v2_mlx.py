@@ -4586,6 +4586,46 @@ def run_wait_train_from_run(args: argparse.Namespace) -> None:
     run_resume_train_from_run(args)
 
 
+def run_wait_resume_train_from_path(args: argparse.Namespace) -> None:
+    source_run_root = Path(args.source_run_root).resolve()
+    target_run_root = Path(args.output_root).resolve() / args.run_name
+    existing_marker = (
+        detect_started_run_marker(target_run_root) if bool(args.skip_if_target_started) else None
+    )
+    if existing_marker is not None:
+        wait_status_path = (
+            Path(args.wait_status_json).resolve()
+            if args.wait_status_json is not None
+            else (target_run_root / "wait_for_trigger_path.json")
+        )
+        wait_result = {
+            "recorded_at": utc_now(),
+            "source_run_root": str(source_run_root),
+            "wait_path": str(Path(args.wait_path).resolve()),
+            "target_run_root": str(target_run_root),
+            "status": "skipped_existing_target",
+            "target_existing_marker": str(existing_marker),
+        }
+        write_json(wait_status_path, wait_result)
+        print(json.dumps(wait_result, ensure_ascii=False, indent=2))
+        return
+    wait_result = wait_for_path(
+        Path(args.wait_path),
+        expected_kind=str(args.expected_kind),
+        poll_seconds=float(args.poll_seconds),
+        timeout_seconds=float(args.timeout_seconds),
+    )
+    wait_result["source_run_root"] = str(source_run_root)
+    wait_status_path = (
+        Path(args.wait_status_json).resolve()
+        if args.wait_status_json is not None
+        else (target_run_root / "wait_for_trigger_path.json")
+    )
+    write_json(wait_status_path, wait_result)
+    args._wait_trigger_result = wait_result
+    run_resume_train_from_run(args)
+
+
 def run_postprocess_run(args: argparse.Namespace) -> None:
     run_root = Path(args.run_root).resolve()
     label = str(args.label).strip() if getattr(args, "label", None) else run_root.name
@@ -5034,6 +5074,33 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
     )
     wait_train_from_run.set_defaults(func=run_wait_train_from_run)
+
+    wait_resume_train_from_path = subparsers.add_parser(
+        "wait-resume-train-from-path",
+        help="Wait for an arbitrary trigger file/dir, then launch a resumed train from a source run.",
+    )
+    add_shared_train_args(wait_resume_train_from_path)
+    wait_resume_train_from_path.add_argument("--source-run-root", type=Path, required=True)
+    wait_resume_train_from_path.add_argument("--wait-path", type=Path, required=True)
+    wait_resume_train_from_path.add_argument(
+        "--expected-kind",
+        choices=("any", "file", "dir"),
+        default="file",
+    )
+    wait_resume_train_from_path.add_argument("--poll-seconds", type=float, default=60.0)
+    wait_resume_train_from_path.add_argument("--timeout-seconds", type=float, default=0.0)
+    wait_resume_train_from_path.add_argument("--wait-status-json", type=Path, default=None)
+    wait_resume_train_from_path.add_argument(
+        "--skip-if-target-started",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    wait_resume_train_from_path.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    wait_resume_train_from_path.set_defaults(func=run_wait_resume_train_from_path)
 
     train_mlx_config = subparsers.add_parser(
         "train-mlx-config",

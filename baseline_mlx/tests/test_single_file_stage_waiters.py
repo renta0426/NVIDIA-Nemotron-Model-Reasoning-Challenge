@@ -52,6 +52,29 @@ def build_wait_train_args(source_run: Path, output_root: Path, run_name: str, **
     return SimpleNamespace(**payload)
 
 
+def build_wait_resume_from_path_args(
+    source_run: Path,
+    output_root: Path,
+    run_name: str,
+    wait_path: Path,
+    **overrides,
+) -> SimpleNamespace:
+    payload = {
+        "source_run_root": source_run,
+        "output_root": output_root,
+        "run_name": run_name,
+        "wait_path": wait_path,
+        "expected_kind": "file",
+        "poll_seconds": 0.1,
+        "timeout_seconds": 1.0,
+        "wait_status_json": None,
+        "skip_if_target_started": True,
+        "dry_run": True,
+    }
+    payload.update(overrides)
+    return SimpleNamespace(**payload)
+
+
 def build_postprocess_args(run_root: Path, summary_json: Path, **overrides) -> SimpleNamespace:
     payload = {
         "run_root": run_root,
@@ -279,6 +302,54 @@ def test_wait_train_from_run_skips_if_target_already_started(tmp_path: Path) -> 
     )
 
     wait_manifest = json.loads((run_root / "wait_for_source_training_result.json").read_text(encoding="utf-8"))
+    assert wait_manifest["status"] == "skipped_existing_target"
+    assert wait_manifest["target_existing_marker"] == str(existing_marker.resolve())
+
+
+def test_wait_resume_train_from_path_dry_run_writes_wait_and_resume_manifests(tmp_path: Path) -> None:
+    source_run, _, expected_adapter_file = make_source_run(tmp_path)
+    output_root = tmp_path / "output"
+    trigger_path = tmp_path / "trigger.json"
+    trigger_path.write_text("{}", encoding="utf-8")
+
+    stage_waiters.run_wait_resume_train_from_path(
+        build_wait_resume_from_path_args(
+            source_run=source_run,
+            output_root=output_root,
+            run_name="stage2_attention_vo",
+            wait_path=trigger_path,
+        )
+    )
+
+    run_root = output_root / "stage2_attention_vo"
+    wait_manifest = json.loads((run_root / "wait_for_trigger_path.json").read_text(encoding="utf-8"))
+    resume_manifest = json.loads((run_root / "resume_from_run_manifest.json").read_text(encoding="utf-8"))
+    assert wait_manifest["path"] == str(trigger_path.resolve())
+    assert wait_manifest["source_run_root"] == str(source_run.resolve())
+    assert resume_manifest["resolved_resume_adapter_file"] == str(expected_adapter_file)
+    assert resume_manifest["target_existing_marker"] == ""
+
+
+def test_wait_resume_train_from_path_skips_if_target_already_started(tmp_path: Path) -> None:
+    source_run, _, _ = make_source_run(tmp_path)
+    output_root = tmp_path / "output"
+    trigger_path = tmp_path / "trigger.json"
+    trigger_path.write_text("{}", encoding="utf-8")
+    run_root = output_root / "stage2_attention_vo"
+    run_root.mkdir(parents=True)
+    existing_marker = run_root / "resume_from_run_manifest.json"
+    existing_marker.write_text("{}", encoding="utf-8")
+
+    stage_waiters.run_wait_resume_train_from_path(
+        build_wait_resume_from_path_args(
+            source_run=source_run,
+            output_root=output_root,
+            run_name="stage2_attention_vo",
+            wait_path=trigger_path,
+        )
+    )
+
+    wait_manifest = json.loads((run_root / "wait_for_trigger_path.json").read_text(encoding="utf-8"))
     assert wait_manifest["status"] == "skipped_existing_target"
     assert wait_manifest["target_existing_marker"] == str(existing_marker.resolve())
 
