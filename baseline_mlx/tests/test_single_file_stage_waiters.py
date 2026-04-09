@@ -534,6 +534,60 @@ def test_postprocess_run_skips_existing_steps_without_reinvoking_pipeline(tmp_pa
     assert summary["steps"]["record_run_result"]["recorded_at"] == recorded_result["recorded_at"]
 
 
+def test_postprocess_run_persists_eval_suite_running_state_before_invocation(tmp_path: Path) -> None:
+    run_root = tmp_path / "completed_run"
+    shadow_model_dir = run_root / "shadow_model"
+    adapter_dir = run_root / "adapter"
+    shadow_model_dir.mkdir(parents=True)
+    adapter_dir.mkdir(parents=True)
+    (adapter_dir / "adapters.safetensors").write_bytes(b"adapter")
+    (run_root / "training_result.json").write_text("{}", encoding="utf-8")
+    (run_root / "prepare_manifest.json").write_text(
+        json.dumps(
+            {
+                "shadow_model_dir": str(shadow_model_dir.resolve()),
+                "artifacts": {"adapter_dir": str(adapter_dir.resolve())},
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary_json = tmp_path / "postprocess_running_summary.json"
+
+    original_eval = stage_waiters.run_eval_benchmark_suite
+    try:
+        def fake_eval(_args) -> None:
+            summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            assert summary["steps"]["eval_suite"]["status"] == "running"
+            assert summary["steps"]["eval_suite"]["progress_relpath"] == str(
+                Path("eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json")
+            )
+
+        stage_waiters.run_eval_benchmark_suite = fake_eval
+        stage_waiters.run_postprocess_run(
+            build_postprocess_args(
+                run_root=run_root,
+                summary_json=summary_json,
+                dry_run=False,
+                skip_existing_steps=False,
+                run_audit_submission=False,
+                run_export_submission=False,
+                run_record_run_result=False,
+                run_package_best_submission=False,
+            )
+        )
+    finally:
+        stage_waiters.run_eval_benchmark_suite = original_eval
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["suite_progress_relpath"] == str(
+        Path("eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json")
+    )
+    assert summary["steps"]["eval_suite"]["status"] == "completed"
+    assert summary["steps"]["eval_suite"]["progress_relpath"] == str(
+        Path("eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json")
+    )
+
+
 def test_evaluate_benchmark_rows_falls_back_to_evaluation_name_for_missing_benchmark_name() -> None:
     fake_mlx_lm = ModuleType("mlx_lm")
     fake_sample_utils = ModuleType("mlx_lm.sample_utils")
@@ -602,6 +656,124 @@ def test_evaluate_benchmark_rows_falls_back_to_evaluation_name_for_missing_bench
     assert records[0]["benchmark_name"] == "stage2_suite"
     assert scored_rows[0]["is_correct"] is True
     assert summary["overall"]["accuracy"] == 1.0
+
+
+def test_run_eval_benchmark_suite_writes_progress_files(tmp_path: Path) -> None:
+    benchmark_root = tmp_path / "benchmarks"
+    benchmark_root.mkdir(parents=True)
+    for filename in stage_waiters.REFERENCE_PHASE0_BENCHMARK_FILES:
+        (benchmark_root / filename).write_text(
+            "id,prompt,answer,prompt_len_chars\nrow-1,What is 1+1?,2,12\n",
+            encoding="utf-8",
+        )
+
+    output_root = tmp_path / "suite_output"
+    model_root = tmp_path / "model_root"
+    adapter_dir = tmp_path / "adapter_dir"
+    model_root.mkdir()
+    adapter_dir.mkdir()
+
+    fake_mlx_lm = ModuleType("mlx_lm")
+    original_mlx_lm = sys.modules.get("mlx_lm")
+    original_normalize = stage_waiters.normalize_tokenizer_for_hf_parity
+    original_eval = stage_waiters.evaluate_benchmark_rows
+    original_write_outputs = stage_waiters.write_benchmark_eval_outputs
+
+    fake_mlx_lm.load = lambda *_args, **_kwargs: (object(), object())
+
+    def fake_evaluate_benchmark_rows(
+        *,
+        model,
+        tokenizer,
+        benchmark_rows,
+        evaluation_name,
+        source_paths,
+        args,
+        progress_callback=None,
+    ):
+        assert model is not None
+        assert tokenizer is not None
+        assert source_paths
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "status": "running",
+                    "evaluation_name": evaluation_name,
+                    "rows_total": len(benchmark_rows),
+                    "rows_completed": 0,
+                    "chunks_total": 1,
+                    "chunks_completed": 0,
+                }
+            )
+            progress_callback(
+                {
+                    "status": "scored",
+                    "evaluation_name": evaluation_name,
+                    "rows_total": len(benchmark_rows),
+                    "rows_completed": len(benchmark_rows),
+                    "chunks_total": 1,
+                    "chunks_completed": 1,
+                    "correct": len(benchmark_rows),
+                    "accuracy": 1.0,
+                }
+            )
+        payload = {
+            "overall": {
+                "rows": len(benchmark_rows),
+                "correct": len(benchmark_rows),
+                "accuracy": 1.0,
+            }
+        }
+        return [], [], payload
+
+    try:
+        sys.modules["mlx_lm"] = fake_mlx_lm
+        stage_waiters.normalize_tokenizer_for_hf_parity = lambda _tokenizer: None
+        stage_waiters.evaluate_benchmark_rows = fake_evaluate_benchmark_rows
+        stage_waiters.write_benchmark_eval_outputs = lambda **_kwargs: None
+
+        stage_waiters.run_eval_benchmark_suite(
+            SimpleNamespace(
+                benchmark_root=benchmark_root,
+                output_root=output_root,
+                model_root=model_root,
+                adapter_dir=adapter_dir,
+                extra_benchmark_csv=[],
+                lazy_load=True,
+                max_tokens=stage_waiters.README_MAX_TOKENS,
+                temperature=stage_waiters.README_TEMPERATURE,
+                top_p=stage_waiters.README_TOP_P,
+                max_num_seqs=8,
+                max_model_len=stage_waiters.README_MAX_MODEL_LEN,
+                prompt_chunk_size=8,
+                prefill_batch_size=8,
+                completion_batch_size=8,
+                eval_enable_thinking=True,
+                force_single_generate=False,
+            )
+        )
+    finally:
+        if original_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = original_mlx_lm
+        stage_waiters.normalize_tokenizer_for_hf_parity = original_normalize
+        stage_waiters.evaluate_benchmark_rows = original_eval
+        stage_waiters.write_benchmark_eval_outputs = original_write_outputs
+
+    suite_progress = json.loads(
+        (output_root / "benchmark_eval_suite_progress.json").read_text(encoding="utf-8")
+    )
+    assert suite_progress["status"] == "completed"
+    assert suite_progress["evaluations_completed"] == 1
+    assert suite_progress["current_evaluation"] == "readme_local320"
+    eval_progress = json.loads(
+        (output_root / "readme_local320" / "benchmark_eval_progress.json").read_text(encoding="utf-8")
+    )
+    assert eval_progress["status"] == "completed"
+    assert eval_progress["rows_total"] == 3
+    assert eval_progress["rows_completed"] == 3
+    assert eval_progress["accuracy"] == 1.0
 
 
 def test_package_best_submission_selects_best_exportable_candidate(tmp_path: Path) -> None:

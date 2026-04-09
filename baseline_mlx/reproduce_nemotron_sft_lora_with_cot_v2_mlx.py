@@ -16,7 +16,7 @@ import zipfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import pandas as pd
 import yaml
@@ -1936,6 +1936,7 @@ def evaluate_benchmark_rows(
     evaluation_name: str,
     source_paths: Sequence[Path],
     args: argparse.Namespace,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     from mlx_lm import batch_generate, generate
     from mlx_lm.sample_utils import make_sampler
@@ -1959,6 +1960,18 @@ def evaluate_benchmark_rows(
 
     records: list[dict[str, Any]] = []
     total_prompts = len(prompt_tokens)
+    total_chunks = math.ceil(total_prompts / chunk_size) if total_prompts else 0
+    if progress_callback is not None:
+        progress_callback(
+            {
+                "status": "running",
+                "evaluation_name": evaluation_name,
+                "rows_total": total_prompts,
+                "rows_completed": 0,
+                "chunks_total": total_chunks,
+                "chunks_completed": 0,
+            }
+        )
     for chunk_start in range(0, total_prompts, chunk_size):
         chunk_prompts = prompt_tokens[chunk_start : chunk_start + chunk_size]
         chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompts)]
@@ -2009,6 +2022,17 @@ def evaluate_benchmark_rows(
                     "extracted_answer": extract_final_answer(str(raw_output)),
                 }
             )
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "status": "running",
+                    "evaluation_name": evaluation_name,
+                    "rows_total": total_prompts,
+                    "rows_completed": min(chunk_start + len(chunk_prompts), total_prompts),
+                    "chunks_total": total_chunks,
+                    "chunks_completed": min((chunk_start // chunk_size) + 1, total_chunks),
+                }
+            )
 
     scored_rows: list[dict[str, Any]] = []
     for row in records:
@@ -2049,6 +2073,19 @@ def evaluate_benchmark_rows(
         "readme_eval_assumptions": build_readme_eval_assumptions(args),
         **summary,
     }
+    if progress_callback is not None:
+        progress_callback(
+            {
+                "status": "scored",
+                "evaluation_name": evaluation_name,
+                "rows_total": total_prompts,
+                "rows_completed": total_prompts,
+                "chunks_total": total_chunks,
+                "chunks_completed": total_chunks,
+                "correct": int(payload["overall"]["correct"]),
+                "accuracy": float(payload["overall"]["accuracy"]),
+            }
+        )
     return records, scored_rows, payload
 
 
@@ -2140,9 +2177,61 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
     model, tokenizer = load(str(Path(args.model_root).resolve()), **load_kwargs)
     normalize_tokenizer_for_hf_parity(tokenizer)
 
+    suite_progress_path = output_root / "benchmark_eval_suite_progress.json"
     suite_rows: list[dict[str, Any]] = []
+    suite_progress: dict[str, Any] = {
+        "recorded_at": utc_now(),
+        "status": "running",
+        "output_root": str(output_root),
+        "evaluations_total": len(benchmark_specs),
+        "evaluations_completed": 0,
+        "current_evaluation": "",
+        "current_rows_total": 0,
+        "current_rows_completed": 0,
+        "current_chunks_total": 0,
+        "current_chunks_completed": 0,
+        "completed_evaluations": [],
+    }
+    write_json(suite_progress_path, suite_progress)
     for evaluation_name, benchmark_rows, source_paths in benchmark_specs:
         eval_root = output_root / evaluation_name
+        eval_progress_path = eval_root / "benchmark_eval_progress.json"
+        latest_progress: dict[str, Any] = {
+            "status": "pending",
+            "evaluation_name": evaluation_name,
+            "rows_total": len(benchmark_rows),
+            "rows_completed": 0,
+            "chunks_total": 0,
+            "chunks_completed": 0,
+        }
+
+        def persist_progress(progress: dict[str, Any]) -> None:
+            latest_progress.update(progress)
+            eval_payload: dict[str, Any] = {
+                "recorded_at": utc_now(),
+                "status": str(latest_progress.get("status", "running")),
+                "evaluation_name": evaluation_name,
+                "output_root": str(eval_root),
+                "source_paths": [str(path) for path in source_paths],
+                "rows_total": int(latest_progress.get("rows_total", len(benchmark_rows))),
+                "rows_completed": int(latest_progress.get("rows_completed", 0)),
+                "chunks_total": int(latest_progress.get("chunks_total", 0)),
+                "chunks_completed": int(latest_progress.get("chunks_completed", 0)),
+            }
+            if "correct" in latest_progress:
+                eval_payload["correct"] = int(latest_progress["correct"])
+            if "accuracy" in latest_progress:
+                eval_payload["accuracy"] = float(latest_progress["accuracy"])
+            write_json(eval_progress_path, eval_payload)
+            suite_progress["recorded_at"] = utc_now()
+            suite_progress["status"] = "running"
+            suite_progress["current_evaluation"] = evaluation_name
+            suite_progress["current_rows_total"] = int(eval_payload["rows_total"])
+            suite_progress["current_rows_completed"] = int(eval_payload["rows_completed"])
+            suite_progress["current_chunks_total"] = int(eval_payload["chunks_total"])
+            suite_progress["current_chunks_completed"] = int(eval_payload["chunks_completed"])
+            write_json(suite_progress_path, suite_progress)
+
         records, scored_rows, payload = evaluate_benchmark_rows(
             model=model,
             tokenizer=tokenizer,
@@ -2150,6 +2239,7 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
             evaluation_name=evaluation_name,
             source_paths=source_paths,
             args=args,
+            progress_callback=persist_progress,
         )
         write_benchmark_eval_outputs(
             output_root=eval_root,
@@ -2157,6 +2247,15 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
             records=records,
             scored_rows=scored_rows,
             payload=payload,
+        )
+        persist_progress(
+            {
+                "status": "completed",
+                "rows_total": int(payload["overall"]["rows"]),
+                "rows_completed": int(payload["overall"]["rows"]),
+                "correct": int(payload["overall"]["correct"]),
+                "accuracy": float(payload["overall"]["accuracy"]),
+            }
         )
         suite_rows.append(
             {
@@ -2168,6 +2267,9 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
                 "source_paths": [str(path) for path in source_paths],
             }
         )
+        suite_progress["evaluations_completed"] = len(suite_rows)
+        suite_progress["completed_evaluations"] = list(suite_rows)
+        write_json(suite_progress_path, suite_progress)
 
     suite_payload = {
         "created_at": utc_now(),
@@ -2182,6 +2284,12 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
         output_root / "benchmark_eval_suite_summary.md",
         render_eval_suite_markdown_summary(suite_payload),
     )
+    suite_progress["recorded_at"] = utc_now()
+    suite_progress["status"] = "completed"
+    suite_progress["evaluations_completed"] = len(suite_rows)
+    suite_progress["completed_evaluations"] = list(suite_rows)
+    suite_progress["suite_summary_path"] = str(output_root / "benchmark_eval_suite_summary.json")
+    write_json(suite_progress_path, suite_progress)
     print(json.dumps(suite_payload, ensure_ascii=False, indent=2))
 
 
@@ -5275,6 +5383,10 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
         run_root,
         export_output_root / "export_manifest.json",
     )
+    suite_progress_relpath = relative_run_artifact_path(
+        run_root,
+        suite_output_root / "benchmark_eval_suite_progress.json",
+    )
     suite_summary_path = suite_output_root / "benchmark_eval_suite_summary.json"
     audit_summary_path = audit_output_root / "submission_compat_audit.json"
     export_manifest_path = export_output_root / "export_manifest.json"
@@ -5283,6 +5395,7 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
     summary["model_root"] = str(model_root)
     summary["adapter_dir"] = str(adapter_dir)
     summary["suite_summary_relpath"] = str(suite_summary_relpath)
+    summary["suite_progress_relpath"] = str(suite_progress_relpath)
     summary["audit_relpath"] = str(audit_relpath)
     summary["export_relpath"] = str(export_relpath)
     persist_summary()
@@ -5297,8 +5410,15 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
             summary["steps"]["eval_suite"] = {
                 "status": "skipped_existing",
                 "output_root": str(suite_output_root),
+                "progress_relpath": str(suite_progress_relpath),
             }
         else:
+            summary["steps"]["eval_suite"] = {
+                "status": "running",
+                "output_root": str(suite_output_root),
+                "progress_relpath": str(suite_progress_relpath),
+            }
+            persist_summary()
             run_eval_benchmark_suite(
                 argparse.Namespace(
                     model_root=model_root,
@@ -5322,9 +5442,13 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
             summary["steps"]["eval_suite"] = {
                 "status": "completed",
                 "output_root": str(suite_output_root),
+                "progress_relpath": str(suite_progress_relpath),
             }
     else:
-        summary["steps"]["eval_suite"] = {"status": "skipped"}
+        summary["steps"]["eval_suite"] = {
+            "status": "skipped",
+            "progress_relpath": str(suite_progress_relpath),
+        }
     persist_summary()
 
     audit_summary = load_json(audit_summary_path, default=None)
