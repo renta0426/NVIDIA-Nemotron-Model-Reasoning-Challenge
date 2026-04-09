@@ -916,3 +916,9 @@ row-level overlap:
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v2 -->
+
+## Export-safe five-lane local320 late progress
+
+- `2026-04-09T14:24Z` 時点では **current qkvo = `176/320, 22/40`**, **current vo = `168/320, 21/40`**, **current short = `192/320, 24/40`**, **qkvo low-LR = `168/320, 21/40`**, **vo high-LR = `144/320, 18/40`**。first summary はまだ 0 本だが、5 lane 全てが引き続き chunk 単位で前進した。
+- `2026-04-09T14:34Z` 時点では **current qkvo = `192/320, 24/40`**, **current vo = `176/320, 22/40`**, **current short = `224/320, 28/40`**, **qkvo low-LR = `184/320, 23/40`**, **vo high-LR = `160/320, 20/40`**。先頭は引き続き **current short** で、first local320 summary の最有力になっている。
+- memory snapshot は `14:24Z` / `14:34Z` ともに **`PhysMem 420-421G used / 90G unused`** 帯で横ばい。したがって現時点の 5-lane local320 並列は **stall でも OOM 前兆でもなく、単純に wall-clock が重い状態** とみなして継続する。
