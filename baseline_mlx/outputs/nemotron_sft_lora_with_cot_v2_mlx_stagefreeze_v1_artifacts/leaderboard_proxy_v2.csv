@@ -1,0 +1,1135 @@
+benchmark_name,benchmark_role,benchmark_index,id,prompt,answer,family,family_short,template_subtype,selection_tier,teacher_solver_candidate,answer_type,num_examples,prompt_len_chars,hard_score,group_signature,query_raw,leaderboard_proxy_bucket,proxy_v2_source,proxy_v2_focus_bucket,proxy_v2_note,v1_focus_bucket,v1_exposure_band,v1_bucket_note,bit_structured_formula_name,bit_structured_formula_abstract_family,bit_not_structured_formula_name,bit_structured_formula_safe_support,bit_structured_formula_abstract_support,bit_not_structured_formula_safe_support,bit_no_candidate_positions,bit_multi_candidate_positions,query_hamming_bin,audit_priority_score,_source_name,_source_split,proxy_role,leaderboard_proxy_note,v3f_prediction,current_prediction,v3f_is_correct,current_is_correct
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,1,a6192d29,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00101010 -> 00010100
+10011011 -> 01100110
+00110001 -> 01001000
+11100011 -> 11110000
+00011001 -> 00000110
+10100111 -> 01001011
+10000000 -> 00000000
+01101100 -> 00011010
+10001110 -> 00000111
+11011001 -> 01110110
+
+Now, determine the output for: 00110000",00001000,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,10,510,6.0,unknown__ex10__qhwlow,00110000,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"majority(ror2,shl1,shr1)","majority(ror,shl,shr)","majority(ror2,shl1,shr1)",1.0,52.0,1.0,8.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,00001000,00001100,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,2,01e09228,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01000111 -> 01110000
+00100010 -> 00101010
+10101100 -> 01101010
+10000110 -> 01100000
+01100010 -> 00101110
+00100011 -> 00111010
+00001011 -> 10010000
+11100110 -> 01111110
+
+Now, determine the output for: 01011001",10010101,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,8,468,3.0,unknown__ex8__qhwmid,01011001,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"choose(shl2,shr2,nibble_swap)","choose(shl,shr,nibble_swap)","choose(not(shl2),nibble_swap,shr2)",1.0,21.0,1.0,4.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10010101,11000101,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,3,885c8b51,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11111011 -> 00001001
+10000110 -> 00110000
+00101000 -> 00000001
+00101001 -> 00001001
+11010010 -> 00010010
+00000111 -> 00110000
+01010000 -> 00000010
+10111111 -> 10000001
+10110100 -> 10000101
+01100010 -> 00010011
+
+Now, determine the output for: 11111111",00000001,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,8.0,unknown__ex10__qhwhigh,11111111,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"choose(shl1,shr7,rol3)","choose(shl,shr,rol)","and(not(shl1),rol3)",2.0,59.0,2.0,7.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,00000001,00000011,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,4,3fdc3de7,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10100110 -> 00100000
+00101111 -> 01110000
+11110010 -> 00000001
+10111000 -> 10000001
+11011101 -> 11001001
+11001011 -> 00011000
+11010001 -> 00001001
+01011101 -> 11000000
+11001110 -> 01100000
+10110101 -> 00001001
+
+Now, determine the output for: 11111110",11100001,bit_manipulation,binary,bit_structured_byte_formula,answer_only_keep,,binary8,10,510,6.0,unknown__ex10__qhwhigh,11111110,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"majority(nibble_swap,shl3,shr7)","majority(nibble_swap,shl,shr)","majority(nibble_swap,shl3,shr7)",2.0,12.0,2.0,8.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,11100001,00000001,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,5,86b727ff,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10100011 -> 00000000
+00100101 -> 00100000
+11010100 -> 10000010
+01100011 -> 00000001
+00100000 -> 00000000
+00100100 -> 00000000
+10100000 -> 00000000
+10110111 -> 10100000
+01111000 -> 00000001
+00011010 -> 01000000
+
+Now, determine the output for: 10011011",01000000,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,10011011,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"majority(rol3,shl5,shr6)","majority(rol,shl,shr)","majority(rol3,shl5,shr6)",2.0,41.0,2.0,8.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,01000000,00000000,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,6,8e5d6fe6,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11101110 -> 10011101
+01100111 -> 10001100
+10010110 -> 01010010
+11111110 -> 11011111
+11111011 -> 01111111
+10000101 -> 00010000
+10101111 -> 10110101
+00001001 -> 00100001
+00010000 -> 00000010
+11011100 -> 00011011
+
+Now, determine the output for: 00111100",10000111,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,00111100,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"choose(rol2,ror3,shr3)","choose(rol,ror,shr)","choose(not(rol2),shr3,ror3)",3.0,5.0,3.0,3.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10000111,00000111,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,7,1c671acc,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10110010 -> 11011101
+10010011 -> 11011100
+00100000 -> 10000001
+01101100 -> 11110011
+11110000 -> 11000111
+00000111 -> 00111100
+00011011 -> 11111100
+11011101 -> 11111110
+11111000 -> 11100111
+
+Now, determine the output for: 00101011",11111101,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,9,489,5.0,unknown__ex9__qhwmid,00101011,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"or(rol3,shl2)","or(rol,shl)",,2.0,20.0,0.0,6.0,1.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,11111101,11111100,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,8,3bdb85cf,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10101110 -> 01110101
+10000011 -> 00011100
+10110100 -> 10100101
+00011101 -> 10101000
+11001100 -> 01100110
+11101101 -> 00101111
+00100010 -> 00010001
+10010110 -> 00110100
+11011110 -> 01110110
+
+Now, determine the output for: 10001000",01000100,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,9,489,5.0,unknown__ex9__qhwlow,10001000,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"choose(shl6,shr2,rol3)","choose(shl,shr,rol)","and(not(shl6),rol3)",3.0,59.0,3.0,2.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,01000100,00100100,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,9,3feeabea,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10000001 -> 00010010
+11010000 -> 00000011
+10110011 -> 00110010
+11111011 -> 10110011
+01001111 -> 11110001
+00100101 -> 01010000
+01001000 -> 10000001
+10010000 -> 00000010
+01010010 -> 00100001
+
+Now, determine the output for: 10101001",10010010,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,10101001,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(shl4,shr6)","xor(shl,shr)","xor(not(shl4),not(shr6))",11.0,322.0,10.0,2.0,0.0,-1.0,8.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10010010,01000010,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,10,783a1317,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00101001 -> 01001010
+11101111 -> 11111011
+01001010 -> 10010010
+10010101 -> 00100101
+11100000 -> 00111000
+10111101 -> 01101111
+11110000 -> 00111100
+00111010 -> 00001110
+11011111 -> 10110111
+
+Now, determine the output for: 11111000",00111110,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,11111000,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"choose(rol1,ror2,shr2)","choose(rol,ror,shr)","choose(not(rol1),shr2,ror2)",1.0,5.0,1.0,2.0,0.0,-1.0,8.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,00111110,11111100,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,11,bf98d26a,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00010100 -> 10000101
+10110000 -> 00101100
+10001111 -> 00000011
+10000000 -> 00100000
+11010011 -> 10010100
+10110111 -> 00001101
+01011000 -> 00010110
+00101001 -> 01101010
+01100011 -> 10111000
+
+Now, determine the output for: 10111000",00101110,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,10111000,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(ror2,shl5)","xor(ror,shl)","xor(not(ror2),not(shl5))",3.0,33.0,3.0,3.0,0.0,-1.0,8.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,00101110,00010110,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,12,1e677e2c,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11110100 -> 01001111
+00100111 -> 10110010
+01000011 -> 11110100
+01110011 -> 11110111
+11100011 -> 11111110
+00000100 -> 01000000
+10101111 -> 00111010
+00111101 -> 10010011
+
+Now, determine the output for: 11011000",10001101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,8,468,3.0,unknown__ex8__qhwmid,11011000,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(nibble_swap,shl6)","xor(nibble_swap,shl)","xor(nibble_swap,shl6)",1.0,9.0,1.0,2.0,0.0,-1.0,6.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10001101,00011101,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,13,0031df9c,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00000000 -> 00000000
+11001011 -> 11110010
+11110010 -> 10111100
+01001000 -> 00010010
+01101000 -> 00011010
+01011101 -> 01010111
+10111001 -> 01101110
+11011111 -> 11110111
+11110101 -> 01111101
+01111001 -> 01011110
+
+Now, determine the output for: 11010000",00110100,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwmid,11010000,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror2,ror,ror2,5.0,18.0,4.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,00110100,10110100,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,14,6a578940,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11100001 -> 00001111
+10011110 -> 11110100
+01111111 -> 11111011
+10101010 -> 01010101
+11110001 -> 10001111
+11011110 -> 11110110
+01111000 -> 11000011
+10001110 -> 01110100
+01110110 -> 10110011
+00111000 -> 11000001
+
+Now, determine the output for: 00010010",10010000,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwlow,00010010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,rol3,rol,,6.0,11.0,0.0,0.0,0.0,-1.0,8.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10010000,01001000,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,15,dff2a315,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11101100 -> 00111011
+00000000 -> 00000000
+00010100 -> 00000101
+11101001 -> 01111010
+10000001 -> 01100000
+00110101 -> 01001101
+11010100 -> 00110101
+01000110 -> 10010001
+11111011 -> 11111110
+10110100 -> 00101101
+
+Now, determine the output for: 11111010",10111110,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwhigh,11111010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror2,ror,,5.0,18.0,0.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10111110,01111110,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,16,873b8ea2,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11100101 -> 11110010
+10000100 -> 01000010
+01111111 -> 10111111
+11101101 -> 11110110
+01001111 -> 10100111
+10111010 -> 01011101
+01001001 -> 10100100
+10011111 -> 11001111
+01110100 -> 00111010
+10110011 -> 11011001
+
+Now, determine the output for: 11100100",01110010,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,rrot__ex10__qhwmid,11100100,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.0,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,01110010,11110010,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,17,04183bf9,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01100011 -> 10001101
+00001000 -> 00100000
+11000000 -> 00000011
+10011000 -> 01100010
+00001110 -> 00111000
+10101011 -> 10101110
+00110000 -> 11000000
+
+Now, determine the output for: 00100100",10010000,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,7,447,3.0,unknown__ex7__qhwlow,00100100,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.5,binary_bias_specialized_set,specialized,v3f_only,Rows where v3f is correct and current is wrong; concentrates suspected hidden-regression slices.,10010000,01001000,True,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,18,1054486f,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00111000 -> 00000111
+11100100 -> 10011100
+00100111 -> 11100100
+00000001 -> 00100000
+00011011 -> 01100011
+01101110 -> 11001101
+01111001 -> 00101111
+00011010 -> 01000011
+01101000 -> 00001101
+11001001 -> 00111001
+
+Now, determine the output for: 11110100",10011110,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwmid,11110100,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,8.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,10011110,10011110,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,19,b9500f41,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00110000 -> 10000001
+01010000 -> 10000010
+01111011 -> 11011011
+10101011 -> 01011101
+11000111 -> 00111110
+10010010 -> 10010100
+10101101 -> 01101101
+10010101 -> 10101100
+11000011 -> 00011110
+10111100 -> 11100101
+
+Now, determine the output for: 00011110",11110000,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwmid,00011110,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,8.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,11110000,11110000,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,20,bfee75d5,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11010110 -> 10110101
+00110111 -> 11001101
+10011011 -> 11100110
+10001001 -> 01100010
+11110111 -> 11111101
+00011101 -> 01000111
+11111101 -> 01111111
+00001110 -> 10000011
+10110111 -> 11101101
+01101111 -> 11011011
+
+Now, determine the output for: 00001001",01000010,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwlow,00001001,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror2,ror,ror2,5.0,18.0,4.0,0.0,0.0,-1.0,8.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,01000010,01000010,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,21,d062642e,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01011000 -> 00001011
+10110100 -> 10010110
+01101101 -> 10101101
+10010011 -> 01110010
+10111010 -> 01010111
+11001100 -> 10011001
+11010110 -> 11011010
+11010011 -> 01111010
+01101110 -> 11001101
+11110110 -> 11011110
+
+Now, determine the output for: 10010000",00010010,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwlow,10010000,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00010010,00010010,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,22,fa67da07,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10000011 -> 00001110
+10101010 -> 10101010
+01011010 -> 01101001
+10001100 -> 00110010
+00000111 -> 00011100
+00001101 -> 00110100
+10101101 -> 10110110
+11110110 -> 11011011
+01101101 -> 10110101
+10110111 -> 11011110
+
+Now, determine the output for: 11111010",11101011,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,6.0,unknown__ex10__qhwhigh,11111010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,rol2,rol,rol2,2.0,11.0,2.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,11101011,11101011,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,23,0201e198,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01010111 -> 10111010
+11100010 -> 00010111
+00111100 -> 11100001
+00001110 -> 01110000
+10000111 -> 00111100
+10111000 -> 11000101
+10100110 -> 00110101
+00101110 -> 01110001
+01011001 -> 11001010
+
+Now, determine the output for: 10111110",11110101,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwhigh,10111110,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,11110101,11110101,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,24,034930e2,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10010110 -> 01011010
+10010001 -> 01000110
+10100001 -> 10000110
+11010000 -> 01000011
+10001000 -> 00100010
+11110001 -> 11000111
+01100001 -> 10000101
+00000001 -> 00000100
+00101010 -> 10101000
+
+Now, determine the output for: 11000101",00010111,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwmid,11000101,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00010111,00010111,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,25,046e8532,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10000111 -> 00111100
+00110000 -> 10000001
+11001101 -> 01101110
+01011011 -> 11011010
+11110111 -> 10111111
+00100001 -> 00001001
+00001110 -> 01110000
+11010111 -> 10111110
+01001111 -> 01111010
+
+Now, determine the output for: 10000011",00011100,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwmid,10000011,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,rol3,rol,rol3,6.0,11.0,3.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00011100,00011100,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,26,06412918,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10101000 -> 00010101
+10111010 -> 01010111
+11001001 -> 00111001
+00101000 -> 00000101
+10000110 -> 11010000
+00010011 -> 01100010
+11101000 -> 00011101
+10011110 -> 11010011
+00101011 -> 01100101
+
+Now, determine the output for: 10010000",00010010,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwlow,10010000,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,7.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00010010,00010010,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,27,8ad0116e,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11011000 -> 00011011
+01100011 -> 01101100
+11110100 -> 10011110
+01101010 -> 01001101
+11111110 -> 11011111
+01100101 -> 10101100
+11110111 -> 11111110
+00001111 -> 11100001
+10110011 -> 01110110
+
+Now, determine the output for: 00100010",01000100,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwlow,00100010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror3,ror,ror3,8.0,18.0,4.0,0.0,2.0,-1.0,7.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,01000100,01000100,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,28,a00fe76a,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11010011 -> 11110100
+10010001 -> 01100100
+00100001 -> 01001000
+10101011 -> 11101010
+10010111 -> 11100101
+11010010 -> 10110100
+01100110 -> 10011001
+10101010 -> 10101010
+00111101 -> 01001111
+
+Now, determine the output for: 11101110",10111011,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwhigh,11101110,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror2,ror,ror2,5.0,18.0,4.0,0.0,0.0,-1.0,7.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,10111011,10111011,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,29,d50683b4,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11010001 -> 00111010
+10010011 -> 01110010
+11101111 -> 11111101
+11110100 -> 10011110
+01110101 -> 10101110
+11111011 -> 01111111
+11111101 -> 10111111
+01110100 -> 10001110
+11111000 -> 00011111
+
+Now, determine the output for: 00110001",00100110,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,9,489,5.0,unknown__ex9__qhwmid,00110001,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror3,ror,ror3,8.0,18.0,4.0,0.0,0.0,-1.0,7.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00100110,00100110,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,30,0c7acd69,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00000111 -> 00001110
+01101001 -> 11010010
+11101110 -> 11011101
+00100110 -> 01001100
+11100111 -> 11001111
+00101101 -> 01011010
+00101111 -> 01011110
+01110011 -> 11100110
+11000010 -> 10000101
+01110110 -> 11101100
+
+Now, determine the output for: 11111010",11110101,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,lrot__ex10__qhwhigh,11111010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,11110101,11110101,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,31,2dcfc1a3,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00100011 -> 01000110
+01011110 -> 10111100
+00001011 -> 00010110
+11100111 -> 11001111
+00110100 -> 01101000
+10000001 -> 00000011
+00100111 -> 01001110
+01001100 -> 10011000
+01101001 -> 11010010
+11010100 -> 10101001
+
+Now, determine the output for: 00010100",00101000,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,lrot__ex10__qhwlow,00010100,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00101000,00101000,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,32,629b09d1,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011110 -> 01001111
+00110111 -> 10011011
+00000011 -> 10000001
+01011101 -> 10101110
+10111011 -> 11011101
+01011011 -> 10101101
+01001000 -> 00100100
+11110111 -> 11111011
+01110110 -> 00111011
+01100110 -> 00110011
+
+Now, determine the output for: 01110100",00111010,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,rrot__ex10__qhwmid,01110100,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00111010,00111010,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,33,a4970d02,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11100000 -> 01110000
+00010000 -> 00001000
+10100110 -> 01010011
+11011001 -> 11101100
+11110101 -> 11111010
+00000011 -> 10000001
+00110101 -> 10011010
+10111101 -> 11011110
+10101111 -> 11010111
+10000100 -> 01000010
+
+Now, determine the output for: 00001010",00000101,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,rrot__ex10__qhwlow,00001010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,ror1,ror,ror1,5.0,18.0,3.0,0.0,0.0,-1.0,6.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00000101,00000101,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,34,b5b9c138,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01011101 -> 10111010
+01000111 -> 10001110
+10100101 -> 01001011
+00010110 -> 00101100
+00100110 -> 01001100
+11100111 -> 11001111
+11111100 -> 11111001
+10101010 -> 01010101
+00100111 -> 01001110
+11101110 -> 11011101
+
+Now, determine the output for: 10010000",00100001,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,lrot__ex10__qhwlow,10010000,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,6.0,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00100001,00100001,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,35,c24e1a48,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11000100 -> 01100010
+01110011 -> 10111001
+01000000 -> 00100000
+11101010 -> 01110101
+01111101 -> 10111110
+11000000 -> 01100000
+10001010 -> 01000101
+01101101 -> 10110110
+00000111 -> 10000011
+01011110 -> 00101111
+
+Now, determine the output for: 00100010",00010001,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,10,510,4.0,rrot__ex10__qhwlow,00100010,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.5,binary_bias_specialized_set,specialized,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,00010001,00010001,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,36,1532c0d1,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00101001 -> 00000010
+00010101 -> 01000101
+00100100 -> 00001001
+00011110 -> 00000111
+11100001 -> 01111000
+01001101 -> 00011011
+01001100 -> 00010011
+10011111 -> 00010111
+10011100 -> 00000111
+10001001 -> 00100010
+
+Now, determine the output for: 01110011",01001100,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,10,510,6.0,unknown__ex10__qhwmid,01110011,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"choose(shl3,shr3,ror2)","choose(shl,shr,ror)","choose(not(shl3),ror2,shr3)",1.0,42.0,1.0,5.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00011100,00011100,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,37,25a8aeb1,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00001101 -> 11000010
+10000111 -> 01110000
+00011001 -> 10000011
+10100000 -> 00001010
+11001101 -> 01010110
+10011010 -> 10101101
+11110111 -> 00111101
+00010010 -> 00000101
+01111111 -> 00011111
+01100110 -> 00101010
+
+Now, determine the output for: 11011001",00111111,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,10,510,6.0,unknown__ex10__qhwmid,11011001,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"choose(shl1,shr2,nibble_swap)","choose(shl,shr,nibble_swap)","choose(not(shl1),nibble_swap,shr2)",1.0,21.0,1.0,7.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00010110,00101101,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,38,26a70ae0,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11101000 -> 00010001
+00101000 -> 00000000
+01110011 -> 11000110
+01111010 -> 10000100
+11011101 -> 00011011
+11010011 -> 10000010
+01110101 -> 01001010
+10011001 -> 00010011
+11001100 -> 00011001
+01100001 -> 01000000
+
+Now, determine the output for: 11101010",10010101,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,10,510,6.0,unknown__ex10__qhwmid,11101010,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"majority(rol1,shl6,shr3)","majority(rol,shl,shr)","majority(rol1,shl6,shr3)",1.0,41.0,1.0,6.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00010010,00010101,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,39,37664f79,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00000111 -> 00100000
+01010000 -> 00000000
+01001101 -> 00101001
+01100101 -> 00101000
+01010111 -> 10101000
+11110101 -> 10101010
+11000010 -> 00010000
+00011110 -> 11000000
+00111110 -> 11000000
+11010001 -> 00001010
+
+Now, determine the output for: 11010111",10111010,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,10,510,6.0,unknown__ex10__qhwhigh,11010111,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"majority(ror3,shl3,shr6)","majority(ror,shl,shr)","majority(ror3,shl3,shr6)",1.0,52.0,1.0,8.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,10101000,10100000,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,40,37d81990,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00010100 -> 01101000
+10100000 -> 01000001
+10100110 -> 01101101
+01110100 -> 11101000
+11011110 -> 11111101
+01001101 -> 11011010
+01011110 -> 11111100
+00110101 -> 01111010
+00001011 -> 10110110
+00110110 -> 01101100
+
+Now, determine the output for: 10110101",01111011,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula_abstract,binary8,10,510,6.0,unknown__ex10__qhwmid,10110101,dominant_structured_abstract,leaderboard_proxy_v1_focus,dominant_structured_abstract,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_abstract,dominant,v1で厚い structured-byte abstract family 寄り slice。,"or(rol1,shl4)","or(rol,shl)",,1.0,20.0,0.0,4.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01111010,01110101,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,41,012fb81b,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10000100 -> 00000000
+01101111 -> 10100011
+01001111 -> 10100010
+00010010 -> 00000000
+10010100 -> 00000000
+00101000 -> 00000000
+01011001 -> 00100000
+00010100 -> 00000000
+00111000 -> 00000000
+01110000 -> 00000000
+
+Now, determine the output for: 10101101",10000100,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,10101101,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"majority(ror1,shl5,shr5)","majority(ror,shl,shr)","majority(ror1,shl5,shr5)",2.0,52.0,2.0,7.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01000010,00000000,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,42,0520a6ec,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00101110 -> 00011100
+00001010 -> 00010100
+10000101 -> 00001011
+11011100 -> 00111001
+00101111 -> 00011110
+11110111 -> 00001111
+10000100 -> 00001001
+00000000 -> 00000000
+10101100 -> 01011001
+01011111 -> 00011110
+
+Now, determine the output for: 11010000",10100001,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,11010000,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"choose(shl5,shr3,rol1)","choose(shl,shr,rol)","and(not(shl5),rol1)",4.0,59.0,4.0,3.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00100001,00100001,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,43,0a50c4a8,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10110011 -> 00010000
+00100111 -> 10100000
+01000011 -> 01101000
+00011110 -> 11000011
+11001101 -> 00100001
+00001011 -> 01100001
+11011100 -> 00000011
+00110111 -> 10000000
+00110001 -> 00000100
+10110010 -> 00010010
+
+Now, determine the output for: 11101000",00001101,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,11101000,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"choose(shl1,shr7,ror3)","choose(shl,shr,ror)","and(not(shl1),ror3)",2.0,42.0,2.0,5.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00000100,00000011,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,44,13009e35,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00101010 -> 10101000
+10000000 -> 00000010
+11001011 -> 10111111
+10010101 -> 01010110
+01001010 -> 10101001
+10010110 -> 01111010
+00000001 -> 00010100
+00110001 -> 11010100
+11010011 -> 01111111
+00111010 -> 11101000
+
+Now, determine the output for: 11100110",11111011,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,11100110,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"or(rol2,shl4)","or(rol,shl)","or(rol2,shl4)",3.0,20.0,2.0,2.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00111011,01111011,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,45,1f1292d6,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10110011 -> 10011001
+11100100 -> 00100110
+00010101 -> 10101000
+10110100 -> 10100001
+11011110 -> 11110100
+10001100 -> 01100000
+00011101 -> 11101000
+00100110 -> 00110000
+11001111 -> 01111100
+10111010 -> 11010001
+
+Now, determine the output for: 01010001",10001000,bit_manipulation,binary,bit_structured_byte_formula,answer_only_keep,,binary8,10,510,6.0,unknown__ex10__qhwmid,01010001,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"choose(nibble_swap,rol3,shl3)","choose(nibble_swap,rol,shl)","choose(nibble_swap,rol3,shl3)",2.0,3.0,2.0,2.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00001000,10001010,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,46,2817d770,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10111000 -> 11101110
+01010000 -> 01010101
+10000000 -> 00100010
+11011000 -> 01110111
+00000010 -> 00001000
+00010001 -> 01000100
+11111011 -> 11111111
+00110110 -> 11011101
+11000011 -> 00111111
+00010110 -> 01011101
+
+Now, determine the output for: 00011000",01100110,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_formula,binary8,10,510,6.0,unknown__ex10__qhwlow,00011000,dominant_structured_safe,leaderboard_proxy_v1_focus,dominant_structured_safe,Focused hidden-gap slices from leaderboard_proxy_v1.,dominant_structured_safe,dominant,v1で最も厚い structured-byte exact formula 寄り slice。,"or(rol2,shr2)","or(rol,shr)",,3.0,31.0,0.0,4.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00110000,00110011,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,47,008b52fd,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011001 -> 01001110
+10110101 -> 00010110
+10011101 -> 01000110
+10011110 -> 11000010
+10111000 -> 10001110
+11010000 -> 01011111
+00110001 -> 00011101
+11000111 -> 11110011
+11110001 -> 10011111
+11010001 -> 11011111
+
+Now, determine the output for: 00001101",01100101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,00001101,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,,,,0.0,0.0,0.0,2.0,0.0,-1.0,9.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,10010011,01000100,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,48,08615ada,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01001000 -> 00101001
+01101111 -> 10110001
+11000010 -> 00010000
+10011100 -> 01100011
+00010111 -> 01011110
+11010001 -> 01011110
+01101001 -> 10101001
+11010010 -> 01010010
+11011001 -> 01111111
+00000101 -> 00010100
+
+Now, determine the output for: 10111110",11101111,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwhigh,10111110,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(shl2,shr3)","xor(shl,shr)","xor(not(shl2),not(shr3))",13.0,322.0,12.0,3.0,0.0,-1.0,9.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01111101,01111011,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,49,0d7aacfc,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11000000 -> 10110000
+00010110 -> 00101001
+11100001 -> 11111010
+11110011 -> 11011010
+11101011 -> 11101100
+01101000 -> 11001010
+00010101 -> 00101111
+01010011 -> 10110010
+11111101 -> 11000101
+10101010 -> 01111110
+
+Now, determine the output for: 10100100",01100001,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,10100100,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(shl1,shr2)","xor(shl,shr)","xor(not(shl1),not(shr2))",11.0,322.0,10.0,5.0,0.0,-1.0,9.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01001001,01101001,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,50,0dfd7674,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00110100 -> 01100101
+00010001 -> 01100110
+10011000 -> 00010110
+00101111 -> 10010101
+00001010 -> 10010110
+01111111 -> 00100001
+11001110 -> 00101111
+11111001 -> 10001100
+11010110 -> 00011001
+00110011 -> 10101010
+
+Now, determine the output for: 01101010",01001110,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,01101010,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(ror2,shl1)","xor(ror,shl)","xor(not(ror2),not(shl1))",3.0,33.0,2.0,7.0,0.0,-1.0,9.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,10010111,10101110,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,51,10d29630,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011010 -> 00101010
+00011011 -> 00001100
+00100111 -> 01111100
+00001010 -> 01101000
+10110101 -> 01110110
+00101111 -> 01011100
+00010110 -> 10011000
+00011111 -> 10011100
+10010100 -> 11010010
+01110111 -> 00111101
+
+Now, determine the output for: 01100010",11001001,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,01100010,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(rol2,shl5)","xor(rol,shl)","xor(not(rol2),not(shl5))",2.0,21.0,2.0,3.0,0.0,-1.0,9.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00000001,10000100,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,52,1dfb1f3d,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11110000 -> 01111000
+01110011 -> 01111001
+01000010 -> 10100001
+10111010 -> 11011101
+10101101 -> 10010110
+10011010 -> 11001101
+11010001 -> 10101000
+10011111 -> 00001111
+01001110 -> 10100111
+10100000 -> 01010000
+
+Now, determine the output for: 00001010",10000101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwlow,00001010,supported_affine_xor,leaderboard_proxy_v1_focus,supported_affine_xor,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_affine_xor,supported,v1で明示的に学習量を確保した affine_xor slice。,"xor(ror1,shl6)","xor(ror,shl)","xor(not(ror1),not(shl6))",3.0,33.0,3.0,2.0,0.0,-1.0,9.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,00000101,00000101,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,53,b67194af,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11101101 -> 10110111
+01100011 -> 10001101
+11110110 -> 11011011
+01001010 -> 00101001
+01011101 -> 01110101
+00011100 -> 01110000
+01111100 -> 11110001
+
+Now, determine the output for: 10101001",10100110,bit_manipulation,binary,bit_permutation_inversion,verified_trace_ready,binary_bit_permutation_bijection,binary8,7,447,3.0,unknown__ex7__qhwmid,10101001,supported_bijection,leaderboard_proxy_v1_focus,supported_bijection,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_bijection,supported,v1の rotation / bijection 系 teacher を代表する slice。,,,,0.0,0.0,0.0,0.0,0.0,-1.0,5.5,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01001101,01001101,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,54,6a186446,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00111011 -> 10011111
+10111100 -> 01011111
+11010111 -> 01101011
+00001110 -> 11000111
+10110000 -> 01111101
+01000011 -> 01110011
+10111000 -> 01011101
+11000000 -> 11111100
+01001011 -> 01110111
+10101110 -> 01010111
+
+Now, determine the output for: 10100110",01110111,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_not_formula,binary8,10,510,6.0,unknown__ex10__qhwmid,10100110,supported_not_structured,leaderboard_proxy_v1_focus,supported_not_structured,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_not_structured,supported,v1では少量だが not-structured formula teacher を持つ slice。,,,"choose(not(rol2),not(shl7),ror1)",0.0,0.0,3.0,8.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01110011,01010011,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,55,77602e0f,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01101100 -> 10111101
+01010110 -> 01011010
+11011110 -> 11011011
+00010001 -> 11001110
+01010000 -> 11111010
+01001100 -> 10111011
+10111101 -> 10010111
+00110011 -> 10101110
+11101100 -> 10111101
+00000110 -> 01011111
+
+Now, determine the output for: 00100001",11001101,bit_manipulation,binary,bit_structured_byte_formula,verified_trace_ready,binary_structured_byte_not_formula,binary8,10,510,6.0,unknown__ex10__qhwlow,00100001,supported_not_structured,leaderboard_proxy_v1_focus,supported_not_structured,Focused hidden-gap slices from leaderboard_proxy_v1.,supported_not_structured,supported,v1では少量だが not-structured formula teacher を持つ slice。,,,"choose(nibble_swap,ror3,not(shl5))",0.0,0.0,3.0,8.0,0.0,-1.0,0.0,binary_bias_specialized_set,specialized,both_wrong,Rows both models miss; approximates hidden hard tail not captured by local320.,01011101,11011101,False,False
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,56,12e947ca,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10010001 -> 00001000
+00011101 -> 01001110
+10010101 -> 00001010
+11110001 -> 00111000
+01001000 -> 00100100
+01010100 -> 00101010
+00010010 -> 10001001
+11100101 -> 00110010
+11101100 -> 01110110
+10110001 -> 00011000
+
+Now, determine the output for: 11111101",111110,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwhigh,11111101,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,57,24ef5b88,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01111011 -> 10111101
+00001001 -> 10000100
+10011011 -> 11001101
+10111101 -> 11011111
+10100010 -> 01010001
+01101110 -> 00110111
+10011101 -> 11001111
+10001101 -> 11000111
+10111110 -> 01011111
+00010100 -> 00001010
+
+Now, determine the output for: 01001110",100111,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,1001110,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,58,3564baf1,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011111 -> 11111101
+10011001 -> 11001101
+00100010 -> 00010001
+11011001 -> 11001111
+00111001 -> 11001001
+11001010 -> 01010111
+11000101 -> 00101111
+11101110 -> 01110111
+01101111 -> 01111011
+01100010 -> 00010011
+
+Now, determine the output for: 10110101",10101101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,10110101,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,59,6818b555,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01101110 -> 00000000
+10001011 -> 10000001
+10010110 -> 00000001
+10101110 -> 00000001
+00101000 -> 00000000
+01111110 -> 00000000
+00110101 -> 10000000
+10101100 -> 00000000
+11011010 -> 00000001
+00101100 -> 00000000
+
+Now, determine the output for: 11000101",10000000,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,11000101,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,60,7e527a97,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01011000 -> 00000010
+00111100 -> 00000001
+10010101 -> 00000100
+01111110 -> 10000011
+01101001 -> 01000011
+10101100 -> 00000101
+01011101 -> 01000010
+11111110 -> 10000111
+10111111 -> 11000101
+01111101 -> 01000011
+
+Now, determine the output for: 11001000",110,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,11001000,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,61,de11a23a,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00110011 -> 00000000
+11000001 -> 00000011
+00001101 -> 00000000
+00000110 -> 00000000
+10001100 -> 00000010
+11011100 -> 00000011
+10100010 -> 00000010
+00110110 -> 00000000
+11011011 -> 00000011
+10000111 -> 00000010
+
+Now, determine the output for: 01110001",1,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,6.0,unknown__ex10__qhwmid,1110001,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,62,08df5363,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01001101 -> 00101001
+01010111 -> 01101010
+00101001 -> 00100101
+10100011 -> 01110100
+11110001 -> 00111110
+00010000 -> 00000010
+00000110 -> 11000000
+00000001 -> 00100000
+00101100 -> 10000101
+
+Now, determine the output for: 11100010",1011100,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,11100010,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,63,094de91f,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11100111 -> 01000001
+11001011 -> 11011001
+01000010 -> 01011011
+10111001 -> 00011101
+01110000 -> 00011111
+11011011 -> 11111001
+01010001 -> 01001101
+11100110 -> 01010011
+01100101 -> 01100101
+
+Now, determine the output for: 11101011",10011001,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwhigh,11101011,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,64,2ead53dc,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10001010 -> 00001000
+10011111 -> 00001001
+01101000 -> 00000110
+11110001 -> 00001111
+10011100 -> 00001001
+11111011 -> 00001111
+10101100 -> 00001010
+00101101 -> 00000010
+11000111 -> 00001100
+
+Now, determine the output for: 01011010",101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,1011010,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,65,32e5fe87,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01101001 -> 00000000
+11010111 -> 00000001
+01010101 -> 00000000
+10110100 -> 00000000
+00100011 -> 00000000
+11001011 -> 00000001
+01100001 -> 00000000
+00011000 -> 00000000
+11111100 -> 00000000
+
+Now, determine the output for: 01001011",0,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,1001011,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,66,567e3da4,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00110001 -> 00010011
+00001001 -> 00010000
+01010110 -> 01100101
+01010001 -> 00010101
+01110100 -> 01000111
+10100110 -> 01101010
+10111000 -> 10001011
+01100100 -> 01000110
+01011011 -> 00110101
+
+Now, determine the output for: 01001000",10000100,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwlow,1001000,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,67,bdb93228,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00001000 -> 00000000
+10111010 -> 01010101
+01000000 -> 00000000
+10001110 -> 01000100
+00110100 -> 10000000
+10010000 -> 00000000
+01111001 -> 00101000
+11110100 -> 10100010
+11000001 -> 00100000
+
+Now, determine the output for: 10111111",11111101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwhigh,10111111,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,68,cb7c2230,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+00100011 -> 00011000
+00000101 -> 00101000
+00011001 -> 11001000
+10110001 -> 10001001
+11011001 -> 11001000
+10110000 -> 10000001
+10011000 -> 11000000
+11000001 -> 00001000
+01110110 -> 10110000
+
+Now, determine the output for: 11010100",10100000,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,5.0,unknown__ex9__qhwmid,11010100,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,69,c625ba91,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11010011 -> 11111111
+11010111 -> 11111111
+01110101 -> 11111111
+00000000 -> 11111111
+11110110 -> 11111111
+00001000 -> 11111111
+10010001 -> 11111111
+11010000 -> 11111111
+01110100 -> 11111111
+11100111 -> 11111111
+
+Now, determine the output for: 10100000",11111111,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,4.0,or_mask__ex10__qhwlow,10100000,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,70,e368d23f,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+11011001 -> 01101100
+10100100 -> 01010010
+01110001 -> 00111000
+01010100 -> 00101010
+00100111 -> 00010011
+01111100 -> 00111110
+10110110 -> 01011011
+11010010 -> 01101001
+00111100 -> 00011110
+01101011 -> 00110101
+
+Now, determine the output for: 00011010",1101,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,10,510,4.0,rshift__ex10__qhwmid,11010,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,71,bcdf9198,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10001011 -> 11111111
+00011111 -> 11111111
+01011100 -> 11111111
+10101000 -> 11111111
+11110010 -> 11111111
+10111000 -> 11111111
+01111100 -> 11111111
+11011010 -> 11111111
+10101111 -> 11111111
+
+Now, determine the output for: 01100010",11111111,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,9,489,3.0,or_mask__ex9__qhwmid,1100010,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,72,00066667,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01010001 -> 11011101
+00001001 -> 01101101
+00010101 -> 01010101
+11111111 -> 10000001
+10011101 -> 01000101
+00111011 -> 00001001
+10111101 -> 00000101
+00100110 -> 10110011
+
+Now, determine the output for: 00110100",10010111,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,8,468,3.0,unknown__ex8__qhwmid,110100,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,73,0f7be6a8,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10011011 -> 01001101
+10100111 -> 01010011
+00011101 -> 00001110
+00111101 -> 00011110
+00111010 -> 00011101
+11011011 -> 01101101
+01011100 -> 00101110
+00001110 -> 00000111
+
+Now, determine the output for: 10000001",1000000,bit_manipulation,binary,bit_other,verified_trace_ready,binary_affine_xor,binary8,8,468,1.0,rshift__ex8__qhwlow,10000001,,binary_hard_topup,binary_affine_xor,Hard binary top-up for safe/bijection/structured-formula solvers.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,74,2f485a40,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+20+44 = 2044
+15}39 = 1539
+35}43 = 3543
+82+31 = 8231
+Now, determine the result for: 18+67",1867,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,4,199,4.0,atypenumeric__alen4__risksafe,18+67,,symbol_numeric_watch,symbol_numeric_operator_formula,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,75,75032b65,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+64&31 = 33
+28'15 = 419
+40'85 = 3399
+54&29 = 25
+Now, determine the result for: 52&25",27,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,4,194,1.0,atypenumeric__alen2__risksafe,52&25,,symbol_numeric_watch,symbol_numeric_operator_formula,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,76,54c9bde5,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+52(28 = 79
+50-78 = 5078
+71\89 = \18
+36-79 = 3679
+87(18 = 104
+Now, determine the result for: 30-64",3064,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,5,208,4.0,atypenumeric__alen4__risksafe,30-64,,symbol_numeric_watch,symbol_numeric_operator_formula,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,77,ff8409cd,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+55)97 = )42
+66'68 = 6668
+90)83 = 7
+96)65 = 31
+Now, determine the result for: 28)19",9,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,4,193,2.0,atypenumeric__alen1__risksafe,28)19,,symbol_numeric_watch,symbol_numeric_operator_formula,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,78,27cec7a9,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+62!34 = 95
+17%40 = %23
+52:35 = 5235
+52%99 = %47
+90:55 = 9055
+Now, determine the result for: 33:41",3341,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,5,208,3.0,atypenumeric__alen4__risksafe,33:41,symbol:numeric_2x2,symbol_numeric_watch,symbol:numeric_2x2,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,phase0_combined_eval_set,phase0,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,3341,3341,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,79,cfa59b38,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+18#56 = 1007
+89-22 = 111
+81+97 = 16
+63#91 = 5732
+76-58 = 134
+Now, determine the result for: 13#18",233,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,5,208,1.0,atypenumeric__alen3__risksafe,13#18,symbol:numeric_2x2,symbol_numeric_watch,symbol:numeric_2x2,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,phase0_combined_eval_set,phase0,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,233,233,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,80,5c743e8a,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+67(30 = 2010
+85`55 = `30
+91(23 = 2093
+45(43 = 1935
+83(26 = 2158
+Now, determine the result for: 27(65",1755,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,5,211,3.0,atypenumeric__alen4__risksafe,27(65,symbol:numeric_2x2,symbol_numeric_watch,symbol:numeric_2x2,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,phase0_combined_eval_set,phase0,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,1755,1755,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,81,aa251ec4,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+77>22 = 98
+98?62 = 9862
+53%84 = %31
+56?80 = 5680
+57%83 = %26
+Now, determine the result for: 38%58",%20,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,symbolic,5,208,2.0,atypesymbolic__alen3__risksafe,38%58,,symbol_numeric_watch,symbol_numeric_operator_formula,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,82,5b06502f,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+20!22 = 441
+37^62 = 25
+77!93 = 7162
+16!70 = 1121
+98<87 = 185
+Now, determine the result for: 31!57",1768,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,5,208,3.0,atypenumeric__alen4__risksafe,31!57,,symbol_numeric_watch,symbol_numeric_operator_formula,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,,,,,,,,
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,83,18268687,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+49*98 = 4998
+84'18 = 66
+28*73 = 2873
+72'62 = 10
+Now, determine the result for: 75'75",0,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,4,195,2.0,atypenumeric__alen1__risksafe,75'75,symbol:numeric_2x2,symbol_numeric_watch,symbol:numeric_2x2,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,phase0_combined_eval_set,phase0,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,0,0,True,True
+leaderboard_proxy_v2_set,leaderboard_proxy_v2,84,878c843c,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+99/10 = 89
+37'26 = 3726
+76'94 = 7694
+57'21 = 5721
+88/47 = 41
+Now, determine the result for: 80/45",35,symbol_equation,symbol,numeric_2x2,verified_trace_ready,symbol_numeric_operator_formula,numeric,5,208,2.0,atypenumeric__alen2__risksafe,80/45,symbol:numeric_2x2,symbol_numeric_watch,symbol:numeric_2x2,Small numeric_2x2 symbol watch slice to guard route-sensitive symbol drift.,,,,,,,,,,,,,,phase0_combined_eval_set,phase0,both_correct,Rows both models solve; calibrates proxy topline upward without collapsing the gap.,35,35,True,True

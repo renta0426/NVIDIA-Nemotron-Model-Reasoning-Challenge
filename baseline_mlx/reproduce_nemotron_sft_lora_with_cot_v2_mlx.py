@@ -77,6 +77,8 @@ DEFAULT_RUN_AUDIT_RELPATH = Path("submission_compat_audit/submission_compat_audi
 DEFAULT_RUN_EXPORT_RELPATH = Path("submission_export/export_manifest.json")
 DEFAULT_RESULTS_MD = REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md"
 DEFAULT_RESULTS_GIT_LOCK_DIR = REPO_ROOT / ".git" / ".nemotron_ledger_lock"
+DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES = 65536
+DEFAULT_LIVE_PROGRESS_POLL_SECONDS = 300.0
 COPILOT_COAUTHORED_BY_TRAILER = "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 
 EXPECTED_COLUMNS = ["id", "prompt", "answer", "type", "generated_cot"]
@@ -363,6 +365,15 @@ FINAL_ANSWER_PATTERNS = (
 )
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 BIT8_PATTERN = re.compile(r"^[01]{8}$")
+TRAIN_PROGRESS_LINE_PATTERN = re.compile(
+    r"^Iter (?P<iteration>\d+) \(Opt (?P<optimizer_step>\d+)\): "
+    r"Train loss (?P<train_loss>[-+0-9.eE]+), "
+    r"Learning Rate (?P<learning_rate>[-+0-9.eE]+), "
+    r"It/sec (?P<iterations_per_second>[-+0-9.eE]+), "
+    r"Tokens/sec (?P<tokens_per_second>[-+0-9.eE]+), "
+    r"Trained Tokens (?P<trained_tokens>\d+), "
+    r"Peak mem (?P<peak_memory>[-+0-9.eE]+) GB$"
+)
 REFERENCE_PHASE0_BENCHMARK_FILES = (
     "general_stable_set.csv",
     "binary_hard_set.csv",
@@ -399,6 +410,68 @@ def load_json(path: Path, *, default: Any = None) -> Any:
     if not path.exists():
         return default
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_text_tail(path: Path, *, max_bytes: int = DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES) -> str:
+    resolved_path = Path(path).resolve()
+    if not resolved_path.exists():
+        return ""
+    normalized_max_bytes = max(int(max_bytes), 4096)
+    with resolved_path.open("rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        handle.seek(max(0, size - normalized_max_bytes))
+        return handle.read().decode("utf-8", errors="ignore")
+
+
+def normalize_train_progress_payload(
+    payload: dict[str, Any],
+    *,
+    source: str,
+    source_path: Path | None = None,
+) -> dict[str, Any]:
+    normalized: dict[str, Any] = {
+        "progress_source": str(source),
+        "source_path": str(source_path.resolve()) if source_path is not None else "",
+        "observed_at": str(payload.get("logged_at") or payload.get("observed_at") or ""),
+    }
+    for field_name in ("iteration", "optimizer_step", "trained_tokens"):
+        value = payload.get(field_name)
+        if value not in (None, ""):
+            normalized[field_name] = int(value)
+    for field_name in (
+        "train_loss",
+        "learning_rate",
+        "iterations_per_second",
+        "tokens_per_second",
+        "peak_memory",
+    ):
+        value = payload.get(field_name)
+        if value not in (None, ""):
+            normalized[field_name] = float(value)
+    if payload.get("steps_per_report_step_unit") not in (None, ""):
+        normalized["steps_per_report_step_unit"] = str(payload["steps_per_report_step_unit"])
+    return normalized
+
+
+def extract_console_train_progress(
+    run_root: Path,
+    *,
+    max_log_bytes: int = DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+) -> dict[str, Any] | None:
+    console_path = Path(run_root).resolve() / "console.log"
+    if not console_path.exists():
+        return None
+    observed_at = datetime.fromtimestamp(console_path.stat().st_mtime, tz=timezone.utc).isoformat()
+    for raw_line in reversed(read_text_tail(console_path, max_bytes=max_log_bytes).splitlines()):
+        match = TRAIN_PROGRESS_LINE_PATTERN.match(raw_line.strip())
+        if match is None:
+            continue
+        payload = dict(match.groupdict())
+        payload["observed_at"] = observed_at
+        payload["steps_per_report_step_unit"] = "optimizer"
+        return normalize_train_progress_payload(payload, source="console_log", source_path=console_path)
+    return None
 
 
 def path_matches_kind(path: Path, expected_kind: str) -> bool:

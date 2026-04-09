@@ -1,0 +1,110 @@
+{
+  "captured_at": "2026-04-09T00:08:04.176643+00:00",
+  "current_pid": 69225,
+  "memory_pressure": {
+    "returncode": 0,
+    "head": [
+      "The system has 549755813888 (33554432 pages with a page size of 16384).",
+      "",
+      "Stats: ",
+      "Pages free: 4506758 ",
+      "Pages purgeable: 44154 ",
+      "Pages purged: 1141032 ",
+      "",
+      "Swap I/O:",
+      "Swapins: 0 ",
+      "Swapouts: 0 ",
+      "",
+      "Page Q counts:",
+      "Pages active: 1553448 ",
+      "Pages inactive: 5250115 ",
+      "Pages speculative: 51750 ",
+      "Pages throttled: 0 ",
+      "Pages wired down: 22029948 ",
+      "",
+      "Compressor Stats:",
+      "Pages used by compressor: 85701 "
+    ],
+    "system_free_percent": 33
+  },
+  "gpu_snapshot": {
+    "returncode": 0,
+    "head": [
+      "+-o AGXAcceleratorG15X  <class AGXAcceleratorG15X, id 0x1000005f2, registered, matched, active, busy 0 (6553 ms), retain 61>",
+      "    {",
+      "      \"SchedulerState\" = {\"Stamps\"=({\"idx\"=5,\"sub\"=375808768,\"gpu\"=375805952}),\"BusyWorkQueues\"=({\"submitted\"=1464544,\"id\"=8,\"added\"=1464544,\"finished\"=1464533,\"state\"=\"Idle\",\"submit\"=(21850642688)})}",
+      "      \"IOMatchedAtBoot\" = Yes",
+      "      \"vendor-id\" = <6b100000>",
+      "      \"GPURawCounterBundleName\" = \"AGXGPURawCounterBundle\"",
+      "      \"AGXParameterBufferMaxSizeEverMemless\" = 1148715008",
+      "      \"GPURawCounterPluginClassName\" = \"AGXGPURawCounterSourceGroup\"",
+      "      \"MetalPluginClassName\" = \"AGXG15DDevice\"",
+      "      \"SCMVersionNumber\" = \"\"",
+      "      \"AGCInfo\" = {\"fLastSubmissionPID\"=56469,\"fSubmissionsSinceLastCheck\"=0,\"fBusyCount\"=0}",
+      "      \"CommandSubmissionEnabled\" = Yes",
+      "      \"IONameMatched\" = \"gpu,t6032\"",
+      "      \"MetalPluginName\" = \"AGXMetalG15X_M2\"",
+      "      \"PerformanceStatistics\" = {\"In use system memory (driver)\"=0,\"Alloc system memory\"=356762763264,\"Tiler Utilization %\"=100,\"recoveryCount\"=0,\"lastRecoveryTime\"=0,\"Renderer Utilization %\"=100,\"TiledSceneBytes\"=557056,\"Device Utilization %\"=100,\"SplitSceneCount\"=0,\"Allocated PB Size\"=175243264,\"In use system memory\"=354023489536}",
+      "      \"IOGLBundleName\" = \"AppleMetalOpenGLRenderer\"",
+      "      \"AGXParameterBufferMaxSizeNeverMemless\" = 574357504",
+      "      \"IOGLESBundleName\" = \"AppleMetalGLRenderer\"",
+      "      \"IOSourceVersion\" = \"350.38\"",
+      "      \"IOPersonalityPublisher\" = \"com.apple.AGXG15C\""
+    ],
+    "device_util_percent": 100,
+    "renderer_util_percent": 100,
+    "tiler_util_percent": 100,
+    "alloc_system_memory_bytes": 356762763264,
+    "in_use_system_memory_bytes": 354023489536
+  },
+  "competing_mlx_train_processes": [
+    {
+      "pid": 56469,
+      "ppid": 56466,
+      "rss_kb": 66314432,
+      "pcpu": 9.0,
+      "etime": "44:42",
+      "command": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/.venv/bin/python3 baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py train --model-root baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2/shadow_model --run-name nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union --profile notebook-current --lora-key-group stage-union --trainable-lora-suffix-group broad --fail-on-runtime-contention"
+    },
+    {
+      "pid": 67528,
+      "ppid": 67526,
+      "rss_kb": 64195072,
+      "pcpu": 16.4,
+      "etime": "05:41",
+      "command": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/.venv/bin/python3 baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py train --model-root baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2/shadow_model --run-name nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union --profile notebook-current --lora-key-group stage-union-exportsafe --trainable-lora-suffix-group broad-exportsafe"
+    },
+    {
+      "pid": 64321,
+      "ppid": 64320,
+      "rss_kb": 2544,
+      "pcpu": 0.0,
+      "etime": "18:16",
+      "command": "bash -lc \\012set -euo pipefail\\012repo_root=\"$PWD\"\\012stage1_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union\"\\012main_suite_root=\"$repo_root/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536/eval_suite_readme_proxy_specialized\"\\012vo_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536\"\\012vo_log=\"$repo_root/$vo_run/console.log\"\\012mkdir -p \"$(dirname \"$vo_log\")\"\\012while [ ! -f \"$main_suite_root/benchmark_eval_suite_summary.json\" ]; do\\012  sleep 60\\012done\\012if [ -f \"$repo_root/$vo_run/training_result.json\" ]; then\\012  exit 0\\012fi\\012uv run python baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py train \\\\012  --model-root \"$repo_root/$stage1_run/shadow_model\" \\\\012  --run-name nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536 \\\\012  --profile notebook-current \\\\012  --train-csv \"$repo_root/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv\" \\\\012  --type-sample \"Bit Manipulation=209\" \\\\012  --type-sample \"Equation Transformation=9\" \\\\012  --type-sample \"Gravitational Constant=0\" \\\\012  --type-sample \"Numeral Conversion=0\" \\\\012  --type-sample \"Text Encryption=0\" \\\\012  --type-sample \"Unit Conversion=0\" \\\\012  --num-epochs 3.6 \\\\012  --learning-rate 2e-5 \\\\012  --max-seq-length 1536 \\\\012  --lora-key-group stage-union \\\\012  --trainable-lora-suffix-group attention-vo \\\\012  --resume-adapter-file \"$repo_root/$stage1_run/adapter/adapters.safetensors\" \\\\012  --fail-on-runtime-contention \\\\012  2>&1 | tee \"$vo_log\"\\012"
+    },
+    {
+      "pid": 64322,
+      "ppid": 64319,
+      "rss_kb": 2544,
+      "pcpu": 0.0,
+      "etime": "18:16",
+      "command": "bash -lc \\012set -euo pipefail\\012repo_root=\"$PWD\"\\012stage1_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union\"\\012vo_suite_root=\"$repo_root/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536/eval_suite_readme_proxy_specialized\"\\012short_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536\"\\012short_log=\"$repo_root/$short_run/console.log\"\\012mkdir -p \"$(dirname \"$short_log\")\"\\012while [ ! -f \"$vo_suite_root/benchmark_eval_suite_summary.json\" ]; do\\012  sleep 60\\012done\\012if [ -f \"$repo_root/$short_run/training_result.json\" ]; then\\012  exit 0\\012fi\\012uv run python baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py train \\\\012  --model-root \"$repo_root/$stage1_run/shadow_model\" \\\\012  --run-name nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536 \\\\012  --profile notebook-current \\\\012  --train-csv \"$repo_root/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv\" \\\\012  --type-sample \"Bit Manipulation=209\" \\\\012  --type-sample \"Equation Transformation=9\" \\\\012  --type-sample \"Gravitational Constant=0\" \\\\012  --type-sample \"Numeral Conversion=0\" \\\\012  --type-sample \"Text Encryption=0\" \\\\012  --type-sample \"Unit Conversion=0\" \\\\012  --num-epochs 2.4 \\\\012  --learning-rate 1e-5 \\\\012  --max-seq-length 1536 \\\\012  --lora-key-group stage-union \\\\012  --trainable-lora-suffix-group attention \\\\012  --resume-adapter-file \"$repo_root/$stage1_run/adapter/adapters.safetensors\" \\\\012  --fail-on-runtime-contention \\\\012  2>&1 | tee \"$short_log\"\\012"
+    },
+    {
+      "pid": 67582,
+      "ppid": 67581,
+      "rss_kb": 2544,
+      "pcpu": 0.0,
+      "etime": "05:40",
+      "command": "bash -lc \\012set -euo pipefail\\012repo_root=\"$PWD\"\\012stage1_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union\"\\012stage2_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536\"\\012stage2_log=\"$repo_root/$stage2_run/console.log\"\\012mkdir -p \"$(dirname \"$stage2_log\")\"\\012while [ ! -f \"$repo_root/$stage1_run/training_result.json\" ]; do\\012  sleep 60\\012done\\012if [ -f \"$repo_root/$stage2_run/training_result.json\" ]; then\\012  exit 0\\012fi\\012uv run python baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py train \\\\012  --model-root \"$repo_root/$stage1_run/shadow_model\" \\\\012  --run-name nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536 \\\\012  --profile notebook-current \\\\012  --train-csv \"$repo_root/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv\" \\\\012  --type-sample \"Bit Manipulation=209\" \\\\012  --type-sample \"Equation Transformation=9\" \\\\012  --type-sample \"Gravitational Constant=0\" \\\\012  --type-sample \"Numeral Conversion=0\" \\\\012  --type-sample \"Text Encryption=0\" \\\\012  --type-sample \"Unit Conversion=0\" \\\\012  --num-epochs 3.6 \\\\012  --learning-rate 2e-5 \\\\012  --max-seq-length 1536 \\\\012  --lora-key-group stage-union-exportsafe \\\\012  --trainable-lora-suffix-group attention \\\\012  --resume-adapter-file \"$repo_root/$stage1_run/adapter/adapters.safetensors\" \\\\012  2>&1 | tee \"$stage2_log\"\\012"
+    },
+    {
+      "pid": 57937,
+      "ppid": 57936,
+      "rss_kb": 2528,
+      "pcpu": 0.0,
+      "etime": "39:01",
+      "command": "bash -lc \\012set -euo pipefail\\012repo_root=\"$PWD\"\\012stage1_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union\"\\012stage2_run=\"baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536\"\\012stage2_log=\"$repo_root/$stage2_run/console.log\"\\012mkdir -p \"$(dirname \"$stage2_log\")\"\\012while [ ! -f \"$repo_root/$stage1_run/training_result.json\" ]; do\\012  sleep 60\\012done\\012uv run python baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py train \\\\012  --model-root \"$repo_root/$stage1_run/shadow_model\" \\\\012  --run-name nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536 \\\\012  --profile notebook-current \\\\012  --train-csv \"$repo_root/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv\" \\\\012  --type-sample \"Bit Manipulation=209\" \\\\012  --type-sample \"Equation Transformation=9\" \\\\012  --type-sample \"Gravitational Constant=0\" \\\\012  --type-sample \"Numeral Conversion=0\" \\\\012  --type-sample \"Text Encryption=0\" \\\\012  --type-sample \"Unit Conversion=0\" \\\\012  --num-epochs 3.6 \\\\012  --learning-rate 2e-5 \\\\012  --max-seq-length 1536 \\\\012  --lora-key-group stage-union \\\\012  --trainable-lora-suffix-group attention \\\\012  --resume-adapter-file \"$repo_root/$stage1_run/adapter/adapters.safetensors\" \\\\012  --fail-on-runtime-contention \\\\012  2>&1 | tee \"$stage2_log\"\\012"
+    }
+  ]
+}
