@@ -1296,3 +1296,28 @@ row-level overlap:
 - zip_size_bytes: `102355396`
 - validation_valid: `True`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1`
+
+- status: `running_untracked`
+- label: `export-safe-qkvo-reanchor-len1536-from-len768-v1-live`
+- observed_at: `2026-04-09T23:56:46.888044+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
+- sampled_rows: `200`
+- optimizer_progress: `0/12 = 0.00%`
+- lr: `1e-05`
+- max_seq_length: `1536`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Completion markers
+
+- training_result_exists: `False`
+- runtime_pid: `8328`
+- runtime_pid_alive: `True`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1 -->
