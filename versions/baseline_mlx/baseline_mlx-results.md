@@ -336,3 +336,14 @@ row-level overlap:
 - single-file trainer に **JSONL progress callback** も追加した。`mlx_lm.lora.run()` が内部で callback 引数を上書きする挙動を利用し、`get_reporting_callbacks()` を wrap して **`adapter/train_report.jsonl`**, **`adapter/val_report.jsonl`**, **`adapter/latest_train_report.json`**, **`adapter/latest_val_report.json`** を常時出す。1-step smoke `nemotron_sft_lora_with_cot_v2_mlx_progress_callback_smoke` で生成を確認した。
 - この progress callback により、**これから起動する Stage2 / export-safe ablation / future runs** は final save 前でも file artifact から optimizer step と latest loss/memory を追える。なお、すでに起動済みの Stage1 broad 2 本には retroactive には効かない。
 - `baseline_mlx/outputs/best_submission_candidate_auto/selection_manifest.json` は継続更新中で、現時点の status は **`no_eligible_candidate`**。つまり best-submission poller 自体は動いており、まだ **`local320 > 215/320` かつ exportable** な run が出ていないことが確認できている。
+
+## Direct corrective from baseline fullrun v2
+
+| version | run_name | resume_from | train_csv | total_iters | optimizer_steps | measured | status | artifacts |
+| --- | --- | --- | --- | ---: | ---: | --- | --- | --- |
+| `baseline-mlx-direct-fullrun-v2-qkvo-launch` | `nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr2e5_len1536` | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2/adapter/adapters.safetensors` | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv` | `784` | `98` | `Iter1 val=1.606`; `trainable=3.736M`; `attention=q/k/v/o only`; `runtime preflight saw 8 other Nemotron train processes` | running | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr2e5_len1536/console.log` |
+
+- この lane は **Stage1 broad の完走待ちをバイパス**して、現時点の MLX best **`baseline_mlx_notebook_original_fullrun_v2 = 215/320 = 0.6719`** を trunk とし、その上に **attention-only corrective** を直差しする即応実験として追加した。
+- 設定は **`stage-union`**, **`resume=fullrun_v2 adapters.safetensors`**, **`trainable=attention(q/k/v/o)`**, **`lr=2e-5`**, **`max_seq_length=1536`**, **`train_csv=stage2_corrective_v1.csv (218 rows)`**。起動時点では **`LoRA suffix filter = 24 modules`**, **`Trainable parameters = 3.736M`**, **`Iter1 val_loss = 1.606`** を確認した。
+- この resume 元は `switch_mlp` routed-expert の **3D tensor** を含むため、**この direct lane 自体は submission 互換 lane ではない**。役割はまず **「attention corrective が baseline trunk を上積みできるか」**を stagefreeze 本線より早く読むことにある。
+- 完走後は detached waiter で **`eval-benchmark-suite` → `audit-submission-compat` → `record-run-result` → `results.md` commit/push** まで自動連結してある。
