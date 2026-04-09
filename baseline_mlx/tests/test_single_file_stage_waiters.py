@@ -84,6 +84,7 @@ def build_postprocess_args(run_root: Path, summary_json: Path, **overrides) -> S
         "timeout_seconds": 1.0,
         "summary_json": summary_json,
         "dry_run": True,
+        "skip_existing_steps": True,
         "run_eval_suite": True,
         "benchmark_root": stage_waiters.PHASE0_OFFLINE_EVAL_ARTIFACT_ROOT,
         "extra_benchmark_csv": None,
@@ -383,6 +384,61 @@ def test_postprocess_run_dry_run_writes_summary_without_loading_model(tmp_path: 
     assert summary["suite_summary_relpath"] == str(stage_waiters.DEFAULT_RUN_SUITE_SUMMARY_RELPATH)
     assert summary["audit_relpath"] == str(stage_waiters.DEFAULT_RUN_AUDIT_RELPATH)
     assert summary["export_relpath"] == str(stage_waiters.DEFAULT_RUN_EXPORT_RELPATH)
+
+
+def test_postprocess_run_skips_existing_steps_without_reinvoking_pipeline(tmp_path: Path) -> None:
+    run_root = make_candidate_run(
+        tmp_path,
+        run_name="completed_run",
+        local320_correct=224,
+        proxy_correct=72,
+        specialized_correct=320,
+    )
+    shadow_model_dir = run_root / "shadow_model"
+    shadow_model_dir.mkdir(parents=True, exist_ok=True)
+    recorded_result = {"recorded_at": "2026-04-09T01:54:31Z"}
+    (run_root / "recorded_run_result.json").write_text(json.dumps(recorded_result), encoding="utf-8")
+    prepare_manifest = json.loads((run_root / "prepare_manifest.json").read_text(encoding="utf-8"))
+    prepare_manifest["shadow_model_dir"] = str(shadow_model_dir.resolve())
+    prepare_manifest["artifacts"] = {"adapter_dir": str((run_root / "adapter").resolve())}
+    (run_root / "prepare_manifest.json").write_text(json.dumps(prepare_manifest), encoding="utf-8")
+    summary_json = tmp_path / "postprocess_skip_summary.json"
+
+    original_eval = stage_waiters.run_eval_benchmark_suite
+    original_audit = stage_waiters.run_audit_submission_compat
+    original_export = stage_waiters.run_export_peft_submission
+    original_record = stage_waiters.run_record_run_result
+    try:
+        stage_waiters.run_eval_benchmark_suite = lambda _args: (_ for _ in ()).throw(AssertionError("eval reran"))
+        stage_waiters.run_audit_submission_compat = (
+            lambda _args: (_ for _ in ()).throw(AssertionError("audit reran"))
+        )
+        stage_waiters.run_export_peft_submission = (
+            lambda _args: (_ for _ in ()).throw(AssertionError("export reran"))
+        )
+        stage_waiters.run_record_run_result = lambda _args: (_ for _ in ()).throw(AssertionError("record reran"))
+
+        stage_waiters.run_postprocess_run(
+            build_postprocess_args(
+                run_root=run_root,
+                summary_json=summary_json,
+                dry_run=False,
+                run_package_best_submission=False,
+            )
+        )
+    finally:
+        stage_waiters.run_eval_benchmark_suite = original_eval
+        stage_waiters.run_audit_submission_compat = original_audit
+        stage_waiters.run_export_peft_submission = original_export
+        stage_waiters.run_record_run_result = original_record
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["dry_run"] is False
+    assert summary["steps"]["eval_suite"]["status"] == "skipped_existing"
+    assert summary["steps"]["audit_submission"]["status"] == "skipped_existing"
+    assert summary["steps"]["export_submission"]["status"] == "skipped_existing"
+    assert summary["steps"]["record_run_result"]["status"] == "skipped_existing"
+    assert summary["steps"]["record_run_result"]["recorded_at"] == recorded_result["recorded_at"]
 
 
 def test_package_best_submission_selects_best_exportable_candidate(tmp_path: Path) -> None:

@@ -4629,6 +4629,7 @@ def run_wait_resume_train_from_path(args: argparse.Namespace) -> None:
 def run_postprocess_run(args: argparse.Namespace) -> None:
     run_root = Path(args.run_root).resolve()
     label = str(args.label).strip() if getattr(args, "label", None) else run_root.name
+    skip_existing_steps = bool(getattr(args, "skip_existing_steps", True))
     summary_path = (
         Path(args.summary_json).resolve()
         if args.summary_json is not None
@@ -4697,6 +4698,10 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
         run_root,
         export_output_root / "export_manifest.json",
     )
+    suite_summary_path = suite_output_root / "benchmark_eval_suite_summary.json"
+    audit_summary_path = audit_output_root / "submission_compat_audit.json"
+    export_manifest_path = export_output_root / "export_manifest.json"
+    recorded_run_result_path = run_root / "recorded_run_result.json"
 
     summary["model_root"] = str(model_root)
     summary["adapter_dir"] = str(adapter_dir)
@@ -4711,71 +4716,92 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
         return
 
     if args.run_eval_suite:
-        run_eval_benchmark_suite(
-            argparse.Namespace(
-                model_root=model_root,
-                adapter_dir=adapter_dir,
-                benchmark_root=Path(args.benchmark_root).resolve(),
-                extra_benchmark_csv=[Path(path).resolve() for path in (args.extra_benchmark_csv or [])],
-                output_root=suite_output_root,
-                max_tokens=int(args.max_tokens),
-                temperature=float(args.temperature),
-                top_p=float(args.top_p),
-                max_num_seqs=int(args.max_num_seqs),
-                max_model_len=int(args.max_model_len),
-                prompt_chunk_size=int(args.prompt_chunk_size),
-                prefill_batch_size=int(args.prefill_batch_size),
-                completion_batch_size=int(args.completion_batch_size),
-                eval_enable_thinking=bool(args.eval_enable_thinking),
-                lazy_load=bool(args.lazy_load),
-                force_single_generate=bool(args.force_single_generate),
+        if skip_existing_steps and suite_summary_path.exists():
+            summary["steps"]["eval_suite"] = {
+                "status": "skipped_existing",
+                "output_root": str(suite_output_root),
+            }
+        else:
+            run_eval_benchmark_suite(
+                argparse.Namespace(
+                    model_root=model_root,
+                    adapter_dir=adapter_dir,
+                    benchmark_root=Path(args.benchmark_root).resolve(),
+                    extra_benchmark_csv=[Path(path).resolve() for path in (args.extra_benchmark_csv or [])],
+                    output_root=suite_output_root,
+                    max_tokens=int(args.max_tokens),
+                    temperature=float(args.temperature),
+                    top_p=float(args.top_p),
+                    max_num_seqs=int(args.max_num_seqs),
+                    max_model_len=int(args.max_model_len),
+                    prompt_chunk_size=int(args.prompt_chunk_size),
+                    prefill_batch_size=int(args.prefill_batch_size),
+                    completion_batch_size=int(args.completion_batch_size),
+                    eval_enable_thinking=bool(args.eval_enable_thinking),
+                    lazy_load=bool(args.lazy_load),
+                    force_single_generate=bool(args.force_single_generate),
+                )
             )
-        )
-        summary["steps"]["eval_suite"] = {
-            "status": "completed",
-            "output_root": str(suite_output_root),
-        }
+            summary["steps"]["eval_suite"] = {
+                "status": "completed",
+                "output_root": str(suite_output_root),
+            }
     else:
         summary["steps"]["eval_suite"] = {"status": "skipped"}
     persist_summary()
 
-    audit_summary = load_json(audit_output_root / "submission_compat_audit.json", default=None)
+    audit_summary = load_json(audit_summary_path, default=None)
     if args.run_audit_submission:
-        run_audit_submission_compat(
-            argparse.Namespace(
-                adapter_dir=adapter_dir,
-                output_root=audit_output_root,
-                base_model_name_or_path=str(args.base_model_name_or_path),
+        if skip_existing_steps and audit_summary_path.exists():
+            summary["steps"]["audit_submission"] = {
+                "status": "skipped_existing",
+                "output_root": str(audit_output_root),
+                "audit_status": audit_summary.get("audit_status", "") if isinstance(audit_summary, dict) else "",
+            }
+        else:
+            run_audit_submission_compat(
+                argparse.Namespace(
+                    adapter_dir=adapter_dir,
+                    output_root=audit_output_root,
+                    base_model_name_or_path=str(args.base_model_name_or_path),
+                )
             )
-        )
-        audit_summary = load_json(audit_output_root / "submission_compat_audit.json", default=None)
-        summary["steps"]["audit_submission"] = {
-            "status": "completed",
-            "output_root": str(audit_output_root),
-            "audit_status": audit_summary.get("audit_status", "") if isinstance(audit_summary, dict) else "",
-        }
+            audit_summary = load_json(audit_summary_path, default=None)
+            summary["steps"]["audit_submission"] = {
+                "status": "completed",
+                "output_root": str(audit_output_root),
+                "audit_status": audit_summary.get("audit_status", "") if isinstance(audit_summary, dict) else "",
+            }
     else:
         summary["steps"]["audit_submission"] = {"status": "skipped"}
     persist_summary()
 
     export_allowed = isinstance(audit_summary, dict) and bool(audit_summary.get("peft_export_ready"))
     if args.run_export_submission and (export_allowed or not args.export_only_if_ready):
-        run_export_peft_submission(
-            argparse.Namespace(
-                adapter_dir=adapter_dir,
-                output_root=export_output_root,
-                reference_model_root=Path(args.reference_model_root).resolve()
-                if args.reference_model_root is not None
-                else None,
-                base_model_name_or_path=str(args.base_model_name_or_path),
+        export_manifest = load_json(export_manifest_path, default=None)
+        if skip_existing_steps and export_manifest_path.exists():
+            summary["steps"]["export_submission"] = {
+                "status": "skipped_existing",
+                "output_root": str(export_output_root),
+                "zip_path": export_manifest.get("zip_path", "") if isinstance(export_manifest, dict) else "",
+            }
+        else:
+            run_export_peft_submission(
+                argparse.Namespace(
+                    adapter_dir=adapter_dir,
+                    output_root=export_output_root,
+                    reference_model_root=Path(args.reference_model_root).resolve()
+                    if args.reference_model_root is not None
+                    else None,
+                    base_model_name_or_path=str(args.base_model_name_or_path),
+                )
             )
-        )
-        export_manifest = load_json(export_output_root / "export_manifest.json", default=None)
-        summary["steps"]["export_submission"] = {
-            "status": "completed",
-            "output_root": str(export_output_root),
-            "zip_path": export_manifest.get("zip_path", "") if isinstance(export_manifest, dict) else "",
-        }
+            export_manifest = load_json(export_manifest_path, default=None)
+            summary["steps"]["export_submission"] = {
+                "status": "completed",
+                "output_root": str(export_output_root),
+                "zip_path": export_manifest.get("zip_path", "") if isinstance(export_manifest, dict) else "",
+            }
     elif args.run_export_submission:
         summary["steps"]["export_submission"] = {
             "status": "skipped",
@@ -4787,20 +4813,30 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
     persist_summary()
 
     if args.run_record_run_result:
-        run_record_run_result(
-            argparse.Namespace(
-                run_root=run_root,
-                results_md=Path(args.results_md).resolve(),
-                label=label,
-                suite_summary_relpath=suite_summary_relpath,
-                audit_relpath=audit_relpath,
-                export_relpath=export_relpath,
+        if skip_existing_steps and recorded_run_result_path.exists():
+            recorded_run_result = load_json(recorded_run_result_path, default=None)
+            summary["steps"]["record_run_result"] = {
+                "status": "skipped_existing",
+                "results_md": str(Path(args.results_md).resolve()),
+                "recorded_at": recorded_run_result.get("recorded_at", "")
+                if isinstance(recorded_run_result, dict)
+                else "",
+            }
+        else:
+            run_record_run_result(
+                argparse.Namespace(
+                    run_root=run_root,
+                    results_md=Path(args.results_md).resolve(),
+                    label=label,
+                    suite_summary_relpath=suite_summary_relpath,
+                    audit_relpath=audit_relpath,
+                    export_relpath=export_relpath,
+                )
             )
-        )
-        summary["steps"]["record_run_result"] = {
-            "status": "completed",
-            "results_md": str(Path(args.results_md).resolve()),
-        }
+            summary["steps"]["record_run_result"] = {
+                "status": "completed",
+                "results_md": str(Path(args.results_md).resolve()),
+            }
     else:
         summary["steps"]["record_run_result"] = {"status": "skipped"}
     persist_summary()
@@ -5354,6 +5390,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action=argparse.BooleanOptionalAction,
         default=False,
+    )
+    postprocess_run.add_argument(
+        "--skip-existing-steps",
+        action=argparse.BooleanOptionalAction,
+        default=True,
     )
     postprocess_run.add_argument(
         "--run-eval-suite",
