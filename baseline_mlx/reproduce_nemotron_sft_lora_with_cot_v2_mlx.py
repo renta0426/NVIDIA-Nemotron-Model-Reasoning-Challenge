@@ -599,8 +599,13 @@ def detect_started_run_marker(run_root: Path) -> Path | None:
         resolved_run_root / "adapter" / "adapters.safetensors",
     )
     for candidate in marker_candidates:
-        if candidate.exists():
-            return candidate
+        if not candidate.exists():
+            continue
+        if candidate.name == "resume_from_run_manifest.json":
+            resume_manifest = load_json(candidate, default=None)
+            if isinstance(resume_manifest, dict) and bool(resume_manifest.get("dry_run")):
+                continue
+        return candidate
     return None
 
 

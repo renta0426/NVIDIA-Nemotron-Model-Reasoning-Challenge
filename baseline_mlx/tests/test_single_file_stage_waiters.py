@@ -400,6 +400,47 @@ def test_wait_train_from_run_skips_if_target_already_started(tmp_path: Path) -> 
     assert wait_manifest["target_existing_marker"] == str(existing_marker.resolve())
 
 
+def test_resume_train_from_run_real_launch_ignores_prior_dry_run_marker(tmp_path: Path) -> None:
+    source_run, expected_shadow_model_dir, expected_adapter_file = make_source_run(tmp_path)
+    output_root = tmp_path / "output"
+    run_name = "stage2_attention_after_dry_run"
+    run_root = output_root / run_name
+
+    dry_run_args = SimpleNamespace(
+        source_run_root=source_run,
+        output_root=output_root,
+        run_name=run_name,
+        skip_if_target_started=True,
+        dry_run=True,
+    )
+    stage_waiters.run_resume_train_from_run(dry_run_args)
+
+    calls: dict[str, str] = {}
+    original_run_train = stage_waiters.run_train
+    try:
+        def fake_run_train(args: SimpleNamespace) -> None:
+            calls["model_root"] = str(args.model_root)
+            calls["resume_adapter_file"] = str(args.resume_adapter_file)
+
+        stage_waiters.run_train = fake_run_train
+        real_args = SimpleNamespace(
+            source_run_root=source_run,
+            output_root=output_root,
+            run_name=run_name,
+            skip_if_target_started=True,
+            dry_run=False,
+        )
+        stage_waiters.run_resume_train_from_run(real_args)
+    finally:
+        stage_waiters.run_train = original_run_train
+
+    resume_manifest = json.loads((run_root / "resume_from_run_manifest.json").read_text(encoding="utf-8"))
+    assert calls["model_root"] == str(expected_shadow_model_dir)
+    assert calls["resume_adapter_file"] == str(expected_adapter_file)
+    assert resume_manifest["dry_run"] is False
+    assert resume_manifest["target_existing_marker"] == ""
+
+
 def test_wait_resume_train_from_path_dry_run_writes_wait_and_resume_manifests(tmp_path: Path) -> None:
     source_run, _, expected_adapter_file = make_source_run(tmp_path)
     output_root = tmp_path / "output"
