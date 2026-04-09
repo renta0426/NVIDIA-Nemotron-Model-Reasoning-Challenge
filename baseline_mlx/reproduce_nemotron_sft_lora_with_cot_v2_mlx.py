@@ -2224,6 +2224,186 @@ def run_export_peft_submission(args: argparse.Namespace) -> None:
     print(json.dumps(export_manifest, ensure_ascii=False, indent=2))
 
 
+def format_correct_accuracy(row: dict[str, Any]) -> str:
+    return f"{int(row['correct'])}/{int(row['rows'])} = {float(row['accuracy']):.4f}"
+
+
+def build_eval_map_from_suite_summary(
+    suite_summary: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    evaluations: dict[str, dict[str, Any]] = {}
+    for row in suite_summary.get("evaluations", []):
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("evaluation_name", "")).strip()
+        output_root = str(row.get("output_root", "")).strip()
+        if not name or not output_root:
+            continue
+        summary = load_json(Path(output_root) / "benchmark_eval_summary.json", default=None)
+        if isinstance(summary, dict):
+            evaluations[name] = summary
+    return evaluations
+
+
+def extract_local320_component_rows(
+    local320_summary: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    rows_by_name: dict[str, dict[str, Any]] = {}
+    for row in local320_summary.get("by_benchmark", []):
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("benchmark_name", "")).strip()
+        if name:
+            rows_by_name[name] = row
+    return rows_by_name
+
+
+def upsert_markdown_block(path: Path, block_id: str, content: str) -> None:
+    start_marker = f"<!-- auto-run-summary:start:{block_id} -->"
+    end_marker = f"<!-- auto-run-summary:end:{block_id} -->"
+    block = f"{start_marker}\n{content.rstrip()}\n{end_marker}\n"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    pattern = re.compile(
+        re.escape(start_marker) + r".*?" + re.escape(end_marker) + r"\n?",
+        flags=re.DOTALL,
+    )
+    if pattern.search(existing):
+        updated = pattern.sub(block, existing)
+    else:
+        updated = existing
+        if updated and not updated.endswith("\n"):
+            updated += "\n"
+        if updated:
+            updated += "\n"
+        updated += block
+    write_text(path, updated)
+
+
+def build_record_run_result_payload(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.run_root).resolve()
+    prepare_manifest = load_json(run_root / "prepare_manifest.json", default=None)
+    training_result = load_json(run_root / "training_result.json", default=None)
+    suite_summary = load_json(run_root / args.suite_summary_relpath, default=None)
+    audit_summary = load_json(run_root / args.audit_relpath, default=None)
+    export_manifest = load_json(run_root / args.export_relpath, default=None)
+
+    if not isinstance(prepare_manifest, dict):
+        raise FileNotFoundError(f"Missing prepare manifest: {run_root / 'prepare_manifest.json'}")
+    if not isinstance(training_result, dict):
+        raise FileNotFoundError(f"Missing training result: {run_root / 'training_result.json'}")
+
+    evaluation_payloads = (
+        build_eval_map_from_suite_summary(suite_summary)
+        if isinstance(suite_summary, dict)
+        else {}
+    )
+    local320_summary = evaluation_payloads.get("readme_local320", {})
+    local320_components = (
+        extract_local320_component_rows(local320_summary)
+        if isinstance(local320_summary, dict)
+        else {}
+    )
+    payload = {
+        "recorded_at": utc_now(),
+        "label": str(args.label),
+        "run_name": run_root.name,
+        "run_root": str(run_root),
+        "prepare_manifest": prepare_manifest,
+        "training_result": training_result,
+        "suite_summary": suite_summary if isinstance(suite_summary, dict) else None,
+        "evaluation_payloads": evaluation_payloads,
+        "local320_components": local320_components,
+        "audit_summary": audit_summary if isinstance(audit_summary, dict) else None,
+        "export_manifest": export_manifest if isinstance(export_manifest, dict) else None,
+    }
+    return payload
+
+
+def render_record_run_result_markdown(payload: dict[str, Any]) -> str:
+    prepare_manifest = payload["prepare_manifest"]
+    training = prepare_manifest["training"]
+    sampling = prepare_manifest["sampling"]
+    lines = [f"### Auto result: `{payload['run_name']}`", ""]
+    lines.append(f"- recorded_at: `{payload['recorded_at']}`")
+    lines.append(f"- label: `{payload['label']}`")
+    lines.append(f"- run_root: `{payload['run_root']}`")
+    lines.append(f"- train_csv: `{prepare_manifest['train_csv']}`")
+    lines.append(f"- sampled_rows: `{int(sampling['sampled_rows'])}`")
+    lines.append(f"- optimizer_steps: `{int(training['optimizer_steps'])}`")
+    lines.append(f"- lr: `{float(training['learning_rate']):.6g}`")
+    lines.append(f"- max_seq_length: `{int(training['max_seq_length'])}`")
+    lines.append(f"- trainable_lora_suffixes: `{training['trainable_lora_suffixes']}`")
+    lines.append("")
+
+    evaluation_payloads = payload.get("evaluation_payloads", {})
+    if evaluation_payloads:
+        lines.append("#### Scores")
+        lines.append("")
+        local320 = evaluation_payloads.get("readme_local320")
+        if isinstance(local320, dict):
+            lines.append(f"- readme_local320: `{format_correct_accuracy(local320['overall'])}`")
+            local320_components = payload.get("local320_components", {})
+            component_labels = (
+                "general_stable_set",
+                "binary_hard_set",
+                "symbol_watch_set",
+            )
+            component_parts = []
+            for key in component_labels:
+                row = local320_components.get(key)
+                if isinstance(row, dict):
+                    component_parts.append(f"{key} {format_correct_accuracy(row)}")
+            if component_parts:
+                lines.append(f"- local320_components: `{'; '.join(component_parts)}`")
+        for name in (
+            "leaderboard_proxy_v2",
+            "binary_bias_specialized_set",
+        ):
+            summary = evaluation_payloads.get(name)
+            if isinstance(summary, dict):
+                lines.append(f"- {name}: `{format_correct_accuracy(summary['overall'])}`")
+        lines.append("")
+
+    audit_summary = payload.get("audit_summary")
+    if isinstance(audit_summary, dict):
+        lines.append("#### Submission audit")
+        lines.append("")
+        lines.append(f"- audit_status: `{audit_summary.get('audit_status', '')}`")
+        lines.append(f"- peft_export_ready: `{audit_summary.get('peft_export_ready', False)}`")
+        lines.append(f"- tensor_count: `{audit_summary.get('tensor_count', 0)}`")
+        blocked_reasons = audit_summary.get("blocked_reasons") or []
+        if blocked_reasons:
+            lines.append(f"- blocked_reasons: `{blocked_reasons}`")
+        lines.append("")
+
+    export_manifest = payload.get("export_manifest")
+    if isinstance(export_manifest, dict):
+        lines.append("#### Submission export")
+        lines.append("")
+        lines.append(f"- submission_zip: `{export_manifest.get('zip_path', '')}`")
+        lines.append(f"- zip_size_bytes: `{export_manifest.get('zip_size_bytes', 0)}`")
+        validation = export_manifest.get("validation") or {}
+        lines.append(f"- validation_valid: `{validation.get('valid', False)}`")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def run_record_run_result(args: argparse.Namespace) -> None:
+    results_md = Path(args.results_md).resolve()
+    payload = build_record_run_result_payload(args)
+    markdown = render_record_run_result_markdown(payload)
+    upsert_markdown_block(results_md, payload["run_name"], markdown)
+    record_payload = {
+        "recorded_at": payload["recorded_at"],
+        "results_md": str(results_md),
+        "run_name": payload["run_name"],
+        "label": payload["label"],
+    }
+    write_json(Path(payload["run_root"]) / "recorded_run_result.json", record_payload)
+    print(json.dumps(record_payload, ensure_ascii=False, indent=2))
+
+
 def select_shadow_validation_records(
     records: Sequence[dict[str, Any]],
     *,
@@ -4149,6 +4329,34 @@ def build_parser() -> argparse.ArgumentParser:
         default=BASE_MODEL_NAME,
     )
     export_peft_submission.set_defaults(func=run_export_peft_submission)
+
+    record_run_result = subparsers.add_parser(
+        "record-run-result",
+        help="Append an auto-recorded completed run summary to the git-managed baseline_mlx results ledger.",
+    )
+    record_run_result.add_argument("--run-root", type=Path, required=True)
+    record_run_result.add_argument(
+        "--results-md",
+        type=Path,
+        default=REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+    )
+    record_run_result.add_argument("--label", type=str, required=True)
+    record_run_result.add_argument(
+        "--suite-summary-relpath",
+        type=Path,
+        default=Path("eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json"),
+    )
+    record_run_result.add_argument(
+        "--audit-relpath",
+        type=Path,
+        default=Path("submission_compat_audit/submission_compat_audit.json"),
+    )
+    record_run_result.add_argument(
+        "--export-relpath",
+        type=Path,
+        default=Path("submission_export/export_manifest.json"),
+    )
+    record_run_result.set_defaults(func=run_record_run_result)
 
     return parser
 
