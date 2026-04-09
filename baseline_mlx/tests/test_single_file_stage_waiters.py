@@ -297,6 +297,58 @@ def make_candidate_run(
     return run_root
 
 
+def make_live_progress_run(
+    parent_root: Path,
+    *,
+    run_name: str,
+    progress_source: str = "latest_train_report",
+) -> Path:
+    run_root = parent_root / run_name
+    adapter_dir = run_root / "adapter"
+    adapter_dir.mkdir(parents=True, exist_ok=True)
+    (run_root / "runtime_preflight.json").write_text("{}", encoding="utf-8")
+    (run_root / "prepare_manifest.json").write_text(
+        json.dumps(
+            {
+                "created_at": "2026-04-09T02:00:00+00:00",
+                "train_csv": "train.csv",
+                "sampling": {"sampled_rows": 3321},
+                "training": {
+                    "optimizer_steps": 832,
+                    "learning_rate": 1e-4,
+                    "max_seq_length": 4096,
+                    "trainable_lora_suffixes": ["mixer.in_proj", "mixer.out_proj"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    latest_payload = {
+        "event": "train",
+        "logged_at": "2026-04-09T02:10:00+00:00",
+        "iteration": 3200,
+        "optimizer_step": 400,
+        "train_loss": 0.436,
+        "learning_rate": 6.105e-05,
+        "iterations_per_second": 0.400,
+        "tokens_per_second": 245.351,
+        "trained_tokens": 1900181,
+        "peak_memory": 82.620,
+        "steps_per_report_step_unit": "optimizer",
+    }
+    if progress_source == "latest_train_report":
+        (adapter_dir / "latest_train_report.json").write_text(json.dumps(latest_payload), encoding="utf-8")
+    elif progress_source == "console_log":
+        (run_root / "console.log").write_text(
+            "Iter 3200 (Opt 400): Train loss 0.436, Learning Rate 6.105e-05, "
+            "It/sec 0.400, Tokens/sec 245.351, Trained Tokens 1900181, Peak mem 82.620 GB\n",
+            encoding="utf-8",
+        )
+    else:
+        raise ValueError(f"Unsupported progress source: {progress_source}")
+    return run_root
+
+
 def test_resolve_source_run_resume_paths_uses_prepare_manifest(tmp_path: Path) -> None:
     source_run, expected_shadow_model_dir, expected_adapter_file = make_source_run(tmp_path)
 
@@ -621,6 +673,97 @@ def test_publish_results_md_reports_no_changes(tmp_path: Path) -> None:
         text=True,
     ).stdout.strip()
     assert commit_count == "1"
+
+
+def test_record_live_run_status_prefers_latest_train_report(tmp_path: Path) -> None:
+    run_root = make_live_progress_run(tmp_path, run_name="live_progress_latest")
+    results_md = tmp_path / "results.md"
+    summary_json = tmp_path / "record_live_summary.json"
+
+    stage_waiters.run_record_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-broad",
+            results_md=results_md,
+            summary_json=summary_json,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "training"
+    assert summary["live_progress"]["progress_source"] == "latest_train_report"
+    ledger = results_md.read_text(encoding="utf-8")
+    assert "### Live progress: `live_progress_latest`" in ledger
+    assert "- optimizer_progress: `400/832 = 48.08%`" in ledger
+    assert "- source: `latest_train_report`" in ledger
+
+
+def test_record_live_run_status_falls_back_to_console_log(tmp_path: Path) -> None:
+    run_root = make_live_progress_run(
+        tmp_path,
+        run_name="live_progress_console",
+        progress_source="console_log",
+    )
+    results_md = tmp_path / "results.md"
+    summary_json = tmp_path / "record_live_console_summary.json"
+
+    stage_waiters.run_record_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-exportsafe",
+            results_md=results_md,
+            summary_json=summary_json,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "training"
+    assert summary["live_progress"]["progress_source"] == "console_log"
+    assert summary["live_progress"]["optimizer_step"] == 400
+    assert "- source: `console_log`" in results_md.read_text(encoding="utf-8")
+
+
+def test_poll_live_run_status_commits_progress_update(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    run_root = make_live_progress_run(repo_root, run_name="live_progress_polled")
+    summary_json = tmp_path / "poll_live_summary.json"
+
+    stage_waiters.run_poll_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-polled",
+            results_md=results_md,
+            summary_json=summary_json,
+            poll_seconds=0.1,
+            max_iterations=1,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+            stop_on_training_result=True,
+            run_publish_results_md=True,
+            publish_commit_message=None,
+            publish_push=False,
+            publish_dry_run=False,
+            repo_root=repo_root,
+            publish_lock_dir=repo_root / ".git" / ".nemotron_ledger_lock",
+            publish_lock_poll_seconds=0.1,
+            publish_lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "max_iterations_reached"
+    assert summary["iterations"][0]["changed"] is True
+    assert summary["iterations"][0]["publish_results_md"]["status"] == "committed"
+    latest_message = subprocess.run(
+        ["git", "log", "--format=%B", "-1"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert "Record live progress for live_progress_polled" in latest_message
+    assert "### Live progress: `live_progress_polled`" in results_md.read_text(encoding="utf-8")
 
 
 def test_poll_best_submission_selects_candidate_and_publishes_results_md(tmp_path: Path) -> None:

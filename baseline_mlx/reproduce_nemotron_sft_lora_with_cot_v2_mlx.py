@@ -2781,6 +2781,180 @@ def render_record_run_result_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def load_live_run_status_payload(
+    *,
+    run_root: Path,
+    label: str,
+    max_log_bytes: int = DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+) -> dict[str, Any]:
+    resolved_run_root = Path(run_root).resolve()
+    prepare_manifest = load_json(resolved_run_root / "prepare_manifest.json", default=None)
+    if not isinstance(prepare_manifest, dict):
+        raise FileNotFoundError(f"Missing prepare manifest: {resolved_run_root / 'prepare_manifest.json'}")
+
+    training_result = load_json(resolved_run_root / "training_result.json", default=None)
+    latest_train_report_path = resolved_run_root / "adapter" / "latest_train_report.json"
+    latest_train_report = load_json(latest_train_report_path, default=None)
+    runtime_preflight_path = resolved_run_root / "runtime_preflight.json"
+    live_progress = None
+    if isinstance(latest_train_report, dict):
+        live_progress = normalize_train_progress_payload(
+            latest_train_report,
+            source="latest_train_report",
+            source_path=latest_train_report_path,
+        )
+    elif isinstance(training_result, dict) and isinstance(training_result.get("latest_train_report"), dict):
+        live_progress = normalize_train_progress_payload(
+            training_result["latest_train_report"],
+            source="training_result",
+            source_path=resolved_run_root / "training_result.json",
+        )
+    else:
+        live_progress = extract_console_train_progress(resolved_run_root, max_log_bytes=max_log_bytes)
+
+    suite_summary_path = resolved_run_root / DEFAULT_RUN_SUITE_SUMMARY_RELPATH
+    audit_summary_path = resolved_run_root / DEFAULT_RUN_AUDIT_RELPATH
+    export_manifest_path = resolved_run_root / DEFAULT_RUN_EXPORT_RELPATH
+    recorded_run_result_path = resolved_run_root / "recorded_run_result.json"
+    if recorded_run_result_path.exists():
+        status = "recorded"
+    elif export_manifest_path.exists():
+        status = "exported"
+    elif audit_summary_path.exists():
+        status = "audited"
+    elif suite_summary_path.exists():
+        status = "scored"
+    elif isinstance(training_result, dict):
+        status = "training_completed"
+    elif isinstance(live_progress, dict):
+        status = "training"
+    elif runtime_preflight_path.exists():
+        status = "running_untracked"
+    else:
+        status = "prepared"
+
+    observed_at = ""
+    if isinstance(live_progress, dict):
+        observed_at = str(live_progress.get("observed_at", ""))
+    elif isinstance(training_result, dict):
+        observed_at = str(training_result.get("created_at", ""))
+    elif runtime_preflight_path.exists():
+        observed_at = datetime.fromtimestamp(runtime_preflight_path.stat().st_mtime, tz=timezone.utc).isoformat()
+    else:
+        observed_at = str(prepare_manifest.get("created_at", ""))
+
+    progress_signature_parts = [status, observed_at]
+    if isinstance(live_progress, dict):
+        progress_signature_parts.extend(
+            [
+                live_progress.get("progress_source", ""),
+                live_progress.get("optimizer_step", 0),
+                live_progress.get("iteration", 0),
+                live_progress.get("train_loss", ""),
+            ]
+        )
+
+    return {
+        "recorded_at": utc_now(),
+        "label": str(label),
+        "run_name": resolved_run_root.name,
+        "run_root": str(resolved_run_root),
+        "prepare_manifest": prepare_manifest,
+        "training_result": training_result if isinstance(training_result, dict) else None,
+        "live_progress": live_progress if isinstance(live_progress, dict) else None,
+        "status": status,
+        "status_observed_at": observed_at,
+        "suite_summary_exists": suite_summary_path.exists(),
+        "audit_summary_exists": audit_summary_path.exists(),
+        "export_manifest_exists": export_manifest_path.exists(),
+        "recorded_run_result_exists": recorded_run_result_path.exists(),
+        "training_result_exists": isinstance(training_result, dict),
+        "progress_signature": "|".join(str(part) for part in progress_signature_parts),
+    }
+
+
+def render_live_run_status_markdown(payload: dict[str, Any]) -> str:
+    prepare_manifest = payload["prepare_manifest"]
+    training = prepare_manifest.get("training", {})
+    sampling = prepare_manifest.get("sampling", {})
+    live_progress = payload.get("live_progress")
+    total_optimizer_steps = int(training.get("optimizer_steps", 0) or 0)
+    optimizer_step = (
+        int(live_progress.get("optimizer_step", 0))
+        if isinstance(live_progress, dict) and live_progress.get("optimizer_step") is not None
+        else 0
+    )
+    optimizer_progress = (
+        f"{optimizer_step}/{total_optimizer_steps} = {optimizer_step / total_optimizer_steps:.2%}"
+        if total_optimizer_steps > 0
+        else str(optimizer_step)
+    )
+
+    lines = [f"### Live progress: `{payload['run_name']}`", ""]
+    lines.append(f"- status: `{payload['status']}`")
+    lines.append(f"- label: `{payload['label']}`")
+    lines.append(f"- observed_at: `{payload.get('status_observed_at', '')}`")
+    lines.append(f"- run_root: `{payload['run_root']}`")
+    lines.append(f"- train_csv: `{prepare_manifest.get('train_csv', '')}`")
+    lines.append(f"- sampled_rows: `{int(sampling.get('sampled_rows', 0) or 0)}`")
+    lines.append(f"- optimizer_progress: `{optimizer_progress}`")
+    lines.append(f"- lr: `{float(training.get('learning_rate', 0.0)):.6g}`")
+    lines.append(f"- max_seq_length: `{int(training.get('max_seq_length', 0) or 0)}`")
+    lines.append(f"- trainable_lora_suffixes: `{training.get('trainable_lora_suffixes', [])}`")
+    lines.append("")
+
+    if isinstance(live_progress, dict):
+        lines.append("#### Latest train progress")
+        lines.append("")
+        lines.append(f"- source: `{live_progress.get('progress_source', '')}`")
+        lines.append(f"- source_path: `{live_progress.get('source_path', '')}`")
+        lines.append(f"- iteration: `{int(live_progress.get('iteration', 0) or 0)}`")
+        lines.append(f"- optimizer_step: `{int(live_progress.get('optimizer_step', 0) or 0)}`")
+        lines.append(f"- train_loss: `{float(live_progress.get('train_loss', 0.0)):.6g}`")
+        lines.append(f"- learning_rate: `{float(live_progress.get('learning_rate', 0.0)):.6g}`")
+        lines.append(f"- it_per_sec: `{float(live_progress.get('iterations_per_second', 0.0)):.6g}`")
+        lines.append(f"- tokens_per_sec: `{float(live_progress.get('tokens_per_second', 0.0)):.6g}`")
+        lines.append(f"- trained_tokens: `{int(live_progress.get('trained_tokens', 0) or 0)}`")
+        lines.append(f"- peak_memory_gb: `{float(live_progress.get('peak_memory', 0.0)):.6g}`")
+        lines.append("")
+
+    lines.append("#### Completion markers")
+    lines.append("")
+    lines.append(f"- training_result_exists: `{payload.get('training_result_exists', False)}`")
+    lines.append(f"- suite_summary_exists: `{payload.get('suite_summary_exists', False)}`")
+    lines.append(f"- audit_summary_exists: `{payload.get('audit_summary_exists', False)}`")
+    lines.append(f"- export_manifest_exists: `{payload.get('export_manifest_exists', False)}`")
+    lines.append(f"- recorded_run_result_exists: `{payload.get('recorded_run_result_exists', False)}`")
+    lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def record_live_run_status_to_results_md(
+    *,
+    run_root: Path,
+    label: str,
+    results_md: Path,
+    max_log_bytes: int = DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+) -> dict[str, Any]:
+    payload = load_live_run_status_payload(
+        run_root=Path(run_root).resolve(),
+        label=label,
+        max_log_bytes=max_log_bytes,
+    )
+    upsert_markdown_block(Path(results_md).resolve(), payload["run_name"], render_live_run_status_markdown(payload))
+    return {
+        "recorded_at": payload["recorded_at"],
+        "results_md": str(Path(results_md).resolve()),
+        "run_name": payload["run_name"],
+        "label": payload["label"],
+        "status": payload["status"],
+        "status_observed_at": payload["status_observed_at"],
+        "progress_signature": payload["progress_signature"],
+        "training_result_exists": payload["training_result_exists"],
+        "live_progress": payload.get("live_progress"),
+    }
+
+
 def run_record_run_result(args: argparse.Namespace) -> None:
     results_md = Path(args.results_md).resolve()
     payload = build_record_run_result_payload(args)
@@ -2794,6 +2968,20 @@ def run_record_run_result(args: argparse.Namespace) -> None:
     }
     write_json(Path(payload["run_root"]) / "recorded_run_result.json", record_payload)
     print(json.dumps(record_payload, ensure_ascii=False, indent=2))
+
+
+def run_record_live_run_status(args: argparse.Namespace) -> None:
+    run_root = Path(args.run_root).resolve()
+    label = str(args.label).strip() if getattr(args, "label", None) else run_root.name
+    summary = record_live_run_status_to_results_md(
+        run_root=run_root,
+        label=label,
+        results_md=Path(args.results_md).resolve(),
+        max_log_bytes=int(args.max_log_bytes),
+    )
+    if args.summary_json is not None:
+        write_json(Path(args.summary_json).resolve(), summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def run_publish_results_md(args: argparse.Namespace) -> None:
@@ -2810,6 +2998,84 @@ def run_publish_results_md(args: argparse.Namespace) -> None:
     if args.summary_json is not None:
         write_json(Path(args.summary_json).resolve(), summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
+def run_poll_live_run_status(args: argparse.Namespace) -> None:
+    run_root = Path(args.run_root).resolve()
+    label = str(args.label).strip() if getattr(args, "label", None) else run_root.name
+    summary_path = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else (run_root / "poll_live_run_status_summary.json")
+    )
+    summary: dict[str, Any] = {
+        "recorded_at": utc_now(),
+        "run_root": str(run_root),
+        "results_md": str(Path(args.results_md).resolve()),
+        "poll_seconds": float(args.poll_seconds),
+        "max_iterations": int(args.max_iterations),
+        "run_publish_results_md": bool(args.run_publish_results_md),
+        "iterations": [],
+        "status": "running",
+    }
+
+    def persist_summary() -> None:
+        write_json(summary_path, summary)
+
+    persist_summary()
+    iteration = 0
+    last_progress_signature = ""
+    while True:
+        iteration += 1
+        record_summary = record_live_run_status_to_results_md(
+            run_root=run_root,
+            label=label,
+            results_md=Path(args.results_md).resolve(),
+            max_log_bytes=int(args.max_log_bytes),
+        )
+        changed = str(record_summary.get("progress_signature", "")) != last_progress_signature
+        iteration_summary: dict[str, Any] = {
+            "iteration": iteration,
+            "recorded_at": utc_now(),
+            "status": record_summary.get("status", ""),
+            "status_observed_at": record_summary.get("status_observed_at", ""),
+            "progress_signature": record_summary.get("progress_signature", ""),
+            "changed": changed,
+        }
+        if changed and args.run_publish_results_md:
+            publish_commit_message = (
+                str(args.publish_commit_message).strip()
+                if getattr(args, "publish_commit_message", None)
+                else f"Record live progress for {run_root.name}"
+            )
+            iteration_summary["publish_results_md"] = publish_results_md_to_git(
+                repo_root=Path(args.repo_root).resolve(),
+                results_md=Path(args.results_md).resolve(),
+                commit_message=publish_commit_message,
+                push=bool(args.publish_push),
+                lock_dir=Path(args.publish_lock_dir).resolve(),
+                lock_poll_seconds=float(args.publish_lock_poll_seconds),
+                lock_timeout_seconds=float(args.publish_lock_timeout_seconds),
+                dry_run=bool(args.publish_dry_run),
+            )
+        else:
+            iteration_summary["publish_results_md"] = {"status": "skipped"}
+        summary["iterations"].append(iteration_summary)
+        summary["latest"] = record_summary
+        if changed:
+            last_progress_signature = str(record_summary.get("progress_signature", ""))
+        if bool(args.stop_on_training_result) and bool(record_summary.get("training_result_exists")):
+            summary["status"] = str(record_summary.get("status", "training_completed"))
+            persist_summary()
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+            return
+        if int(args.max_iterations) > 0 and iteration >= int(args.max_iterations):
+            summary["status"] = "max_iterations_reached"
+            persist_summary()
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+            return
+        persist_summary()
+        time.sleep(max(float(args.poll_seconds), 0.1))
 
 
 def make_empty_score_row() -> dict[str, Any]:
@@ -5613,6 +5879,71 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_RUN_EXPORT_RELPATH,
     )
     record_run_result.set_defaults(func=run_record_run_result)
+
+    record_live_run_status = subparsers.add_parser(
+        "record-live-run-status",
+        help="Upsert the latest in-flight train progress for a run into the git-managed baseline_mlx results ledger.",
+    )
+    record_live_run_status.add_argument("--run-root", type=Path, required=True)
+    record_live_run_status.add_argument("--label", type=str, default=None)
+    record_live_run_status.add_argument(
+        "--results-md",
+        type=Path,
+        default=DEFAULT_RESULTS_MD,
+    )
+    record_live_run_status.add_argument("--summary-json", type=Path, default=None)
+    record_live_run_status.add_argument(
+        "--max-log-bytes",
+        type=int,
+        default=DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+    )
+    record_live_run_status.set_defaults(func=run_record_live_run_status)
+
+    poll_live_run_status = subparsers.add_parser(
+        "poll-live-run-status",
+        help="Poll a live run, upsert its latest progress block, and optionally commit/push ledger updates.",
+    )
+    poll_live_run_status.add_argument("--run-root", type=Path, required=True)
+    poll_live_run_status.add_argument("--label", type=str, default=None)
+    poll_live_run_status.add_argument(
+        "--results-md",
+        type=Path,
+        default=DEFAULT_RESULTS_MD,
+    )
+    poll_live_run_status.add_argument("--summary-json", type=Path, default=None)
+    poll_live_run_status.add_argument("--poll-seconds", type=float, default=DEFAULT_LIVE_PROGRESS_POLL_SECONDS)
+    poll_live_run_status.add_argument("--max-iterations", type=int, default=0)
+    poll_live_run_status.add_argument(
+        "--max-log-bytes",
+        type=int,
+        default=DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+    )
+    poll_live_run_status.add_argument(
+        "--stop-on-training-result",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_live_run_status.add_argument(
+        "--run-publish-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_live_run_status.add_argument("--publish-commit-message", type=str, default=None)
+    poll_live_run_status.add_argument(
+        "--publish-push",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    poll_live_run_status.add_argument(
+        "--publish-dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    poll_live_run_status.add_argument("--repo-root", type=Path, default=REPO_ROOT)
+    poll_live_run_status.add_argument("--publish-lock-dir", type=Path, default=DEFAULT_RESULTS_GIT_LOCK_DIR)
+    poll_live_run_status.add_argument("--publish-lock-poll-seconds", type=float, default=5.0)
+    poll_live_run_status.add_argument("--publish-lock-timeout-seconds", type=float, default=0.0)
+    poll_live_run_status.set_defaults(func=run_poll_live_run_status)
 
     publish_results_md = subparsers.add_parser(
         "publish-results-md",
