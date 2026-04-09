@@ -692,7 +692,7 @@ row-level overlap:
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2`
 
-- status: `training`
+- status: `training_completed`
 - label: `export-safe-qkvo-rerun-v2-live`
 - observed_at: `2026-04-09T12:12:30.827771+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2`
@@ -718,9 +718,9 @@ row-level overlap:
 
 #### Completion markers
 
-- training_result_exists: `False`
+- training_result_exists: `True`
 - runtime_pid: `71469`
-- runtime_pid_alive: `True`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
