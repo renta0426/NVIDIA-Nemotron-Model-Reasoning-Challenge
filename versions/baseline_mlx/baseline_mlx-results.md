@@ -694,11 +694,11 @@ row-level overlap:
 
 - status: `training`
 - label: `export-safe-qkvo-rerun-v2-live`
-- observed_at: `2026-04-09T12:08:39.260326+00:00`
+- observed_at: `2026-04-09T12:12:30.827771+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
 - sampled_rows: `218`
-- optimizer_progress: `90/101 = 89.11%`
+- optimizer_progress: `101/101 = 100.00%`
 - lr: `2e-05`
 - max_seq_length: `1536`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
@@ -707,13 +707,13 @@ row-level overlap:
 
 - source: `latest_train_report`
 - source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `702`
-- optimizer_step: `90`
-- train_loss: `0.206994`
-- learning_rate: `1.52685e-06`
-- it_per_sec: `0.362954`
-- tokens_per_sec: `188.917`
-- trained_tokens: `374241`
+- iteration: `784`
+- optimizer_step: `101`
+- train_loss: `0.182466`
+- learning_rate: `2.36105e-07`
+- it_per_sec: `0.387012`
+- tokens_per_sec: `179.574`
+- trained_tokens: `418695`
 - peak_memory_gb: `67.3986`
 
 #### Completion markers
