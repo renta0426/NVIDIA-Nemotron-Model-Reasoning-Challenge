@@ -931,3 +931,28 @@ row-level overlap:
 - `2026-04-09T15:44Z` に **first local320 summary** が出て、最初に完了した lane は **current short (`qkvo lr1e-5 ep2.4 len1536 rerun_v2`)** だった。score は **`212/320 = 0.6625`** で、既知の export-safe baseline **`215/320 = 0.6719`** を下回ったため、submission-ready 本線としては弱い。
 - breakdown は **binary `18/60`**, **symbol `19/60`**, **text `27/50`**, **unit `48/50`**, **gravity `50/50`**, **roman `50/50`**。特に **`glyph_len5 0/20`**, **`bit_structured_byte_formula 3/14`**, **`manual_audit_priority 7/50`** が重く、逆に gravity / roman は完全維持だった。
 - `benchmark_eval_suite_progress.json` 上では current short は local320 完了直後に **`leaderboard_proxy_v2` (84 rows)** へ遷移しており、suite 自体はまだ継続中。残る local320 は **current qkvo `312/320, 39/40`**, **current vo `296/320, 37/40`**, **qkvo low-LR `280/320, 35/40`**, **vo high-LR `240/320, 30/40`** を追跡中で、次の summary 回収へ watcher を切り替える。
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1`
+
+- status: `running_untracked`
+- label: `export-safe-vo-len1024-rerun-v1-live`
+- observed_at: `2026-04-09T15:52:27.495983+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
+- sampled_rows: `218`
+- optimizer_progress: `0/101 = 0.00%`
+- lr: `2e-05`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
+
+#### Completion markers
+
+- training_result_exists: `False`
+- runtime_pid: `27744`
+- runtime_pid_alive: `True`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1 -->
