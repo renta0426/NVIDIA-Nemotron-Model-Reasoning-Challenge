@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,6 +36,32 @@ def make_source_run(tmp_path: Path) -> tuple[Path, Path, Path]:
         encoding="utf-8",
     )
     return source_run, shadow_model_dir.resolve(), adapter_file.resolve()
+
+
+def init_git_repo_with_results_md(tmp_path: Path) -> tuple[Path, Path]:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_root, check=True, capture_output=True, text=True)
+    results_md = repo_root / "versions" / "baseline_mlx" / "baseline_mlx-results.md"
+    results_md.parent.mkdir(parents=True, exist_ok=True)
+    results_md.write_text("initial\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "versions/baseline_mlx/baseline_mlx-results.md"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "Initial ledger"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return repo_root, results_md
 
 
 def build_wait_train_args(source_run: Path, output_root: Path, run_name: str, **overrides) -> SimpleNamespace:
@@ -107,8 +134,16 @@ def build_postprocess_args(run_root: Path, summary_json: Path, **overrides) -> S
         "export_only_if_ready": True,
         "reference_model_root": None,
         "run_record_run_result": True,
-        "results_md": stage_waiters.REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+        "results_md": stage_waiters.DEFAULT_RESULTS_MD,
         "run_package_best_submission": False,
+        "run_publish_results_md": False,
+        "publish_commit_message": None,
+        "publish_push": True,
+        "publish_dry_run": False,
+        "repo_root": stage_waiters.REPO_ROOT,
+        "publish_lock_dir": stage_waiters.DEFAULT_RESULTS_GIT_LOCK_DIR,
+        "publish_lock_poll_seconds": 0.1,
+        "publish_lock_timeout_seconds": 1.0,
         "search_root": stage_waiters.DEFAULT_OUTPUT_ROOT,
         "candidate_run_root": None,
         "best_submission_output_root": stage_waiters.DEFAULT_OUTPUT_ROOT / "best_submission_candidate_auto",
@@ -524,3 +559,65 @@ def test_package_best_submission_reports_no_eligible_candidate(tmp_path: Path) -
     assert selection["eligible_candidate_count"] == 0
     assert selection["selected_run_root"] == ""
     assert not (output_root / "submission.zip").exists()
+
+
+def test_publish_results_md_commits_modified_results_file(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    results_md.write_text("updated\n", encoding="utf-8")
+    summary_json = tmp_path / "publish_summary.json"
+
+    stage_waiters.run_publish_results_md(
+        SimpleNamespace(
+            repo_root=repo_root,
+            results_md=results_md,
+            commit_message="Record temp results",
+            push=False,
+            dry_run=False,
+            summary_json=summary_json,
+            lock_dir=repo_root / ".git" / ".nemotron_ledger_lock",
+            lock_poll_seconds=0.1,
+            lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "committed"
+    latest_message = subprocess.run(
+        ["git", "log", "--format=%B", "-1"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert "Record temp results" in latest_message
+    assert stage_waiters.COPILOT_COAUTHORED_BY_TRAILER in latest_message
+
+
+def test_publish_results_md_reports_no_changes(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    summary_json = tmp_path / "publish_no_changes_summary.json"
+
+    stage_waiters.run_publish_results_md(
+        SimpleNamespace(
+            repo_root=repo_root,
+            results_md=results_md,
+            commit_message="Record temp results",
+            push=False,
+            dry_run=False,
+            summary_json=summary_json,
+            lock_dir=repo_root / ".git" / ".nemotron_ledger_lock",
+            lock_poll_seconds=0.1,
+            lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "no_changes"
+    commit_count = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert commit_count == "1"

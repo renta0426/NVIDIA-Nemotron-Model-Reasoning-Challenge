@@ -75,6 +75,9 @@ DEFAULT_RUN_SUITE_SUMMARY_RELPATH = Path(
 )
 DEFAULT_RUN_AUDIT_RELPATH = Path("submission_compat_audit/submission_compat_audit.json")
 DEFAULT_RUN_EXPORT_RELPATH = Path("submission_export/export_manifest.json")
+DEFAULT_RESULTS_MD = REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md"
+DEFAULT_RESULTS_GIT_LOCK_DIR = REPO_ROOT / ".git" / ".nemotron_ledger_lock"
+COPILOT_COAUTHORED_BY_TRAILER = "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 
 EXPECTED_COLUMNS = ["id", "prompt", "answer", "type", "generated_cot"]
 DEFAULT_TYPE_SAMPLES = {
@@ -651,6 +654,107 @@ def _run_text_command(command: Sequence[str]) -> tuple[int, str]:
     except OSError as exc:
         return 127, str(exc)
     return completed.returncode, completed.stdout or completed.stderr
+
+
+def resolve_repo_relative_path(repo_root: Path, path: Path) -> str:
+    resolved_repo_root = repo_root.resolve()
+    resolved_path = path.resolve()
+    try:
+        return str(resolved_path.relative_to(resolved_repo_root))
+    except ValueError as exc:
+        raise ValueError(f"Path is outside repo root: {resolved_path}") from exc
+
+
+def run_git_text_command(repo_root: Path, args: Sequence[str]) -> tuple[int, str]:
+    return _run_text_command(("git", "-C", str(Path(repo_root).resolve()), *args))
+
+
+def publish_results_md_to_git(
+    *,
+    repo_root: Path,
+    results_md: Path,
+    commit_message: str,
+    push: bool,
+    lock_dir: Path,
+    lock_poll_seconds: float,
+    lock_timeout_seconds: float,
+    dry_run: bool,
+) -> dict[str, Any]:
+    resolved_repo_root = Path(repo_root).resolve()
+    resolved_results_md = Path(results_md).resolve()
+    if not resolved_results_md.exists():
+        raise FileNotFoundError(f"Missing results markdown: {resolved_results_md}")
+    if not (resolved_repo_root / ".git").exists():
+        raise FileNotFoundError(f"Missing git repository metadata: {resolved_repo_root / '.git'}")
+    staged_relpath = resolve_repo_relative_path(resolved_repo_root, resolved_results_md)
+    resolved_lock_dir = Path(lock_dir).resolve()
+    deadline = (
+        (time.monotonic() + float(lock_timeout_seconds))
+        if float(lock_timeout_seconds) > 0.0
+        else None
+    )
+    while True:
+        try:
+            resolved_lock_dir.mkdir()
+            break
+        except FileExistsError:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError(f"Timed out waiting for git lock: {resolved_lock_dir}")
+            time.sleep(float(lock_poll_seconds))
+
+    summary: dict[str, Any] = {
+        "recorded_at": utc_now(),
+        "repo_root": str(resolved_repo_root),
+        "results_md": str(resolved_results_md),
+        "staged_relpaths": [staged_relpath],
+        "commit_message": str(commit_message),
+        "push": bool(push),
+        "dry_run": bool(dry_run),
+        "lock_dir": str(resolved_lock_dir),
+    }
+    try:
+        add_returncode, add_output = run_git_text_command(
+            resolved_repo_root,
+            ("add", "--", staged_relpath),
+        )
+        if add_returncode != 0:
+            raise RuntimeError(f"git add failed ({add_returncode}): {add_output}")
+        summary["add_output"] = add_output
+
+        diff_returncode, diff_output = run_git_text_command(
+            resolved_repo_root,
+            ("diff", "--cached", "--quiet", "--", staged_relpath),
+        )
+        if diff_returncode == 0:
+            summary["status"] = "no_changes"
+            summary["diff_output"] = diff_output
+            return summary
+        if diff_returncode != 1:
+            raise RuntimeError(f"git diff --cached failed ({diff_returncode}): {diff_output}")
+        summary["diff_output"] = diff_output
+
+        if dry_run:
+            summary["status"] = "dry_run"
+            return summary
+
+        commit_returncode, commit_output = run_git_text_command(
+            resolved_repo_root,
+            ("commit", "-m", str(commit_message), "-m", COPILOT_COAUTHORED_BY_TRAILER),
+        )
+        if commit_returncode != 0:
+            raise RuntimeError(f"git commit failed ({commit_returncode}): {commit_output}")
+        summary["commit_output"] = commit_output
+        summary["status"] = "committed"
+
+        if push:
+            push_returncode, push_output = run_git_text_command(resolved_repo_root, ("push",))
+            if push_returncode != 0:
+                raise RuntimeError(f"git push failed ({push_returncode}): {push_output}")
+            summary["push_output"] = push_output
+            summary["status"] = "pushed"
+        return summary
+    finally:
+        resolved_lock_dir.rmdir()
 
 
 def collect_memory_pressure_snapshot() -> dict[str, Any]:
@@ -2617,6 +2721,22 @@ def run_record_run_result(args: argparse.Namespace) -> None:
     }
     write_json(Path(payload["run_root"]) / "recorded_run_result.json", record_payload)
     print(json.dumps(record_payload, ensure_ascii=False, indent=2))
+
+
+def run_publish_results_md(args: argparse.Namespace) -> None:
+    summary = publish_results_md_to_git(
+        repo_root=Path(args.repo_root).resolve(),
+        results_md=Path(args.results_md).resolve(),
+        commit_message=str(args.commit_message),
+        push=bool(args.push),
+        lock_dir=Path(args.lock_dir).resolve(),
+        lock_poll_seconds=float(args.lock_poll_seconds),
+        lock_timeout_seconds=float(args.lock_timeout_seconds),
+        dry_run=bool(args.dry_run),
+    )
+    if args.summary_json is not None:
+        write_json(Path(args.summary_json).resolve(), summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def make_empty_score_row() -> dict[str, Any]:
@@ -4875,6 +4995,26 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
     else:
         summary["steps"]["package_best_submission"] = {"status": "skipped"}
     persist_summary()
+
+    if args.run_publish_results_md:
+        publish_commit_message = (
+            str(args.publish_commit_message).strip()
+            if getattr(args, "publish_commit_message", None)
+            else f"Record {label} results"
+        )
+        summary["steps"]["publish_results_md"] = publish_results_md_to_git(
+            repo_root=Path(args.repo_root).resolve(),
+            results_md=Path(args.results_md).resolve(),
+            commit_message=publish_commit_message,
+            push=bool(args.publish_push),
+            lock_dir=Path(args.publish_lock_dir).resolve(),
+            lock_poll_seconds=float(args.publish_lock_poll_seconds),
+            lock_timeout_seconds=float(args.publish_lock_timeout_seconds),
+            dry_run=bool(args.publish_dry_run),
+        )
+    else:
+        summary["steps"]["publish_results_md"] = {"status": "skipped"}
+    persist_summary()
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
@@ -5291,7 +5431,7 @@ def build_parser() -> argparse.ArgumentParser:
     record_run_result.add_argument(
         "--results-md",
         type=Path,
-        default=REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+        default=DEFAULT_RESULTS_MD,
     )
     record_run_result.add_argument("--label", type=str, required=True)
     record_run_result.add_argument(
@@ -5311,6 +5451,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     record_run_result.set_defaults(func=run_record_run_result)
 
+    publish_results_md = subparsers.add_parser(
+        "publish-results-md",
+        help="Stage results markdown and create a git commit/push under the shared ledger lock.",
+    )
+    publish_results_md.add_argument("--repo-root", type=Path, default=REPO_ROOT)
+    publish_results_md.add_argument("--results-md", type=Path, default=DEFAULT_RESULTS_MD)
+    publish_results_md.add_argument("--commit-message", type=str, required=True)
+    publish_results_md.add_argument(
+        "--push",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    publish_results_md.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    publish_results_md.add_argument("--summary-json", type=Path, default=None)
+    publish_results_md.add_argument("--lock-dir", type=Path, default=DEFAULT_RESULTS_GIT_LOCK_DIR)
+    publish_results_md.add_argument("--lock-poll-seconds", type=float, default=5.0)
+    publish_results_md.add_argument("--lock-timeout-seconds", type=float, default=0.0)
+    publish_results_md.set_defaults(func=run_publish_results_md)
+
     package_best_submission = subparsers.add_parser(
         "package-best-submission",
         help="Select the best eligible exportable run, update the results ledger, and promote a canonical submission.zip.",
@@ -5321,7 +5484,7 @@ def build_parser() -> argparse.ArgumentParser:
     package_best_submission.add_argument(
         "--results-md",
         type=Path,
-        default=REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+        default=DEFAULT_RESULTS_MD,
     )
     package_best_submission.add_argument(
         "--suite-summary-relpath",
@@ -5449,13 +5612,33 @@ def build_parser() -> argparse.ArgumentParser:
     postprocess_run.add_argument(
         "--results-md",
         type=Path,
-        default=REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md",
+        default=DEFAULT_RESULTS_MD,
     )
     postprocess_run.add_argument(
         "--run-package-best-submission",
         action=argparse.BooleanOptionalAction,
         default=False,
     )
+    postprocess_run.add_argument(
+        "--run-publish-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    postprocess_run.add_argument("--publish-commit-message", type=str, default=None)
+    postprocess_run.add_argument(
+        "--publish-push",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    postprocess_run.add_argument(
+        "--publish-dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    postprocess_run.add_argument("--repo-root", type=Path, default=REPO_ROOT)
+    postprocess_run.add_argument("--publish-lock-dir", type=Path, default=DEFAULT_RESULTS_GIT_LOCK_DIR)
+    postprocess_run.add_argument("--publish-lock-poll-seconds", type=float, default=5.0)
+    postprocess_run.add_argument("--publish-lock-timeout-seconds", type=float, default=0.0)
     postprocess_run.add_argument("--search-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     postprocess_run.add_argument("--candidate-run-root", type=Path, action="append", default=None)
     postprocess_run.add_argument(
