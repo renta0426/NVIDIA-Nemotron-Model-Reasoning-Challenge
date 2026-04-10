@@ -1360,6 +1360,42 @@ def test_poll_live_run_status_commits_progress_update(tmp_path: Path) -> None:
     assert "### Live progress: `live_progress_polled`" in results_md.read_text(encoding="utf-8")
 
 
+def test_poll_live_run_status_does_not_stop_while_evaluating(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    run_root = make_live_progress_run(
+        repo_root,
+        run_name="live_progress_eval_polled",
+        progress_source="eval_suite_progress",
+    )
+    summary_json = tmp_path / "poll_live_eval_summary.json"
+
+    stage_waiters.run_poll_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-eval-polled",
+            results_md=results_md,
+            summary_json=summary_json,
+            poll_seconds=0.1,
+            max_iterations=1,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+            stop_on_training_result=True,
+            run_publish_results_md=False,
+            publish_commit_message=None,
+            publish_push=False,
+            publish_dry_run=False,
+            repo_root=repo_root,
+            publish_lock_dir=repo_root / ".git" / ".nemotron_ledger_lock",
+            publish_lock_poll_seconds=0.1,
+            publish_lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "max_iterations_reached"
+    assert summary["latest"]["status"] == "evaluating"
+    assert summary["iterations"][0]["publish_results_md"]["status"] == "skipped"
+
+
 def test_poll_best_submission_selects_candidate_and_publishes_results_md(tmp_path: Path) -> None:
     repo_root, results_md = init_git_repo_with_results_md(tmp_path)
     selected = make_candidate_run(

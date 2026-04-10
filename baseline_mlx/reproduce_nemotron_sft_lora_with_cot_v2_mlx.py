@@ -3511,7 +3511,11 @@ def run_poll_live_run_status(args: argparse.Namespace) -> None:
         summary["latest"] = record_summary
         if changed:
             last_progress_signature = str(record_summary.get("progress_signature", ""))
-        if bool(args.stop_on_training_result) and bool(record_summary.get("training_result_exists")):
+        if (
+            bool(args.stop_on_training_result)
+            and bool(record_summary.get("training_result_exists"))
+            and str(record_summary.get("status", "")) != "evaluating"
+        ):
             summary["status"] = str(record_summary.get("status", "training_completed"))
             persist_summary()
             print(json.dumps(summary, ensure_ascii=False, indent=2))
