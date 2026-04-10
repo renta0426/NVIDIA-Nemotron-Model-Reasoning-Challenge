@@ -23,9 +23,9 @@
 
 ## 2. リポジトリ内ノートブックにある事実
 
-### 2.1 現在のアクティブノートブック
+### 2.1 baseline 単発SFTノートブック
 
-出典: baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2.ipynb
+出典: baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-original.ipynb
 
 - LoRA 設定は LoraConfig で定義されている。
 - r は 32 である。
@@ -168,7 +168,7 @@ target_modules=r".*\.(in_proj|out_proj|up_proj|down_proj)$",
 
 このうち、リポジトリ内で実際に確認した指定は次のとおりである。
 
-- 4 層限定は baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2.ipynb と baseline/nvidia-nemotron-submission-demo.ipynb に存在する。
+- 4 層限定は baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-original.ipynb と baseline/nvidia-nemotron-submission-demo.ipynb に存在する。
 - 8 層明示は how-to-get-started-transformers.md の記述として存在する。
 - all-linear は baseline/cot/train_rule_based_cot_baseline.ipynb に存在する。
 

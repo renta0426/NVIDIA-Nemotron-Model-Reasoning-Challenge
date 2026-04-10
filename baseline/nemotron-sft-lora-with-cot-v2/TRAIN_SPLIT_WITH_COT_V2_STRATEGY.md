@@ -157,7 +157,7 @@ solver family 内訳:
 
 ## 6. 学習時の推奨
 
-notebook `baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2.ipynb` は dataset path だけでなく、`TYPE_SAMPLES` の `Bit Manipulation` を見直す必要がある。
+notebook `baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-original.ipynb` は dataset path だけでなく、`TYPE_SAMPLES` の `Bit Manipulation` を見直す必要がある。
 
 ### 推奨 first shot
 
