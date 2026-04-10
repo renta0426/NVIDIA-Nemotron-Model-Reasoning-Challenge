@@ -1300,12 +1300,32 @@ def resolve_trainable_lora_suffixes(
     )
 
 
-def sample_dataframe_rows(df: pd.DataFrame, *, max_rows: int, seed: int) -> pd.DataFrame:
+def sample_dataframe_rows(
+    df: pd.DataFrame,
+    *,
+    max_rows: int,
+    seed: int,
+    prioritize_mask: pd.Series | None = None,
+) -> pd.DataFrame:
     if max_rows == 0:
         return df.head(0).copy().reset_index(drop=True)
-    if max_rows < 0 or len(df) <= max_rows:
-        return df.copy().reset_index(drop=True)
-    return df.sample(n=max_rows, random_state=seed).reset_index(drop=True)
+    sampled_df = df.copy()
+    if prioritize_mask is not None:
+        priority_values = pd.Series(prioritize_mask, index=df.index).reindex(df.index).fillna(False).astype(bool).to_numpy()
+        sampled_df = sampled_df.assign(_copilot_priority=priority_values)
+    if max_rows < 0 or len(sampled_df) <= max_rows:
+        return sampled_df.drop(columns="_copilot_priority", errors="ignore").reset_index(drop=True)
+    sampled_df = sampled_df.sample(frac=1.0, random_state=seed)
+    if prioritize_mask is not None:
+        sampled_df = sampled_df.sort_values("_copilot_priority", ascending=False, kind="stable")
+    return sampled_df.head(max_rows).drop(columns="_copilot_priority", errors="ignore").reset_index(drop=True)
+
+
+def has_binary_leading_zero_answer(value: Any) -> bool:
+    if value is None or pd.isna(value):
+        return False
+    text = str(value).strip()
+    return len(text) >= 2 and text.startswith("0") and all(ch in {"0", "1"} for ch in text)
 
 
 def maybe_fix_tokenizer_eos_ids(tokenizer: Any) -> None:
@@ -1685,6 +1705,7 @@ def build_text_binary_reanchor_dataframe(
     gravity_rows: int,
     unit_rows: int,
     seed: int,
+    prefer_binary_leading_zero: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     metadata_columns = ["id", "family", "template_subtype", "selection_tier", "teacher_solver_candidate"]
     row_analysis_unique = row_analysis_df.loc[:, metadata_columns].drop_duplicates(subset="id", keep="first").copy()
@@ -1735,6 +1756,11 @@ def build_text_binary_reanchor_dataframe(
     binary_bit_structured_pool = binary_verified_pool[
         binary_verified_pool["template_subtype"].astype(str).eq("bit_structured_byte_formula")
     ].reset_index(drop=True)
+    binary_leading_zero_masks = {
+        "binary_bit_other_rows": binary_bit_other_pool["answer"].map(has_binary_leading_zero_answer).astype(bool),
+        "binary_bit_permutation_rows": binary_bit_permutation_pool["answer"].map(has_binary_leading_zero_answer).astype(bool),
+        "binary_bit_structured_rows": binary_bit_structured_pool["answer"].map(has_binary_leading_zero_answer).astype(bool),
+    }
 
     pools = {
         "text_verified_rows": text_verified_pool,
@@ -1754,16 +1780,19 @@ def build_text_binary_reanchor_dataframe(
             binary_bit_other_pool,
             max_rows=int(binary_bit_other_rows),
             seed=seed,
+            prioritize_mask=binary_leading_zero_masks["binary_bit_other_rows"] if prefer_binary_leading_zero else None,
         ),
         "binary_bit_permutation_rows": sample_dataframe_rows(
             binary_bit_permutation_pool,
             max_rows=int(binary_bit_permutation_rows),
             seed=seed,
+            prioritize_mask=binary_leading_zero_masks["binary_bit_permutation_rows"] if prefer_binary_leading_zero else None,
         ),
         "binary_bit_structured_rows": sample_dataframe_rows(
             binary_bit_structured_pool,
             max_rows=int(binary_bit_structured_rows),
             seed=seed,
+            prioritize_mask=binary_leading_zero_masks["binary_bit_structured_rows"] if prefer_binary_leading_zero else None,
         ),
         "gravity_rows": sample_dataframe_rows(gravity_pool, max_rows=int(gravity_rows), seed=seed),
         "unit_rows": sample_dataframe_rows(unit_pool, max_rows=int(unit_rows), seed=seed),
@@ -1802,6 +1831,14 @@ def build_text_binary_reanchor_dataframe(
         "teacher_solver_candidate_counts": {
             str(key): int(value)
             for key, value in combined_with_metadata["teacher_solver_candidate"].fillna("nan").astype(str).value_counts().sort_index().items()
+        },
+        "binary_leading_zero_preferred": bool(prefer_binary_leading_zero),
+        "binary_leading_zero_pool_rows": {
+            key: int(value.sum()) for key, value in binary_leading_zero_masks.items()
+        },
+        "binary_leading_zero_selected_rows": {
+            key: int(sampled_frames[key]["answer"].map(has_binary_leading_zero_answer).astype(bool).sum())
+            for key in binary_leading_zero_masks
         },
         "recommended_type_samples": type_counts,
         "recommended_type_sample_args": [f"{key}={value}" for key, value in sorted(type_counts.items())],
@@ -5577,6 +5614,7 @@ def run_build_text_binary_reanchor_csv(args: argparse.Namespace) -> None:
         gravity_rows=int(args.gravity_rows),
         unit_rows=int(args.unit_rows),
         seed=int(args.seed),
+        prefer_binary_leading_zero=bool(args.prefer_binary_leading_zero),
     )
     ensure_dir(output_csv.parent)
     combined_df.to_csv(output_csv, index=False)
@@ -6484,6 +6522,11 @@ def build_parser() -> argparse.ArgumentParser:
     build_text_binary_reanchor_csv.add_argument("--binary-bit-structured-rows", type=int, default=5)
     build_text_binary_reanchor_csv.add_argument("--gravity-rows", type=int, default=15)
     build_text_binary_reanchor_csv.add_argument("--unit-rows", type=int, default=15)
+    build_text_binary_reanchor_csv.add_argument(
+        "--prefer-binary-leading-zero",
+        action="store_true",
+        help="Prioritize verified binary rows whose gold answer starts with a leading zero when sampling proxy-sensitive binary slices.",
+    )
     build_text_binary_reanchor_csv.add_argument("--seed", type=int, default=DEFAULT_SEED)
     build_text_binary_reanchor_csv.add_argument("--output-csv", type=Path, required=True)
     build_text_binary_reanchor_csv.add_argument("--summary-json", type=Path, default=None)

@@ -1112,6 +1112,7 @@ def test_build_text_binary_reanchor_csv_joins_proxy_binary_rows(tmp_path: Path) 
             binary_bit_structured_rows=1,
             gravity_rows=1,
             unit_rows=1,
+            prefer_binary_leading_zero=False,
             seed=123,
             output_csv=output_csv,
             summary_json=summary_json,
@@ -1154,6 +1155,132 @@ def test_build_text_binary_reanchor_csv_joins_proxy_binary_rows(tmp_path: Path) 
         "gravity_numeric_rule": 1,
         "text_char_substitution": 2,
         "unit_numeric_rule": 1,
+    }
+    assert summary["binary_leading_zero_preferred"] is False
+    assert summary["binary_leading_zero_pool_rows"] == {
+        "binary_bit_other_rows": 0,
+        "binary_bit_permutation_rows": 0,
+        "binary_bit_structured_rows": 0,
+    }
+    assert summary["binary_leading_zero_selected_rows"] == {
+        "binary_bit_other_rows": 0,
+        "binary_bit_permutation_rows": 0,
+        "binary_bit_structured_rows": 0,
+    }
+
+
+def test_build_text_binary_reanchor_csv_prefers_binary_leading_zero_rows(tmp_path: Path) -> None:
+    source_train_csv = tmp_path / "source_train.csv"
+    row_analysis_csv = tmp_path / "row_analysis.csv"
+    output_csv = tmp_path / "text_binary_reanchor_lz.csv"
+    summary_json = tmp_path / "text_binary_reanchor_lz_summary.json"
+
+    write_csv_rows(
+        source_train_csv,
+        stage_waiters.EXPECTED_COLUMNS,
+        [
+            {"id": "tv1", "prompt": "p", "answer": "AZ", "type": "Text Encryption", "generated_cot": "cot"},
+            {"id": "bo_lz", "prompt": "p", "answer": "0011", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "bo_plain", "prompt": "p", "answer": "1111", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "bs_lz", "prompt": "p", "answer": "0101", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "bs_plain", "prompt": "p", "answer": "1100", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "g1", "prompt": "p", "answer": "4.9", "type": "Gravitational Constant", "generated_cot": "cot"},
+            {"id": "u1", "prompt": "p", "answer": "12", "type": "Unit Conversion", "generated_cot": "cot"},
+        ],
+    )
+    write_csv_rows(
+        row_analysis_csv,
+        ["id", "family", "template_subtype", "selection_tier", "teacher_solver_candidate"],
+        [
+            {
+                "id": "tv1",
+                "family": "text_decryption",
+                "template_subtype": "text_monoalphabetic",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "text_char_substitution",
+            },
+            {
+                "id": "bo_lz",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_other",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_two_bit_boolean",
+            },
+            {
+                "id": "bo_plain",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_other",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_affine_xor",
+            },
+            {
+                "id": "bs_lz",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_structured_byte_formula",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_structured_byte_formula",
+            },
+            {
+                "id": "bs_plain",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_structured_byte_formula",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_structured_byte_formula_abstract",
+            },
+            {
+                "id": "g1",
+                "family": "gravity_constant",
+                "template_subtype": "gravity_half_g_t2",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "gravity_numeric_rule",
+            },
+            {
+                "id": "u1",
+                "family": "unit_conversion",
+                "template_subtype": "unit_fixed_ratio",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "unit_numeric_rule",
+            },
+        ],
+    )
+
+    stage_waiters.run_build_text_binary_reanchor_csv(
+        SimpleNamespace(
+            source_train_csv=source_train_csv,
+            row_analysis_csv=row_analysis_csv,
+            text_verified_rows=1,
+            binary_bit_other_rows=1,
+            binary_bit_permutation_rows=0,
+            binary_bit_structured_rows=1,
+            gravity_rows=1,
+            unit_rows=1,
+            prefer_binary_leading_zero=True,
+            seed=123,
+            output_csv=output_csv,
+            summary_json=summary_json,
+        )
+    )
+
+    with output_csv.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    selected_ids = {row["id"] for row in rows}
+    assert "bo_lz" in selected_ids
+    assert "bo_plain" not in selected_ids
+    assert "bs_lz" in selected_ids
+    assert "bs_plain" not in selected_ids
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["binary_leading_zero_preferred"] is True
+    assert summary["binary_leading_zero_pool_rows"] == {
+        "binary_bit_other_rows": 1,
+        "binary_bit_permutation_rows": 0,
+        "binary_bit_structured_rows": 1,
+    }
+    assert summary["binary_leading_zero_selected_rows"] == {
+        "binary_bit_other_rows": 1,
+        "binary_bit_permutation_rows": 0,
+        "binary_bit_structured_rows": 1,
     }
 
 
