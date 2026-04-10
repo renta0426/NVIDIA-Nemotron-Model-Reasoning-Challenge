@@ -1372,7 +1372,7 @@ row-level overlap:
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1`
 
 - status: `training_completed`
-- label: `stage25 reanchor text120 num40 grav20 unit20 from reanchor1024`
+- label: `export-safe-qkvo-reanchor-text120-num40-grav20-unit20-len1024-v1-live`
 - observed_at: `2026-04-10T00:26:25.185349+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
