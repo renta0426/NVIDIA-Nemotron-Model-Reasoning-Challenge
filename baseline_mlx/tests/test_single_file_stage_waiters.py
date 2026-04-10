@@ -1757,6 +1757,81 @@ def test_record_live_run_status_prefers_eval_suite_progress_after_training(tmp_p
     assert "- suite_evaluations: `0/2 = 0.00%`" in ledger
 
 
+def test_record_live_run_status_lists_completed_evaluation_scores(tmp_path: Path) -> None:
+    run_root = make_live_progress_run(
+        tmp_path,
+        run_name="live_progress_eval_completed",
+        progress_source="eval_suite_progress",
+    )
+    suite_progress_path = run_root / stage_waiters.DEFAULT_RUN_SUITE_PROGRESS_RELPATH
+    suite_payload = json.loads(suite_progress_path.read_text(encoding="utf-8"))
+    suite_payload.update(
+        {
+            "evaluations_completed": 1,
+            "current_evaluation": "leaderboard_proxy_v1_set",
+            "current_rows_total": 200,
+            "current_rows_completed": 32,
+            "current_chunks_total": 13,
+            "current_chunks_completed": 2,
+            "completed_evaluations": [
+                {
+                    "evaluation_name": "readme_local320",
+                    "rows": 320,
+                    "correct": 227,
+                    "accuracy": 227 / 320,
+                }
+            ],
+        }
+    )
+    suite_progress_path.write_text(json.dumps(suite_payload), encoding="utf-8")
+    proxy_eval_root = suite_progress_path.parent / "leaderboard_proxy_v1_set"
+    proxy_eval_root.mkdir(parents=True, exist_ok=True)
+    (proxy_eval_root / "benchmark_eval_progress.json").write_text(
+        json.dumps(
+            {
+                "recorded_at": "2026-04-09T02:40:00+00:00",
+                "status": "running",
+                "evaluation_name": "leaderboard_proxy_v1_set",
+                "output_root": str(proxy_eval_root),
+                "rows_total": 200,
+                "rows_completed": 32,
+                "chunks_total": 13,
+                "chunks_completed": 2,
+                "correct": 20,
+                "accuracy": 0.625,
+            }
+        ),
+        encoding="utf-8",
+    )
+    results_md = tmp_path / "results.md"
+    summary_json = tmp_path / "record_live_eval_completed_summary.json"
+
+    stage_waiters.run_record_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-eval-completed",
+            results_md=results_md,
+            summary_json=summary_json,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "evaluating"
+    assert summary["live_progress"]["current_evaluation"] == "leaderboard_proxy_v1_set"
+    assert summary["live_progress"]["completed_evaluation_rows"] == [
+        {
+            "evaluation_name": "readme_local320",
+            "rows": 320,
+            "correct": 227,
+            "accuracy": 227 / 320,
+        }
+    ]
+    ledger = results_md.read_text(encoding="utf-8")
+    assert "- completed_evaluations: `['readme_local320']`" in ledger
+    assert "- completed_evaluation_scores: `readme_local320 227/320 = 0.7094`" in ledger
+
+
 def test_record_live_run_status_marks_stopped_when_runtime_pid_is_dead(tmp_path: Path) -> None:
     run_root = make_live_progress_run(
         tmp_path,

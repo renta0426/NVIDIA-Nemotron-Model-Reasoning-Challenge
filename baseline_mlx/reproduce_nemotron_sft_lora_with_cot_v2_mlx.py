@@ -489,6 +489,21 @@ def normalize_eval_progress_payload(
         observed_at = str(evaluation_payload.get("recorded_at") or "")
     if not observed_at:
         observed_at = str(suite_payload.get("recorded_at") or "")
+    completed_evaluation_rows: list[dict[str, Any]] = []
+    for item in (suite_payload.get("completed_evaluations") or []):
+        if not isinstance(item, dict):
+            continue
+        evaluation_name = str(item.get("evaluation_name", "")).strip()
+        if not evaluation_name:
+            continue
+        row: dict[str, Any] = {"evaluation_name": evaluation_name}
+        if item.get("rows") not in (None, ""):
+            row["rows"] = int(item.get("rows"))
+        if item.get("correct") not in (None, ""):
+            row["correct"] = int(item.get("correct"))
+        if item.get("accuracy") not in (None, ""):
+            row["accuracy"] = float(item.get("accuracy"))
+        completed_evaluation_rows.append(row)
     normalized: dict[str, Any] = {
         "progress_kind": "evaluation",
         "progress_source": str(source),
@@ -519,6 +534,7 @@ def normalize_eval_progress_payload(
                 )
             )
         ],
+        "completed_evaluation_rows": completed_evaluation_rows,
     }
     int_field_sources: dict[str, Any] = {
         "evaluations_total": suite_payload.get("evaluations_total"),
@@ -3697,6 +3713,27 @@ def render_live_run_status_markdown(payload: dict[str, Any]) -> str:
         completed_evaluations = live_progress.get("completed_evaluations") or []
         if completed_evaluations:
             lines.append(f"- completed_evaluations: `{list(completed_evaluations)}`")
+        completed_evaluation_rows = live_progress.get("completed_evaluation_rows") or []
+        if completed_evaluation_rows:
+            completed_score_rows: list[str] = []
+            for row in completed_evaluation_rows:
+                if not isinstance(row, dict):
+                    continue
+                evaluation_name = str(row.get("evaluation_name", "")).strip()
+                if not evaluation_name:
+                    continue
+                if (
+                    row.get("rows") not in (None, "")
+                    and row.get("correct") not in (None, "")
+                    and row.get("accuracy") not in (None, "")
+                ):
+                    completed_score_rows.append(
+                        f"{evaluation_name} {int(row['correct'])}/{int(row['rows'])} = {float(row['accuracy']):.4f}"
+                    )
+                else:
+                    completed_score_rows.append(evaluation_name)
+            if completed_score_rows:
+                lines.append(f"- completed_evaluation_scores: `{'; '.join(completed_score_rows)}`")
         lines.append("")
     elif isinstance(live_progress, dict):
         lines.append("#### Latest train progress")
