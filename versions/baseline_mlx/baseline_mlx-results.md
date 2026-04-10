@@ -451,7 +451,7 @@
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv110_bin60proxyo35p0s25_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
 - status: `evaluating`
-- label: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv110_bin60proxyo35p0s25_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+- label: `stage25 reanchor textv110 binary60proxy o35 p0 s25 grav15 unit15 rowselect from reanchor1024 v1`
 - observed_at: `2026-04-10T11:24:49.641124+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv110_bin60proxyo35p0s25_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified110_binary60proxyo35p0s25_grav15_unit15_rowselect_v1.csv`
