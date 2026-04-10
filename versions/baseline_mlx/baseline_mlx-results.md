@@ -1438,3 +1438,21 @@ row-level overlap:
 - zip_size_bytes: `102356358`
 - validation_valid: `True`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_textao0_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2`
+
+- recorded_at: `2026-04-10T04:13:34.624110+00:00`
+- label: `baseline mlx notebook original fullrun v2 proxy v1 readme64`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv`
+- sampled_rows: `2907`
+- optimizer_steps: `728`
+- lr: `0.0001`
+- max_seq_length: `4096`
+- trainable_lora_suffixes: `[]`
+
+#### Scores
+
+- leaderboard_proxy_v1_set: `123/200 = 0.6150`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2 -->
