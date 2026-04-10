@@ -269,3 +269,35 @@
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3 -->
+
+## 2026-04-10 notebook runtime fix: Kaggle stagefreeze follow-up
+
+- `baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-stagefreeze-curriculum.ipynb` の Mode A は、`generated_cot` が `\boxed{...}` だけの行でも落ちないように修正した。Kaggle 実行で落ちた `id=5e149421` は `generated_cot='\\boxed{11010010}'` で、従来の boxed cleanup 後に空文字になっていた。
+- 対応として、boxed cleanup 後に CoT が空ならその行は **answer-only fallback** (`\boxed{answer}` のみ) で SFT record を作る。これにより curriculum CSV を捨てずにそのまま通せる。
+- 7 時間級の full run 保護のため、`TRAINING_PROFILE` (`full` / `smoke`)、`RESUME_COMPLETED_STAGES`, `FORCE_STAGE_RESTART` を追加した。resume state は `/kaggle/working/stagefreeze_curriculum_artifacts/resume_state.json` に保存し、完了済み stage adapter が残っていれば再実行時に skip する。
+- `smoke` profile は各 stage を `64` rows / `16` max_steps / `max_length<=768` / `gradient_accumulation_steps=4` に落として、submission packaging までの end-to-end 動作確認用に使う。本番学習は `TRAINING_PROFILE=\"full\"` のまま使う。
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+
+- status: `running_untracked`
+- label: `stage25 reanchor textv150 binary20proxy grav15 unit15 rowselect from reanchor1024 v1`
+- observed_at: `2026-04-10T07:50:38.603755+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified150_binary20proxy_grav15_unit15_rowselect_v1.csv`
+- sampled_rows: `200`
+- optimizer_progress: `0/12 = 0.00%`
+- lr: `8e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Completion markers
+
+- training_result_exists: `False`
+- runtime_pid: `84562`
+- runtime_pid_alive: `True`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
