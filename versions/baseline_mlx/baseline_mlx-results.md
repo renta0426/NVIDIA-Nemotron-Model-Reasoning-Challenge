@@ -3,7 +3,7 @@
 
 - status: `evaluating`
 - label: `stage25 reanchor textv120 textao20 num30 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T06:32:22.367261+00:00`
+- observed_at: `2026-04-10T06:40:58.492804+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified120_answeronly20_num30_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -19,8 +19,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `1/2 = 50.00%`
 - current_evaluation: `leaderboard_proxy_v1_set`
-- current_rows_progress: `96/200 = 48.00%`
-- current_chunks_progress: `6/13 = 46.15%`
+- current_rows_progress: `112/200 = 56.00%`
+- current_chunks_progress: `7/13 = 53.85%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
 - completed_evaluations: `['readme_local320']`
 
@@ -179,3 +179,27 @@
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+
+## 2026-04-10 notebook adaptation note: Kaggle HF/PEFT stagefreeze curriculum
+
+- updated notebook: `baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2.ipynb`
+- base notebook kept as reference: `baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-original.ipynb`
+- curriculum CSVs were materialized under `baseline/nemotron-sft-lora-with-cot-v2/artifacts/` and are referenced directly by filename:
+  - `train_split_with_cot_stagefreeze_stage1_broad_v3f_safe_plus_notformula.csv` (`3321` rows)
+  - `train_split_with_cot_stagefreeze_stage2_corrective_v1.csv` (`218` rows)
+  - `train_split_with_cot_stagefreeze_stage25_reanchor_nonbit_50_each.csv` (`200` rows)
+- decision: **split CSV per stage**, not one CSV with notebook-side filtering. Reason: the request was to avoid data shaping inside the notebook; per-stage CSVs make the curriculum explicit and reproducible in Kaggle.
+- notebook LoRA logic was changed from single-stage `target_modules=r".*\\.(in_proj|out_proj|up_proj|down_proj)$"` to a union adapter over:
+  - `mixer.in_proj`
+  - `mixer.out_proj`
+  - `mixer.shared_experts.up_proj`
+  - `mixer.shared_experts.down_proj`
+  - `mixer.q_proj`
+  - `mixer.k_proj`
+  - `mixer.v_proj`
+  - `mixer.o_proj`
+- stage-specific trainability now matches the MLX stagefreeze curriculum:
+  - Stage1 trains broad trunk only
+  - Stage2 trains attention `q/k/v/o` only with `lr=2e-5`, `epochs=2.4`, `max_length=768`
+  - Stage2.5 trains attention `q/k/v/o` only with `lr=1e-5`, `epochs=0.45`, `max_length=1024`
+- final adapter handoff stays compatible with the original notebook packaging flow because the curriculum cell copies the last-stage adapter to `/kaggle/working/sft_adapter`, and the submission cell still packages from that location.
