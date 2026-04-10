@@ -376,40 +376,21 @@
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p5s15_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+### Local320 checkpoint: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- status: `evaluating`
-- label: `binary45_frontier`
-- observed_at: `2026-04-10T13:13:41.856682+00:00`
+- status: `pruned_after_local320`
+- local320: `216/320 = 0.6750`
+- observed_at: `2026-04-10T13:13:41.805024+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified125_binary45proxyo25p0s20_grav15_unit15_rowselect_v1.csv`
-- sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
-- lr: `8e-06`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest evaluation progress
-
-- source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
-- suite_evaluations: `1/2 = 50.00%`
-- current_evaluation: `leaderboard_proxy_v1_set`
-- current_rows_progress: `0/200 = 0.00%`
-- current_chunks_progress: `0/13 = 0.00%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
-- completed_evaluations: `['readme_local320']`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `31429`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
+- verdict: `binary40 (229/320) と binary30 (227/320) を大きく下回り、text=18/50 まで崩れたため proxy tail を停止`
+- general_stable: `167/200`
+- binary_hard: `29/60`
+- symbol_watch: `20/60`
+- family: `text 18/50`, `gravity 49/50`, `roman 50/50`, `unit 50/50`
+- template_subtype: `bit_other 23/46`, `bit_structured_byte_formula 6/14`, `glyph_len5 0/20`
+- binary_metrics: `leading_zero_retention_rate=1.0`, `format_failure_rate=0.0`, `format_ok_content_wrong_rate=0.5167`
+- proxy_v1_status_when_pruned: `16/200, 1/13 chunks`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv125_bin45proxyo25p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_bin50proxyo30p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
