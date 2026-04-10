@@ -1,32 +1,39 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- recorded_at: `2026-04-10T06:57:38.469722+00:00`
+- status: `recorded`
 - label: `stage25 reanchor textv120 textao20 num30 grav15 unit15 rowselect from reanchor1024 v1`
+- observed_at: `2026-04-10T03:35:02.149450+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified120_answeronly20_num30_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
-- optimizer_steps: `12`
+- optimizer_progress: `12/12 = 100.00%`
 - lr: `8e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-#### Scores
+#### Latest train progress
 
-- readme_local320: `215/320 = 0.6719`
-- local320_components: `general_stable_set 169/200 = 0.8450; binary_hard_set 25/60 = 0.4167; symbol_watch_set 21/60 = 0.3500`
+- source: `latest_train_report`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/adapter/latest_train_report.json`
+- iteration: `90`
+- optimizer_step: `12`
+- train_loss: `0.405881`
+- learning_rate: `1.36297e-07`
+- it_per_sec: `0.641791`
+- tokens_per_sec: `396.114`
+- trained_tokens: `57387`
+- peak_memory_gb: `65.4618`
 
-#### Submission audit
+#### Completion markers
 
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/submission_export/submission.zip`
-- zip_size_bytes: `102356778`
-- validation_valid: `True`
+- training_result_exists: `True`
+- runtime_pid: `98765`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `True`
+- audit_summary_exists: `True`
+- export_manifest_exists: `True`
+- recorded_run_result_exists: `True`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
