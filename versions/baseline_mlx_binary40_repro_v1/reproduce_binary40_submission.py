@@ -40,6 +40,7 @@ BEST_SUITE_SUMMARY = BEST_RUN_ROOT / "eval_suite_readme_proxy_specialized" / "be
 BEST_AUDIT_SUMMARY = BEST_RUN_ROOT / "submission_compat_audit" / "submission_compat_audit.json"
 BEST_EXPORT_MANIFEST = BEST_RUN_ROOT / "submission_export" / "export_manifest.json"
 BEST_SUBMISSION_ZIP = BEST_RUN_ROOT / "submission_export" / "submission.zip"
+RESULTS_MD = REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md"
 LEADERBOARD_PROXY_CSV = (
     REPO_ROOT
     / "cuda-train-data-analysis-v1"
@@ -75,6 +76,11 @@ def load_json(path: Path) -> dict[str, Any]:
 def dump_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def dump_markdown(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:
@@ -209,7 +215,56 @@ def write_summary(output_root: Path, mode: str, extra: dict[str, Any]) -> Path:
     summary_path = output_root / "binary40_repro_summary.json"
     payload = {"mode": mode, **verify_best_run(), **extra}
     dump_json(summary_path, payload)
+    markdown_path = output_root / "binary40_repro_summary.md"
+    dump_markdown(markdown_path, render_markdown_summary(payload))
     return summary_path
+
+
+def render_markdown_summary(payload: dict[str, Any]) -> str:
+    local320 = payload["local320"]
+    proxy = payload["leaderboard_proxy_v1_set"]
+    lines = [
+        "# Binary40 repro summary",
+        "",
+        f"- mode: `{payload['mode']}`",
+        f"- source run: `{payload['best_run_root']}`",
+        f"- readme_local320: `{local320['correct']}/{local320['rows']} = {local320['accuracy']}`",
+        f"- leaderboard_proxy_v1_set: `{proxy['correct']}/{proxy['rows']} = {proxy['accuracy']}`",
+        f"- audit_status: `{payload['audit_status']}`",
+        f"- submission_zip: `{payload['submission_zip']}`",
+        f"- submission_zip_size_bytes: `{payload['submission_zip_size_bytes']}`",
+        "",
+        "## README contract",
+        "",
+        f"- max_lora_rank: `{payload['readme_contract']['max_lora_rank']}`",
+        f"- max_tokens: `{payload['readme_contract']['max_tokens']}`",
+        f"- top_p: `{payload['readme_contract']['top_p']}`",
+        f"- temperature: `{payload['readme_contract']['temperature']}`",
+        f"- max_num_seqs: `{payload['readme_contract']['max_num_seqs']}`",
+        f"- max_model_len: `{payload['readme_contract']['max_model_len']}`",
+    ]
+    if payload.get("reproduced_submission_zip"):
+        lines.extend(
+            [
+                "",
+                "## Re-exported artifact",
+                "",
+                f"- reproduced_submission_zip: `{payload['reproduced_submission_zip']}`",
+                f"- reproduced_validation_valid: `{payload.get('reproduced_validation_valid')}`",
+            ]
+        )
+    if payload.get("repro_run_root"):
+        lines.extend(
+            [
+                "",
+                "## Full reproduce target",
+                "",
+                f"- repro_run_root: `{payload['repro_run_root']}`",
+                f"- dataset_csv: `{payload['dataset_csv']}`",
+                f"- dataset_summary_json: `{payload['dataset_summary_json']}`",
+            ]
+        )
+    return "\n".join(lines)
 
 
 def command_verify(args: argparse.Namespace) -> int:
@@ -353,6 +408,11 @@ def command_full_reproduce(args: argparse.Namespace) -> int:
             LEADERBOARD_PROXY_CSV,
             "--run-record-run-result",
             "--run-package-best-submission",
+            "--results-md",
+            repo_path(args.results_md),
+            "--run-publish-results-md" if args.run_publish_results_md else "--no-run-publish-results-md",
+            "--publish-commit-message",
+            args.publish_commit_message,
         ),
         dry_run=args.dry_run,
     )
@@ -423,6 +483,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--summary-output-root",
         type=Path,
         default=REPO_ROOT / "baseline_mlx" / "outputs" / "binary40_local_best_repro_full_v1",
+    )
+    full_reproduce.add_argument("--results-md", type=Path, default=RESULTS_MD)
+    full_reproduce.add_argument(
+        "--run-publish-results-md",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    full_reproduce.add_argument(
+        "--publish-commit-message",
+        default="Record binary40 local-best repro full rerun results",
     )
     full_reproduce.add_argument("--dry-run", action="store_true")
     full_reproduce.set_defaults(func=command_full_reproduce)
