@@ -1319,6 +1319,36 @@ def test_record_live_run_status_marks_stopped_when_runtime_pid_is_dead(tmp_path:
     assert "- runtime_pid_alive: `False`" in ledger
 
 
+def test_record_live_run_status_preserves_auto_result_when_recorded(tmp_path: Path) -> None:
+    run_root = make_candidate_run(
+        tmp_path,
+        run_name="live_progress_recorded",
+        local320_correct=224,
+    )
+    (run_root / "recorded_run_result.json").write_text(
+        json.dumps({"recorded_at": "2026-04-10T06:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    results_md = tmp_path / "results.md"
+    summary_json = tmp_path / "record_live_recorded_summary.json"
+
+    stage_waiters.run_record_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-recorded",
+            results_md=results_md,
+            summary_json=summary_json,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "recorded"
+    ledger = results_md.read_text(encoding="utf-8")
+    assert "### Auto result: `live_progress_recorded`" in ledger
+    assert "- readme_local320: `224/320 = 0.7000`" in ledger
+
+
 def test_poll_live_run_status_commits_progress_update(tmp_path: Path) -> None:
     repo_root, results_md = init_git_repo_with_results_md(tmp_path)
     run_root = make_live_progress_run(repo_root, run_name="live_progress_polled")

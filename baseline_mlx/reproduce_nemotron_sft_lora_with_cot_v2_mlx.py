@@ -3383,12 +3383,25 @@ def record_live_run_status_to_results_md(
     results_md: Path,
     max_log_bytes: int = DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
 ) -> dict[str, Any]:
+    resolved_run_root = Path(run_root).resolve()
     payload = load_live_run_status_payload(
-        run_root=Path(run_root).resolve(),
+        run_root=resolved_run_root,
         label=label,
         max_log_bytes=max_log_bytes,
     )
-    upsert_markdown_block(Path(results_md).resolve(), payload["run_name"], render_live_run_status_markdown(payload))
+    if bool(payload.get("recorded_run_result_exists")) and bool(payload.get("suite_summary_exists")):
+        markdown = render_record_run_result_markdown(
+            load_run_result_payload(
+                run_root=resolved_run_root,
+                label=label,
+                suite_summary_relpath=DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+                audit_relpath=DEFAULT_RUN_AUDIT_RELPATH,
+                export_relpath=DEFAULT_RUN_EXPORT_RELPATH,
+            )
+        )
+    else:
+        markdown = render_live_run_status_markdown(payload)
+    upsert_markdown_block(Path(results_md).resolve(), payload["run_name"], markdown)
     return {
         "recorded_at": payload["recorded_at"],
         "results_md": str(Path(results_md).resolve()),
