@@ -24,10 +24,17 @@ GENERAL_STABLE_QUOTAS = {
     "roman_numeral": 50,
     "text_decryption": 50,
 }
-BINARY_HARD_TIER_QUOTAS = {
-    "verified_trace_ready": 20,
-    "answer_only_keep": 20,
-    "manual_audit_priority": 20,
+BINARY_HARD_BUCKET_QUOTAS = {
+    "supported_bijection": 16,
+    "dominant_structured_safe": 8,
+    "supported_affine_xor": 7,
+    "boolean_family": 6,
+    "dominant_structured_abstract": 6,
+    "no_solver_answer_only": 6,
+    "no_solver_manual": 5,
+    "supported_not_structured": 4,
+    "rare_perm_independent": 1,
+    "rare_byte_transform": 1,
 }
 SYMBOL_WATCH_TARGETS = [
     ("numeric_2x2", "verified_trace_ready", 15),
@@ -231,6 +238,7 @@ def benchmark_columns() -> list[str]:
         "num_examples",
         "prompt_len_chars",
         "hard_score",
+        "binary_focus_bucket",
         "group_signature",
         "query_raw",
         "answer",
@@ -252,11 +260,40 @@ def to_benchmark_row(row: dict[str, str], *, benchmark_name: str, benchmark_role
         "num_examples": parse_int(row.get("num_examples"), 0),
         "prompt_len_chars": parse_int(row.get("prompt_len_chars"), 0),
         "hard_score": parse_float(row.get("hard_score"), 0.0),
+        "binary_focus_bucket": row.get("binary_focus_bucket", ""),
         "group_signature": row.get("group_signature", ""),
         "query_raw": row.get("query_raw", ""),
         "answer": row.get("answer", ""),
         "prompt": row.get("prompt", ""),
     }
+
+
+def binary_focus_bucket(row: dict[str, str]) -> str | None:
+    solver = (row.get("teacher_solver_candidate") or "").strip()
+    tier = (row.get("selection_tier") or "").strip()
+    if row.get("family") != "bit_manipulation" or tier == "exclude_suspect":
+        return None
+    if solver == "binary_bit_permutation_independent":
+        return "rare_perm_independent"
+    if solver == "binary_byte_transform":
+        return "rare_byte_transform"
+    if solver == "binary_affine_xor":
+        return "supported_affine_xor"
+    if solver == "binary_bit_permutation_bijection":
+        return "supported_bijection"
+    if "boolean" in solver:
+        return "boolean_family"
+    if row.get("template_subtype") == "bit_structured_byte_formula" and (row.get("bit_structured_formula_safe") or "").lower() == "true":
+        return "dominant_structured_safe"
+    if (row.get("bit_structured_formula_abstract_safe") or "").lower() == "true":
+        return "dominant_structured_abstract"
+    if (row.get("bit_not_structured_formula_safe") or "").lower() == "true":
+        return "supported_not_structured"
+    if solver == "" and tier == "answer_only_keep":
+        return "no_solver_answer_only"
+    if solver == "" and tier == "manual_audit_priority":
+        return "no_solver_manual"
+    return None
 
 
 def build_general_stable_set(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
@@ -284,18 +321,29 @@ def build_general_stable_set(rows: list[dict[str, str]]) -> list[dict[str, Any]]
 
 def build_binary_hard_set(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
-    binary_rows = [row for row in rows if row.get("family") == "bit_manipulation"]
-    for tier, quota in BINARY_HARD_TIER_QUOTAS.items():
-        candidates = [row for row in binary_rows if row.get("selection_tier") == tier]
+    bucketed_rows: list[dict[str, str]] = []
+    for row in rows:
+        focus_bucket = binary_focus_bucket(row)
+        if focus_bucket is None:
+            continue
+        enriched = dict(row)
+        enriched["binary_focus_bucket"] = focus_bucket
+        bucketed_rows.append(enriched)
+    for focus_bucket, quota in BINARY_HARD_BUCKET_QUOTAS.items():
+        candidates = [row for row in bucketed_rows if row.get("binary_focus_bucket") == focus_bucket]
         group_keys = (
+            "selection_tier",
+            "template_subtype",
             "teacher_solver_candidate",
             "bit_structured_formula_abstract_family",
             "group_signature",
         )
-        tier_rows = balanced_take(candidates, quota=quota, group_keys=group_keys, hard_first=True)
+        bucket_rows = balanced_take(candidates, quota=quota, group_keys=group_keys, hard_first=True)
+        if len(bucket_rows) != quota:
+            raise RuntimeError(f"binary_hard_set bucket {focus_bucket}: expected {quota}, got {len(bucket_rows)}")
         selected.extend(
             to_benchmark_row(row, benchmark_name="binary_hard_set", benchmark_role="hard_binary_watch")
-            for row in tier_rows
+            for row in bucket_rows
         )
     return selected
 
@@ -428,12 +476,16 @@ def summarize_benchmark(rows: list[dict[str, Any]]) -> dict[str, Any]:
     family_counts = Counter(row["family_short"] for row in rows)
     tier_counts = Counter(row["selection_tier"] for row in rows)
     template_counts = Counter(row["template_subtype"] for row in rows)
-    return {
+    summary = {
         "rows": len(rows),
         "family_counts": dict(sorted(family_counts.items())),
         "selection_tier_counts": dict(sorted(tier_counts.items())),
         "template_subtype_counts": dict(sorted(template_counts.items())),
     }
+    focus_bucket_counts = Counter(str(row.get("binary_focus_bucket", "") or "") for row in rows if row.get("binary_focus_bucket"))
+    if focus_bucket_counts:
+        summary["binary_focus_bucket_counts"] = dict(sorted(focus_bucket_counts.items()))
+    return summary
 
 
 def build_manifest(
@@ -791,11 +843,12 @@ def render_phase0_report(manifest: dict[str, Any]) -> str:
     lines.append("")
     lines.append("## Benchmark sets")
     lines.append("")
-    lines.append("| set | rows | family_counts | selection_tier_counts |")
-    lines.append("| --- | ---: | --- | --- |")
+    lines.append("| set | rows | family_counts | selection_tier_counts | binary_focus_bucket_counts |")
+    lines.append("| --- | ---: | --- | --- | --- |")
     for set_name, payload in manifest["benchmark_sets"].items():
+        bucket_counts = payload.get("binary_focus_bucket_counts", {})
         lines.append(
-            f"| `{set_name}` | {payload['rows']} | `{json.dumps(payload['family_counts'], ensure_ascii=False)}` | `{json.dumps(payload['selection_tier_counts'], ensure_ascii=False)}` |"
+            f"| `{set_name}` | {payload['rows']} | `{json.dumps(payload['family_counts'], ensure_ascii=False)}` | `{json.dumps(payload['selection_tier_counts'], ensure_ascii=False)}` | `{json.dumps(bucket_counts, ensure_ascii=False)}` |"
         )
     lines.append("")
     lines.append("## Binary holdout fold counts")

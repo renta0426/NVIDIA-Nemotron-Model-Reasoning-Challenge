@@ -13,11 +13,11 @@
 
 ## Benchmark sets
 
-| set | rows | family_counts | selection_tier_counts |
-| --- | ---: | --- | --- |
-| `general_stable_set` | 200 | `{"gravity": 50, "roman": 50, "text": 50, "unit": 50}` | `{"verified_trace_ready": 200}` |
-| `binary_hard_set` | 60 | `{"binary": 60}` | `{"answer_only_keep": 20, "manual_audit_priority": 20, "verified_trace_ready": 20}` |
-| `symbol_watch_set` | 60 | `{"symbol": 60}` | `{"answer_only_keep": 15, "manual_audit_priority": 30, "verified_trace_ready": 15}` |
+| set | rows | family_counts | selection_tier_counts | binary_focus_bucket_counts |
+| --- | ---: | --- | --- | --- |
+| `general_stable_set` | 200 | `{"gravity": 50, "roman": 50, "text": 50, "unit": 50}` | `{"verified_trace_ready": 200}` | `{}` |
+| `binary_hard_set` | 60 | `{"binary": 60}` | `{"answer_only_keep": 24, "manual_audit_priority": 5, "verified_trace_ready": 31}` | `{"boolean_family": 6, "dominant_structured_abstract": 6, "dominant_structured_safe": 8, "no_solver_answer_only": 6, "no_solver_manual": 5, "rare_byte_transform": 1, "rare_perm_independent": 1, "supported_affine_xor": 7, "supported_bijection": 16, "supported_not_structured": 4}` |
+| `symbol_watch_set` | 60 | `{"symbol": 60}` | `{"answer_only_keep": 35, "manual_audit_priority": 10, "verified_trace_ready": 15}` | `{}` |
 
 ## Binary holdout fold counts
 
