@@ -66,6 +66,15 @@ def init_git_repo_with_results_md(tmp_path: Path) -> tuple[Path, Path]:
     return repo_root, results_md
 
 
+def init_git_repo_with_remote_results_md(tmp_path: Path) -> tuple[Path, Path, Path]:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    remote_root = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote_root)], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote_root)], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=repo_root, check=True, capture_output=True, text=True)
+    return repo_root, results_md, remote_root
+
+
 def write_csv_rows(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -1473,6 +1482,65 @@ def test_publish_results_md_reports_no_changes(tmp_path: Path) -> None:
         text=True,
     ).stdout.strip()
     assert commit_count == "1"
+
+
+def test_publish_results_md_retries_after_remote_advances(tmp_path: Path) -> None:
+    repo_root, results_md, remote_root = init_git_repo_with_remote_results_md(tmp_path)
+    other_root = tmp_path / "other"
+    subprocess.run(["git", "clone", str(remote_root), str(other_root)], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "remote@example.com"], cwd=other_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "Remote User"], cwd=other_root, check=True, capture_output=True, text=True)
+    remote_note = other_root / "remote-note.txt"
+    remote_note.write_text("remote change\n", encoding="utf-8")
+    subprocess.run(["git", "add", "remote-note.txt"], cwd=other_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "Remote note"], cwd=other_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "push"], cwd=other_root, check=True, capture_output=True, text=True)
+
+    results_md.write_text("updated after remote\n", encoding="utf-8")
+    summary_json = tmp_path / "publish_retry_summary.json"
+
+    stage_waiters.run_publish_results_md(
+        SimpleNamespace(
+            repo_root=repo_root,
+            results_md=results_md,
+            commit_message="Record temp results",
+            push=True,
+            dry_run=False,
+            summary_json=summary_json,
+            lock_dir=repo_root / ".git" / ".nemotron_ledger_lock",
+            lock_poll_seconds=0.1,
+            lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "pushed"
+    assert "push_retry" in summary
+    assert summary["push_retry"]["upstream_ref"].startswith("origin/")
+    remote_head = subprocess.run(
+        ["git", "rev-parse", "@{upstream}"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    local_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert remote_head == local_head
+    log_subjects = subprocess.run(
+        ["git", "log", "--format=%s", "--max-count=5"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert "Record temp results" in log_subjects
+    assert "Remote note" in log_subjects
 
 
 def test_record_live_run_status_prefers_latest_train_report(tmp_path: Path) -> None:

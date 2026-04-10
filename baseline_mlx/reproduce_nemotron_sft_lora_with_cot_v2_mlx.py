@@ -884,6 +884,46 @@ def run_git_text_command(repo_root: Path, args: Sequence[str]) -> tuple[int, str
     return _run_text_command(("git", "-C", str(Path(repo_root).resolve()), *args))
 
 
+def should_retry_git_push(push_output: str) -> bool:
+    lowered = str(push_output).lower()
+    return any(
+        needle in lowered
+        for needle in (
+            "non-fast-forward",
+            "fetch first",
+            "[rejected]",
+            "failed to push some refs",
+        )
+    )
+
+
+def retry_git_push_with_merge(repo_root: Path) -> dict[str, Any]:
+    upstream_returncode, upstream_output = run_git_text_command(
+        repo_root,
+        ("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"),
+    )
+    if upstream_returncode != 0:
+        raise RuntimeError(f"git upstream resolution failed ({upstream_returncode}): {upstream_output}")
+    upstream_ref = upstream_output.strip()
+    remote_name = upstream_ref.split("/", 1)[0]
+    fetch_returncode, fetch_output = run_git_text_command(repo_root, ("fetch", remote_name))
+    if fetch_returncode != 0:
+        raise RuntimeError(f"git fetch failed ({fetch_returncode}): {fetch_output}")
+    merge_returncode, merge_output = run_git_text_command(repo_root, ("merge", "--no-edit", upstream_ref))
+    if merge_returncode != 0:
+        raise RuntimeError(f"git merge failed ({merge_returncode}): {merge_output}")
+    push_returncode, push_output = run_git_text_command(repo_root, ("push",))
+    if push_returncode != 0:
+        raise RuntimeError(f"git push retry failed ({push_returncode}): {push_output}")
+    return {
+        "upstream_ref": upstream_ref,
+        "remote_name": remote_name,
+        "fetch_output": fetch_output,
+        "merge_output": merge_output,
+        "push_output": push_output,
+    }
+
+
 def publish_results_md_to_git(
     *,
     repo_root: Path,
@@ -964,7 +1004,13 @@ def publish_results_md_to_git(
         if push:
             push_returncode, push_output = run_git_text_command(resolved_repo_root, ("push",))
             if push_returncode != 0:
-                raise RuntimeError(f"git push failed ({push_returncode}): {push_output}")
+                if not should_retry_git_push(push_output):
+                    raise RuntimeError(f"git push failed ({push_returncode}): {push_output}")
+                summary["initial_push_output"] = push_output
+                summary["push_retry"] = retry_git_push_with_merge(resolved_repo_root)
+                summary["push_output"] = summary["push_retry"]["push_output"]
+                summary["status"] = "pushed"
+                return summary
             summary["push_output"] = push_output
             summary["status"] = "pushed"
         return summary
