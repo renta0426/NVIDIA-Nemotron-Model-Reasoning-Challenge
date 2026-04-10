@@ -317,3 +317,28 @@
 
 - `baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-stagefreeze-curriculum.ipynb` の Mode A で、`generated_cot` が `\boxed{...}` のみの行でも落ちないよう answer-only fallback を追加した。実際の停止例は `id=5e149421`, `generated_cot='\\boxed{11010010}'`。
 - 同 notebook に `TRAINING_PROFILE` (`full` / `smoke`) と stage resume state (`/kaggle/working/stagefreeze_curriculum_artifacts/resume_state.json`) を追加し、長時間 run 完了後に再実行しても完了済み stage を skip できるようにした。
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+
+- status: `running_untracked`
+- label: `stage25 reanchor textv140 binary30proxy o15 p5 s10 grav15 unit15 rowselect from reanchor1024 v1`
+- observed_at: `2026-04-10T08:01:24.653814+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified140_binary30proxyo15p5s10_grav15_unit15_rowselect_v1.csv`
+- sampled_rows: `200`
+- optimizer_progress: `0/12 = 0.00%`
+- lr: `8e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Completion markers
+
+- training_result_exists: `False`
+- runtime_pid: `89052`
+- runtime_pid_alive: `True`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
