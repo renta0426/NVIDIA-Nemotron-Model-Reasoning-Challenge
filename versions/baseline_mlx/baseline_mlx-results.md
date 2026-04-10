@@ -798,7 +798,7 @@
 
 - status: `evaluating`
 - label: `binary40_o20_p0_s20_no_lz`
-- observed_at: `2026-04-10T19:39:21.822989+00:00`
+- observed_at: `2026-04-10T19:56:11.334210+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo20p0s20_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
