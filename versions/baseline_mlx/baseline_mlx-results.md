@@ -240,7 +240,7 @@
 
 - status: `evaluating`
 - label: `stage25 reanchor textv160 textao0 num10 grav15 unit15 rowselect from reanchor1024 v3`
-- observed_at: `2026-04-10T08:15:21.864649+00:00`
+- observed_at: `2026-04-10T08:22:24.642580+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified160_num10_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -256,8 +256,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `64/320 = 20.00%`
-- current_chunks_progress: `4/20 = 20.00%`
+- current_rows_progress: `80/320 = 25.00%`
+- current_chunks_progress: `5/20 = 25.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
@@ -283,7 +283,7 @@
 
 - status: `evaluating`
 - label: `stage25 reanchor textv150 binary20proxy grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T08:11:39.385474+00:00`
+- observed_at: `2026-04-10T08:21:42.598494+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified150_binary20proxy_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -299,8 +299,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `32/320 = 10.00%`
-- current_chunks_progress: `2/20 = 10.00%`
+- current_rows_progress: `48/320 = 15.00%`
+- current_chunks_progress: `3/20 = 15.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
@@ -324,7 +324,7 @@
 
 - status: `evaluating`
 - label: `stage25 reanchor textv140 binary30proxy o15 p5 s10 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T08:14:43.774602+00:00`
+- observed_at: `2026-04-10T08:24:15.018926+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified140_binary30proxyo15p5s10_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -340,8 +340,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `16/320 = 5.00%`
-- current_chunks_progress: `1/20 = 5.00%`
+- current_rows_progress: `32/320 = 10.00%`
+- current_chunks_progress: `2/20 = 10.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_bin30proxyo15p5s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
@@ -360,7 +360,7 @@
 
 - status: `evaluating`
 - label: `stage25 reanchor textv130 binary40proxy o20 p5 s15 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T08:14:36.500934+00:00`
+- observed_at: `2026-04-10T08:24:04.824503+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p5s15_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo20p5s15_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -376,8 +376,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p5s15_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `0/320 = 0.00%`
-- current_chunks_progress: `0/20 = 0.00%`
+- current_rows_progress: `16/320 = 5.00%`
+- current_chunks_progress: `1/20 = 5.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p5s15_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
