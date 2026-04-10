@@ -364,6 +364,55 @@ def make_live_progress_run(
             "It/sec 0.400, Tokens/sec 245.351, Trained Tokens 1900181, Peak mem 82.620 GB\n",
             encoding="utf-8",
         )
+    elif progress_source == "eval_suite_progress":
+        (adapter_dir / "latest_train_report.json").write_text(json.dumps(latest_payload), encoding="utf-8")
+        (run_root / "training_result.json").write_text(
+            json.dumps(
+                {
+                    "created_at": "2026-04-09T02:12:00+00:00",
+                    "latest_train_report": latest_payload,
+                }
+            ),
+            encoding="utf-8",
+        )
+        suite_root = run_root / stage_waiters.DEFAULT_RUN_SUITE_PROGRESS_RELPATH.parent
+        eval_root = suite_root / "readme_local320"
+        eval_root.mkdir(parents=True, exist_ok=True)
+        (suite_root / "benchmark_eval_suite_progress.json").write_text(
+            json.dumps(
+                {
+                    "recorded_at": "2026-04-09T02:30:00+00:00",
+                    "status": "running",
+                    "output_root": str(suite_root),
+                    "evaluations_total": 2,
+                    "evaluations_completed": 0,
+                    "current_evaluation": "readme_local320",
+                    "current_rows_total": 320,
+                    "current_rows_completed": 288,
+                    "current_chunks_total": 20,
+                    "current_chunks_completed": 18,
+                    "completed_evaluations": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (eval_root / "benchmark_eval_progress.json").write_text(
+            json.dumps(
+                {
+                    "recorded_at": "2026-04-09T02:30:00+00:00",
+                    "status": "running",
+                    "evaluation_name": "readme_local320",
+                    "output_root": str(eval_root),
+                    "rows_total": 320,
+                    "rows_completed": 288,
+                    "chunks_total": 20,
+                    "chunks_completed": 18,
+                    "correct": 204,
+                    "accuracy": 0.6375,
+                }
+            ),
+            encoding="utf-8",
+        )
     else:
         raise ValueError(f"Unsupported progress source: {progress_source}")
     return run_root
@@ -1209,6 +1258,38 @@ def test_record_live_run_status_falls_back_to_console_log(tmp_path: Path) -> Non
     assert summary["live_progress"]["progress_source"] == "console_log"
     assert summary["live_progress"]["optimizer_step"] == 400
     assert "- source: `console_log`" in results_md.read_text(encoding="utf-8")
+
+
+def test_record_live_run_status_prefers_eval_suite_progress_after_training(tmp_path: Path) -> None:
+    run_root = make_live_progress_run(
+        tmp_path,
+        run_name="live_progress_eval",
+        progress_source="eval_suite_progress",
+    )
+    results_md = tmp_path / "results.md"
+    summary_json = tmp_path / "record_live_eval_summary.json"
+
+    stage_waiters.run_record_live_run_status(
+        SimpleNamespace(
+            run_root=run_root,
+            label="live-eval",
+            results_md=results_md,
+            summary_json=summary_json,
+            max_log_bytes=stage_waiters.DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "evaluating"
+    assert summary["live_progress"]["progress_kind"] == "evaluation"
+    assert summary["live_progress"]["progress_source"] == "benchmark_eval_suite_progress"
+    assert summary["live_progress"]["current_evaluation"] == "readme_local320"
+    assert summary["live_progress"]["current_rows_completed"] == 288
+    ledger = results_md.read_text(encoding="utf-8")
+    assert "#### Latest evaluation progress" in ledger
+    assert "- current_evaluation: `readme_local320`" in ledger
+    assert "- current_rows_progress: `288/320 = 90.00%`" in ledger
+    assert "- suite_evaluations: `0/2 = 0.00%`" in ledger
 
 
 def test_record_live_run_status_marks_stopped_when_runtime_pid_is_dead(tmp_path: Path) -> None:

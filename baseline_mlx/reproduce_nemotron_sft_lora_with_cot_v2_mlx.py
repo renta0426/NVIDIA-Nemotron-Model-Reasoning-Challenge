@@ -76,6 +76,9 @@ DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY = 0.96
 DEFAULT_RUN_SUITE_SUMMARY_RELPATH = Path(
     "eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json"
 )
+DEFAULT_RUN_SUITE_PROGRESS_RELPATH = Path(
+    "eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json"
+)
 DEFAULT_RUN_AUDIT_RELPATH = Path("submission_compat_audit/submission_compat_audit.json")
 DEFAULT_RUN_EXPORT_RELPATH = Path("submission_export/export_manifest.json")
 DEFAULT_RESULTS_MD = REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md"
@@ -449,6 +452,7 @@ def normalize_train_progress_payload(
     source_path: Path | None = None,
 ) -> dict[str, Any]:
     normalized: dict[str, Any] = {
+        "progress_kind": "training",
         "progress_source": str(source),
         "source_path": str(source_path.resolve()) if source_path is not None else "",
         "observed_at": str(payload.get("logged_at") or payload.get("observed_at") or ""),
@@ -472,6 +476,93 @@ def normalize_train_progress_payload(
     return normalized
 
 
+def normalize_eval_progress_payload(
+    suite_payload: dict[str, Any],
+    *,
+    source: str,
+    source_path: Path | None = None,
+    evaluation_payload: dict[str, Any] | None = None,
+    evaluation_path: Path | None = None,
+) -> dict[str, Any]:
+    observed_at = ""
+    if isinstance(evaluation_payload, dict):
+        observed_at = str(evaluation_payload.get("recorded_at") or "")
+    if not observed_at:
+        observed_at = str(suite_payload.get("recorded_at") or "")
+    normalized: dict[str, Any] = {
+        "progress_kind": "evaluation",
+        "progress_source": str(source),
+        "source_path": str(source_path.resolve()) if source_path is not None else "",
+        "observed_at": observed_at,
+        "suite_status": str(suite_payload.get("status", "")),
+        "suite_output_root": str(suite_payload.get("output_root", "")),
+        "current_evaluation": str(
+            (
+                evaluation_payload.get("evaluation_name")
+                if isinstance(evaluation_payload, dict) and evaluation_payload.get("evaluation_name") not in (None, "")
+                else suite_payload.get("current_evaluation")
+            )
+            or ""
+        ),
+        "completed_evaluations": [
+            (
+                str(item.get("evaluation_name", "")).strip()
+                if isinstance(item, dict) and str(item.get("evaluation_name", "")).strip()
+                else str(item).strip()
+            )
+            for item in (suite_payload.get("completed_evaluations") or [])
+            if (
+                (
+                    str(item.get("evaluation_name", "")).strip()
+                    if isinstance(item, dict)
+                    else str(item).strip()
+                )
+            )
+        ],
+    }
+    int_field_sources: dict[str, Any] = {
+        "evaluations_total": suite_payload.get("evaluations_total"),
+        "evaluations_completed": suite_payload.get("evaluations_completed"),
+        "current_rows_total": (
+            evaluation_payload.get("rows_total")
+            if isinstance(evaluation_payload, dict) and evaluation_payload.get("rows_total") not in (None, "")
+            else suite_payload.get("current_rows_total")
+        ),
+        "current_rows_completed": (
+            evaluation_payload.get("rows_completed")
+            if isinstance(evaluation_payload, dict) and evaluation_payload.get("rows_completed") not in (None, "")
+            else suite_payload.get("current_rows_completed")
+        ),
+        "current_chunks_total": (
+            evaluation_payload.get("chunks_total")
+            if isinstance(evaluation_payload, dict) and evaluation_payload.get("chunks_total") not in (None, "")
+            else suite_payload.get("current_chunks_total")
+        ),
+        "current_chunks_completed": (
+            evaluation_payload.get("chunks_completed")
+            if isinstance(evaluation_payload, dict) and evaluation_payload.get("chunks_completed") not in (None, "")
+            else suite_payload.get("current_chunks_completed")
+        ),
+    }
+    for field_name, value in int_field_sources.items():
+        if value not in (None, ""):
+            normalized[field_name] = int(value)
+    if evaluation_path is not None:
+        normalized["evaluation_source_path"] = str(evaluation_path.resolve())
+    if isinstance(evaluation_payload, dict):
+        evaluation_output_root = evaluation_payload.get("output_root")
+        if evaluation_output_root not in (None, ""):
+            normalized["evaluation_output_root"] = str(evaluation_output_root)
+        for field_name in ("correct",):
+            value = evaluation_payload.get(field_name)
+            if value not in (None, ""):
+                normalized[field_name] = int(value)
+        value = evaluation_payload.get("accuracy")
+        if value not in (None, ""):
+            normalized["accuracy"] = float(value)
+    return normalized
+
+
 def extract_console_train_progress(
     run_root: Path,
     *,
@@ -490,6 +581,34 @@ def extract_console_train_progress(
         payload["steps_per_report_step_unit"] = "optimizer"
         return normalize_train_progress_payload(payload, source="console_log", source_path=console_path)
     return None
+
+
+def extract_suite_eval_progress(run_root: Path) -> dict[str, Any] | None:
+    resolved_run_root = Path(run_root).resolve()
+    suite_progress_path = resolved_run_root / DEFAULT_RUN_SUITE_PROGRESS_RELPATH
+    suite_progress = load_json(suite_progress_path, default=None)
+    if not isinstance(suite_progress, dict):
+        return None
+    current_evaluation = str(suite_progress.get("current_evaluation", "")).strip()
+    evaluation_progress_path = (
+        suite_progress_path.parent / current_evaluation / "benchmark_eval_progress.json"
+        if current_evaluation
+        else None
+    )
+    evaluation_progress = (
+        load_json(evaluation_progress_path, default=None)
+        if evaluation_progress_path is not None and evaluation_progress_path.exists()
+        else None
+    )
+    if not isinstance(evaluation_progress, dict):
+        evaluation_progress = None
+    return normalize_eval_progress_payload(
+        suite_progress,
+        source="benchmark_eval_suite_progress",
+        source_path=suite_progress_path,
+        evaluation_payload=evaluation_progress,
+        evaluation_path=evaluation_progress_path if evaluation_progress_path is not None else None,
+    )
 
 
 def path_matches_kind(path: Path, expected_kind: str) -> bool:
@@ -3063,23 +3182,24 @@ def load_live_run_status_payload(
         else None
     )
     runtime_pid_alive = is_pid_running(runtime_pid)
-    live_progress = None
-    if isinstance(latest_train_report, dict):
+    suite_summary_path = resolved_run_root / DEFAULT_RUN_SUITE_SUMMARY_RELPATH
+    suite_progress = None if suite_summary_path.exists() else extract_suite_eval_progress(resolved_run_root)
+    live_progress = suite_progress
+    if live_progress is None and isinstance(latest_train_report, dict):
         live_progress = normalize_train_progress_payload(
             latest_train_report,
             source="latest_train_report",
             source_path=latest_train_report_path,
         )
-    elif isinstance(training_result, dict) and isinstance(training_result.get("latest_train_report"), dict):
+    elif live_progress is None and isinstance(training_result, dict) and isinstance(training_result.get("latest_train_report"), dict):
         live_progress = normalize_train_progress_payload(
             training_result["latest_train_report"],
             source="training_result",
             source_path=resolved_run_root / "training_result.json",
         )
-    else:
+    elif live_progress is None:
         live_progress = extract_console_train_progress(resolved_run_root, max_log_bytes=max_log_bytes)
 
-    suite_summary_path = resolved_run_root / DEFAULT_RUN_SUITE_SUMMARY_RELPATH
     audit_summary_path = resolved_run_root / DEFAULT_RUN_AUDIT_RELPATH
     export_manifest_path = resolved_run_root / DEFAULT_RUN_EXPORT_RELPATH
     recorded_run_result_path = resolved_run_root / "recorded_run_result.json"
@@ -3091,6 +3211,8 @@ def load_live_run_status_payload(
         status = "audited"
     elif suite_summary_path.exists():
         status = "scored"
+    elif isinstance(suite_progress, dict):
+        status = "evaluating"
     elif isinstance(training_result, dict):
         status = "training_completed"
     elif runtime_pid_alive and isinstance(live_progress, dict):
@@ -3114,14 +3236,25 @@ def load_live_run_status_payload(
 
     progress_signature_parts = [status, observed_at]
     if isinstance(live_progress, dict):
-        progress_signature_parts.extend(
-            [
-                live_progress.get("progress_source", ""),
-                live_progress.get("optimizer_step", 0),
-                live_progress.get("iteration", 0),
-                live_progress.get("train_loss", ""),
-            ]
-        )
+        if str(live_progress.get("progress_kind", "")) == "evaluation":
+            progress_signature_parts.extend(
+                [
+                    live_progress.get("progress_source", ""),
+                    live_progress.get("current_evaluation", ""),
+                    live_progress.get("evaluations_completed", 0),
+                    live_progress.get("current_rows_completed", 0),
+                    live_progress.get("current_chunks_completed", 0),
+                ]
+            )
+        else:
+            progress_signature_parts.extend(
+                [
+                    live_progress.get("progress_source", ""),
+                    live_progress.get("optimizer_step", 0),
+                    live_progress.get("iteration", 0),
+                    live_progress.get("train_loss", ""),
+                ]
+            )
 
     return {
         "recorded_at": utc_now(),
@@ -3174,7 +3307,48 @@ def render_live_run_status_markdown(payload: dict[str, Any]) -> str:
     lines.append(f"- trainable_lora_suffixes: `{training.get('trainable_lora_suffixes', [])}`")
     lines.append("")
 
-    if isinstance(live_progress, dict):
+    if isinstance(live_progress, dict) and str(live_progress.get("progress_kind", "")) == "evaluation":
+        evaluations_total = int(live_progress.get("evaluations_total", 0) or 0)
+        evaluations_completed = int(live_progress.get("evaluations_completed", 0) or 0)
+        current_rows_total = int(live_progress.get("current_rows_total", 0) or 0)
+        current_rows_completed = int(live_progress.get("current_rows_completed", 0) or 0)
+        current_chunks_total = int(live_progress.get("current_chunks_total", 0) or 0)
+        current_chunks_completed = int(live_progress.get("current_chunks_completed", 0) or 0)
+        suite_progress = (
+            f"{evaluations_completed}/{evaluations_total} = {evaluations_completed / evaluations_total:.2%}"
+            if evaluations_total > 0
+            else str(evaluations_completed)
+        )
+        current_rows_progress = (
+            f"{current_rows_completed}/{current_rows_total} = {current_rows_completed / current_rows_total:.2%}"
+            if current_rows_total > 0
+            else str(current_rows_completed)
+        )
+        current_chunks_progress = (
+            f"{current_chunks_completed}/{current_chunks_total} = {current_chunks_completed / current_chunks_total:.2%}"
+            if current_chunks_total > 0
+            else str(current_chunks_completed)
+        )
+        lines.append("#### Latest evaluation progress")
+        lines.append("")
+        lines.append(f"- source: `{live_progress.get('progress_source', '')}`")
+        lines.append(f"- source_path: `{live_progress.get('source_path', '')}`")
+        lines.append(f"- suite_output_root: `{live_progress.get('suite_output_root', '')}`")
+        lines.append(f"- suite_evaluations: `{suite_progress}`")
+        lines.append(f"- current_evaluation: `{live_progress.get('current_evaluation', '')}`")
+        lines.append(f"- current_rows_progress: `{current_rows_progress}`")
+        lines.append(f"- current_chunks_progress: `{current_chunks_progress}`")
+        if live_progress.get("evaluation_source_path") not in (None, ""):
+            lines.append(f"- evaluation_source_path: `{live_progress.get('evaluation_source_path', '')}`")
+        if live_progress.get("accuracy") not in (None, ""):
+            lines.append(f"- accuracy_so_far: `{float(live_progress.get('accuracy', 0.0)):.4f}`")
+        if live_progress.get("correct") not in (None, ""):
+            lines.append(f"- correct_so_far: `{int(live_progress.get('correct', 0) or 0)}`")
+        completed_evaluations = live_progress.get("completed_evaluations") or []
+        if completed_evaluations:
+            lines.append(f"- completed_evaluations: `{list(completed_evaluations)}`")
+        lines.append("")
+    elif isinstance(live_progress, dict):
         lines.append("#### Latest train progress")
         lines.append("")
         lines.append(f"- source: `{live_progress.get('progress_source', '')}`")
