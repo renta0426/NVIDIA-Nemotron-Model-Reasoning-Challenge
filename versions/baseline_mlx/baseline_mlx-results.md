@@ -416,7 +416,7 @@
 
 - status: `evaluating`
 - label: `stage25 reanchor textv120 binary50proxy o30 p0 s20 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T11:39:15.776993+00:00`
+- observed_at: `2026-04-10T11:45:29.557814+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_bin50proxyo30p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified120_binary50proxyo30p0s20_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -432,8 +432,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_bin50proxyo30p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `64/320 = 20.00%`
-- current_chunks_progress: `4/20 = 20.00%`
+- current_rows_progress: `80/320 = 25.00%`
+- current_chunks_progress: `5/20 = 25.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_bin50proxyo30p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
@@ -518,3 +518,30 @@
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_bin70proxyo40p0s30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+
+## 2026-04-10 binary40 local-best repro pipeline
+
+- README.md 契約の再確認:
+  - `max_lora_rank=32`
+  - `max_tokens=7680`
+  - `top_p=1.0`
+  - `temperature=0.0`
+  - `max_num_seqs=64`
+  - `max_model_len=8192`
+  - 提出物は `submission.zip`
+- local/proxy best source run:
+  - `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p5s15_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+  - `readme_local320 = 229/320 = 0.7156`
+  - `leaderboard_proxy_v1_set = 129/200 = 0.6450`
+- single-file repro entrypoint:
+  - `versions/baseline_mlx_binary40_repro_v1/reproduce_binary40_submission.py`
+  - subcommands:
+    - `verify`
+    - `export-existing`
+    - `full-reproduce`
+- regenerated submission artifact:
+  - `baseline_mlx/outputs/binary40_local_best_repro_export_v1/submission_export/submission.zip`
+  - validation: `valid=True`
+  - zip_size_bytes: `102356506`
+  - converted_tensor_count: `232`
+  - audit_status: `potentially_exportable_2d_only`
