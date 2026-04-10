@@ -200,3 +200,35 @@
   - Stage2 trains attention `q/k/v/o` only with `lr=2e-5`, `epochs=2.4`, `max_length=768`
   - Stage2.5 trains attention `q/k/v/o` only with `lr=1e-5`, `epochs=0.45`, `max_length=1024`
 - final adapter handoff stays compatible with the original notebook packaging flow because the curriculum cell copies the last-stage adapter to `/kaggle/working/sft_adapter`, and the submission cell still packages from that location.
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
+
+- recorded_at: `2026-04-10T07:32:37.406197+00:00`
+- label: `export-safe-qkvo-reanchor-len1024-from-len768-v1-postprocess`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
+- sampled_rows: `200`
+- optimizer_steps: `12`
+- lr: `1e-05`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `221/320 = 0.6906`
+- local320_components: `general_stable_set 179/200 = 0.8950; binary_hard_set 21/60 = 0.3500; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `119/200 = 0.5950`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1/submission_export/submission.zip`
+- zip_size_bytes: `102355396`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1 -->
