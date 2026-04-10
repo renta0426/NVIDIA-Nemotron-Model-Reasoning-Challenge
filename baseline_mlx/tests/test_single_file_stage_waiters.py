@@ -201,6 +201,8 @@ def make_candidate_run(
     local320_rows: int = 320,
     general_stable_correct: int = 96,
     general_stable_rows: int = 100,
+    proxy_v1_correct: int = 120,
+    proxy_v1_rows: int = 200,
     proxy_correct: int = 70,
     proxy_rows: int = 84,
     specialized_correct: int = 300,
@@ -222,6 +224,7 @@ def make_candidate_run(
         archive.writestr("adapter_model.safetensors", "adapter")
 
     local320_root = run_root / "eval_suite_readme_proxy_specialized" / "readme_local320"
+    proxy_v1_root = run_root / "eval_suite_readme_proxy_specialized" / "leaderboard_proxy_v1_set"
     proxy_root = run_root / "eval_suite_readme_proxy_specialized" / "leaderboard_proxy_v2"
     specialized_root = run_root / "eval_suite_readme_proxy_specialized" / "binary_bias_specialized_set"
     write_benchmark_eval_summary(
@@ -249,6 +252,7 @@ def make_candidate_run(
             },
         ],
     )
+    write_benchmark_eval_summary(proxy_v1_root, rows=proxy_v1_rows, correct=proxy_v1_correct)
     write_benchmark_eval_summary(proxy_root, rows=proxy_rows, correct=proxy_correct)
     write_benchmark_eval_summary(specialized_root, rows=specialized_rows, correct=specialized_correct)
 
@@ -257,6 +261,7 @@ def make_candidate_run(
             {
                 "evaluations": [
                     {"evaluation_name": "readme_local320", "output_root": str(local320_root.resolve())},
+                    {"evaluation_name": "leaderboard_proxy_v1_set", "output_root": str(proxy_v1_root.resolve())},
                     {"evaluation_name": "leaderboard_proxy_v2", "output_root": str(proxy_root.resolve())},
                     {
                         "evaluation_name": "binary_bias_specialized_set",
@@ -1014,6 +1019,50 @@ def test_package_best_submission_reports_no_eligible_candidate(tmp_path: Path) -
     assert selection["eligible_candidate_count"] == 0
     assert selection["selected_run_root"] == ""
     assert not (output_root / "submission.zip").exists()
+
+
+def test_package_best_submission_uses_proxy_v1_tiebreak(tmp_path: Path) -> None:
+    weaker_proxy_v1 = make_candidate_run(
+        tmp_path,
+        run_name="candidate_weaker_proxy_v1",
+        local320_correct=224,
+        proxy_v1_correct=110,
+        proxy_correct=72,
+        specialized_correct=320,
+    )
+    stronger_proxy_v1 = make_candidate_run(
+        tmp_path,
+        run_name="candidate_stronger_proxy_v1",
+        local320_correct=224,
+        proxy_v1_correct=130,
+        proxy_correct=72,
+        specialized_correct=320,
+    )
+    output_root = tmp_path / "best_submission_proxy_v1"
+
+    stage_waiters.run_package_best_submission(
+        SimpleNamespace(
+            search_root=tmp_path,
+            candidate_run_root=[weaker_proxy_v1, stronger_proxy_v1],
+            output_root=output_root,
+            results_md=tmp_path / "results.md",
+            suite_summary_relpath=stage_waiters.DEFAULT_RUN_SUITE_SUMMARY_RELPATH,
+            audit_relpath=stage_waiters.DEFAULT_RUN_AUDIT_RELPATH,
+            export_relpath=stage_waiters.DEFAULT_RUN_EXPORT_RELPATH,
+            min_local320_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY,
+            min_general_stable_accuracy=stage_waiters.DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY,
+            min_proxy_v2_accuracy=0.0,
+            min_specialized_accuracy=0.0,
+            require_exportable=True,
+            export_if_missing=False,
+            update_results_md=False,
+            base_model_name_or_path=stage_waiters.BASE_MODEL_NAME,
+        )
+    )
+
+    selection = json.loads((output_root / "selection_manifest.json").read_text(encoding="utf-8"))
+    assert selection["selected_run_root"] == str(stronger_proxy_v1.resolve())
+    assert selection["selected_candidate"]["proxy_v1"]["correct"] == 130
 
 
 def test_publish_results_md_commits_modified_results_file(tmp_path: Path) -> None:

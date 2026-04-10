@@ -3007,6 +3007,7 @@ def render_record_run_result_markdown(payload: dict[str, Any]) -> str:
             if component_parts:
                 lines.append(f"- local320_components: `{'; '.join(component_parts)}`")
         for name in (
+            "leaderboard_proxy_v1_set",
             "leaderboard_proxy_v2",
             "binary_bias_specialized_set",
         ):
@@ -3384,6 +3385,11 @@ def build_submission_candidate_from_payload(payload: dict[str, Any]) -> dict[str
         "general_stable": coerce_score_row(local320_components.get("general_stable_set")),
         "binary_hard": coerce_score_row(local320_components.get("binary_hard_set")),
         "symbol_watch": coerce_score_row(local320_components.get("symbol_watch_set")),
+        "proxy_v1": coerce_score_row(
+            evaluation_payloads.get("leaderboard_proxy_v1_set", {}).get("overall")
+            if isinstance(evaluation_payloads.get("leaderboard_proxy_v1_set"), dict)
+            else None
+        ),
         "proxy_v2": coerce_score_row(
             evaluation_payloads.get("leaderboard_proxy_v2", {}).get("overall")
             if isinstance(evaluation_payloads.get("leaderboard_proxy_v2"), dict)
@@ -3444,6 +3450,7 @@ def candidate_selection_sort_key(candidate: dict[str, Any]) -> tuple[float, ...]
     return (
         float(candidate["local320"]["accuracy"]),
         float(candidate["general_stable"]["accuracy"]),
+        float(candidate["proxy_v1"]["accuracy"]),
         float(candidate["proxy_v2"]["accuracy"]),
         float(candidate["specialized"]["accuracy"]),
         float(candidate["binary_hard"]["accuracy"]),
@@ -3491,6 +3498,7 @@ def render_best_submission_markdown(summary: dict[str, Any]) -> str:
         lines.append(f"- selected_run: `{selected['run_name']}`")
         lines.append(f"- local320: `{format_correct_accuracy(selected['local320'])}`")
         lines.append(f"- general_stable: `{format_correct_accuracy(selected['general_stable'])}`")
+        lines.append(f"- leaderboard_proxy_v1_set: `{format_correct_accuracy(selected['proxy_v1'])}`")
         lines.append(f"- leaderboard_proxy_v2: `{format_correct_accuracy(selected['proxy_v2'])}`")
         lines.append(f"- binary_bias_specialized_set: `{format_correct_accuracy(selected['specialized'])}`")
         lines.append(f"- audit_status: `{selected['audit_status']}`")
@@ -3498,12 +3506,13 @@ def render_best_submission_markdown(summary: dict[str, Any]) -> str:
         lines.append("")
     top_candidates = summary.get("top_candidates") or []
     if top_candidates:
-        lines.append("| run_name | local320 | general_stable | proxy_v2 | specialized | exportable |")
-        lines.append("| --- | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| run_name | local320 | general_stable | proxy_v1 | proxy_v2 | specialized | exportable |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | --- |")
         for row in top_candidates:
             lines.append(
                 f"| `{row['run_name']}` | {float(row['local320']['accuracy']):.4f} | "
-                f"{float(row['general_stable']['accuracy']):.4f} | {float(row['proxy_v2']['accuracy']):.4f} | "
+                f"{float(row['general_stable']['accuracy']):.4f} | {float(row['proxy_v1']['accuracy']):.4f} | "
+                f"{float(row['proxy_v2']['accuracy']):.4f} | "
                 f"{float(row['specialized']['accuracy']):.4f} | `{bool(row['peft_export_ready'])}` |"
             )
         lines.append("")
