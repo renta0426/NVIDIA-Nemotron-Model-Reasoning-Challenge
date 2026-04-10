@@ -1019,6 +1019,144 @@ def test_build_text_reanchor_csv_joins_row_analysis_with_train_rows(tmp_path: Pa
     }
 
 
+def test_build_text_binary_reanchor_csv_joins_proxy_binary_rows(tmp_path: Path) -> None:
+    source_train_csv = tmp_path / "source_train.csv"
+    row_analysis_csv = tmp_path / "row_analysis.csv"
+    output_csv = tmp_path / "text_binary_reanchor.csv"
+    summary_json = tmp_path / "text_binary_reanchor_summary.json"
+
+    write_csv_rows(
+        source_train_csv,
+        stage_waiters.EXPECTED_COLUMNS,
+        [
+            {"id": "tv1", "prompt": "p", "answer": "a", "type": "Text Encryption", "generated_cot": "cot"},
+            {"id": "tv2", "prompt": "p", "answer": "a", "type": "Text Encryption", "generated_cot": "cot"},
+            {"id": "b1", "prompt": "p", "answer": "a", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "b2", "prompt": "p", "answer": "a", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "b3", "prompt": "p", "answer": "a", "type": "Bit Manipulation", "generated_cot": "cot"},
+            {"id": "g1", "prompt": "p", "answer": "a", "type": "Gravitational Constant", "generated_cot": "cot"},
+            {"id": "u1", "prompt": "p", "answer": "a", "type": "Unit Conversion", "generated_cot": "cot"},
+            {"id": "unused", "prompt": "p", "answer": "a", "type": "Numeral Conversion", "generated_cot": "cot"},
+        ],
+    )
+    write_csv_rows(
+        row_analysis_csv,
+        ["id", "family", "template_subtype", "selection_tier", "teacher_solver_candidate"],
+        [
+            {
+                "id": "tv1",
+                "family": "text_decryption",
+                "template_subtype": "text_monoalphabetic",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "text_char_substitution",
+            },
+            {
+                "id": "tv2",
+                "family": "text_decryption",
+                "template_subtype": "text_monoalphabetic",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "text_char_substitution",
+            },
+            {
+                "id": "b1",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_other",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_two_bit_boolean",
+            },
+            {
+                "id": "b2",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_permutation_inversion",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_bit_permutation_bijection",
+            },
+            {
+                "id": "b3",
+                "family": "bit_manipulation",
+                "template_subtype": "bit_structured_byte_formula",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "binary_structured_byte_formula",
+            },
+            {
+                "id": "g1",
+                "family": "gravity_constant",
+                "template_subtype": "gravity_half_g_t2",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "gravity_numeric_rule",
+            },
+            {
+                "id": "u1",
+                "family": "unit_conversion",
+                "template_subtype": "unit_fixed_ratio",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "unit_numeric_rule",
+            },
+            {
+                "id": "unused",
+                "family": "roman_numeral",
+                "template_subtype": "roman_standard",
+                "selection_tier": "verified_trace_ready",
+                "teacher_solver_candidate": "roman_standard",
+            },
+        ],
+    )
+
+    stage_waiters.run_build_text_binary_reanchor_csv(
+        SimpleNamespace(
+            source_train_csv=source_train_csv,
+            row_analysis_csv=row_analysis_csv,
+            text_verified_rows=2,
+            binary_bit_other_rows=1,
+            binary_bit_permutation_rows=1,
+            binary_bit_structured_rows=1,
+            gravity_rows=1,
+            unit_rows=1,
+            seed=123,
+            output_csv=output_csv,
+            summary_json=summary_json,
+        )
+    )
+
+    with output_csv.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 7
+    assert {row["id"] for row in rows} == {"tv1", "tv2", "b1", "b2", "b3", "g1", "u1"}
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["resolved_rows"] == {
+        "text_verified_rows": 2,
+        "binary_bit_other_rows": 1,
+        "binary_bit_permutation_rows": 1,
+        "binary_bit_structured_rows": 1,
+        "gravity_rows": 1,
+        "unit_rows": 1,
+    }
+    assert summary["type_counts"] == {
+        "Bit Manipulation": 3,
+        "Gravitational Constant": 1,
+        "Text Encryption": 2,
+        "Unit Conversion": 1,
+    }
+    assert summary["template_subtype_counts"] == {
+        "bit_other": 1,
+        "bit_permutation_inversion": 1,
+        "bit_structured_byte_formula": 1,
+        "gravity_half_g_t2": 1,
+        "text_monoalphabetic": 2,
+        "unit_fixed_ratio": 1,
+    }
+    assert summary["teacher_solver_candidate_counts"] == {
+        "binary_bit_permutation_bijection": 1,
+        "binary_structured_byte_formula": 1,
+        "binary_two_bit_boolean": 1,
+        "gravity_numeric_rule": 1,
+        "text_char_substitution": 2,
+        "unit_numeric_rule": 1,
+    }
+
+
 def test_package_best_submission_selects_best_exportable_candidate(tmp_path: Path) -> None:
     weaker = make_candidate_run(
         tmp_path,

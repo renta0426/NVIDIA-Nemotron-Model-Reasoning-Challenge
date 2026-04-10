@@ -1674,6 +1674,141 @@ def build_text_reanchor_dataframe(
     return combined_df, summary
 
 
+def build_text_binary_reanchor_dataframe(
+    *,
+    source_train_df: pd.DataFrame,
+    row_analysis_df: pd.DataFrame,
+    text_verified_rows: int,
+    binary_bit_other_rows: int,
+    binary_bit_permutation_rows: int,
+    binary_bit_structured_rows: int,
+    gravity_rows: int,
+    unit_rows: int,
+    seed: int,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    metadata_columns = ["id", "family", "template_subtype", "selection_tier", "teacher_solver_candidate"]
+    row_analysis_unique = row_analysis_df.loc[:, metadata_columns].drop_duplicates(subset="id", keep="first").copy()
+    merged_df = source_train_df.merge(row_analysis_unique, on="id", how="inner", validate="one_to_one")
+    if merged_df.empty:
+        raise ValueError("Row-analysis-guided text+binary reanchor dataset resolved to zero joined rows.")
+
+    requested_rows = {
+        "text_verified_rows": int(text_verified_rows),
+        "binary_bit_other_rows": int(binary_bit_other_rows),
+        "binary_bit_permutation_rows": int(binary_bit_permutation_rows),
+        "binary_bit_structured_rows": int(binary_bit_structured_rows),
+        "gravity_rows": int(gravity_rows),
+        "unit_rows": int(unit_rows),
+    }
+    if all(value <= 0 for value in requested_rows.values()):
+        raise ValueError("At least one row count must be > 0 for the text+binary reanchor dataset.")
+    for name, value in requested_rows.items():
+        if value < 0:
+            raise ValueError(f"{name} must be >= 0, got {value}")
+
+    text_verified_pool = filter_family_training_rows(
+        merged_df,
+        family="text_decryption",
+        selection_tiers=["verified_trace_ready"],
+        template_subtypes=["text_monoalphabetic"],
+    )
+    gravity_pool = filter_family_training_rows(
+        merged_df,
+        family="gravity_constant",
+        selection_tiers=["verified_trace_ready"],
+    )
+    unit_pool = filter_family_training_rows(
+        merged_df,
+        family="unit_conversion",
+        selection_tiers=["verified_trace_ready"],
+    )
+    binary_verified_pool = merged_df[
+        merged_df["type"].astype(str).eq("Bit Manipulation")
+        & merged_df["selection_tier"].astype(str).eq("verified_trace_ready")
+    ].reset_index(drop=True)
+    binary_bit_other_pool = binary_verified_pool[
+        binary_verified_pool["template_subtype"].astype(str).eq("bit_other")
+    ].reset_index(drop=True)
+    binary_bit_permutation_pool = binary_verified_pool[
+        binary_verified_pool["template_subtype"].astype(str).eq("bit_permutation_inversion")
+    ].reset_index(drop=True)
+    binary_bit_structured_pool = binary_verified_pool[
+        binary_verified_pool["template_subtype"].astype(str).eq("bit_structured_byte_formula")
+    ].reset_index(drop=True)
+
+    pools = {
+        "text_verified_rows": text_verified_pool,
+        "binary_bit_other_rows": binary_bit_other_pool,
+        "binary_bit_permutation_rows": binary_bit_permutation_pool,
+        "binary_bit_structured_rows": binary_bit_structured_pool,
+        "gravity_rows": gravity_pool,
+        "unit_rows": unit_pool,
+    }
+    for name, requested in requested_rows.items():
+        if requested > 0 and pools[name].empty:
+            raise ValueError(f"{name} requested {requested} rows but the candidate pool is empty.")
+
+    sampled_frames = {
+        "text_verified_rows": sample_dataframe_rows(text_verified_pool, max_rows=int(text_verified_rows), seed=seed),
+        "binary_bit_other_rows": sample_dataframe_rows(
+            binary_bit_other_pool,
+            max_rows=int(binary_bit_other_rows),
+            seed=seed,
+        ),
+        "binary_bit_permutation_rows": sample_dataframe_rows(
+            binary_bit_permutation_pool,
+            max_rows=int(binary_bit_permutation_rows),
+            seed=seed,
+        ),
+        "binary_bit_structured_rows": sample_dataframe_rows(
+            binary_bit_structured_pool,
+            max_rows=int(binary_bit_structured_rows),
+            seed=seed,
+        ),
+        "gravity_rows": sample_dataframe_rows(gravity_pool, max_rows=int(gravity_rows), seed=seed),
+        "unit_rows": sample_dataframe_rows(unit_pool, max_rows=int(unit_rows), seed=seed),
+    }
+    combined_with_metadata = pd.concat(sampled_frames.values(), ignore_index=True)
+    combined_with_metadata = combined_with_metadata.drop_duplicates(subset="id", keep="first")
+    combined_with_metadata = combined_with_metadata.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    if combined_with_metadata.empty:
+        raise ValueError("Text+binary reanchor dataset resolved to zero rows after sampling.")
+
+    combined_df = combined_with_metadata.loc[:, EXPECTED_COLUMNS].copy()
+    type_counts = {
+        str(key): int(value)
+        for key, value in combined_df["type"].astype(str).value_counts().sort_index().items()
+    }
+    summary = {
+        "created_at": utc_now(),
+        "seed": int(seed),
+        "rows": int(len(combined_df)),
+        "requested_rows": requested_rows,
+        "resolved_rows": {key: int(len(value)) for key, value in sampled_frames.items()},
+        "pool_rows": {key: int(len(value)) for key, value in pools.items()},
+        "type_counts": type_counts,
+        "family_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["family"].astype(str).value_counts().sort_index().items()
+        },
+        "selection_tier_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["selection_tier"].astype(str).value_counts().sort_index().items()
+        },
+        "template_subtype_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["template_subtype"].astype(str).value_counts().sort_index().items()
+        },
+        "teacher_solver_candidate_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["teacher_solver_candidate"].fillna("nan").astype(str).value_counts().sort_index().items()
+        },
+        "recommended_type_samples": type_counts,
+        "recommended_type_sample_args": [f"{key}={value}" for key, value in sorted(type_counts.items())],
+    }
+    return combined_df, summary
+
+
 def encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
     bos_token = getattr(tokenizer, "bos_token", None)
     add_special_tokens = bos_token is None or not str(prompt).startswith(str(bos_token))
@@ -5413,6 +5548,48 @@ def run_build_text_reanchor_csv(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def run_build_text_binary_reanchor_csv(args: argparse.Namespace) -> None:
+    source_train_path = Path(args.source_train_csv).resolve()
+    row_analysis_path = Path(args.row_analysis_csv).resolve()
+    output_csv = Path(args.output_csv).resolve()
+    summary_json = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else output_csv.with_name(f"{output_csv.stem}_summary.json")
+    )
+
+    source_train_df = pd.read_csv(source_train_path)
+    validate_training_frame(source_train_df, source_train_path)
+    row_analysis_df = pd.read_csv(row_analysis_path, low_memory=False)
+    require_columns(
+        row_analysis_df,
+        row_analysis_path,
+        ["id", "family", "template_subtype", "selection_tier", "teacher_solver_candidate"],
+    )
+
+    combined_df, summary = build_text_binary_reanchor_dataframe(
+        source_train_df=source_train_df,
+        row_analysis_df=row_analysis_df,
+        text_verified_rows=int(args.text_verified_rows),
+        binary_bit_other_rows=int(args.binary_bit_other_rows),
+        binary_bit_permutation_rows=int(args.binary_bit_permutation_rows),
+        binary_bit_structured_rows=int(args.binary_bit_structured_rows),
+        gravity_rows=int(args.gravity_rows),
+        unit_rows=int(args.unit_rows),
+        seed=int(args.seed),
+    )
+    ensure_dir(output_csv.parent)
+    combined_df.to_csv(output_csv, index=False)
+    summary["output_csv"] = str(output_csv)
+    summary["summary_json"] = str(summary_json)
+    summary["source_paths"] = {
+        "source_train_csv": str(source_train_path),
+        "row_analysis_csv": str(row_analysis_path),
+    }
+    write_json(summary_json, summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def run_build_leaderboard_proxy_v2(args: argparse.Namespace) -> None:
     proxy_v1_path = Path(args.proxy_v1_csv).resolve()
     binary_hard_path = Path(args.binary_hard_csv).resolve()
@@ -6294,6 +6471,23 @@ def build_parser() -> argparse.ArgumentParser:
     build_text_reanchor_csv.add_argument("--output-csv", type=Path, required=True)
     build_text_reanchor_csv.add_argument("--summary-json", type=Path, default=None)
     build_text_reanchor_csv.set_defaults(func=run_build_text_reanchor_csv)
+
+    build_text_binary_reanchor_csv = subparsers.add_parser(
+        "build-text-binary-reanchor-csv",
+        help="Build a row-analysis-guided re-anchor CSV that keeps text_monoalphabetic strong while reinjecting proxy-sensitive binary slices.",
+    )
+    build_text_binary_reanchor_csv.add_argument("--source-train-csv", type=Path, default=NOTEBOOK_CURRENT_TRAIN_CSV)
+    build_text_binary_reanchor_csv.add_argument("--row-analysis-csv", type=Path, default=TRAIN_ROW_ANALYSIS_V1_CSV)
+    build_text_binary_reanchor_csv.add_argument("--text-verified-rows", type=int, default=150)
+    build_text_binary_reanchor_csv.add_argument("--binary-bit-other-rows", type=int, default=10)
+    build_text_binary_reanchor_csv.add_argument("--binary-bit-permutation-rows", type=int, default=5)
+    build_text_binary_reanchor_csv.add_argument("--binary-bit-structured-rows", type=int, default=5)
+    build_text_binary_reanchor_csv.add_argument("--gravity-rows", type=int, default=15)
+    build_text_binary_reanchor_csv.add_argument("--unit-rows", type=int, default=15)
+    build_text_binary_reanchor_csv.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    build_text_binary_reanchor_csv.add_argument("--output-csv", type=Path, required=True)
+    build_text_binary_reanchor_csv.add_argument("--summary-json", type=Path, default=None)
+    build_text_binary_reanchor_csv.set_defaults(func=run_build_text_binary_reanchor_csv)
 
     build_leaderboard_proxy_v2 = subparsers.add_parser(
         "build-leaderboard-proxy-v2",
