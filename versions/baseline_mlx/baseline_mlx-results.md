@@ -1333,13 +1333,13 @@ row-level overlap:
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1`
 
-- status: `training`
-- label: `export-safe-qkvo-reanchor-text100-num50-grav25-unit25-len1024-v1-live`
-- observed_at: `2026-04-10T00:25:38.508316+00:00`
+- status: `training_completed`
+- label: `stage25 reanchor text100 num50 grav25 unit25 from reanchor1024`
+- observed_at: `2026-04-10T00:26:04.897675+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
 - sampled_rows: `200`
-- optimizer_progress: `10/12 = 83.33%`
+- optimizer_progress: `12/12 = 100.00%`
 - lr: `8e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
@@ -1348,20 +1348,20 @@ row-level overlap:
 
 - source: `latest_train_report`
 - source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1/adapter/latest_train_report.json`
-- iteration: `80`
-- optimizer_step: `10`
-- train_loss: `0.402852`
-- learning_rate: `1.17157e-06`
-- it_per_sec: `0.382051`
-- tokens_per_sec: `240.893`
-- trained_tokens: `50442`
+- iteration: `90`
+- optimizer_step: `12`
+- train_loss: `0.314842`
+- learning_rate: `1.36297e-07`
+- it_per_sec: `0.388655`
+- tokens_per_sec: `258.805`
+- trained_tokens: `57101`
 - peak_memory_gb: `65.4618`
 
 #### Completion markers
 
-- training_result_exists: `False`
+- training_result_exists: `True`
 - runtime_pid: `37588`
-- runtime_pid_alive: `True`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
@@ -1371,22 +1371,35 @@ row-level overlap:
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1`
 
-- status: `running_untracked`
-- label: `export-safe-qkvo-reanchor-text120-num40-grav20-unit20-len1024-v1-live`
-- observed_at: `2026-04-10T00:21:59.712956+00:00`
+- status: `training_completed`
+- label: `stage25 reanchor text120 num40 grav20 unit20 from reanchor1024`
+- observed_at: `2026-04-10T00:26:25.185349+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
 - sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
+- optimizer_progress: `12/12 = 100.00%`
 - lr: `8e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
+#### Latest train progress
+
+- source: `latest_train_report`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1/adapter/latest_train_report.json`
+- iteration: `90`
+- optimizer_step: `12`
+- train_loss: `0.298021`
+- learning_rate: `1.36297e-07`
+- it_per_sec: `0.607853`
+- tokens_per_sec: `389.208`
+- trained_tokens: `59133`
+- peak_memory_gb: `65.4617`
+
 #### Completion markers
 
-- training_result_exists: `False`
+- training_result_exists: `True`
 - runtime_pid: `37587`
-- runtime_pid_alive: `True`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
