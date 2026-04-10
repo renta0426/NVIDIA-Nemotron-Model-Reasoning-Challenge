@@ -589,6 +589,40 @@ def test_postprocess_run_skips_existing_steps_without_reinvoking_pipeline(tmp_pa
     assert summary["steps"]["record_run_result"]["recorded_at"] == recorded_result["recorded_at"]
 
 
+def test_record_run_result_accepts_legacy_prepare_manifest_without_trainable_suffixes(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    run_root = make_candidate_run(
+        repo_root / "baseline_mlx" / "outputs",
+        run_name="legacy_run",
+        local320_correct=220,
+        proxy_v1_correct=123,
+    )
+
+    prepare_manifest_path = run_root / "prepare_manifest.json"
+    prepare_manifest = json.loads(prepare_manifest_path.read_text(encoding="utf-8"))
+    training = prepare_manifest["training"]
+    training.pop("trainable_lora_suffixes", None)
+    training.pop("lora_keys", None)
+    prepare_manifest_path.write_text(json.dumps(prepare_manifest), encoding="utf-8")
+
+    stage_waiters.run_record_run_result(
+        SimpleNamespace(
+            run_root=run_root,
+            results_md=results_md,
+            label="legacy proxy record",
+            suite_summary_relpath=Path("eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json"),
+            audit_relpath=Path("submission_compat_audit/submission_compat_audit.json"),
+            export_relpath=Path("submission_export/export_manifest.json"),
+        )
+    )
+
+    recorded = json.loads((run_root / "recorded_run_result.json").read_text(encoding="utf-8"))
+    assert recorded["run_name"] == "legacy_run"
+    ledger = results_md.read_text(encoding="utf-8")
+    assert "trainable_lora_suffixes: `[]`" in ledger
+    assert "leaderboard_proxy_v1_set: `123/200 = 0.6150`" in ledger
+
+
 def test_postprocess_run_persists_eval_suite_running_state_before_invocation(tmp_path: Path) -> None:
     run_root = tmp_path / "completed_run"
     shadow_model_dir = run_root / "shadow_model"

@@ -2983,7 +2983,7 @@ def render_record_run_result_markdown(payload: dict[str, Any]) -> str:
     lines.append(f"- optimizer_steps: `{int(training['optimizer_steps'])}`")
     lines.append(f"- lr: `{float(training['learning_rate']):.6g}`")
     lines.append(f"- max_seq_length: `{int(training['max_seq_length'])}`")
-    lines.append(f"- trainable_lora_suffixes: `{training['trainable_lora_suffixes']}`")
+    lines.append(f"- trainable_lora_suffixes: `{list(training.get('trainable_lora_suffixes', []))}`")
     lines.append("")
 
     evaluation_payloads = payload.get("evaluation_payloads", {})
