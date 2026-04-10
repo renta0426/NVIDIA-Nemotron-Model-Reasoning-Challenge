@@ -827,35 +827,33 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2`
 
-- status: `training`
+- status: `evaluating`
 - label: `binary40_o20_p0_s20_no_lz_v2`
-- observed_at: `2026-04-10T20:07:09.469684+00:00`
+- observed_at: `2026-04-10T20:08:25.175781+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo20p0s20_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
-- optimizer_progress: `12/12 = 100.00%`
+- optimizer_progress: `0/12 = 0.00%`
 - lr: `8e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-#### Latest train progress
+#### Latest evaluation progress
 
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2/adapter/latest_train_report.json`
-- iteration: `90`
-- optimizer_step: `12`
-- train_loss: `0.45799`
-- learning_rate: `1.36297e-07`
-- it_per_sec: `0.553`
-- tokens_per_sec: `361.772`
-- trained_tokens: `57109`
-- peak_memory_gb: `69.0289`
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `0/2 = 0.00%`
+- current_evaluation: `readme_local320`
+- current_rows_progress: `0/320 = 0.00%`
+- current_chunks_progress: `0/20 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo20p0s20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
 
-- training_result_exists: `False`
+- training_result_exists: `True`
 - runtime_pid: `83492`
-- runtime_pid_alive: `True`
+- runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
