@@ -56,6 +56,9 @@ NOTEBOOK_CURRENT_TRAIN_CSV = (
     / "artifacts"
     / "train_split_with_cot_v3f_safe_plus_notformula.csv"
 )
+TRAIN_ROW_ANALYSIS_V1_CSV = (
+    REPO_ROOT / "cuda-train-data-analysis-v1" / "artifacts" / "train_row_analysis_v1.csv"
+)
 NOTEBOOK_ORIGINAL_TRAIN_CSV = DEFAULT_TRAIN_CSV
 NOTEBOOK_CURRENT_RUN_NAME = "nemotron_sft_lora_with_cot_v2_mlx_notebook_current_v1"
 NOTEBOOK_ORIGINAL_RUN_NAME = "nemotron_sft_lora_with_cot_v2_mlx_notebook_original_v1"
@@ -1422,6 +1425,134 @@ def build_corrective_stage2_dataframe(
         "symbol_candidate_overlap_rows": int(len(symbol_candidate_ids & set(symbol_source_df["id"].astype(str)))),
     }
     return combined, summary
+
+
+def filter_family_training_rows(
+    df: pd.DataFrame,
+    *,
+    family: str,
+    selection_tiers: Sequence[str],
+    template_subtypes: Sequence[str] = (),
+) -> pd.DataFrame:
+    subset = df[df["family"].astype(str).eq(str(family))].copy()
+    if selection_tiers:
+        subset = subset[subset["selection_tier"].astype(str).isin([str(item) for item in selection_tiers])]
+    if template_subtypes:
+        subset = subset[subset["template_subtype"].astype(str).isin([str(item) for item in template_subtypes])]
+    return subset.reset_index(drop=True)
+
+
+def build_text_reanchor_dataframe(
+    *,
+    source_train_df: pd.DataFrame,
+    row_analysis_df: pd.DataFrame,
+    text_verified_rows: int,
+    text_answer_only_rows: int,
+    numeral_rows: int,
+    gravity_rows: int,
+    unit_rows: int,
+    seed: int,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    metadata_columns = ["id", "family", "template_subtype", "selection_tier"]
+    row_analysis_unique = row_analysis_df.loc[:, metadata_columns].drop_duplicates(subset="id", keep="first").copy()
+    merged_df = source_train_df.merge(row_analysis_unique, on="id", how="inner", validate="one_to_one")
+    if merged_df.empty:
+        raise ValueError("Row-analysis-guided text reanchor dataset resolved to zero joined rows.")
+
+    requested_rows = {
+        "text_verified_rows": int(text_verified_rows),
+        "text_answer_only_rows": int(text_answer_only_rows),
+        "numeral_rows": int(numeral_rows),
+        "gravity_rows": int(gravity_rows),
+        "unit_rows": int(unit_rows),
+    }
+    if all(value <= 0 for value in requested_rows.values()):
+        raise ValueError("At least one row count must be > 0 for the text reanchor dataset.")
+    for name, value in requested_rows.items():
+        if value < 0:
+            raise ValueError(f"{name} must be >= 0, got {value}")
+
+    text_verified_pool = filter_family_training_rows(
+        merged_df,
+        family="text_decryption",
+        selection_tiers=["verified_trace_ready"],
+        template_subtypes=["text_monoalphabetic"],
+    )
+    text_answer_only_pool = filter_family_training_rows(
+        merged_df,
+        family="text_decryption",
+        selection_tiers=["answer_only_keep"],
+        template_subtypes=["text_monoalphabetic"],
+    )
+    numeral_pool = filter_family_training_rows(
+        merged_df,
+        family="roman_numeral",
+        selection_tiers=["verified_trace_ready"],
+    )
+    gravity_pool = filter_family_training_rows(
+        merged_df,
+        family="gravity_constant",
+        selection_tiers=["verified_trace_ready"],
+    )
+    unit_pool = filter_family_training_rows(
+        merged_df,
+        family="unit_conversion",
+        selection_tiers=["verified_trace_ready"],
+    )
+
+    pools = {
+        "text_verified_rows": text_verified_pool,
+        "text_answer_only_rows": text_answer_only_pool,
+        "numeral_rows": numeral_pool,
+        "gravity_rows": gravity_pool,
+        "unit_rows": unit_pool,
+    }
+    for name, requested in requested_rows.items():
+        if requested > 0 and pools[name].empty:
+            raise ValueError(f"{name} requested {requested} rows but the candidate pool is empty.")
+
+    sampled_frames = {
+        "text_verified_rows": sample_dataframe_rows(text_verified_pool, max_rows=int(text_verified_rows), seed=seed),
+        "text_answer_only_rows": sample_dataframe_rows(text_answer_only_pool, max_rows=int(text_answer_only_rows), seed=seed),
+        "numeral_rows": sample_dataframe_rows(numeral_pool, max_rows=int(numeral_rows), seed=seed),
+        "gravity_rows": sample_dataframe_rows(gravity_pool, max_rows=int(gravity_rows), seed=seed),
+        "unit_rows": sample_dataframe_rows(unit_pool, max_rows=int(unit_rows), seed=seed),
+    }
+    combined_with_metadata = pd.concat(sampled_frames.values(), ignore_index=True)
+    combined_with_metadata = combined_with_metadata.drop_duplicates(subset="id", keep="first")
+    combined_with_metadata = combined_with_metadata.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    if combined_with_metadata.empty:
+        raise ValueError("Text reanchor dataset resolved to zero rows after sampling.")
+
+    combined_df = combined_with_metadata.loc[:, EXPECTED_COLUMNS].copy()
+    type_counts = {
+        str(key): int(value)
+        for key, value in combined_df["type"].astype(str).value_counts().sort_index().items()
+    }
+    summary = {
+        "created_at": utc_now(),
+        "seed": int(seed),
+        "rows": int(len(combined_df)),
+        "requested_rows": requested_rows,
+        "resolved_rows": {key: int(len(value)) for key, value in sampled_frames.items()},
+        "pool_rows": {key: int(len(value)) for key, value in pools.items()},
+        "type_counts": type_counts,
+        "family_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["family"].astype(str).value_counts().sort_index().items()
+        },
+        "selection_tier_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["selection_tier"].astype(str).value_counts().sort_index().items()
+        },
+        "template_subtype_counts": {
+            str(key): int(value)
+            for key, value in combined_with_metadata["template_subtype"].astype(str).value_counts().sort_index().items()
+        },
+        "recommended_type_samples": type_counts,
+        "recommended_type_sample_args": [f"{key}={value}" for key, value in sorted(type_counts.items())],
+    }
+    return combined_df, summary
 
 
 def encode_prompt(tokenizer: Any, prompt: str) -> list[int]:
@@ -5041,6 +5172,47 @@ def run_build_corrective_stage2_csv(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def run_build_text_reanchor_csv(args: argparse.Namespace) -> None:
+    source_train_path = Path(args.source_train_csv).resolve()
+    row_analysis_path = Path(args.row_analysis_csv).resolve()
+    output_csv = Path(args.output_csv).resolve()
+    summary_json = (
+        Path(args.summary_json).resolve()
+        if args.summary_json is not None
+        else output_csv.with_name(f"{output_csv.stem}_summary.json")
+    )
+
+    source_train_df = pd.read_csv(source_train_path)
+    validate_training_frame(source_train_df, source_train_path)
+    row_analysis_df = pd.read_csv(row_analysis_path, low_memory=False)
+    require_columns(
+        row_analysis_df,
+        row_analysis_path,
+        ["id", "family", "template_subtype", "selection_tier"],
+    )
+
+    combined_df, summary = build_text_reanchor_dataframe(
+        source_train_df=source_train_df,
+        row_analysis_df=row_analysis_df,
+        text_verified_rows=int(args.text_verified_rows),
+        text_answer_only_rows=int(args.text_answer_only_rows),
+        numeral_rows=int(args.numeral_rows),
+        gravity_rows=int(args.gravity_rows),
+        unit_rows=int(args.unit_rows),
+        seed=int(args.seed),
+    )
+    ensure_dir(output_csv.parent)
+    combined_df.to_csv(output_csv, index=False)
+    summary["output_csv"] = str(output_csv)
+    summary["summary_json"] = str(summary_json)
+    summary["source_paths"] = {
+        "source_train_csv": str(source_train_path),
+        "row_analysis_csv": str(row_analysis_path),
+    }
+    write_json(summary_json, summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def run_build_leaderboard_proxy_v2(args: argparse.Namespace) -> None:
     proxy_v1_path = Path(args.proxy_v1_csv).resolve()
     binary_hard_path = Path(args.binary_hard_csv).resolve()
@@ -5906,6 +6078,22 @@ def build_parser() -> argparse.ArgumentParser:
     build_corrective_stage2_csv.add_argument("--output-csv", type=Path, required=True)
     build_corrective_stage2_csv.add_argument("--summary-json", type=Path, default=None)
     build_corrective_stage2_csv.set_defaults(func=run_build_corrective_stage2_csv)
+
+    build_text_reanchor_csv = subparsers.add_parser(
+        "build-text-reanchor-csv",
+        help="Build a row-analysis-guided re-anchor CSV focused on text_monoalphabetic plus verified numeral/gravity/unit stabilizers.",
+    )
+    build_text_reanchor_csv.add_argument("--source-train-csv", type=Path, default=NOTEBOOK_CURRENT_TRAIN_CSV)
+    build_text_reanchor_csv.add_argument("--row-analysis-csv", type=Path, default=TRAIN_ROW_ANALYSIS_V1_CSV)
+    build_text_reanchor_csv.add_argument("--text-verified-rows", type=int, default=120)
+    build_text_reanchor_csv.add_argument("--text-answer-only-rows", type=int, default=0)
+    build_text_reanchor_csv.add_argument("--numeral-rows", type=int, default=40)
+    build_text_reanchor_csv.add_argument("--gravity-rows", type=int, default=20)
+    build_text_reanchor_csv.add_argument("--unit-rows", type=int, default=20)
+    build_text_reanchor_csv.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    build_text_reanchor_csv.add_argument("--output-csv", type=Path, required=True)
+    build_text_reanchor_csv.add_argument("--summary-json", type=Path, default=None)
+    build_text_reanchor_csv.set_defaults(func=run_build_text_reanchor_csv)
 
     build_leaderboard_proxy_v2 = subparsers.add_parser(
         "build-leaderboard-proxy-v2",

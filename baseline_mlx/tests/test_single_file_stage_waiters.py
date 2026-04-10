@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 import os
@@ -63,6 +64,14 @@ def init_git_repo_with_results_md(tmp_path: Path) -> tuple[Path, Path]:
         text=True,
     )
     return repo_root, results_md
+
+
+def write_csv_rows(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def build_wait_train_args(source_run: Path, output_root: Path, run_name: str, **overrides) -> SimpleNamespace:
@@ -815,6 +824,111 @@ def test_run_eval_benchmark_suite_writes_progress_files(tmp_path: Path) -> None:
     assert eval_progress["rows_total"] == 3
     assert eval_progress["rows_completed"] == 3
     assert eval_progress["accuracy"] == 1.0
+
+
+def test_build_text_reanchor_csv_joins_row_analysis_with_train_rows(tmp_path: Path) -> None:
+    source_train_csv = tmp_path / "source_train.csv"
+    row_analysis_csv = tmp_path / "row_analysis.csv"
+    output_csv = tmp_path / "text_reanchor.csv"
+    summary_json = tmp_path / "text_reanchor_summary.json"
+
+    write_csv_rows(
+        source_train_csv,
+        stage_waiters.EXPECTED_COLUMNS,
+        [
+            {"id": "tv1", "prompt": "p", "answer": "a", "type": "Text Encryption", "generated_cot": "cot"},
+            {"id": "tv2", "prompt": "p", "answer": "a", "type": "Text Encryption", "generated_cot": "cot"},
+            {"id": "ta1", "prompt": "p", "answer": "a", "type": "Text Encryption", "generated_cot": "cot"},
+            {"id": "n1", "prompt": "p", "answer": "a", "type": "Numeral Conversion", "generated_cot": "cot"},
+            {"id": "g1", "prompt": "p", "answer": "a", "type": "Gravitational Constant", "generated_cot": "cot"},
+            {"id": "u1", "prompt": "p", "answer": "a", "type": "Unit Conversion", "generated_cot": "cot"},
+            {"id": "unused", "prompt": "p", "answer": "a", "type": "Equation Transformation", "generated_cot": "cot"},
+        ],
+    )
+    write_csv_rows(
+        row_analysis_csv,
+        ["id", "family", "template_subtype", "selection_tier"],
+        [
+            {
+                "id": "tv1",
+                "family": "text_decryption",
+                "template_subtype": "text_monoalphabetic",
+                "selection_tier": "verified_trace_ready",
+            },
+            {
+                "id": "tv2",
+                "family": "text_decryption",
+                "template_subtype": "text_monoalphabetic",
+                "selection_tier": "verified_trace_ready",
+            },
+            {
+                "id": "ta1",
+                "family": "text_decryption",
+                "template_subtype": "text_monoalphabetic",
+                "selection_tier": "answer_only_keep",
+            },
+            {
+                "id": "n1",
+                "family": "roman_numeral",
+                "template_subtype": "roman_standard",
+                "selection_tier": "verified_trace_ready",
+            },
+            {
+                "id": "g1",
+                "family": "gravity_constant",
+                "template_subtype": "gravity_half_g_t2",
+                "selection_tier": "verified_trace_ready",
+            },
+            {
+                "id": "u1",
+                "family": "unit_conversion",
+                "template_subtype": "unit_fixed_ratio",
+                "selection_tier": "verified_trace_ready",
+            },
+            {
+                "id": "unused",
+                "family": "symbol_equation",
+                "template_subtype": "numeric_2x2",
+                "selection_tier": "verified_trace_ready",
+            },
+        ],
+    )
+
+    stage_waiters.run_build_text_reanchor_csv(
+        SimpleNamespace(
+            source_train_csv=source_train_csv,
+            row_analysis_csv=row_analysis_csv,
+            text_verified_rows=2,
+            text_answer_only_rows=1,
+            numeral_rows=1,
+            gravity_rows=1,
+            unit_rows=1,
+            seed=123,
+            output_csv=output_csv,
+            summary_json=summary_json,
+        )
+    )
+
+    with output_csv.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 6
+    assert {row["id"] for row in rows} == {"tv1", "tv2", "ta1", "n1", "g1", "u1"}
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["resolved_rows"] == {
+        "text_verified_rows": 2,
+        "text_answer_only_rows": 1,
+        "numeral_rows": 1,
+        "gravity_rows": 1,
+        "unit_rows": 1,
+    }
+    assert summary["type_counts"] == {
+        "Gravitational Constant": 1,
+        "Numeral Conversion": 1,
+        "Text Encryption": 3,
+        "Unit Conversion": 1,
+    }
 
 
 def test_package_best_submission_selects_best_exportable_candidate(tmp_path: Path) -> None:
