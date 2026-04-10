@@ -1224,38 +1224,30 @@ row-level overlap:
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
+### Manual result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
 
-- status: `training_completed`
-- label: `export-safe-qkvo-lr3e5-ep24-len768-live`
-- observed_at: `2026-04-09T21:00:35.047370+00:00`
+- recorded_at: `2026-04-10T01:33:00+00:00`
+- label: `export-safe-qkvo-lr3e5-ep24-len768-rerun-v1-pruned-after-local320`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
 - sampled_rows: `218`
-- optimizer_progress: `67/67 = 100.00%`
+- optimizer_steps: `67`
 - lr: `3e-05`
 - max_seq_length: `768`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-#### Latest train progress
+#### Scores
 
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1/adapter/latest_train_report.json`
-- iteration: `523`
-- optimizer_step: `67`
-- train_loss: `0.241193`
-- learning_rate: `4.10357e-07`
-- it_per_sec: `0.584084`
-- tokens_per_sec: `306.485`
-- trained_tokens: `275879`
-- peak_memory_gb: `64.8494`
+- readme_local320: `72/320 = 0.2250`
+- local320_components: `general_stable_set 52/200 = 0.2600; binary_hard_set 10/60 = 0.1667; symbol_watch_set 10/60 = 0.1667`
+- family_breakdown: `text 0/50 = 0.0000; gravity 6/50 = 0.1200; unit 8/50 = 0.1600; roman 38/50 = 0.7600; binary 10/60 = 0.1667; symbol 10/60 = 0.1667`
 
-#### Completion markers
+#### Notes
 
 - training_result_exists: `True`
 - runtime_pid: `91963`
 - runtime_pid_alive: `False`
-- suite_summary_exists: `False`
+- suite_summary_exists: `False` (postprocess pruned after local320 dead result)
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
