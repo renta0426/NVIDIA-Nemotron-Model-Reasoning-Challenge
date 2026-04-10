@@ -581,8 +581,18 @@ def test_wait_for_free_memory_writes_status_json(tmp_path: Path) -> None:
     status_json = tmp_path / "wait_for_free_memory.json"
     snapshots = iter(
         [
-            {"system_free_percent": 20, "free_system_memory_gb": 100.0},
-            {"system_free_percent": 33, "free_system_memory_gb": 170.0},
+            {
+                "system_free_percent": 20,
+                "free_system_memory_gb": 180.0,
+                "physmem_unused_gb": 100.0,
+                "memory_gate_free_gb": 100.0,
+            },
+            {
+                "system_free_percent": 33,
+                "free_system_memory_gb": 170.0,
+                "physmem_unused_gb": 160.0,
+                "memory_gate_free_gb": 160.0,
+            },
         ]
     )
     original_collect = stage_waiters.collect_memory_pressure_snapshot
@@ -607,6 +617,44 @@ def test_wait_for_free_memory_writes_status_json(tmp_path: Path) -> None:
     assert result["min_free_gb"] == 150.0
     assert result["memory_pressure"]["system_free_percent"] == 33
     assert result["memory_pressure"]["free_system_memory_gb"] == 170.0
+    assert result["memory_pressure"]["physmem_unused_gb"] == 160.0
+    assert result["memory_pressure"]["memory_gate_free_gb"] == 160.0
+
+
+def test_collect_memory_pressure_snapshot_uses_conservative_top_unused() -> None:
+    original_run_text_command = stage_waiters._run_text_command
+
+    def fake_run_text_command(command: tuple[str, ...] | list[str]) -> tuple[int, str]:
+        normalized = tuple(command)
+        if normalized == ("memory_pressure",):
+            return (
+                0,
+                "System-wide memory free percentage: 74%\n",
+            )
+        if normalized == ("sysctl", "-n", "hw.memsize"):
+            return (0, "549755813888\n")
+        if normalized == ("top", "-l", "1"):
+            return (
+                0,
+                "\n".join(
+                    [
+                        "Processes: 1435 total, 2 running, 1433 sleeping, 6111 threads",
+                        "PhysMem: 318G used (191G wired, 1103M compressor), 193G unused.",
+                    ]
+                ),
+            )
+        raise AssertionError(f"Unexpected command: {normalized}")
+
+    try:
+        stage_waiters._run_text_command = fake_run_text_command
+        snapshot = stage_waiters.collect_memory_pressure_snapshot()
+    finally:
+        stage_waiters._run_text_command = original_run_text_command
+
+    assert snapshot["system_free_percent"] == 74
+    assert snapshot["free_system_memory_gb"] > 400.0
+    assert snapshot["physmem_unused_gb"] == 193.0
+    assert snapshot["memory_gate_free_gb"] == 193.0
 
 
 def test_wait_resume_train_from_path_records_memory_wait_result(tmp_path: Path) -> None:

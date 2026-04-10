@@ -713,7 +713,8 @@ def wait_for_free_memory(
         snapshot = collect_memory_pressure_snapshot()
         last_snapshot = snapshot
         free_percent_value = snapshot.get("system_free_percent")
-        free_gb_value = snapshot.get("free_system_memory_gb")
+        free_gb_value = snapshot.get("memory_gate_free_gb")
+        raw_free_gb_value = snapshot.get("free_system_memory_gb")
         meets_percent = normalized_min_free_percent is None or (
             free_percent_value is not None and float(free_percent_value) >= normalized_min_free_percent
         )
@@ -744,7 +745,13 @@ def wait_for_free_memory(
             if free_percent_value is not None:
                 current_bits.append(f"free_percent={float(free_percent_value):.2f}")
             if free_gb_value is not None:
-                current_bits.append(f"free_gb={float(free_gb_value):.2f}")
+                current_bits.append(f"gate_free_gb={float(free_gb_value):.2f}")
+            if (
+                raw_free_gb_value is not None
+                and free_gb_value is not None
+                and float(raw_free_gb_value) != float(free_gb_value)
+            ):
+                current_bits.append(f"raw_free_gb={float(raw_free_gb_value):.2f}")
             current_text = ", ".join(current_bits) if current_bits else "metrics unavailable"
             print(
                 f"Still waiting for free memory ({threshold_text}; {current_text}) "
@@ -951,6 +958,21 @@ def _run_text_command(command: Sequence[str]) -> tuple[int, str]:
     return completed.returncode, completed.stdout or completed.stderr
 
 
+def _convert_decimal_size_to_gb(value: str, unit: str) -> float:
+    unit_scale = {
+        "B": 1e-9,
+        "K": 1e-6,
+        "M": 1e-3,
+        "G": 1.0,
+        "T": 1e3,
+        "P": 1e6,
+    }
+    normalized_unit = str(unit).strip().upper()
+    if normalized_unit not in unit_scale:
+        raise ValueError(f"Unsupported size unit: {unit}")
+    return float(value) * unit_scale[normalized_unit]
+
+
 def resolve_repo_relative_path(repo_root: Path, path: Path) -> str:
     resolved_repo_root = repo_root.resolve()
     resolved_path = path.resolve()
@@ -1119,6 +1141,24 @@ def collect_memory_pressure_snapshot() -> dict[str, Any]:
                 snapshot["total_system_memory_bytes"] = total_system_memory_bytes
                 snapshot["free_system_memory_bytes"] = free_system_memory_bytes
                 snapshot["free_system_memory_gb"] = free_system_memory_bytes / 1e9
+    top_returncode, top_output = _run_text_command(("top", "-l", "1"))
+    snapshot["top_returncode"] = top_returncode
+    snapshot["top_head"] = top_output.splitlines()[:10]
+    physmem_match = re.search(
+        r"PhysMem:\s*([0-9.]+)\s*([KMGTP])\s+used\b.*?,\s*([0-9.]+)\s*([KMGTP])\s+unused\b",
+        top_output,
+    )
+    if physmem_match:
+        used_value, used_unit, unused_value, unused_unit = physmem_match.groups()
+        snapshot["physmem_used_gb"] = _convert_decimal_size_to_gb(used_value, used_unit)
+        snapshot["physmem_unused_gb"] = _convert_decimal_size_to_gb(unused_value, unused_unit)
+    free_gb_candidates = [
+        float(snapshot[key])
+        for key in ("free_system_memory_gb", "physmem_unused_gb")
+        if snapshot.get(key) is not None
+    ]
+    if free_gb_candidates:
+        snapshot["memory_gate_free_gb"] = min(free_gb_candidates)
     return snapshot
 
 
