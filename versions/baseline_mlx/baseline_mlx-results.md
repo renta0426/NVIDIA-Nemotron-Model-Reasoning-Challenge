@@ -238,8 +238,8 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3`
 
-- recorded_at: `2026-04-10T11:01:42.559774+00:00`
-- label: `stage25 reanchor textv160 textao0 num10 grav15 unit15 rowselect from reanchor1024 v3`
+- recorded_at: `2026-04-10T11:03:38.067182+00:00`
+- label: `replay`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified160_num10_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
@@ -277,8 +277,8 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- recorded_at: `2026-04-10T10:56:38.755489+00:00`
-- label: `stage25 reanchor textv150 binary20proxy grav15 unit15 rowselect from reanchor1024 v1`
+- recorded_at: `2026-04-10T11:03:38.552273+00:00`
+- label: `replay`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_bin20proxy_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified150_binary20proxy_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
