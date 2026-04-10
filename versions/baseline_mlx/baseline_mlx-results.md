@@ -236,40 +236,35 @@
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3`
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3`
 
-- status: `evaluating`
+- recorded_at: `2026-04-10T10:58:18.016380+00:00`
 - label: `stage25 reanchor textv160 textao0 num10 grav15 unit15 rowselect from reanchor1024 v3`
-- observed_at: `2026-04-10T10:55:51.343692+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified160_num10_grav15_unit15_rowselect_v1.csv`
 - sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
+- optimizer_steps: `12`
 - lr: `8e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-#### Latest evaluation progress
+#### Scores
 
-- source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3/eval_suite_readme_proxy_specialized`
-- suite_evaluations: `1/2 = 50.00%`
-- current_evaluation: `leaderboard_proxy_v1_set`
-- current_rows_progress: `176/200 = 88.00%`
-- current_chunks_progress: `11/13 = 84.62%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
-- completed_evaluations: `['readme_local320']`
+- readme_local320: `220/320 = 0.6875`
+- local320_components: `general_stable_set 175/200 = 0.8750; binary_hard_set 25/60 = 0.4167; symbol_watch_set 20/60 = 0.3333`
+- leaderboard_proxy_v1_set: `119/200 = 0.5950`
 
-#### Completion markers
+#### Submission audit
 
-- training_result_exists: `True`
-- runtime_pid: `80736`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3/submission_export/submission.zip`
+- zip_size_bytes: `102357042`
+- validation_valid: `True`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv160_textao0_num10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v3 -->
 
 ## 2026-04-10 notebook runtime fix: Kaggle stagefreeze follow-up
