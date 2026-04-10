@@ -91,6 +91,8 @@ def build_wait_train_args(source_run: Path, output_root: Path, run_name: str, **
         "poll_seconds": 0.1,
         "timeout_seconds": 1.0,
         "wait_status_json": None,
+        "min_free_percent": None,
+        "min_free_gb": None,
         "skip_if_target_started": True,
         "dry_run": True,
     }
@@ -114,8 +116,22 @@ def build_wait_resume_from_path_args(
         "poll_seconds": 0.1,
         "timeout_seconds": 1.0,
         "wait_status_json": None,
+        "min_free_percent": None,
+        "min_free_gb": None,
         "skip_if_target_started": True,
         "dry_run": True,
+    }
+    payload.update(overrides)
+    return SimpleNamespace(**payload)
+
+
+def build_wait_free_memory_args(**overrides) -> SimpleNamespace:
+    payload = {
+        "min_free_percent": None,
+        "min_free_gb": 150.0,
+        "poll_seconds": 0.1,
+        "timeout_seconds": 1.0,
+        "status_json": None,
     }
     payload.update(overrides)
     return SimpleNamespace(**payload)
@@ -559,6 +575,74 @@ def test_wait_resume_train_from_path_skips_if_target_already_started(tmp_path: P
     wait_manifest = json.loads((run_root / "wait_for_trigger_path.json").read_text(encoding="utf-8"))
     assert wait_manifest["status"] == "skipped_existing_target"
     assert wait_manifest["target_existing_marker"] == str(existing_marker.resolve())
+
+
+def test_wait_for_free_memory_writes_status_json(tmp_path: Path) -> None:
+    status_json = tmp_path / "wait_for_free_memory.json"
+    snapshots = iter(
+        [
+            {"system_free_percent": 20, "free_system_memory_gb": 100.0},
+            {"system_free_percent": 33, "free_system_memory_gb": 170.0},
+        ]
+    )
+    original_collect = stage_waiters.collect_memory_pressure_snapshot
+    original_sleep = stage_waiters.time.sleep
+    try:
+        stage_waiters.collect_memory_pressure_snapshot = lambda: next(snapshots)
+        stage_waiters.time.sleep = lambda _: None
+        stage_waiters.run_wait_for_free_memory(
+            build_wait_free_memory_args(
+                status_json=status_json,
+                min_free_percent=30.0,
+                min_free_gb=150.0,
+            )
+        )
+    finally:
+        stage_waiters.collect_memory_pressure_snapshot = original_collect
+        stage_waiters.time.sleep = original_sleep
+
+    result = json.loads(status_json.read_text(encoding="utf-8"))
+    assert result["status"] == "ready"
+    assert result["min_free_percent"] == 30.0
+    assert result["min_free_gb"] == 150.0
+    assert result["memory_pressure"]["system_free_percent"] == 33
+    assert result["memory_pressure"]["free_system_memory_gb"] == 170.0
+
+
+def test_wait_resume_train_from_path_records_memory_wait_result(tmp_path: Path) -> None:
+    source_run, _, expected_adapter_file = make_source_run(tmp_path)
+    output_root = tmp_path / "output"
+    trigger_path = tmp_path / "trigger.json"
+    trigger_path.write_text("{}", encoding="utf-8")
+    original_wait_for_free_memory = stage_waiters.wait_for_free_memory
+    try:
+        stage_waiters.wait_for_free_memory = lambda **kwargs: {
+            "status": "ready",
+            "min_free_percent": kwargs.get("min_free_percent"),
+            "min_free_gb": kwargs.get("min_free_gb"),
+            "memory_pressure": {
+                "system_free_percent": 35,
+                "free_system_memory_gb": 180.0,
+            },
+        }
+        stage_waiters.run_wait_resume_train_from_path(
+            build_wait_resume_from_path_args(
+                source_run=source_run,
+                output_root=output_root,
+                run_name="stage2_attention_memory_gated",
+                wait_path=trigger_path,
+                min_free_gb=150.0,
+            )
+        )
+    finally:
+        stage_waiters.wait_for_free_memory = original_wait_for_free_memory
+
+    run_root = output_root / "stage2_attention_memory_gated"
+    wait_manifest = json.loads((run_root / "wait_for_trigger_path.json").read_text(encoding="utf-8"))
+    resume_manifest = json.loads((run_root / "resume_from_run_manifest.json").read_text(encoding="utf-8"))
+    assert wait_manifest["memory_wait_result"]["status"] == "ready"
+    assert wait_manifest["memory_wait_result"]["min_free_gb"] == 150.0
+    assert resume_manifest["resolved_resume_adapter_file"] == str(expected_adapter_file)
 
 
 def test_postprocess_run_dry_run_writes_summary_without_loading_model(tmp_path: Path) -> None:

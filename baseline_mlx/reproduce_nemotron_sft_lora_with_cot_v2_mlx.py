@@ -674,6 +674,86 @@ def wait_for_path(
         time.sleep(normalized_poll_seconds)
 
 
+def wait_for_free_memory(
+    *,
+    min_free_percent: float | None = None,
+    min_free_gb: float | None = None,
+    poll_seconds: float = 60.0,
+    timeout_seconds: float = 0.0,
+) -> dict[str, Any]:
+    normalized_poll_seconds = max(float(poll_seconds), 0.1)
+    normalized_timeout_seconds = max(float(timeout_seconds), 0.0)
+    normalized_min_free_percent = (
+        float(min_free_percent) if min_free_percent is not None else None
+    )
+    normalized_min_free_gb = float(min_free_gb) if min_free_gb is not None else None
+    if normalized_min_free_percent is None and normalized_min_free_gb is None:
+        raise ValueError("At least one of min_free_percent or min_free_gb must be set.")
+
+    started_at = utc_now()
+    started_monotonic = time.monotonic()
+    heartbeat_every = max(1, int(math.ceil(300.0 / normalized_poll_seconds)))
+    attempts = 0
+    threshold_bits: list[str] = []
+    if normalized_min_free_percent is not None:
+        threshold_bits.append(f"min_free_percent={normalized_min_free_percent:.2f}")
+    if normalized_min_free_gb is not None:
+        threshold_bits.append(f"min_free_gb={normalized_min_free_gb:.2f}")
+    threshold_text = ", ".join(threshold_bits)
+    print(
+        f"Waiting for free memory ({threshold_text}) "
+        f"(poll={normalized_poll_seconds:.1f}s, timeout={normalized_timeout_seconds:.1f}s)",
+        flush=True,
+    )
+
+    last_snapshot: dict[str, Any] | None = None
+    while True:
+        attempts += 1
+        elapsed_seconds = time.monotonic() - started_monotonic
+        snapshot = collect_memory_pressure_snapshot()
+        last_snapshot = snapshot
+        free_percent_value = snapshot.get("system_free_percent")
+        free_gb_value = snapshot.get("free_system_memory_gb")
+        meets_percent = normalized_min_free_percent is None or (
+            free_percent_value is not None and float(free_percent_value) >= normalized_min_free_percent
+        )
+        meets_gb = normalized_min_free_gb is None or (
+            free_gb_value is not None and float(free_gb_value) >= normalized_min_free_gb
+        )
+        if meets_percent and meets_gb:
+            return {
+                "started_at": started_at,
+                "observed_at": utc_now(),
+                "waited_seconds": elapsed_seconds,
+                "poll_seconds": normalized_poll_seconds,
+                "timeout_seconds": normalized_timeout_seconds,
+                "attempts": attempts,
+                "min_free_percent": normalized_min_free_percent,
+                "min_free_gb": normalized_min_free_gb,
+                "memory_pressure": snapshot,
+                "status": "ready",
+            }
+        if normalized_timeout_seconds and elapsed_seconds >= normalized_timeout_seconds:
+            raise TimeoutError(
+                "Timed out waiting for free memory "
+                f"({threshold_text}) after {elapsed_seconds:.1f}s; "
+                f"last_snapshot={json.dumps(last_snapshot or {}, ensure_ascii=False)}"
+            )
+        if attempts == 1 or attempts % heartbeat_every == 0:
+            current_bits: list[str] = []
+            if free_percent_value is not None:
+                current_bits.append(f"free_percent={float(free_percent_value):.2f}")
+            if free_gb_value is not None:
+                current_bits.append(f"free_gb={float(free_gb_value):.2f}")
+            current_text = ", ".join(current_bits) if current_bits else "metrics unavailable"
+            print(
+                f"Still waiting for free memory ({threshold_text}; {current_text}) "
+                f"(elapsed={elapsed_seconds:.1f}s, attempts={attempts})",
+                flush=True,
+            )
+        time.sleep(normalized_poll_seconds)
+
+
 def relative_run_artifact_path(run_root: Path, artifact_path: Path) -> Path:
     resolved_run_root = Path(run_root).resolve()
     resolved_artifact_path = Path(artifact_path).resolve()
@@ -1026,7 +1106,19 @@ def collect_memory_pressure_snapshot() -> dict[str, Any]:
     }
     match = re.search(r"System-wide memory free percentage:\s*([0-9]+)%", output)
     if match:
-        snapshot["system_free_percent"] = int(match.group(1))
+        free_percent = int(match.group(1))
+        snapshot["system_free_percent"] = free_percent
+        memsize_returncode, memsize_output = _run_text_command(("sysctl", "-n", "hw.memsize"))
+        if memsize_returncode == 0:
+            try:
+                total_system_memory_bytes = int(memsize_output.strip())
+            except ValueError:
+                total_system_memory_bytes = None
+            if total_system_memory_bytes is not None and total_system_memory_bytes > 0:
+                free_system_memory_bytes = int(total_system_memory_bytes * (free_percent / 100.0))
+                snapshot["total_system_memory_bytes"] = total_system_memory_bytes
+                snapshot["free_system_memory_bytes"] = free_system_memory_bytes
+                snapshot["free_system_memory_gb"] = free_system_memory_bytes / 1e9
     return snapshot
 
 
@@ -5838,6 +5930,18 @@ def run_wait_for_path(args: argparse.Namespace) -> None:
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
+def run_wait_for_free_memory(args: argparse.Namespace) -> None:
+    result = wait_for_free_memory(
+        min_free_percent=float(args.min_free_percent) if args.min_free_percent is not None else None,
+        min_free_gb=float(args.min_free_gb) if args.min_free_gb is not None else None,
+        poll_seconds=float(args.poll_seconds),
+        timeout_seconds=float(args.timeout_seconds),
+    )
+    if args.status_json is not None:
+        write_json(Path(args.status_json).resolve(), result)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
 def run_resume_train_from_run(args: argparse.Namespace) -> None:
     source_run_root = Path(args.source_run_root).resolve()
     resolved_model_root, resolved_resume_adapter_file = resolve_source_run_resume_paths(source_run_root)
@@ -5904,6 +6008,13 @@ def run_wait_train_from_run(args: argparse.Namespace) -> None:
         if args.wait_status_json is not None
         else (target_run_root / "wait_for_source_training_result.json")
     )
+    if args.min_free_percent is not None or args.min_free_gb is not None:
+        wait_result["memory_wait_result"] = wait_for_free_memory(
+            min_free_percent=float(args.min_free_percent) if args.min_free_percent is not None else None,
+            min_free_gb=float(args.min_free_gb) if args.min_free_gb is not None else None,
+            poll_seconds=float(args.poll_seconds),
+            timeout_seconds=float(args.timeout_seconds),
+        )
     write_json(wait_status_path, wait_result)
     args._source_wait_result = wait_result
     run_resume_train_from_run(args)
@@ -5944,6 +6055,13 @@ def run_wait_resume_train_from_path(args: argparse.Namespace) -> None:
         if args.wait_status_json is not None
         else (target_run_root / "wait_for_trigger_path.json")
     )
+    if args.min_free_percent is not None or args.min_free_gb is not None:
+        wait_result["memory_wait_result"] = wait_for_free_memory(
+            min_free_percent=float(args.min_free_percent) if args.min_free_percent is not None else None,
+            min_free_gb=float(args.min_free_gb) if args.min_free_gb is not None else None,
+            poll_seconds=float(args.poll_seconds),
+            timeout_seconds=float(args.timeout_seconds),
+        )
     write_json(wait_status_path, wait_result)
     args._wait_trigger_result = wait_result
     run_resume_train_from_run(args)
@@ -6431,6 +6549,17 @@ def build_parser() -> argparse.ArgumentParser:
     wait_for_path_parser.add_argument("--status-json", type=Path, default=None)
     wait_for_path_parser.set_defaults(func=run_wait_for_path)
 
+    wait_for_free_memory_parser = subparsers.add_parser(
+        "wait-for-free-memory",
+        help="Wait until the machine has enough free memory before continuing.",
+    )
+    wait_for_free_memory_parser.add_argument("--min-free-percent", type=float, default=None)
+    wait_for_free_memory_parser.add_argument("--min-free-gb", type=float, default=None)
+    wait_for_free_memory_parser.add_argument("--poll-seconds", type=float, default=60.0)
+    wait_for_free_memory_parser.add_argument("--timeout-seconds", type=float, default=0.0)
+    wait_for_free_memory_parser.add_argument("--status-json", type=Path, default=None)
+    wait_for_free_memory_parser.set_defaults(func=run_wait_for_free_memory)
+
     resume_train_from_run = subparsers.add_parser(
         "resume-train-from-run",
         help="Reuse a completed run's shadow model and adapter as the resume source for a new train.",
@@ -6458,6 +6587,8 @@ def build_parser() -> argparse.ArgumentParser:
     wait_train_from_run.add_argument("--poll-seconds", type=float, default=60.0)
     wait_train_from_run.add_argument("--timeout-seconds", type=float, default=0.0)
     wait_train_from_run.add_argument("--wait-status-json", type=Path, default=None)
+    wait_train_from_run.add_argument("--min-free-percent", type=float, default=None)
+    wait_train_from_run.add_argument("--min-free-gb", type=float, default=None)
     wait_train_from_run.add_argument(
         "--skip-if-target-started",
         action=argparse.BooleanOptionalAction,
@@ -6485,6 +6616,8 @@ def build_parser() -> argparse.ArgumentParser:
     wait_resume_train_from_path.add_argument("--poll-seconds", type=float, default=60.0)
     wait_resume_train_from_path.add_argument("--timeout-seconds", type=float, default=0.0)
     wait_resume_train_from_path.add_argument("--wait-status-json", type=Path, default=None)
+    wait_resume_train_from_path.add_argument("--min-free-percent", type=float, default=None)
+    wait_resume_train_from_path.add_argument("--min-free-gb", type=float, default=None)
     wait_resume_train_from_path.add_argument(
         "--skip-if-target-started",
         action=argparse.BooleanOptionalAction,
