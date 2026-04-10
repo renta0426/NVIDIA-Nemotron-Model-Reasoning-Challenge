@@ -343,3 +343,140 @@ proof-first_solver_factory_routing の精度低下は、スコアだけでなく
 7. current に利点がある局所例はあるが、proxy では `current_only 5` に対して `v3f_only 40` であり、利得より誤ロックの損失が大きい
 
 したがって今回の崩壊は、単なる data quality 低下や wording の違いではない。**proof-first の表面形式を強く学習した結果、route-aware scaffold が evidence を集める前に answer を固定する方向へ働き、hidden/proxy の hard slice で mislock を増幅した**と結論づけるのが最も妥当である。
+
+## 9. v3f を明確に上回るための戦略
+
+## 9.1 基本方針: current を伸ばすのではなく、v3f を土台に selective に route 情報を戻す
+
+今回の比較から、`v3f` を超える最短経路は **proof-first current をそのまま矯正することではない**。正しい主戦略は、**v3f の勝ち筋を土台にして、current が持っていた route-aware 情報のうち本当に効く部分だけを selective に戻す**ことである。
+
+理由は明確である。
+
+1. `v3f` は README 契約上重要な `\boxed{}` 安定性をすでに満たしている
+2. `v3f` は specialized で `0.4227` を出し、structured safe 改善という資産を持っている
+3. current は hard slice で `Route -> So the rule is -> Constraints` の固定 scaffold が誤答時ほど強く出ており、そのまま mainline に据えるのは危険である
+
+したがって trunk は `v3f` で固定し、proof-first 系は **mainline replacement ではなく targeted augmentation** として再設計すべきである。
+
+## 9.2 伸ばすべき対象は 3 つに限定する
+
+v3f を上回るには、改善対象を広げすぎてはいけない。優先順位は次の 3 つに固定する。
+
+1. **binary の hidden 主因 bucket**
+	特に `supported_bijection`, `dominant_structured_safe`, `bit_structured_byte_formula`, `bit_permutation_inversion`, `bit_other` のうち v3f がまだ不安定な slice。
+2. **text の global mapping 復元**
+	current はここで局所辞書 commit に寄りすぎた。v3f の mapping 構築資産を維持しつつ、hidden/proxy で落ちる row だけを補修する。
+3. **symbol numeric_2x2 の narrow repair**
+	operator collapse を起こす row だけに限定して触り、glyph や broad symbol へは広げない。
+
+逆に、次では触らない方がよい領域も明確である。
+
+1. easy family 全般
+2. route surface の全 family 展開
+3. coarse `route_closure_only` の増量
+4. glyph_len5 の大規模 teacher 化
+
+これらは v3f 超えに対してノイズの方が大きい。
+
+## 9.3 binary は「exact-route の中身」だけを取り込み、表面 scaffold は薄くする
+
+binary で必要なのは route phrase そのものではない。必要なのは、**v3f がまだ落とす blind spot に対して exact solver family を増やすこと**である。
+
+したがって binary branch は次の原則で組むべきである。
+
+1. **exact-route verified only を primary lane にする**
+	`verified_trace_ready` のみ、またはそれに準ずる exact teacher のみを主役にする。
+2. **coarse answer-only は補助 lane に落とす**
+	現 current のように family-only `bit_manipulation` と generic closure を主役化しない。
+3. **surface text は v3f 寄りに短く保つ**
+	`Route:` や `Constraints:` を常設せず、必要なら internal metadata に留め、assistant text は短い verified-rule commit に戻す。
+4. **not-formula と abstract は separate lane で管理する**
+	`binary_structured_byte_not_formula` と `binary_structured_byte_formula_abstract` を structured safe と同じ teacher でまとめない。
+
+要するに binary では、**route-aware の価値は surface phrasing ではなく solver family の解像度**にある。v3f 超えの鍵は、proof-first current の 9 行テンプレートを増やすことではなく、`v3f` の boxed-stable short commit に exact blind-spot solver を差し込むことにある。
+
+## 9.4 text は word mapping ではなく char mapping を最後まで保持する
+
+current の text 崩壊は、global substitution を局所的な単語辞書探索に潰したことが主因だった。したがって text branch では、次の 2 条件を強く固定すべきである。
+
+1. **assistant text の中で global char mapping を一度は明示的に構築する**
+2. **未確定 token を辞書の pattern match だけで埋めない**
+
+つまり text では、proof-first 的な `Route: word_mapping` は optional でよい。むしろ必要なのは、v3f がやっていた **mapping accumulation の工程を削らないこと**である。
+
+補修データを作るなら、`v3f_only` の text 13 行を核にして、同型の char-substitution row を追加し、castle/cave 系の unseen lexical choice を落とさない teacher を増やすのがよい。
+
+## 9.5 symbol は route を弱くし、operator collapse を防ぐ narrow supervision に寄せる
+
+symbol では current の route scaffold 自体が悪いのではなく、**早い rule lock の後に長い誤正当化へ入る**ことが悪い。
+
+したがって symbol では次を固定する。
+
+1. `numeric_2x2` に限定する
+2. `Check examples` は許すが、`So the rule is` の強い断定は narrow row のみに制限する
+3. operator 別差異が残る row では concatenate や simple arithmetic に早く潰さない
+4. `glyph_len5` は mainline へ混ぜず、別 research lane に残す
+
+ここは broad にやるほど壊れやすいので、**v3f_only symbol 6 行の failure pattern を直接補う局所 teacher**として扱うのが安全である。
+
+## 9.6 学習データ戦略: 追加ではなく「回収対象を明示した delta」に変える
+
+v3f を超える run では、delta pool を generic に積むのではなく、**どの row-level regression を回収するための教師かを明示した repair set** に変えるべきである。
+
+具体的には次の 4 lane に分ける。
+
+1. **Binary exact verified repair lane**
+	v3f が弱い `supported_bijection`, `structured_formula`, `not_formula`, `bit_other` の exact rows。
+2. **Binary answer-only rescue lane**
+	ただし coarse route closure-only は使わず、template-subtype まで落ちた bounded supervision のみにする。
+3. **Text mapping repair lane**
+	`v3f_only` text 13 行近傍の char-substitution repair。
+4. **Symbol numeric narrow lane**
+	`numeric_2x2` 限定の operator-decorrelation repair。
+
+これにより、単なる route-aware 増量ではなく、**v3f の既知 regressions を埋めるための supervised repair**として設計できる。
+
+## 9.7 評価ゲートを v3f 超え用に再定義する
+
+v3f を超える run を選ぶには、Phase0 topline だけでは不十分である。ゲートは次の順に再定義すべきである。
+
+1. **leaderboard proxy total が v3f rerun `0.6650` を超えること**
+2. **proxy binary が v3f rerun `0.4565` を超えること**
+3. **proxy text を `0.8500` から大きく落とさないこと**
+4. **binary `format_ok_content_wrong_rate` を v3f proxy `0.5435` 未満へ下げること**
+5. **specialized563 を `0.4227` 近辺以上で維持すること**
+
+この順序が重要である。`specialized` だけ上がって proxy が下がる run は、current と同じ failure mode を再生産する危険が高い。
+
+また、生成文監視もゲートに入れるべきである。
+
+1. proxy wrong rows の `route_rate`
+2. proxy wrong rows の `so_rule_rate`
+3. proxy wrong rows の `constraints_rate`
+
+が v3f より大きく跳ねる run は、**premature commitment 再発**として早期棄却した方がよい。
+
+## 9.8 実験順は 5 本前後の並列 ablation に分解する
+
+v3f 超えを狙う実行順としては、次の並列 ablation が最も効率的である。
+
+1. **A: v3f + binary exact verified repair only**
+	最小変化で blind spot を叩く基準 run。
+2. **B: A + not-formula dedicated lane**
+	`binary_structured_byte_not_formula` を独立で改善できるかを見る。
+3. **C: A + bit_other exact repair**
+	public/test 寄り幅改善を確認する run。
+4. **D: A + text mapping repair**
+	proxy text `17/20` を守りながら binary を維持できるかを見る。
+5. **E: A + symbol numeric narrow repair**
+	symbol を少し持ち上げるが、glyph は混ぜない。
+
+ここでは `Route:` の見た目を増やす run は作らない。作るべき比較は、**exact repair の中身が効くか** であって、route surface を増やした時にどう見えるかではない。
+
+## 9.9 最終提案
+
+v3f を明確に上回るには、戦略を次の一文に要約できる。
+
+> `v3f` の boxed-stable short commit を mainline に据えたまま、proof-first 由来の exact solver family 情報を surface scaffold ではなく row-targeted repair supervision として戻し、binary blind spots と text global mapping regressions だけを選択的に埋める。
+
+要するに、次の勝ち筋は **more proof-first** ではない。**v3f core plus selective exact repair** である。
