@@ -1681,7 +1681,7 @@
 
 - status: `evaluating`
 - label: `o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_v1`
-- observed_at: `2026-04-11T14:49:56.176018+00:00`
+- observed_at: `2026-04-11T14:56:36.666337+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary20_text10_grav15_unit15_v1.csv`
 - sampled_rows: `90`
@@ -1697,11 +1697,11 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `1/2 = 50.00%`
 - current_evaluation: `leaderboard_proxy_v1_set`
-- current_rows_progress: `96/200 = 48.00%`
-- current_chunks_progress: `6/13 = 46.15%`
+- current_rows_progress: `112/200 = 56.00%`
+- current_chunks_progress: `7/13 = 53.85%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
-- accuracy_so_far: `0.7500`
-- correct_so_far: `72`
+- accuracy_so_far: `0.7411`
+- correct_so_far: `83`
 - completed_evaluations: `['readme_local320']`
 - completed_evaluation_scores: `readme_local320 229/320 = 0.7156`
 
