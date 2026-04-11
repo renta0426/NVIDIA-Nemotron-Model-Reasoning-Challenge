@@ -1,0 +1,83 @@
+{
+  "created_at": "2026-04-11T15:24:05.012434+00:00",
+  "output_csv": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_verifiedswap22_bit33eq2_v1.csv",
+  "rows_total": 80,
+  "type_counts": {
+    "Bit Manipulation": 33,
+    "Text Encryption": 15,
+    "Gravitational Constant": 15,
+    "Unit Conversion": 15,
+    "Equation Transformation": 2
+  },
+  "source_current_csv": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv",
+  "source_proxy_row_level_csv": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_row_level.csv",
+  "source_analysis_csv": "cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "source_train_csv": "baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv",
+  "swap_strategy": "replace current proxy-miss rows whose supervision is answer_only/manual with new verified real-CoT remaining misses",
+  "added_rows": 22,
+  "added_by_subtype": {
+    "bit_other": 7,
+    "bit_structured_byte_formula": 7,
+    "text_monoalphabetic": 5,
+    "bit_permutation_inversion": 3
+  },
+  "added_ids": [
+    "0d7aacfc",
+    "a28a4dff",
+    "37d81990",
+    "57b03b2b",
+    "86b727ff",
+    "14a72508",
+    "7c8dd1ee",
+    "8fc1816e",
+    "af5302ca",
+    "a00fe76a",
+    "bfee75d5",
+    "9443e78b",
+    "6a578940",
+    "af7b42d2",
+    "4ada9150",
+    "48ae04f6",
+    "f66415c0",
+    "6a186446",
+    "0520a6ec",
+    "0a50c4a8",
+    "3bdb85cf",
+    "885c8b51"
+  ],
+  "removed_rows": 22,
+  "removed_by_subtype": {
+    "bit_other": 8,
+    "glyph_len5": 5,
+    "numeric_2x2": 5,
+    "bit_structured_byte_formula": 4
+  },
+  "removed_ids": [
+    "4195699e",
+    "a85864a9",
+    "b13d511a",
+    "be7101dc",
+    "d7e5414c",
+    "dc240ebd",
+    "e8de8b47",
+    "3acfa7a4",
+    "5f5a73ff",
+    "9f2fae58",
+    "d9bedb64",
+    "22e28f23",
+    "2630aaf8",
+    "2d790c98",
+    "069dbaab",
+    "101410e4",
+    "12e0ac8c",
+    "2230fad0",
+    "257e7158",
+    "5d77eff6",
+    "9b9b87e3",
+    "3dc918eb"
+  ],
+  "notes": [
+    "Replace all 22 current proxy-miss rows whose selection tier is answer_only_keep or manual_audit_priority.",
+    "This yields a bit-heavier 80-row mix while eliminating low-information answer-only/manual misses from the corrective block."
+  ]
+}
