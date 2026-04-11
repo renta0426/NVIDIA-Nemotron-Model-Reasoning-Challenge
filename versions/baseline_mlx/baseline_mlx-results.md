@@ -718,7 +718,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- recorded_at: `2026-04-11T06:32:55.510029+00:00`
+- recorded_at: `2026-04-11T06:34:55.541081+00:00`
 - label: `binary40_o30_p0_s10_no_lz`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1.csv`
@@ -1180,7 +1180,7 @@
 
 - status: `evaluating`
 - label: `o30_general_recover_t040_n120_g20_u20`
-- observed_at: `2026-04-11T06:25:38.145610+00:00`
+- observed_at: `2026-04-11T06:35:41.693369+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text040_num120_grav20_unit20_recover_v1.csv`
 - sampled_rows: `200`
@@ -1196,8 +1196,8 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `288/320 = 90.00%`
-- current_chunks_progress: `18/20 = 90.00%`
+- current_rows_progress: `304/320 = 95.00%`
+- current_chunks_progress: `19/20 = 95.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
 
 #### Completion markers
@@ -1320,17 +1320,24 @@
 - detached_waiters: `v3 wait-for-path->postprocess-run`, `v3 wait-for-path->poll-live-run-status`
 - operator_note: `resolve_type_samples merges overrides into DEFAULT_TYPE_SAMPLES, so filtered custom CSV resumes must explicitly zero unsupported families or default Numeral Conversion and Equation Transformation rows remain required.`
 
-### Prepared serialized lane: `stage2_o30best_binarycorr_defaultsolvers_sym24_v1`
+### Serialized corrective lane: `stage2_o30best_binarycorr_defaultsolvers_sym24_v1`
 
-- status: `prepared_not_queued`
+- status: `queued_waiting_for_binaryaware_v3_completion_then_free_memory`
 - prepared_at: `2026-04-11T06:09Z`
+- queued_at: `2026-04-11T06:35Z`
 - source_run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_binarycorr_defaultsolvers_sym24_v1.csv`
 - rows: `218`
 - type_counts: `Bit Manipulation=209`, `Equation Transformation=9`
+- explicit_type_samples: `Numeral Conversion=0`, `Gravitational Constant=0`, `Unit Conversion=0`, `Text Encryption=0`, `Bit Manipulation=209`, `Equation Transformation=9`
 - binary_solvers: `binary_affine_xor`, `binary_bit_permutation_bijection`, `binary_structured_byte_formula`, `binary_structured_byte_formula_abstract`, `binary_structured_byte_not_formula`
 - symbol_rows: `numeric_2x2 verified rows = 9`
-- serialization_rule: `queue only after the binary-aware lane finishes or is pruned, so train/eval memory stays serialized`
+- target_run_name: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_binarycorr_defaultsolvers_sym24_lr2e5_len1536_v1`
+- training_shape: `resume from binary40_o30_p0_s10_no_lz`, `lr=2e-05`, `epochs=3.2`, `max_seq_length=1536`
+- lora_shape: `lora_key_group=stage-union-exportsafe`, `trainable_lora_suffix_group=attention`
+- wait_chain: `wait-for-path(binary-aware v3 eval_suite summary) -> wait-for-free-memory(unused >= 190 GB) -> resume-train-from-run`
+- detached_waiters: `wait-for-path->postprocess-run`, `wait-for-path->poll-live-run-status`
+- serialization_rule: `launch only after binary-aware v3 finishes evaluation and free memory recovers, so train/eval memory remains serialized and safe`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3`
