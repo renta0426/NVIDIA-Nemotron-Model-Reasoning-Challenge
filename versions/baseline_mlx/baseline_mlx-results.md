@@ -1,7 +1,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-11T22:02:34.421723+00:00`
+- recorded_at: `2026-04-11T22:03:34.432583+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -176,10 +176,22 @@
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 8 / Equation 11`
 - notes: `reprobridge13 differs from reprobridge12 by exactly one row: answer_only hedge row 8158a14c replaces the next easiest remaining unit stabilizer a127eb72; runtime preflight captured current_pid 77590 with PhysMem unused about 192 GB, GPU device util 100%, and in-use system memory about 193.37 GB at launch; the short train then closed with train_loss ≈ 0.3629 / val_loss ≈ 0.4594 / optimizer_step 8 / peak_memory ≈ 65.46 GB and has already handed off to README-contract eval`
 
+### Manual queue note: `reprobridge15_text3bit1num8num1swap_anchorrestore_v1`
+
+- status: `queued_waiting_on_reprobridge13_suite`
+- queued_at: `2026-04-11T22:04Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_v1.csv`
+- trigger: `reprobridge13 full-suite summary plus free memory >= 150 GB; duplicate-safe launch, postprocess, and live publication waiters are armed`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `the selected numeric_2x2 pool is already exhausted by reprobridge13, so this follow-up no longer tries to widen numeric coverage; instead it keeps the 8158a14c hedge row from reprobridge13, restores one unit stabilizer, and drops one high-audit answer_only numeric row to test whether the broad+hedge branch works better with slightly less answer_only burden`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 9 / Equation 10`
+- notes: `reprobridge15 is a hedge-swap / anchor-restore branch built by replacing answer_only numeric row 6e60b0c5 from reprobridge13 with restored unit stabilizer a127eb72 from reprobridge12; the run stays within the currently selected train pool and is intended as the first queued follow-up if reprobridge13 remains the strongest active lane`
+
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 
-- recorded_at: `2026-04-11T22:02:37.580059+00:00`
+- recorded_at: `2026-04-11T22:03:37.588713+00:00`
 - label: `o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_proxymiss40_text20_grav15_unit15_sym8_v1.csv`
@@ -493,7 +505,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 
-- recorded_at: `2026-04-11T22:02:31.976122+00:00`
+- recorded_at: `2026-04-11T22:03:31.992900+00:00`
 - label: `o30best_local_best_actual_repro_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1_repro_v1.csv`
