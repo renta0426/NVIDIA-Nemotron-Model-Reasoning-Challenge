@@ -23,3 +23,7 @@
 - verify: `uv run python versions/baseline_mlx_o30best_proxybench_repro_v1/reproduce_o30best_proxybench_submission.py verify`
 - re-export: `uv run python versions/baseline_mlx_o30best_proxybench_repro_v1/reproduce_o30best_proxybench_submission.py export-existing`
 - full rerun: `uv run python versions/baseline_mlx_o30best_proxybench_repro_v1/reproduce_o30best_proxybench_submission.py full-reproduce`
+
+## queued next action
+
+- clean full rerun is queued behind a conservative free-memory gate: `uv run python baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py wait-for-free-memory --min-free-gb 190`
