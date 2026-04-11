@@ -1,7 +1,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-11T23:10:35.268045+00:00`
+- recorded_at: `2026-04-11T23:11:35.282890+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -51,11 +51,11 @@
 - wait_script: `versions/baseline_mlx_threshold_submission_v1/reproduce_threshold_submission.py`
 - wait_condition: `each waiter blocks on eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json for its target run, then conditionally emits threshold artifacts only when both README-contract gates are satisfied`
 - gate_contract: `readme_local320 >= target threshold`, `leaderboard_proxy_v1_set >= 0.65`, `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`
-- active_waiters: `reprobridge15 -> {0.75, 0.80}`, `reprobridge16 -> {0.75, 0.80}`, `reprobridge17 -> {0.75, 0.80}`
+- active_waiters: `reprobridge15 -> {0.75, 0.80}`, `reprobridge16 -> {0.75, 0.80}`, `reprobridge17 -> {0.75, 0.80}`, `reprobridge18 -> {0.75, 0.80}`
 - retired_waiters: `numreal8` retired after local320 finished at `226/320 = 0.7063`, which ruled out both `local-ge-0.75` and `local-ge-0.80`; `reprogap5` retired after stalling at `225/304 = 0.7401` with one chunk left, which made `local-ge-0.75` improbable enough to cut for memory; `reprogap4` retired after local320 finished at `229/320 = 0.7156`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge9` retired after local320 finished at `230/320 = 0.7188`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge10` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge12` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge13` retired after local320 finished at `235/320 = 0.7344`, which matched the tracked frontier but still missed the `0.75` gate and therefore did not justify further proxy continuation`
 - queued_waiters: `none`
-- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`
-- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, and reprobridge13 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge15, reprobridge16, and reprobridge17 are the remaining active threshold-tracked lanes`
+- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge18_local_ge_075_v1`, `..._080_v1`
+- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, and reprobridge13 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge15, reprobridge16, reprobridge17, and reprobridge18 are the remaining active threshold-tracked lanes`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2`
@@ -217,20 +217,33 @@
 
 ### Manual queue note: `reprobridge18_text3bit1num8num1raw2gravrestore_v1`
 
-- status: `queued_waiting_on_active_bridge_summary`
+- status: `launched_early_after_memory_recovery`
 - queued_at: `2026-04-11T22:59Z`
+- launched_at: `2026-04-11T23:08Z`
 - target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1`
 - train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_v1.csv`
-- trigger: `the first full-suite summary among reprobridge15, reprobridge16, or reprobridge17 plus free memory >= 150 GB; all launch waiters are duplicate-safe so only the first completed parent can actually start the target`
+- trigger: `launched immediately once the active wave still held roughly PhysMem unused 190 GB, intentionally overriding the wait-for-reprobridge15/16/17-summary queue while keeping the duplicate-safe waiters attached as no-op backups`
 - recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
 - rationale: `start from reprobridge15, keep the low-hard-score hedge 8158a14c, remove two harder answer_only numeric rows plus two easy unit stabilizers, then add two strongest unused raw verified numeric rows and two zero-hard-score gravity stabilizers; this is the balanced hybrid between reprobridge16's raw expansion and reprobridge17's pure stabilizer restore`
 - resulting_mix: `Bit 34 / Text 18 / Gravity 11 / Unit 7 / Equation 10`
-- notes: `reprobridge18 preserves the corrective reprogap4 text/bit skeleton and the 8158a14c hedge while moderating reprobridge16's equation-heavy jump; it removes 9cb03277, a19a75ba, 7291f716, and c1775d35, then adds raw verified numeric rows 118f8c86 and 7195cb7b plus restored gravity rows 853a0e3b and 66ae2b46`
+- notes: `reprobridge18 preserves the corrective reprogap4 text/bit skeleton and the 8158a14c hedge while moderating reprobridge16's equation-heavy jump; it removes 9cb03277, a19a75ba, 7291f716, and c1775d35, then adds raw verified numeric rows 118f8c86 and 7195cb7b plus restored gravity rows 853a0e3b and 66ae2b46; runtime preflight captured current_pid 17080 with PhysMem unused about 190 GB, GPU device util 100%, and in-use system memory about 193.36 GB at launch; the short train then closed with train_loss ≈ 0.3596 / val_loss ≈ 0.4478 / optimizer_step 8 / peak_memory ≈ 65.46 GB and has already handed off to README-contract eval; the earlier queue-based live/postprocess/threshold waiters remained attached and now follow the launched run`
+
+### Manual queue note: `reprobridge19_text3bit1num8num1raw3grav1_v1`
+
+- status: `queued_waiting_on_active_bridge_summary`
+- queued_at: `2026-04-11T23:11Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_v1.csv`
+- trigger: `the first full-suite summary among reprobridge15, reprobridge16, reprobridge17, or reprobridge18 plus free memory >= 150 GB; all launch waiters are duplicate-safe so only the first completed parent can actually start the target`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge15, keep the hedge 8158a14c, remove two harder answer_only numeric rows plus two easy unit stabilizers, then add three strongest unused raw verified numeric rows and one zero-hard-score gravity stabilizer; this is the bridge between reprobridge16's raw4 push and reprobridge18's raw2+grav2 balance`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 7 / Equation 11`
+- notes: `reprobridge19 preserves the corrective reprogap4 text/bit skeleton while leaning slightly more equation-heavy than reprobridge18; it removes 9cb03277, a19a75ba, 7291f716, and c1775d35, then adds raw verified numeric rows 118f8c86, 7195cb7b, and 9b820b4e plus restored gravity row 853a0e3b`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 
-- recorded_at: `2026-04-11T23:10:38.436680+00:00`
+- recorded_at: `2026-04-11T23:11:38.451247+00:00`
 - label: `o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_proxymiss40_text20_grav15_unit15_sym8_v1.csv`
@@ -262,7 +275,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-11T23:10:41.993227+00:00`
+- recorded_at: `2026-04-11T23:11:42.007932+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -333,7 +346,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-11T23:10:52.797913+00:00`
+- recorded_at: `2026-04-11T23:11:52.813058+00:00`
 - label: `o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary20_text10_grav15_unit15_v1.csv`
@@ -544,7 +557,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 
-- recorded_at: `2026-04-11T23:10:33.017781+00:00`
+- recorded_at: `2026-04-11T23:11:33.029196+00:00`
 - label: `o30best_local_best_actual_repro_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1_repro_v1.csv`
@@ -576,7 +589,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
 
-- recorded_at: `2026-04-11T23:10:39.650224+00:00`
+- recorded_at: `2026-04-11T23:11:39.664799+00:00`
 - label: `o30best-proxybench-repro-eval-live`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1_repro_v1.csv`
@@ -1116,29 +1129,29 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1`
 
-- status: `training_completed`
+- status: `evaluating`
 - label: `reprobridge18 hybrid`
-- observed_at: `2026-04-11T23:10:22.767137+00:00`
+- observed_at: `2026-04-11T23:11:11.189382+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_v1.csv`
 - sampled_rows: `80`
-- optimizer_progress: `8/8 = 100.00%`
+- optimizer_progress: `0/8 = 0.00%`
 - lr: `1e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-#### Latest train progress
+#### Latest evaluation progress
 
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/adapter/latest_train_report.json`
-- iteration: `64`
-- optimizer_step: `8`
-- train_loss: `0.359596`
-- learning_rate: `3.80602e-08`
-- it_per_sec: `0.586302`
-- tokens_per_sec: `320.112`
-- trained_tokens: `34943`
-- peak_memory_gb: `65.4617`
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `0/2 = 0.00%`
+- current_evaluation: `readme_local320`
+- current_rows_progress: `0/320 = 0.00%`
+- current_chunks_progress: `0/20 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
 
 #### Completion markers
 
