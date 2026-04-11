@@ -2591,8 +2591,11 @@ def evaluate_benchmark_rows(
                 "rows_completed": 0,
                 "chunks_total": total_chunks,
                 "chunks_completed": 0,
+                "correct": 0,
+                "accuracy": 0.0,
             }
         )
+    running_correct = 0
     for chunk_start in range(0, total_prompts, chunk_size):
         chunk_prompts = prompt_tokens[chunk_start : chunk_start + chunk_size]
         chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompts)]
@@ -2623,7 +2626,13 @@ def evaluate_benchmark_rows(
                 )
                 for prompt_tokens_single in chunk_prompts
             ]
+        chunk_correct = 0
         for row, rendered_prompt, raw_output in zip(chunk_rows, chunk_rendered_prompts, chunk_outputs):
+            raw_output_text = str(raw_output)
+            derived = analyze_raw_output(raw_output_text)
+            prediction = str(derived["extracted_answer"])
+            is_correct = verify_answer(str(row["answer"]), prediction)
+            chunk_correct += int(is_correct)
             records.append(
                 {
                     "benchmark_name": str(row.get("benchmark_name") or evaluation_name),
@@ -2639,26 +2648,49 @@ def evaluate_benchmark_rows(
                     "prompt_len_chars": str(row.get("prompt_len_chars", "")),
                     "expected_answer": str(row["answer"]),
                     "rendered_prompt": rendered_prompt,
-                    "raw_output": str(raw_output),
-                    "extracted_answer": extract_final_answer(str(raw_output)),
+                    "raw_output": raw_output_text,
+                    "extracted_answer": prediction,
+                    "is_correct": is_correct,
+                    "fallback_type": derived["fallback_type"],
+                    "format_bucket": derived["format_bucket"],
+                    "has_boxed": derived["has_boxed"],
+                    "boxed_count": derived["boxed_count"],
                 }
             )
+        rows_completed = min(chunk_start + len(chunk_prompts), total_prompts)
+        running_correct += chunk_correct
         if progress_callback is not None:
             progress_callback(
                 {
                     "status": "running",
                     "evaluation_name": evaluation_name,
                     "rows_total": total_prompts,
-                    "rows_completed": min(chunk_start + len(chunk_prompts), total_prompts),
+                    "rows_completed": rows_completed,
                     "chunks_total": total_chunks,
                     "chunks_completed": min((chunk_start // chunk_size) + 1, total_chunks),
+                    "correct": running_correct,
+                    "accuracy": (running_correct / rows_completed) if rows_completed > 0 else 0.0,
                 }
             )
 
     scored_rows: list[dict[str, Any]] = []
     for row in records:
-        derived = analyze_raw_output(row["raw_output"])
-        prediction = str(derived["extracted_answer"])
+        prediction = str(row.get("extracted_answer", ""))
+        if all(key in row for key in ("fallback_type", "format_bucket", "has_boxed", "boxed_count")):
+            derived = {
+                "fallback_type": row["fallback_type"],
+                "format_bucket": row["format_bucket"],
+                "has_boxed": row["has_boxed"],
+                "boxed_count": row["boxed_count"],
+            }
+        else:
+            derived = analyze_raw_output(row["raw_output"])
+            prediction = str(derived["extracted_answer"])
+        is_correct = (
+            bool(row["is_correct"])
+            if "is_correct" in row
+            else verify_answer(row["expected_answer"], prediction)
+        )
         scored_rows.append(
             {
                 "benchmark_name": row["benchmark_name"],
@@ -2666,7 +2698,7 @@ def evaluate_benchmark_rows(
                 "id": row["id"],
                 "gold_answer": row["expected_answer"],
                 "prediction": prediction,
-                "is_correct": verify_answer(row["expected_answer"], prediction),
+                "is_correct": is_correct,
                 "family": row["family"],
                 "family_short": row["family_short"],
                 "template_subtype": row["template_subtype"],

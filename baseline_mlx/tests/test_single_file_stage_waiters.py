@@ -878,6 +878,7 @@ def test_evaluate_benchmark_rows_falls_back_to_evaluation_name_for_missing_bench
     fake_mlx_lm.batch_generate = lambda *_args, **_kwargs: SimpleNamespace(texts=["reasoning... \\boxed{42}"])
     fake_mlx_lm.generate = lambda *_args, **_kwargs: "reasoning... \\boxed{42}"
     fake_sample_utils.make_sampler = lambda **_kwargs: object()
+    progress_events: list[dict[str, object]] = []
 
     class FakeTokenizer:
         bos_token = None
@@ -923,6 +924,7 @@ def test_evaluate_benchmark_rows_falls_back_to_evaluation_name_for_missing_bench
                 model_root=Path("model"),
                 adapter_dir=None,
             ),
+            progress_callback=lambda payload: progress_events.append(dict(payload)),
         )
     finally:
         if original_mlx_lm is None:
@@ -937,6 +939,13 @@ def test_evaluate_benchmark_rows_falls_back_to_evaluation_name_for_missing_bench
     assert records[0]["benchmark_name"] == "stage2_suite"
     assert scored_rows[0]["is_correct"] is True
     assert summary["overall"]["accuracy"] == 1.0
+    assert progress_events[0]["correct"] == 0
+    assert progress_events[0]["accuracy"] == 0.0
+    assert progress_events[1]["rows_completed"] == 1
+    assert progress_events[1]["correct"] == 1
+    assert progress_events[1]["accuracy"] == 1.0
+    assert progress_events[2]["status"] == "scored"
+    assert progress_events[2]["correct"] == 1
 
 
 def test_run_eval_benchmark_suite_writes_progress_files(tmp_path: Path) -> None:
