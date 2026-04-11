@@ -4331,6 +4331,7 @@ def run_poll_best_submission(args: argparse.Namespace) -> None:
         "output_root": str(output_root),
         "poll_seconds": float(args.poll_seconds),
         "max_iterations": int(args.max_iterations),
+        "continue_after_selection": bool(getattr(args, "continue_after_selection", False)),
         "run_publish_results_md": bool(args.run_publish_results_md),
         "iterations": [],
         "status": "running",
@@ -4378,7 +4379,11 @@ def run_poll_best_submission(args: argparse.Namespace) -> None:
         summary["selection_manifest"] = selection_manifest
         selected_run_root = str(iteration_summary["selected_run_root"])
         if selected_run_root:
-            summary["status"] = "selected_candidate"
+            summary["status"] = (
+                "selected_candidate_continuing"
+                if bool(getattr(args, "continue_after_selection", False))
+                else "selected_candidate"
+            )
             if args.run_publish_results_md:
                 publish_commit_message = (
                     str(args.publish_commit_message).strip()
@@ -4395,6 +4400,15 @@ def run_poll_best_submission(args: argparse.Namespace) -> None:
                     lock_timeout_seconds=float(args.publish_lock_timeout_seconds),
                     dry_run=bool(args.publish_dry_run),
                 )
+            if bool(getattr(args, "continue_after_selection", False)):
+                if int(args.max_iterations) > 0 and iteration >= int(args.max_iterations):
+                    summary["status"] = iteration_summary["selection_status"] or "max_iterations_reached"
+                    persist_summary()
+                    print(json.dumps(summary, ensure_ascii=False, indent=2))
+                    return
+                persist_summary()
+                time.sleep(float(args.poll_seconds))
+                continue
             persist_summary()
             print(json.dumps(summary, ensure_ascii=False, indent=2))
             return
@@ -7192,7 +7206,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     poll_best_submission = subparsers.add_parser(
         "poll-best-submission",
-        help="Loop package-best-submission until an eligible candidate is found, then optionally publish the results ledger.",
+        help="Loop package-best-submission until an eligible candidate is found, or keep polling after selection when requested.",
     )
     poll_best_submission.add_argument("--search-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     poll_best_submission.add_argument("--candidate-run-root", type=Path, action="append", default=None)
@@ -7247,6 +7261,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     poll_best_submission.add_argument("--poll-seconds", type=float, default=60.0)
     poll_best_submission.add_argument("--max-iterations", type=int, default=0)
+    poll_best_submission.add_argument(
+        "--continue-after-selection",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     poll_best_submission.add_argument("--summary-json", type=Path, default=None)
     poll_best_submission.add_argument(
         "--run-publish-results-md",
