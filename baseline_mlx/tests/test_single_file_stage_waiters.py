@@ -1627,6 +1627,68 @@ def test_publish_results_md_reports_no_changes(tmp_path: Path) -> None:
     assert commit_count == "1"
 
 
+def test_publish_results_md_clears_empty_stale_lock_dir(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    results_md.write_text("updated\n", encoding="utf-8")
+    summary_json = tmp_path / "publish_stale_empty_lock_summary.json"
+    lock_dir = repo_root / ".git" / ".nemotron_ledger_lock"
+    lock_dir.mkdir()
+
+    stage_waiters.run_publish_results_md(
+        SimpleNamespace(
+            repo_root=repo_root,
+            results_md=results_md,
+            commit_message="Record temp results",
+            push=False,
+            dry_run=False,
+            summary_json=summary_json,
+            lock_dir=lock_dir,
+            lock_poll_seconds=0.1,
+            lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "committed"
+    assert summary["cleared_stale_lock_count"] == 1
+    assert not lock_dir.exists()
+
+
+def test_publish_results_md_clears_dead_owner_lock_dir(tmp_path: Path) -> None:
+    repo_root, results_md = init_git_repo_with_results_md(tmp_path)
+    results_md.write_text("updated\n", encoding="utf-8")
+    summary_json = tmp_path / "publish_stale_owner_lock_summary.json"
+    lock_dir = repo_root / ".git" / ".nemotron_ledger_lock"
+    lock_dir.mkdir()
+    stage_waiters.write_json(
+        lock_dir / stage_waiters.DEFAULT_RESULTS_GIT_LOCK_OWNER_FILENAME,
+        {
+            "pid": 999999,
+            "created_at": stage_waiters.utc_now(),
+            "command": "publish-results-md",
+        },
+    )
+
+    stage_waiters.run_publish_results_md(
+        SimpleNamespace(
+            repo_root=repo_root,
+            results_md=results_md,
+            commit_message="Record temp results",
+            push=False,
+            dry_run=False,
+            summary_json=summary_json,
+            lock_dir=lock_dir,
+            lock_poll_seconds=0.1,
+            lock_timeout_seconds=1.0,
+        )
+    )
+
+    summary = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert summary["status"] == "committed"
+    assert summary["cleared_stale_lock_count"] == 1
+    assert not lock_dir.exists()
+
+
 def test_publish_results_md_retries_after_remote_advances(tmp_path: Path) -> None:
     repo_root, results_md, remote_root = init_git_repo_with_remote_results_md(tmp_path)
     other_root = tmp_path / "other"

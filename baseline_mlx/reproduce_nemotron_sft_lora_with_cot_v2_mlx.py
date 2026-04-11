@@ -83,6 +83,7 @@ DEFAULT_RUN_AUDIT_RELPATH = Path("submission_compat_audit/submission_compat_audi
 DEFAULT_RUN_EXPORT_RELPATH = Path("submission_export/export_manifest.json")
 DEFAULT_RESULTS_MD = REPO_ROOT / "versions" / "baseline_mlx" / "baseline_mlx-results.md"
 DEFAULT_RESULTS_GIT_LOCK_DIR = REPO_ROOT / ".git" / ".nemotron_ledger_lock"
+DEFAULT_RESULTS_GIT_LOCK_OWNER_FILENAME = "owner.json"
 DEFAULT_LIVE_PROGRESS_MAX_LOG_BYTES = 65536
 DEFAULT_LIVE_PROGRESS_POLL_SECONDS = 300.0
 COPILOT_COAUTHORED_BY_TRAILER = "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
@@ -1061,16 +1062,34 @@ def publish_results_md_to_git(
         raise FileNotFoundError(f"Missing git repository metadata: {resolved_repo_root / '.git'}")
     staged_relpath = resolve_repo_relative_path(resolved_repo_root, resolved_results_md)
     resolved_lock_dir = Path(lock_dir).resolve()
+    lock_owner_path = resolved_lock_dir / DEFAULT_RESULTS_GIT_LOCK_OWNER_FILENAME
     deadline = (
         (time.monotonic() + float(lock_timeout_seconds))
         if float(lock_timeout_seconds) > 0.0
         else None
     )
+    cleared_stale_lock_count = 0
     while True:
         try:
             resolved_lock_dir.mkdir()
+            try:
+                write_json(
+                    lock_owner_path,
+                    {
+                        "pid": os.getpid(),
+                        "ppid": os.getppid(),
+                        "created_at": utc_now(),
+                        "command": "publish-results-md",
+                    },
+                )
+            except Exception:
+                resolved_lock_dir.rmdir()
+                raise
             break
         except FileExistsError:
+            if maybe_clear_stale_results_git_lock_dir(resolved_lock_dir):
+                cleared_stale_lock_count += 1
+                continue
             if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError(f"Timed out waiting for git lock: {resolved_lock_dir}")
             time.sleep(float(lock_poll_seconds))
@@ -1084,6 +1103,7 @@ def publish_results_md_to_git(
         "push": bool(push),
         "dry_run": bool(dry_run),
         "lock_dir": str(resolved_lock_dir),
+        "cleared_stale_lock_count": cleared_stale_lock_count,
     }
     try:
         add_returncode, add_output = run_git_text_command(
@@ -1133,7 +1153,70 @@ def publish_results_md_to_git(
             summary["status"] = "pushed"
         return summary
     finally:
+        try:
+            lock_owner_path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+        try:
+            resolved_lock_dir.rmdir()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+
+
+def is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def maybe_clear_stale_results_git_lock_dir(lock_dir: Path) -> bool:
+    resolved_lock_dir = Path(lock_dir).resolve()
+    if not resolved_lock_dir.exists():
+        return False
+    lock_owner_path = resolved_lock_dir / DEFAULT_RESULTS_GIT_LOCK_OWNER_FILENAME
+    if lock_owner_path.exists():
+        try:
+            owner_payload = json.loads(lock_owner_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        if not isinstance(owner_payload, dict):
+            return False
+        owner_pid_value = owner_payload.get("pid")
+        try:
+            owner_pid = int(owner_pid_value)
+        except (TypeError, ValueError):
+            owner_pid = -1
+        if is_pid_alive(owner_pid):
+            return False
+        try:
+            lock_owner_path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return False
+    else:
+        try:
+            if any(resolved_lock_dir.iterdir()):
+                return False
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
+    try:
         resolved_lock_dir.rmdir()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return True
 
 
 def collect_memory_pressure_snapshot() -> dict[str, Any]:
