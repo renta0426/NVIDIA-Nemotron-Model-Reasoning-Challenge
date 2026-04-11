@@ -3812,6 +3812,14 @@ def run_record_run_result(args: argparse.Namespace) -> None:
         "results_md": str(results_md),
         "run_name": payload["run_name"],
         "label": payload["label"],
+        "run_root": payload["run_root"],
+        "prepare_manifest": payload["prepare_manifest"],
+        "training_result": payload.get("training_result"),
+        "suite_summary": payload.get("suite_summary"),
+        "evaluation_payloads": payload.get("evaluation_payloads", {}),
+        "local320_components": payload.get("local320_components", {}),
+        "audit_summary": payload.get("audit_summary"),
+        "export_manifest": payload.get("export_manifest"),
     }
     write_json(Path(payload["run_root"]) / "recorded_run_result.json", record_payload)
     print(json.dumps(record_payload, ensure_ascii=False, indent=2))

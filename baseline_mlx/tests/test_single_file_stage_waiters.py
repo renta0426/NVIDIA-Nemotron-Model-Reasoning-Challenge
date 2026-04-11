@@ -808,6 +808,8 @@ def test_record_run_result_accepts_legacy_prepare_manifest_without_trainable_suf
 
     recorded = json.loads((run_root / "recorded_run_result.json").read_text(encoding="utf-8"))
     assert recorded["run_name"] == "legacy_run"
+    assert recorded["evaluation_payloads"]["leaderboard_proxy_v1_set"]["overall"]["correct"] == 123
+    assert recorded["local320_components"]["general_stable_set"]["correct"] == 96
     ledger = results_md.read_text(encoding="utf-8")
     assert "trainable_lora_suffixes: `[]`" in ledger
     assert "leaderboard_proxy_v1_set: `123/200 = 0.6150`" in ledger
