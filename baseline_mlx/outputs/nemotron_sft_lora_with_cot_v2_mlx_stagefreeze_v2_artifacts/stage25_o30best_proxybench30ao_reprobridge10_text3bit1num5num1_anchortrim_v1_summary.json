@@ -1,0 +1,99 @@
+{
+  "created_at": "2026-04-11T18:21:31.627851+00:00",
+  "output_csv": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_v1.csv",
+  "rows_total": 80,
+  "type_counts": {
+    "Equation Transformation": 8,
+    "Bit Manipulation": 34,
+    "Text Encryption": 18,
+    "Gravitational Constant": 10,
+    "Unit Conversion": 10
+  },
+  "parent_variant_csv": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_verifiedswap22_bit33eq2_v1.csv",
+  "source_train_csv": "baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv",
+  "source_stage2_csv": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_proxymiss40_text20_grav15_unit15_sym8_v1.csv",
+  "source_raw_train_csv": "data/train.csv",
+  "source_analysis_csv": "cuda-train-data-analysis-v1/artifacts/train_row_analysis_v1.csv",
+  "bridge_strategy": "start from verifiedswap22_bit33eq2, then combine the exact four frontier-over-repro absent rows from reprogap4, the five quality-focused numeric anchors from verifiedmix, and the single absent reverse-gap answer_only numeric row from reprogap5 while trimming the easiest five gravity and five unit stabilizers",
+  "added_rows": 10,
+  "added_ids": [
+    "94643472",
+    "46951896",
+    "ba14f4a1",
+    "77602e0f",
+    "18268687",
+    "52c62a3e",
+    "54c9bde5",
+    "878c843c",
+    "75032b65",
+    "8158a14c"
+  ],
+  "added_breakdown": {
+    "frontier_over_repro_exact_gap": [
+      "94643472",
+      "46951896",
+      "ba14f4a1",
+      "77602e0f"
+    ],
+    "quality_focused_numeric_bridge": [
+      "18268687",
+      "52c62a3e",
+      "54c9bde5",
+      "878c843c",
+      "75032b65"
+    ],
+    "reverse_gap_answer_only_hedge": [
+      "8158a14c"
+    ]
+  },
+  "added_by_type": {
+    "Text Encryption": 3,
+    "Bit Manipulation": 1,
+    "Equation Transformation": 6
+  },
+  "added_by_subtype": {
+    "text_monoalphabetic": 3,
+    "bit_structured_byte_formula": 1,
+    "numeric_2x2": 6
+  },
+  "removed_rows": 10,
+  "removed_ids": [
+    "853a0e3b",
+    "66ae2b46",
+    "e8abdc14",
+    "a0132d58",
+    "4001b78e",
+    "c0648741",
+    "49991cf5",
+    "0e2636ae",
+    "80a4ccdc",
+    "b7a94434"
+  ],
+  "removed_by_type": {
+    "Gravitational Constant": 5,
+    "Unit Conversion": 5
+  },
+  "removed_hard_scores": {
+    "853a0e3b": 0.0,
+    "66ae2b46": 0.0,
+    "e8abdc14": 0.0,
+    "a0132d58": 0.0,
+    "4001b78e": 0.0,
+    "c0648741": 1.0,
+    "49991cf5": 1.0,
+    "0e2636ae": 1.0,
+    "80a4ccdc": 1.0,
+    "b7a94434": 1.0
+  },
+  "selection_criteria": {
+    "added_gap": "Use the exact four proxy row ids where the tracked 131/200 frontier beats the clean 128/200 repro and which are absent from the bit33/numreal family.",
+    "added_numeric": "Reuse the five quality-focused numeric_2x2 anchors from the verifiedmix bridge.",
+    "added_answer_only": "Inject the only remaining absent reverse-gap row from raw train as a boxed answer-only example so the hybrid tests the full known repro gap surface with answer_only exposure capped at 1/80.",
+    "removed": "Trim the easiest five Gravitational Constant and five Unit Conversion stabilizers still present in verifiedswap22_bit33eq2 by hard_score, prompt_len_chars, id."
+  },
+  "notes": [
+    "This is the first queued sibling that stacks both reprogap4 and reprogap5 signals onto the verifiedmix numeric bridge.",
+    "The resulting mix is Bit 34 / Text 18 / Gravity 10 / Unit 10 / Equation 8.",
+    "Only one answer_only row is present, preserving the low-exposure hedge design from reprogap5 while broadening the exact-gap repair set."
+  ]
+}
