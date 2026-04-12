@@ -1,0 +1,72 @@
+{
+  "created_at": "2026-04-12T02:02:43.493957+00:00",
+  "base_dataset": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_v1.csv",
+  "output_dataset": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_v1.csv",
+  "strategy": "raw6_plus_unitedge_from_reprobridge23",
+  "rationale": "Start from reprobridge23, keep the added ratio_edge unit hedge 0c26f842, but swap one weakest remaining ratio_lt2 unit stabilizer f9103e02 for the strongest still-unused generated-COT-capable verified numeric_2x2 row 791fc537. This explicitly fuses reprobridge23's unit-edge hedge with reprobridge24's raw6 push rather than choosing only one direction.",
+  "removed_rows": [
+    "f9103e02"
+  ],
+  "added_rows": [
+    "791fc537"
+  ],
+  "removed_row_details": {
+    "f9103e02": {
+      "family": "unit_conversion",
+      "subfamily": "ratio_lt2",
+      "template_subtype": "unit_fixed_ratio",
+      "selection_tier": "verified_trace_ready",
+      "hard_score": "1.0",
+      "answer_only_ready": ""
+    }
+  },
+  "added_row_details": {
+    "791fc537": {
+      "family": "symbol_equation",
+      "subfamily": "equation_transduction",
+      "template_subtype": "numeric_2x2",
+      "selection_tier": "verified_trace_ready",
+      "hard_score": "4.0",
+      "answer_only_ready": ""
+    }
+  },
+  "resulting_mix": {
+    "Bit": 34,
+    "Text": 18,
+    "Gravity": 9,
+    "Unit": 7,
+    "Equation": 12
+  },
+  "notes": {
+    "kept_unit_edge_row": [
+      "0c26f842"
+    ],
+    "removed_weak_unit_stabilizer": [
+      "f9103e02"
+    ],
+    "kept_fullraw_numeric_rows": [
+      "118f8c86",
+      "7195cb7b",
+      "9b820b4e",
+      "f94810f5",
+      "a8e033fe"
+    ],
+    "added_extra_raw_verified_numeric_row": [
+      "791fc537"
+    ],
+    "remaining_unit_rows_include": [
+      "dae6dea8",
+      "2af08815",
+      "95e8326c",
+      "e346233f",
+      "3f37b894",
+      "a127eb72",
+      "0c26f842"
+    ],
+    "cot_sources": [
+      "cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/train_split_with_cot_v3f_one_shot_repair_v1.csv",
+      "cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/train_split_with_cot_v2_plus_binary_route_aware.csv",
+      "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union/sampled_train_split_with_cot.csv"
+    ]
+  }
+}
