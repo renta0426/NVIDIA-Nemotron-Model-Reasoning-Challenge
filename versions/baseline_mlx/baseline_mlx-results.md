@@ -773,7 +773,7 @@
 <!-- auto-run-summary:start:best-submission-candidate -->
 ### Auto best submission candidate
 
-- recorded_at: `2026-04-12T03:02:06.742887+00:00`
+- recorded_at: `2026-04-12T03:07:12.926747+00:00`
 - status: `selected_candidate`
 - candidate_count: `34`
 - eligible_candidate_count: `3`
