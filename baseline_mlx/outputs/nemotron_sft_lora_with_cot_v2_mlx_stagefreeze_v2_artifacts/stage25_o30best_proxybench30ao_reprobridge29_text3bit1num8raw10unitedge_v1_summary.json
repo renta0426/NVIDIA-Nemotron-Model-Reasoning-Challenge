@@ -1,0 +1,63 @@
+{
+  "created_at": "2026-04-12T03:18:17.405162+00:00",
+  "base_dataset": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_v1.csv",
+  "output_dataset": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_v1.csv",
+  "strategy": "raw10_plus_unitedge_from_reprobridge28",
+  "rationale": "Start from reprobridge28, keep the hard unit-edge hedge 0c26f842 plus the remaining stronger unit stabilizers, and swap the weakest remaining unit row 2af08815 for the highest-hard-score still-unused verified numeric_2x2 row 1f445c5e from the baseline train_split_with_cot source. This deepens the raw-heavy bridge while stepping back inside the generated-COT-safe source family after the two rule-based injections.",
+  "removed_rows": [
+    "2af08815"
+  ],
+  "added_rows": [
+    "1f445c5e"
+  ],
+  "removed_row_details": {
+    "2af08815": {
+      "family": "unit_conversion",
+      "subfamily": "ratio_lt1",
+      "template_subtype": "unit_fixed_ratio",
+      "selection_tier": "verified_trace_ready",
+      "hard_score": "2.0",
+      "answer_only_ready": ""
+    }
+  },
+  "added_row_details": {
+    "1f445c5e": {
+      "family": "symbol_equation",
+      "subfamily": "equation_transduction",
+      "template_subtype": "numeric_2x2",
+      "selection_tier": "verified_trace_ready",
+      "hard_score": "4.0",
+      "answer_only_ready": ""
+    }
+  },
+  "resulting_mix": {
+    "Bit": 34,
+    "Text": 18,
+    "Gravity": 9,
+    "Unit": 3,
+    "Equation": 16
+  },
+  "notes": {
+    "kept_unit_edge_row": [
+      "0c26f842"
+    ],
+    "removed_weak_unit_stabilizer": [
+      "2af08815"
+    ],
+    "added_train_split_numeric_row": [
+      "1f445c5e"
+    ],
+    "remaining_unit_rows_include": [
+      "95e8326c",
+      "3f37b894",
+      "0c26f842"
+    ],
+    "row_source_files": {
+      "1f445c5e": "baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv"
+    },
+    "cot_sources": [
+      "baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv",
+      "baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv"
+    ]
+  }
+}
