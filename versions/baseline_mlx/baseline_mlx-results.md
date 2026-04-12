@@ -1541,43 +1541,35 @@ Update 2026-04-12T03:18Z:
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
 
-- status: `evaluating`
-- label: `reprobridge21 unit edge`
-- observed_at: `2026-04-12T04:52:33.607869+00:00`
+- recorded_at: `2026-04-12T04:53:17.671764+00:00`
+- label: `o30best proxybench reprobridge21 unit edge v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_v1.csv`
 - sampled_rows: `80`
-- optimizer_progress: `0/8 = 0.00%`
+- optimizer_steps: `8`
 - lr: `1e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-#### Latest evaluation progress
+#### Scores
 
-- source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
-- suite_evaluations: `1/2 = 50.00%`
-- current_evaluation: `leaderboard_proxy_v1_set`
-- current_rows_progress: `192/200 = 96.00%`
-- current_chunks_progress: `12/13 = 92.31%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
-- accuracy_so_far: `0.6354`
-- correct_so_far: `122`
-- completed_evaluations: `['readme_local320']`
-- completed_evaluation_scores: `readme_local320 227/320 = 0.7094`
+- readme_local320: `227/320 = 0.7094`
+- local320_components: `general_stable_set 176/200 = 0.8800; binary_hard_set 30/60 = 0.5000; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `126/200 = 0.6300`
 
-#### Completion markers
+#### Submission audit
 
-- training_result_exists: `True`
-- runtime_pid: `60884`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356901`
+- validation_valid: `True`
 <!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1 -->
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1 -->
