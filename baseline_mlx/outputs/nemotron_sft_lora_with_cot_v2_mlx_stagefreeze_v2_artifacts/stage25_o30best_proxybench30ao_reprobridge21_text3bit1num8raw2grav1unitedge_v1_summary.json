@@ -1,0 +1,59 @@
+{
+  "created_at": "2026-04-12T00:13:13.060900+00:00",
+  "base_dataset": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_v1.csv",
+  "output_dataset": "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_v1.csv",
+  "strategy": "hybrid_raw2_gravity1_unitedge_from_reprobridge18",
+  "rationale": "Start from reprobridge18, keep its perfect-so-far raw2 + gravity balance, but trade one zero-hard-score gravity stabilizer for the highest-hard-score unused ratio_edge unit row that still exists in generated-COT-capable sources. This tests whether a harder unit hedge improves later hidden-tail robustness without abandoning the strong raw2 branch.",
+  "removed_rows": [
+    "66ae2b46"
+  ],
+  "added_rows": [
+    "0c26f842"
+  ],
+  "removed_row_details": {
+    "66ae2b46": {
+      "family": "gravity_constant",
+      "subfamily": "g14",
+      "template_subtype": "gravity_half_g_t2",
+      "selection_tier": "verified_trace_ready",
+      "hard_score": "0.0",
+      "answer_only_ready": ""
+    }
+  },
+  "added_row_details": {
+    "0c26f842": {
+      "family": "unit_conversion",
+      "subfamily": "ratio_edge",
+      "template_subtype": "unit_fixed_ratio",
+      "selection_tier": "verified_trace_ready",
+      "hard_score": "4.0",
+      "answer_only_ready": ""
+    }
+  },
+  "resulting_mix": {
+    "Bit": 34,
+    "Text": 18,
+    "Gravity": 10,
+    "Unit": 8,
+    "Equation": 10
+  },
+  "notes": {
+    "kept_raw_verified_numeric_rows": [
+      "118f8c86",
+      "7195cb7b"
+    ],
+    "kept_restored_gravity_rows": [
+      "853a0e3b"
+    ],
+    "swapped_out_gravity_row": [
+      "66ae2b46"
+    ],
+    "added_unit_edge_row": [
+      "0c26f842"
+    ],
+    "cot_sources": [
+      "cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/train_split_with_cot_v2_plus_binary_route_aware.csv",
+      "baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union/sampled_train_split_with_cot.csv"
+    ]
+  }
+}
