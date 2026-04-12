@@ -1,7 +1,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:01:38.391418+00:00`
+- recorded_at: `2026-04-12T03:04:38.427325+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -53,9 +53,9 @@
 - gate_contract: `readme_local320 >= target threshold`, `leaderboard_proxy_v1_set >= 0.65`, `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`
 - active_waiters: `reprobridge20 -> {0.75, 0.80}`, `reprobridge22 -> {0.75, 0.80}`, `reprobridge21 -> {0.75, 0.80}`, `reprobridge23 -> {0.75, 0.80}`
 - retired_waiters: `numreal8` retired after local320 finished at `226/320 = 0.7063`, which ruled out both `local-ge-0.75` and `local-ge-0.80`; `reprogap5` retired after stalling at `225/304 = 0.7401` with one chunk left, which made `local-ge-0.75` improbable enough to cut for memory; `reprogap4` retired after local320 finished at `229/320 = 0.7156`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge9` retired after local320 finished at `230/320 = 0.7188`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge10` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge12` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge13` retired after local320 finished at `235/320 = 0.7344`, which matched the tracked frontier but still missed the `0.75` gate and therefore did not justify further proxy continuation; `reprobridge15` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75` and made further proxy continuation lower EV than the stronger raw-heavy siblings; `reprobridge16` retired after local320 finished at `232/320 = 0.7250`, which cleared the previous bridge-family siblings but still missed both the tracked frontier and the `0.75` gate; `reprobridge17` retired after local320 finished at `227/320 = 0.7094`, which matched the older bridge-family collapse pattern rather than the surviving raw+gravity line; `reprobridge18` retired after local320 finished at `227/320 = 0.7094`, which failed in almost the same way as reprobridge17 and removed the last live value from the hybrid restore branch; `reprobridge19` retired after local320 finished at `231/320 = 0.7219`, which ruled out both the tracked frontier and the `0.75` gate before proxy continuation justified another heavy eval worker`
-- queued_waiters: `reprobridge24 -> {0.75, 0.80}`, `reprobridge25 -> {0.75, 0.80}`, `reprobridge26 -> {0.75, 0.80}`
-- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge18_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge19_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge20_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge21_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge22_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge23_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge24_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge25_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge26_local_ge_075_v1`, `..._080_v1`
-- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, reprobridge13, reprobridge15, reprobridge16, reprobridge17, reprobridge18, and now reprobridge19 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge20, reprobridge22, reprobridge21, and manually early-launched reprobridge23 remain the active threshold-tracked lanes; the queue is still not empty because reprobridge24, reprobridge25, and now reprobridge26 threshold waiters remain armed behind the next bridge full-suite completions even after reprobridge23 was promoted from queued to live`
+- queued_waiters: `reprobridge24 -> {0.75, 0.80}`, `reprobridge25 -> {0.75, 0.80}`, `reprobridge26 -> {0.75, 0.80}`, `reprobridge27 -> {0.75, 0.80}`
+- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge18_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge19_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge20_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge21_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge22_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge23_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge24_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge25_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge26_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge27_local_ge_075_v1`, `..._080_v1`
+- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, reprobridge13, reprobridge15, reprobridge16, reprobridge17, reprobridge18, and now reprobridge19 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge20, reprobridge22, reprobridge21, and manually early-launched reprobridge23 remain the active threshold-tracked lanes; a later artifact audit found that reprobridge23 actually trained with sampled_rows=79 because 0c26f842 landed in the queued CSV with blank generated_cot/type, so queued descendants reprobridge24/25/26 were repaired in place before launch and the queue now extends one more corrected step to reprobridge27`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2`
@@ -300,7 +300,7 @@
 - recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
 - rationale: `start from reprobridge22, keep the full raw verified numeric spine, but trade the last zero-hard-score gravity restore 853a0e3b for reprobridge21's harder ratio_edge unit row 0c26f842; this explicitly fuses the current full-raw mainline with the unit-edge side hedge to test whether later hidden-tail robustness benefits more from one hard unit anchor than from one easy gravity stabilizer once all answer_only numerics are already gone`
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 8 / Equation 11`
-- notes: `reprobridge23 is the queue-refill cross between the two surviving design ideas: reprobridge22's full-raw backbone and reprobridge21's unit-edge hedge; it removes the remaining gravity restore 853a0e3b from reprobridge22, keeps raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, and a8e033fe, and injects unit row 0c26f842 instead; runtime preflight at manual early launch captured current_pid 74969 with PhysMem used ≈ 322 GB / unused ≈ 189 GB, system_free_memory 62%, GPU device util 100%, and in-use system memory ≈ 194.06 GB; the short train then closed almost immediately with train_loss ≈ 0.3439 / val_loss ≈ 0.3951 / optimizer_step 8 / peak_memory ≈ 65.46 GB, and the pre-armed postprocess chain has already started `eval_suite_readme_proxy_specialized` on the target root (`readme_local320` 0/320 at handoff), so the bridge queue remains live without waiting for another full-suite summary to free memory`
+- notes: `reprobridge23 is the queue-refill cross between the two surviving design ideas: reprobridge22's full-raw backbone and reprobridge21's unit-edge hedge; it removes the remaining gravity restore 853a0e3b from reprobridge22, keeps raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, and a8e033fe, and injects unit row 0c26f842 instead; runtime preflight at manual early launch captured current_pid 74969 with PhysMem used ≈ 322 GB / unused ≈ 189 GB, system_free_memory 62%, GPU device util 100%, and in-use system memory ≈ 194.06 GB; the short train then closed almost immediately with train_loss ≈ 0.3439 / val_loss ≈ 0.3951 / optimizer_step 8 / peak_memory ≈ 65.46 GB, and the pre-armed postprocess chain has already started `eval_suite_readme_proxy_specialized` on the target root (`readme_local320` 0/320 at handoff), so the bridge queue remains live without waiting for another full-suite summary to free memory; later audit of the run root showed `prepare_manifest.sampled_rows = 79`, because 0c26f842 had blank generated_cot/type in the artifact CSV and was silently skipped by the loader, so treat reprobridge23 as a useful but imperfect early diagnostic rather than the exact intended 80-row unitedge fusion`
 
 ### Manual queue note: `reprobridge24_text3bit1num8raw6_nograv_v1`
 
@@ -312,7 +312,7 @@
 - recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
 - rationale: `start from reprobridge22, drop the last remaining easy gravity restore 853a0e3b, and replace it with the strongest still-unused generated-COT-capable verified numeric_2x2 row dfec0ed4; this is the aggressive continuation of the raw-heavy line and tests whether the branch can push one step past fullraw now that every answer_only numeric row has already been removed`
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 7 / Equation 12`
-- notes: `reprobridge24 keeps the reprogap4 corrective bit/text skeleton and all five full-raw numeric rows from reprobridge22, then swaps the final gravity restore for unused raw verified numeric row dfec0ed4, which is present in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, and the broad-v3f sampled_train_split_with_cot.csv; duplicate-safe live-poller, postprocess, and threshold waiters are already armed on the target root so the queue can keep extending even if reprobridge23 itself is later manual-launched early`
+- notes: `reprobridge24 keeps the reprogap4 corrective bit/text skeleton and all five full-raw numeric rows from reprobridge22, then swaps the final gravity restore for unused raw verified numeric row dfec0ed4, which is present in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, the broad-v3f sampled_train_split_with_cot.csv, and baseline train_split_with_cot.csv; a later artifact audit found dfec0ed4 missing type/generated_cot in the queued-only CSV, so the train CSV was repaired in place from baseline train_split_with_cot.csv before launch; duplicate-safe live-poller, postprocess, and threshold waiters are already armed on the target root so the queue can keep extending even if reprobridge23 itself is later manual-launched early`
 
 ### Manual queue note: `reprobridge25_text3bit1num8raw6unitedge_v1`
 
@@ -324,7 +324,7 @@
 - recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
 - rationale: `start from reprobridge23, keep the injected ratio_edge unit hedge 0c26f842, but swap one weakest remaining ratio_lt2 unit stabilizer f9103e02 for the strongest still-unused generated-COT-capable verified numeric_2x2 row 791fc537; this explicitly fuses reprobridge23's unit-edge hedge with reprobridge24's raw6 push instead of forcing an either-or choice`
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 7 / Equation 12`
-- notes: `reprobridge25 is the deeper continuation after the queue-refill pair: it starts from reprobridge23, preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, and a8e033fe plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row f9103e02 in favor of unused raw verified numeric row 791fc537; 791fc537 was confirmed in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, and the broad-v3f sampled_train_split_with_cot.csv; duplicate-safe launch, live-poller, postprocess, and threshold waiters are all now armed on the target root so the bridge queue can continue beyond reprobridge24 without another manual wiring pass`
+- notes: `reprobridge25 is the deeper continuation after the queue-refill pair: it starts from reprobridge23, preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, and a8e033fe plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row f9103e02 in favor of unused raw verified numeric row 791fc537; 791fc537 was confirmed in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, the broad-v3f sampled_train_split_with_cot.csv, and baseline train_split_with_cot.csv; a later artifact audit found that both 0c26f842 and 791fc537 had landed in the queued-only CSV without complete type/generated_cot fields, so the train CSV was repaired in place from baseline train_split_with_cot.csv before launch; duplicate-safe launch, live-poller, postprocess, and threshold waiters are all now armed on the target root so the bridge queue can continue beyond reprobridge24 without another manual wiring pass`
 
 ### Manual queue note: `reprobridge26_text3bit1num8raw7unitedge_v1`
 
@@ -336,12 +336,24 @@
 - recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
 - rationale: `start from reprobridge25, keep the injected ratio_edge unit hedge 0c26f842 and the first extra raw verified numeric row 791fc537, but swap another weakest remaining ratio_lt2 unit stabilizer a127eb72 for reprobridge24's generated-COT-capable verified numeric_2x2 row dfec0ed4; this is the next raw-heavy continuation because it merges the two queued raw6 branches instead of forcing an either-or choice between them`
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 6 / Equation 13`
-- notes: `reprobridge26 is the triple-fusion continuation after reprobridge24 and reprobridge25: it starts from reprobridge25, preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, and 791fc537 plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row a127eb72 in favor of dfec0ed4 from the reprobridge24 raw6-nograv branch; dfec0ed4 was confirmed in train_split_with_cot_v3f_one_shot_repair_v1.csv and train_split_with_cot_v2_plus_binary_route_aware.csv, so duplicate-safe launch, live-poller, postprocess, and threshold waiters can extend the bridge queue one more step without leaving the generated-COT-capable source family`
+- notes: `reprobridge26 is the triple-fusion continuation after reprobridge24 and reprobridge25: it starts from reprobridge25, preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, and 791fc537 plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row a127eb72 in favor of dfec0ed4 from the reprobridge24 raw6-nograv branch; dfec0ed4 was confirmed in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, and baseline train_split_with_cot.csv; a later artifact audit found that 0c26f842, 791fc537, and dfec0ed4 needed full type/generated_cot backfill in the queued-only CSV, so the train CSV was repaired in place from baseline train_split_with_cot.csv before launch; duplicate-safe launch, live-poller, postprocess, and threshold waiters can extend the bridge queue one more step without leaving the generated-COT-capable source family`
+
+### Manual queue note: `reprobridge27_text3bit1num8raw8unitedge_v1`
+
+- status: `queued_behind_reprobridge26_full_suite_summary`
+- queued_at: `2026-04-12T03:27Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge26 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from repaired reprobridge26, keep the injected ratio_edge unit hedge 0c26f842 and both extra raw verified numeric rows 791fc537 and dfec0ed4, but swap another weakest remaining ratio_lt2 unit stabilizer dae6dea8 for stronger verified numeric_2x2 row 8c6a158e from the rule-based verified COT source; this is the next raw-heavy continuation once the queue has already merged reprobridge24 and reprobridge25`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 5 / Equation 14`
+- notes: `reprobridge27 is the raw8 continuation after the repaired reprobridge26 queue: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row dae6dea8 in favor of 8c6a158e from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this intentionally steps outside the current route-aware/v3f source trio for one stronger rule-based verified raw row while keeping the rest of the queue on generated-COT-capable train_split_with_cot sources`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 
-- recorded_at: `2026-04-12T03:01:41.492940+00:00`
+- recorded_at: `2026-04-12T03:03:41.514635+00:00`
 - label: `o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_proxymiss40_text20_grav15_unit15_sym8_v1.csv`
@@ -373,7 +385,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:01:45.182524+00:00`
+- recorded_at: `2026-04-12T03:03:45.209178+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -444,7 +456,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:01:55.894592+00:00`
+- recorded_at: `2026-04-12T03:03:55.926658+00:00`
 - label: `o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary20_text10_grav15_unit15_v1.csv`
@@ -514,7 +526,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- recorded_at: `2026-04-12T03:01:16.406318+00:00`
+- recorded_at: `2026-04-12T03:04:16.464196+00:00`
 - label: `binary40_o30_p0_s10_no_lz`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1.csv`
@@ -546,7 +558,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 
-- recorded_at: `2026-04-12T03:01:22.124036+00:00`
+- recorded_at: `2026-04-12T03:04:22.180726+00:00`
 - label: `o30_general_recover_t040_n120_g20_u20`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text040_num120_grav20_unit20_recover_v1.csv`
@@ -655,7 +667,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 
-- recorded_at: `2026-04-12T03:01:36.647586+00:00`
+- recorded_at: `2026-04-12T03:04:36.684135+00:00`
 - label: `o30best_local_best_actual_repro_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1_repro_v1.csv`
@@ -687,7 +699,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
 
-- recorded_at: `2026-04-12T03:01:42.792291+00:00`
+- recorded_at: `2026-04-12T03:03:42.824267+00:00`
 - label: `o30best-proxybench-repro-eval-live`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1_repro_v1.csv`
@@ -1315,7 +1327,7 @@
 
 - status: `evaluating`
 - label: `reprobridge20 hedge cut`
-- observed_at: `2026-04-12T02:57:30.655675+00:00`
+- observed_at: `2026-04-12T03:04:38.154619+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_v1.csv`
 - sampled_rows: `80`
@@ -1331,11 +1343,11 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `272/320 = 85.00%`
-- current_chunks_progress: `17/20 = 85.00%`
+- current_rows_progress: `288/320 = 90.00%`
+- current_chunks_progress: `18/20 = 90.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
-- accuracy_so_far: `0.8051`
-- correct_so_far: `219`
+- accuracy_so_far: `0.7917`
+- correct_so_far: `228`
 
 #### Completion markers
 
