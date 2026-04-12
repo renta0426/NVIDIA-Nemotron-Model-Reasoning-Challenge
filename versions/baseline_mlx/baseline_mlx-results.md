@@ -360,7 +360,7 @@
 - recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
 - rationale: `start from reprobridge27, keep only the hardest remaining ratio_edge unit hedge 0c26f842 together with the growing raw verified numeric spine, but swap another weak ratio_lt2 unit stabilizer e346233f for stronger verified numeric_2x2 row db6a5663 from the rule-based verified COT source; this continues the raw-heavy bridge one step further without dropping the final hard unit-edge anchor`
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 4 / Equation 15`
-- notes: `reprobridge28 is the raw9 continuation after reprobridge27: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, 8c6a158e, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row e346233f in favor of db6a5663 from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this pushes the queue one more step outside the current route-aware/v3f source trio while still leaving one hard unit-edge stabilizer in place`
+- notes: `reprobridge28 is the raw9 continuation after reprobridge27: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, 8c6a158e, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row e346233f in favor of db6a5663 from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this pushes the queue one more step outside the current route-aware/v3f source trio while still leaving one hard unit-edge stabilizer in place; duplicate-safe launcher, live-poller, postprocess, and 0.75/0.80 threshold waiters are now armed on the target root behind reprobridge27 full-suite completion`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
@@ -468,7 +468,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:10:56.029931+00:00`
+- recorded_at: `2026-04-12T03:11:56.043302+00:00`
 - label: `o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary20_text10_grav15_unit15_v1.csv`
@@ -538,7 +538,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- recorded_at: `2026-04-12T03:11:16.610608+00:00`
+- recorded_at: `2026-04-12T03:12:16.627415+00:00`
 - label: `binary40_o30_p0_s10_no_lz`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1.csv`
@@ -570,7 +570,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 
-- recorded_at: `2026-04-12T03:11:22.291898+00:00`
+- recorded_at: `2026-04-12T03:12:22.310669+00:00`
 - label: `o30_general_recover_t040_n120_g20_u20`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text040_num120_grav20_unit20_recover_v1.csv`
@@ -785,7 +785,7 @@
 <!-- auto-run-summary:start:best-submission-candidate -->
 ### Auto best submission candidate
 
-- recorded_at: `2026-04-12T03:07:12.926747+00:00`
+- recorded_at: `2026-04-12T03:12:14.111921+00:00`
 - status: `selected_candidate`
 - candidate_count: `34`
 - eligible_candidate_count: `3`
