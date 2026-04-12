@@ -1,7 +1,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:10:38.510096+00:00`
+- recorded_at: `2026-04-12T03:11:38.516222+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -53,9 +53,9 @@
 - gate_contract: `readme_local320 >= target threshold`, `leaderboard_proxy_v1_set >= 0.65`, `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`
 - active_waiters: `reprobridge20 -> {0.75, 0.80}`, `reprobridge22 -> {0.75, 0.80}`, `reprobridge21 -> {0.75, 0.80}`, `reprobridge23 -> {0.75, 0.80}`
 - retired_waiters: `numreal8` retired after local320 finished at `226/320 = 0.7063`, which ruled out both `local-ge-0.75` and `local-ge-0.80`; `reprogap5` retired after stalling at `225/304 = 0.7401` with one chunk left, which made `local-ge-0.75` improbable enough to cut for memory; `reprogap4` retired after local320 finished at `229/320 = 0.7156`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge9` retired after local320 finished at `230/320 = 0.7188`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge10` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge12` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge13` retired after local320 finished at `235/320 = 0.7344`, which matched the tracked frontier but still missed the `0.75` gate and therefore did not justify further proxy continuation; `reprobridge15` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75` and made further proxy continuation lower EV than the stronger raw-heavy siblings; `reprobridge16` retired after local320 finished at `232/320 = 0.7250`, which cleared the previous bridge-family siblings but still missed both the tracked frontier and the `0.75` gate; `reprobridge17` retired after local320 finished at `227/320 = 0.7094`, which matched the older bridge-family collapse pattern rather than the surviving raw+gravity line; `reprobridge18` retired after local320 finished at `227/320 = 0.7094`, which failed in almost the same way as reprobridge17 and removed the last live value from the hybrid restore branch; `reprobridge19` retired after local320 finished at `231/320 = 0.7219`, which ruled out both the tracked frontier and the `0.75` gate before proxy continuation justified another heavy eval worker`
-- queued_waiters: `reprobridge24 -> {0.75, 0.80}`, `reprobridge25 -> {0.75, 0.80}`, `reprobridge26 -> {0.75, 0.80}`, `reprobridge27 -> {0.75, 0.80}`
-- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge18_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge19_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge20_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge21_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge22_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge23_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge24_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge25_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge26_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge27_local_ge_075_v1`, `..._080_v1`
-- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, reprobridge13, reprobridge15, reprobridge16, reprobridge17, reprobridge18, and now reprobridge19 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge20, reprobridge22, reprobridge21, and manually early-launched reprobridge23 remain the active threshold-tracked lanes; a later artifact audit found that reprobridge23 actually trained with sampled_rows=79 because 0c26f842 landed in the queued CSV with blank generated_cot/type, so queued descendants reprobridge24/25/26 were repaired in place before launch and the queue now extends one more corrected step to reprobridge27`
+- queued_waiters: `reprobridge24 -> {0.75, 0.80}`, `reprobridge25 -> {0.75, 0.80}`, `reprobridge26 -> {0.75, 0.80}`, `reprobridge27 -> {0.75, 0.80}`, `reprobridge28 -> {0.75, 0.80}`
+- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge18_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge19_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge20_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge21_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge22_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge23_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge24_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge25_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge26_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge27_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge28_local_ge_075_v1`, `..._080_v1`
+- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, reprobridge13, reprobridge15, reprobridge16, reprobridge17, reprobridge18, and now reprobridge19 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge20, reprobridge22, reprobridge21, and manually early-launched reprobridge23 remain the active threshold-tracked lanes; a later artifact audit found that reprobridge23 actually trained with sampled_rows=79 because 0c26f842 landed in the queued CSV with blank generated_cot/type, so queued descendants reprobridge24/25/26 were repaired in place before launch and the queue now extends further through corrected reprobridge27 to reprobridge28`
 
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2 -->
 ### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2`
@@ -350,10 +350,22 @@
 - resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 5 / Equation 14`
 - notes: `reprobridge27 is the raw8 continuation after the repaired reprobridge26 queue: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row dae6dea8 in favor of 8c6a158e from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this intentionally steps outside the current route-aware/v3f source trio for one stronger rule-based verified raw row while keeping the rest of the queue on generated-COT-capable train_split_with_cot sources; duplicate-safe launcher, live-poller, postprocess, and 0.75/0.80 threshold waiters are now armed on the target root behind reprobridge26 full-suite completion`
 
+### Manual queue note: `reprobridge28_text3bit1num8raw9unitedge_v1`
+
+- status: `queued_behind_reprobridge27_full_suite_summary`
+- queued_at: `2026-04-12T03:43Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge27 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge27, keep only the hardest remaining ratio_edge unit hedge 0c26f842 together with the growing raw verified numeric spine, but swap another weak ratio_lt2 unit stabilizer e346233f for stronger verified numeric_2x2 row db6a5663 from the rule-based verified COT source; this continues the raw-heavy bridge one step further without dropping the final hard unit-edge anchor`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 4 / Equation 15`
+- notes: `reprobridge28 is the raw9 continuation after reprobridge27: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, 8c6a158e, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row e346233f in favor of db6a5663 from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this pushes the queue one more step outside the current route-aware/v3f source trio while still leaving one hard unit-edge stabilizer in place`
+
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 
-- recorded_at: `2026-04-12T03:10:41.624989+00:00`
+- recorded_at: `2026-04-12T03:11:41.640879+00:00`
 - label: `o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_proxymiss40_text20_grav15_unit15_sym8_v1.csv`
@@ -385,7 +397,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:10:45.305507+00:00`
+- recorded_at: `2026-04-12T03:11:45.321016+00:00`
 - label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
@@ -456,7 +468,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- recorded_at: `2026-04-12T03:09:56.013891+00:00`
+- recorded_at: `2026-04-12T03:10:56.029931+00:00`
 - label: `o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary20_text10_grav15_unit15_v1.csv`
@@ -526,7 +538,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 
-- recorded_at: `2026-04-12T03:10:16.595032+00:00`
+- recorded_at: `2026-04-12T03:11:16.610608+00:00`
 - label: `binary40_o30_p0_s10_no_lz`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1.csv`
@@ -558,7 +570,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 
-- recorded_at: `2026-04-12T03:10:22.282743+00:00`
+- recorded_at: `2026-04-12T03:11:22.291898+00:00`
 - label: `o30_general_recover_t040_n120_g20_u20`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text040_num120_grav20_unit20_recover_v1.csv`
@@ -667,7 +679,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 
-- recorded_at: `2026-04-12T03:10:36.778903+00:00`
+- recorded_at: `2026-04-12T03:11:36.796635+00:00`
 - label: `o30best_local_best_actual_repro_v1`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1_repro_v1.csv`
@@ -699,7 +711,7 @@
 <!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1 -->
 ### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
 
-- recorded_at: `2026-04-12T03:10:42.935313+00:00`
+- recorded_at: `2026-04-12T03:11:42.951231+00:00`
 - label: `o30best-proxybench-repro-eval-live`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1_repro_v1.csv`
@@ -1403,7 +1415,7 @@
 
 - status: `evaluating`
 - label: `reprobridge21 unit edge`
-- observed_at: `2026-04-12T03:10:24.319208+00:00`
+- observed_at: `2026-04-12T03:11:37.298589+00:00`
 - run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
 - train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_v1.csv`
 - sampled_rows: `80`
@@ -1419,11 +1431,11 @@
 - suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `208/320 = 65.00%`
-- current_chunks_progress: `13/20 = 65.00%`
+- current_rows_progress: `224/320 = 70.00%`
+- current_chunks_progress: `14/20 = 70.00%`
 - evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
-- accuracy_so_far: `0.8654`
-- correct_so_far: `180`
+- accuracy_so_far: `0.8482`
+- correct_so_far: `190`
 
 #### Completion markers
 
