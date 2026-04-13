@@ -8,9 +8,9 @@ How many tokens are used to train - 27,850,703 tokens[https://nemotron.huikang.d
 How much money I have spent - $212.48 in Tinker credits, approximately $60 in Modal credits, $10 for Kaggle / Colab subscription.
 What do you think is the secret - bit manipulation, you only need SFT, deterministic chain-of-thought design, use of min logprob as objective, use of Tinker for training
 Quick links
-Original notebook
-Validation notebook
-Training metrics and logs for winning submission
+Original notebook:A-Open-ProgressPrizePublication/tinker-submission-notebook.ipynb
+Validation notebook: A-Open-ProgressPrizePublication/adapter-validation-notebook.ipynb
+Training metrics and logs for winning submission: https://nemotron.huikang.dev/metrics.html?logpath=04-08-16-14
 Github containing the relevant code : A-Open-ProgressPrizePublication/nemotron/README.md
 What was I betting on
 This is what I am betting on
