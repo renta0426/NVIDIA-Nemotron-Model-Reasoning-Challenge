@@ -68,11 +68,11 @@
 ## Current live run
 
 - run_root: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad`
-- status: `training in progress`
-- latest_observed_step: `44/245`
-- latest_train_loss: `0.2994743742072881`
-- trained_tokens: `4869260`
-- latest_elapsed_seconds: `110.2272`
+- status: `training complete; A-Open eval running`
+- latest_observed_step: `245/245`
+- latest_train_loss: `0.16977385855533642`
+- trained_tokens: `26576637`
+- total_elapsed_seconds: `27014.2653`
 - peak_memory_gb: `307.9588`
 - note: switched the exact-snapshot full run from dynamic per-microbatch padding to fixed train padding after host RAM climbed toward the 512 GB ceiling; batch membership/order, LR schedule, LoRA targets, and snapshot inputs remain unchanged
 
@@ -82,7 +82,20 @@
 - If the 9500-row evaluation is interrupted, rerunning the same command resumes from the recorded row count instead of restarting from zero.
 - If `benchmark_eval_summary.json` already exists with `benchmark_eval_progress.json.status == complete`, the script returns that summary immediately instead of recomputing.
 - `postprocess-run` can now rebuild the tracked `v20_mlx_repro_v1-results.{md,json}` files from an existing run's `training_result.json` and `benchmark_eval_summary.json`.
-- The active waiter chain is `train -> eval-aopen -> postprocess-run`, so the tracked results files will refresh automatically once the full evaluation finishes.
+- The script now also supports sharded eval via `--eval-shards`, `--eval-shard-index`, and `merge-aopen-eval`, while keeping the implementation in this single file.
+
+## Eval execution log
+
+- The first full-eval resume attempt stayed at the existing root checkpoint `16/9500` while running a single high-concurrency chunk (`max_num_seqs=64`, `prompt_chunk_size=64`), so wall-clock throughput was judged too poor to keep.
+- The live evaluation was pivoted to **6 shard-parallel workers**:
+  - `--eval-shards 6`
+  - `--max-num-seqs 16`
+  - `--prompt-chunk-size 16`
+  - `--prefill-batch-size 16`
+  - `--completion-batch-size 16`
+- Active shard outputs now live under `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards/`.
+- A dedicated waiter process is polling for `6/6` shard summaries, then runs `merge-aopen-eval -> postprocess-run -> git commit/push`.
+- Observed immediately after launching 6 shards: each eval Python process used roughly `11.6%` host memory and system-wide free memory remained around `26%`, so the 6-way configuration fits within the 512 GB machine envelope.
 
 ## Assumptions not explicit in the public v20 config
 
@@ -92,4 +105,4 @@
 
 ## Next recorded milestone
 
-Run the full 245-step MLX training on the exact v20 snapshot, then run full A-Open evaluation on `data/train.csv` and replace this smoke-only section with the measured end-to-end result.
+Wait for the 6 shard-local A-Open eval runs to finish, merge them into the root `aopen_eval/` summary, refresh `v20_mlx_repro_v1-results.{md,json}`, and replace this progress log with the measured end-to-end result.
