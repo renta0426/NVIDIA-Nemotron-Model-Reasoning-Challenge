@@ -1,8 +1,0 @@
-#!/usr/bin/env python3
-"""Legacy singular alias for the canonical reprobridge materializer."""
-
-from materialize_reprobridges import main
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
