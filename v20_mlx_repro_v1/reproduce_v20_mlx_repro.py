@@ -1442,6 +1442,26 @@ def run_full(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    training_result_path = run_root / "training_result.json"
+    eval_summary_path = run_root / "aopen_eval" / "benchmark_eval_summary.json"
+    if not training_result_path.exists():
+        raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
+    if not eval_summary_path.exists():
+        raise FileNotFoundError(f"Missing benchmark_eval_summary.json at {eval_summary_path}")
+    run_result = load_json(training_result_path)
+    eval_result = load_json(eval_summary_path)
+    update_results_files(args, run_result, eval_result)
+    return {
+        "run_root": str(run_root),
+        "training_result_path": str(training_result_path.resolve()),
+        "eval_summary_path": str(eval_summary_path.resolve()),
+        "results_md": str(DEFAULT_RESULTS_MD.resolve()),
+        "results_json": str(DEFAULT_RESULTS_JSON.resolve()),
+    }
+
+
 def run_prepare(args: argparse.Namespace) -> dict[str, Any]:
     artifacts = prepare_run(args)
     return {
@@ -1531,6 +1551,13 @@ def parse_args() -> argparse.Namespace:
     full = subparsers.add_parser("full-run", help="Prepare, train, evaluate, and update the tracked results files.")
     add_shared_args(full)
     full.set_defaults(func=run_full)
+
+    postprocess = subparsers.add_parser(
+        "postprocess-run",
+        help="Update tracked results files from an existing run's training_result.json and benchmark_eval_summary.json.",
+    )
+    add_shared_args(postprocess)
+    postprocess.set_defaults(func=run_postprocess_existing)
 
     return parser.parse_args()
 
