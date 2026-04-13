@@ -24,6 +24,7 @@
 | 保持 baseline (`...notebook_original_fullrun_v2`) | 13 GB |
 | 保持 best raw (`...o30best_proxybench30ao_b10_t10_g15_u15...`) | 620 MB |
 | 保持 threshold export (`threshold_submission_local_ge_070_frontier_v1`) | 203 MB |
+| prune 後の `baseline_mlx/outputs` 実測容量 | 14 GB |
 | それ以外を削除した場合の回収見込み | 約 323.177 GB |
 
 ## 棚卸し集計
