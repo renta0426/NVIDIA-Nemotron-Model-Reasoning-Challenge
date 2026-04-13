@@ -87,15 +87,30 @@
 ## Eval execution log
 
 - The first full-eval resume attempt stayed at the existing root checkpoint `16/9500` while running a single high-concurrency chunk (`max_num_seqs=64`, `prompt_chunk_size=64`), so wall-clock throughput was judged too poor to keep.
-- The live evaluation was pivoted to **6 shard-parallel workers**:
+- A first shard-parallel retry with **6 shard workers** at `max_num_seqs=16`, `prompt_chunk_size=16`, `prefill=16`, `completion=16` also produced `0/6` shard summaries after roughly 44 minutes, so the bottleneck was no longer just batch size.
+- Inspecting the MLX chat template showed:
+  - `--eval-enable-thinking` leaves the assistant prompt open at `<think>`
+  - `--no-eval-enable-thinking` closes it as `<think></think>` before generation starts
+- That made `--no-eval-enable-thinking` the most likely explanation for the long local generations, so a direct benchmark was run before changing the full eval again.
+- Probe result on the first `4` training rows with `--no-eval-enable-thinking --max-num-seqs 4 --prompt-chunk-size 4`:
+  - accuracy: `1/4 = 0.25`
+  - `boxed_found: 4/4`
+  - output char length: `min=15`, `median=16`, `max=15359`
+- Probe result on the first `16` training rows with the same no-thinking settings:
+  - no-thinking accuracy: `5/16 = 0.3125`
+  - previous thinking accuracy on the same 16 rows: `2/16 = 0.125`
+  - `boxed_found: 16/16`
+  - output char length: `min=11`, `median=15`, `max=15359`
+- The live evaluation is now pivoted again to **6 shard-parallel no-thinking workers**:
   - `--eval-shards 6`
-  - `--max-num-seqs 16`
-  - `--prompt-chunk-size 16`
-  - `--prefill-batch-size 16`
-  - `--completion-batch-size 16`
+  - `--no-eval-enable-thinking`
+  - `--max-num-seqs 4`
+  - `--prompt-chunk-size 4`
+  - `--prefill-batch-size 4`
+  - `--completion-batch-size 4`
 - Active shard outputs now live under `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards/`.
 - A dedicated waiter process is polling for `6/6` shard summaries, then runs `merge-aopen-eval -> postprocess-run -> git commit/push`.
-- Observed immediately after launching 6 shards: each eval Python process used roughly `11.6%` host memory and system-wide free memory remained around `26%`, so the 6-way configuration fits within the 512 GB machine envelope.
+- Immediate live confirmation after the no-thinking relaunch: shard `5/6` reached `12/1583` rows quickly, showing that checkpoint progress is now moving again.
 
 ## Assumptions not explicit in the public v20 config
 
