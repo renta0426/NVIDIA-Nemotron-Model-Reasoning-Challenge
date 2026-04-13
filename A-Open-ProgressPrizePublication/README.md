@@ -1,4 +1,4 @@
-[Open Progress Prize Publication] SFT to maximize minimum logprob
+# [Open Progress Prize Publication] SFT to maximize minimum logprob
 I would like to thank the competition hosts and Kaggle for organizing this competition. I did manage to find something interesting to bet on, and I am happy to see my gamble paying off.
 
 You might have made some predictions that I have asked for. These are the answers.
@@ -7,7 +7,8 @@ The score I was aiming for - 0.877
 How many tokens are used to train - 27,850,703 tokens[https://nemotron.huikang.dev/metrics.html?logpath=04-08-16-14] for the winning solution, 598,958,637 in total
 How much money I have spent - $212.48 in Tinker credits, approximately $60 in Modal credits, $10 for Kaggle / Colab subscription.
 What do you think is the secret - bit manipulation, you only need SFT, deterministic chain-of-thought design, use of min logprob as objective, use of Tinker for training
-Quick links
+
+## Quick links
 Original notebook:A-Open-ProgressPrizePublication/tinker-submission-notebook.ipynb
 Validation notebook: A-Open-ProgressPrizePublication/adapter-validation-notebook.ipynb
 Training metrics and logs for winning submission: https://nemotron.huikang.dev/metrics.html?logpath=04-08-16-14
@@ -20,11 +21,14 @@ These are the assumptions in my bet
 
 I can craft the chain-of-thought better than my competitors. I think this turned out to be true. The main differentiator was the bit manipulation problem where I managed to figure out a chain of thought that has solved many more problems.
 I can finetune LoRA correctly and efficiently. I think I got this almost correct. KhoA managed to get perfect scores[baseline/nemotron-unsloth-sft-training/nemotron-unsloth-sft-training-3-30-2.ipynb] on numeral, gravity and unit_conversion whereas my winning model still sometimes fails in these categories.
-What am I betting against
+
+## What am I betting against
 
 Reinforcement learning. I already have the optimal policy for solvable problems. I already know the best next token for the LLM to make (assuming they have been making all the correct moves). The only job of the LLM is to follow the policy.
 Distilling larger models. The optimal policy should be directly generated with code.
-Chain-of-thought design principles
+
+
+## Chain-of-thought design principles
 As mentioned, I believe I can craft the chain-of-thought better than the other competitors.
 
 This is how I designed my chain-of-thought
@@ -44,10 +48,10 @@ Conciseness. I do not need the chain-of-thought to be concise. However, the long
 Verification. For now, I assume the model generates every token correctly. With this assumption, I do not need to run verification or recovery from errors.
 The chain of thought should also be very easy to iterate on. It should be easy to track, modify, train, and debug the chain of thought.
 
-Solution approach
+## Solution approach
 There are seven categories of problems. I describe my approach to solving these problems, in increasing order of difficulty.
 
-Numeral
+### Numeral
 This task asks to convert a Roman numeral into an integer.
 
 I am aiming for a 100% (1576/1576) solve rate.
@@ -58,14 +62,14 @@ I enumerated all the numerals. I also have a step-by-step process of solving the
 
 The code to generate the chain of thought is available here[/nemotron/blob/master/reasoners/numeral.py] and an example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=1deaf759].
 
-Unit conversion / Gravity
+### Unit conversion / Gravity
 This task asks to figure out a scalar value, and multiplication to apply the scalar value on the question input. I am aiming for a 100% (1594/1594) solve rate on unit conversion and a 100% (1597/1597) solve rate on gravity.
 
 The multiplication and division are split into multiple steps, so that it is easier to train the model to not make mistakes.
 
 The code to generate the chain of thought is available here[/nemotron/blob/master/reasoners/unit_conversion.py] for unit conversion and here[https://github.com/tonghuikang/nemotron/blob/master/reasoners/gravity.py] for gravity. An example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=0047365c] for unit conversion and here[https://nemotron.huikang.dev/synthetic.html?problem=0040ff76] for gravity.
 
-Cipher
+### Cipher
 This task asks to decrypt a substitution cipher. Given several example encryptions of Wonderland-themed sentences, the model must deduce the character-level mapping and apply it to decrypt a new sentence.
 
 I am aiming for a 100% (1576/1576) solve rate.
@@ -79,14 +83,14 @@ The code to generate the chain of thought is available here[https://github.com/t
 
 Apparently, Nemotron is quite bad at spelling[https://nemotron.huikang.dev/training.html?logpath=04-10-04-33&category=spelling]. I think perfect performance at this subtask is a baseline expectation to medal in the final leaderboard.
 
-Bit manipulation
+### Bit manipulation
 This task asks to discover a per-bit transformation rule from input-output examples of 8-bit binary numbers.
 
 I am aiming for an 85.1% (1364/1602) solve rate.
 
 Please refer to the full-length post[baseline/nemotron-unsloth-sft-training/Strategy to solve 85% of bit manipulation.md] on how I approach the bit manipulation problem.
 
-Equation
+### Equation
 This task asks to discover the arithmetic rule applied to two-number equations. Given examples like 64-65 = 201, the model must figure out what operator maps the two operands to the result.
 
 I am aiming for a 76.6% (561/732) solve rate.
@@ -99,24 +103,24 @@ Reversed result only (AB, CD) -> YX
 No transformation (AB, CD) -> XY
 There are 32 operators. I have separated them into two groups of operators, so that I match the more popular set of 8 operators first before matching the rarer set of 24 operators.
 
-The code to generate the chain of thought is available here and an example output is available here.
+The code to generate the chain of thought is available here[https://github.com/tonghuikang/nemotron/blob/master/reasoners/equation_numeric.py] and an example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=04322d27].
 
-There are operators that are not found in the examples. I assume that they are absolute difference. This increases my target solve rate by 21 / 9500 = 0.2%.
+There are operators that are not found[https://nemotron.huikang.dev/synthetic.html?logpath=04-10-04-33&category=equation_numeric_guess] in the examples. I assume that they are absolute difference. This increases my target solve rate by 21 / 9500 = 0.2%.
 
-Cryptarithm
-There are some discussions on how this is a verbal arithmetic problem.
+### Cryptarithm
+There are some discussions on how this is a verbal arithmetic problem[https://en.wikipedia.org/wiki/Verbal_arithmetic].
 
 I did manage to decode some operations if I assume that the operators involve multiplication, division and absolute difference. However, I was not able to craft the chain-of-thought that guides the model to produce the answer.
 
-I reduced the problems to identifying whether the question operator is concatenation or reverse concatenation. If the question operator is not found in the examples, I assume the question operator is concatenation. This helped me to increase my target solve rate by (54 + 11) / 9500 = 0.6%.
+I reduced the problems to identifying whether the question operator is concatenation or reverse concatenation. If the question operator is not found[https://nemotron.huikang.dev/synthetic.html?logpath=04-10-04-33&category=cryptarithm_guess] in the examples, I assume the question operator is concatenation. This helped me to increase my target solve rate by (54 + 11) / 9500 = 0.6%.
 
-The code to generate the chain of thought is available here and an example output is available here.
+The code to generate the chain of thought is available here[https://github.com/tonghuikang/nemotron/blob/master/reasoners/cryptarithm.py] and an example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=2c017f70].
 
 I am aiming for a 7.9% (65/823) solve rate overall — 8.2% (54/659) on cryptarithm_deduce and 6.7% (11/164) on cryptarithm_guess.
 
-Apparently, Nemotron is also quite bad at splitting and concatenating symbols. I also think perfect performance at this subtask is a baseline expectation to medal in the final leaderboard.
+Apparently, Nemotron is also quite bad at splitting[https://nemotron.huikang.dev/training.html?logpath=04-10-04-33&category=splitting] and concatenating[https://nemotron.huikang.dev/training.html?logpath=04-10-04-33&category=concatenation] symbols. I also think perfect performance at this subtask is a baseline expectation to medal in the final leaderboard.
 
-Target solve rate
+### Target solve rate
 Overall, I am aiming for an 87.7% (8333/9500) solve rate.
 
 ================================================================
@@ -138,8 +142,8 @@ If the chain-of-thought is achievable and I train the model correctly, I should 
 
 I think that any higher solve rate will require new insights on how to even solve the problems programmatically.
 
-Training
-The training runs for the winning submission were done on Tinker.
+## Training
+The training runs for the winning submission were done on Tinker[https://tinker-docs.thinkingmachines.ai/tinker/models/].
 
 However, the adapter Tinker produces cannot be immediately submitted to the competition.
 
@@ -162,34 +166,36 @@ Generating degenerate responses by repeating previous tokens
 Not following the template exactly and missing out words
 There are multiple remedies for this, which I have yet to apply on my winning submission
 
-Tune on Tinker with rank 16, and losslessly upscale the LoRA to rank 32. However this means that I am not fully using all the ranks. I did manage to score 0.82 with the approach, but apparently it is still making low-level mistakes that are not present in training.
-Implementing the finetuning script end-to-end. I needed to research the compute and memory requirements. I did manage to implement something that scores 0.81. However, instead of 8 seconds per step, training is now 50 seconds per step. The cost is around the same anyway, so I continue finetuning on Tinker instead which allows me to iterate much faster.
+Tune on Tinker with rank 16, and losslessly upscale the LoRA to rank 32. However this means that I am not fully using all the ranks. I did manage to score 0.82[A-Open-ProgressPrizePublication/tinker-submission-notebook-v77-082.ipynb] with the approach, but apparently it is still making low-level mistakes that are not present in training.
+Implementing the finetuning script end-to-end. I needed to research the compute and memory requirements[A-Open-ProgressPrizePublication/Training Nemotron-3-Nano-30B-A3B-BF16 with rank 32 LoRA on length 8192 sequences.md]. I did manage to implement[https://nemotron.huikang.dev/metrics.html?logpath=04-06-00-22] something that scores 0.81. However, instead of 8 seconds per step, training is now 50 seconds per step. The cost is around the same anyway, so I continue finetuning on Tinker instead which allows me to iterate much faster.
 Post-finetune to align the weights. I have not tried this. The idea is to recapture the loss introduced by SVD on tokens that have their loss increased due to SVD.
-End-to-end processes
+
+
+## End-to-end processes
 This is how I iterate on my training
 
 1) I write or update the code that generates the completion traces. This involves the use of AI coding tools. I usually point out the chain-of-thought that I dislike, and what I prefer instead, and I get Claude Code to fix the code. I do not read all the code Claude Code is writing, but if I find Claude Code writing code in a hacky way I will ask it to fix. I inspect the result to check that Claude Code is actually doing what I want.
 
-2) I run the script (reasoning.py) that generates the completion traces. I compare the difference in the output before the edit and after the edit.
+2) I run the script (https://github.com/tonghuikang/nemotron/blob/master/reasoning.py) that generates the completion traces. I compare the difference in the output before the edit and after the edit.
 
-3) I send the completion traces (train_sft.py) for finetuning on Tinker. This is the step that is costing money.
+3) I send the completion traces (https://github.com/tonghuikang/nemotron/blob/master/train_sft.py) for finetuning on Tinker. This is the step that is costing money.
 
-4) I inspect the minimum logprob of individual traces. As mentioned, my objective is to maximize the minimum logprob. I find out which traces have a minimum logprob of less than 0.69, which means it is possible that the similar tokens will not be generated in submission.
+4) I inspect the minimum logprob[https://nemotron.huikang.dev/metrics.html?logpath=04-08-16-14] of individual traces. As mentioned, my objective is to maximize the minimum logprob. I find out which traces have a minimum logprob of less than 0.69, which means it is possible that the similar tokens will not be generated in submission.
 
-5) I inspect the tokens with a huge loss. If I see tokens with a logprob more than 0.69, it is likely that similar tokens will not be generated in similar context. I will need to think of how to modify the chain of thought to address the issue.
+5) I inspect the tokens with a huge loss[https://nemotron.huikang.dev/training.html?logpath=04-08-16-14&problem=eda9e743]. If I see tokens with a logprob more than 0.69, it is likely that similar tokens will not be generated in similar context. I will need to think of how to modify the chain of thought to address the issue.
 
-6) I upload the adapter to Kaggle upload_adapter.py.
+6) I upload the adapter to Kaggle https://github.com/tonghuikang/nemotron/blob/master/upload_adapter.py.
 
-7) I run the notebook on Kaggle to convert the Tinker adapter to a submission-compatible adapter and the evaluation. From this I discover that there is some training-serving misalignment. There are easy problems that the model is doing well in training but failed to be correct at validation.
+7) I run the notebook[A-Open-ProgressPrizePublication/tinker-submission-notebook.ipynb] on Kaggle to convert the Tinker adapter to a submission-compatible adapter and the evaluation. From this I discover that there is some training-serving misalignment. There are easy problems that the model is doing well in training but failed to be correct at validation.
 
 8) Submit the notebook for the public leaderboard score.
 
-These are the training metrics for the winning submission.
+These are the training metrics[https://nemotron.huikang.dev/metrics?logpath=04-08-16-14] for the winning submission.
 
-metrics
 
-Performance
-This was computed in a manner similar to the validation notebook.
+
+## Performance
+This was computed in a manner similar to the validation notebook[A-Open-ProgressPrizePublication/adapter-validation-notebook.ipynb].
 
 Version	v20	Target
 Training tokens	27,850,703	-
@@ -205,11 +211,13 @@ equation_numeric_deduce	90.8% (541)	90.6% (540/596)
 equation_numeric_guess	16.2% (22)	15.4% (21/136)
 cryptarithm_deduce	7.1% (47)	8.2% (54/659)
 cryptarithm_guess	6.7% (11)	6.7% (11/164)
+
 Note that
 
 I am testing on what the model has trained on. This explains why the training set solve rate is higher than my leaderboard submission.
 cryptarithm_deduce / cryptarithm_guess metrics are misleading. This is because cryptarithm_deduce and cryptarithm_guess are trained on multiple epochs. Their minlogprob approached zero, but it was misleading because they have memorized the training set.
-Reflections
+
+## Reflections
 This is my analysis of why I think I won.
 
 I actually spent quite a lot of time on this. I was on leave since March 31 in Singapore. I initially intended to spend my time on AIMO 3. However, I could not prove that my approach to AIMO 3 works in a small scale, so I invested my time in this Nemotron competition instead.
@@ -227,7 +235,8 @@ Things that could be done better
 Writing the validation notebook. As you see, my winning submission failed at some simple tasks like numeral. I am aware of this, but I do not know the scale of how often this is happening.
 Investing in a held out validation set. This allows me to predict the public leaderboard score before submitting it. I think it would have been worth it to craft a function that generates valid problems, and train on those problems instead so that the training set can be used for validation, uncontaminated.
 Using AI coding tools more effectively. I think I used an appropriate amount of AI in my development. I cannot really use AI fully autonomously because the step involving training with Tinker costs $10 to $20 per iteration. I think it still needs good human judgment to ensure that each Tinker finetuning run is worth it. However, there are some processes where I should have used more AI. One place is the investigation of the tokens with highly negative logprobs. I needed to search for these highly negative logprobs manually. There should be a script that AI can use to write and document these so that we can work on the chain of thought.
-Improvements that you can make to score 0.877
+
+## Improvements that you can make to score 0.877
 Fixing the training-serving misalignment. Currently the SVD decomposition is lossy. I have observed that the model fails at inference at places it did not fail in training. Maybe you could try post-finetuning my model to make sure it scores 100% on the easy tasks.
 
 Work with tokens instead of text. Currently I am working with text. My code produces text, and the text gets tokenized for training. I propose that my code should produce the tokens directly, instead. The true training data should be stored in tokens, not text. I will still render the tokens with text to sanity check the completion traces. This should make half of the token-related task unnecessary (concatenation for example).
@@ -236,7 +245,7 @@ Fix Nemotron's ability to convert text to characters. Even as I work with tokens
 
 Scaling training. Currently I do not create synthetic problems to train the model. This would require a function that produces problem statements on demand. With this, we can use a part of the training set as validation set.
 
-Predictions
+## Predictions
 These are my predictions for the final state of the competition
 
 Guaranteeing a score of 0.877 is the baseline to even medal. I think it is possible to train such a model end-to-end in the 30 hour weekly allowance of Kaggle notebooks. There will be people sharing this notebook.
