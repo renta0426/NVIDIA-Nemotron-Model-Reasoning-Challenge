@@ -958,6 +958,31 @@ def build_scored_rows(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]
     return scored_rows
 
 
+def build_eval_settings_payload(
+    args: argparse.Namespace,
+    *,
+    eval_shards: int,
+    eval_shard_index: int,
+    chunk_size: int,
+    prefill_batch_size: int,
+    completion_batch_size: int,
+) -> dict[str, Any]:
+    return {
+        "max_tokens": int(args.max_tokens),
+        "temperature": float(args.temperature),
+        "top_p": float(args.top_p),
+        "max_num_seqs": max(1, int(args.max_num_seqs)),
+        "prompt_chunk_size": int(chunk_size),
+        "prefill_batch_size": int(prefill_batch_size),
+        "completion_batch_size": int(completion_batch_size),
+        "eval_enable_thinking": bool(args.eval_enable_thinking),
+        "lazy_load": bool(args.lazy_load),
+        "force_single_generate": bool(args.force_single_generate),
+        "eval_shards": int(eval_shards),
+        "eval_shard_index": int(eval_shard_index),
+    }
+
+
 def summarize_benchmark_scores(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     correct = sum(int(bool(row.get("is_correct"))) for row in rows)
     total = len(rows)
@@ -993,6 +1018,14 @@ def render_eval_markdown_summary(evaluation_name: str, payload: dict[str, Any]) 
     lines.append(f"- model_root: `{payload['model_root']}`")
     lines.append(f"- adapter_dir: `{payload['adapter_dir']}`")
     lines.append(f"- overall_accuracy: `{overall['accuracy']}` ({overall['correct']}/{overall['total']})")
+    evaluation_settings = payload.get("evaluation_settings")
+    if isinstance(evaluation_settings, dict) and evaluation_settings:
+        lines.append(f"- max_tokens: `{evaluation_settings.get('max_tokens', '')}`")
+        lines.append(f"- max_num_seqs: `{evaluation_settings.get('max_num_seqs', '')}`")
+        lines.append(f"- prompt_chunk_size: `{evaluation_settings.get('prompt_chunk_size', '')}`")
+        lines.append(f"- prefill_batch_size: `{evaluation_settings.get('prefill_batch_size', '')}`")
+        lines.append(f"- completion_batch_size: `{evaluation_settings.get('completion_batch_size', '')}`")
+        lines.append(f"- eval_enable_thinking: `{evaluation_settings.get('eval_enable_thinking', '')}`")
     lines.append("")
     lines.append("| category | correct | total | accuracy |")
     lines.append("| --- | ---: | ---: | ---: |")
@@ -1384,6 +1417,14 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
         if eval_shards <= 1
         else f"aopen_train_csv_shard_{eval_shard_index:02d}_of_{eval_shards:02d}"
     )
+    evaluation_settings = build_eval_settings_payload(
+        args,
+        eval_shards=eval_shards,
+        eval_shard_index=eval_shard_index,
+        chunk_size=chunk_size,
+        prefill_batch_size=prefill_batch_size,
+        completion_batch_size=completion_batch_size,
+    )
     payload = {
         "created_at": utc_now(),
         "evaluation_name": evaluation_name,
@@ -1402,6 +1443,7 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
         "row_end": row_end,
         "eval_shards": eval_shards,
         "eval_shard_index": eval_shard_index,
+        "evaluation_settings": evaluation_settings,
         "v20_target_training_set_accuracy": V20_TARGETS["overall_accuracy"],
         **summary,
     }
@@ -1490,6 +1532,18 @@ def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
 
     scored_rows = build_scored_rows(records)
     summary = summarize_benchmark_scores(scored_rows)
+    max_num_seqs = max(1, int(args.max_num_seqs))
+    chunk_size = min(max_num_seqs, max(1, int(args.prompt_chunk_size)))
+    prefill_batch_size = min(max_num_seqs, max(1, int(args.prefill_batch_size)))
+    completion_batch_size = min(max_num_seqs, max(1, int(args.completion_batch_size)))
+    evaluation_settings = build_eval_settings_payload(
+        args,
+        eval_shards=expected_shards,
+        eval_shard_index=-1,
+        chunk_size=chunk_size,
+        prefill_batch_size=prefill_batch_size,
+        completion_batch_size=completion_batch_size,
+    )
     payload = {
         "created_at": utc_now(),
         "evaluation_name": "aopen_train_csv_full",
@@ -1508,6 +1562,7 @@ def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
         "row_end": total_rows_global,
         "eval_shards": expected_shards,
         "eval_shard_index": -1,
+        "evaluation_settings": evaluation_settings,
         "aggregation": {
             "mode": "sharded",
             "shard_root": str(shard_root.resolve()),
@@ -1546,6 +1601,8 @@ def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
 
 def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, Any]) -> str:
     overall = eval_result["overall"]
+    evaluation_settings = eval_result.get("evaluation_settings")
+    aggregation = eval_result.get("aggregation")
     lines = [
         "# v20_mlx_repro_v1 results",
         "",
@@ -1581,9 +1638,39 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
         f"- v20_target_training_set_accuracy: `{V20_TARGETS['overall_accuracy']}` ({V20_TARGETS['overall_correct']}/{V20_TARGETS['overall_total']})",
         f"- delta_vs_v20_target: `{round(float(overall['accuracy']) - float(V20_TARGETS['overall_accuracy']), 6)}`",
         "",
+    ]
+    if isinstance(evaluation_settings, dict) and evaluation_settings:
+        lines.extend(
+            [
+                "## Eval settings",
+                "",
+                f"- max_tokens: `{evaluation_settings.get('max_tokens', '')}`",
+                f"- max_num_seqs: `{evaluation_settings.get('max_num_seqs', '')}`",
+                f"- prompt_chunk_size: `{evaluation_settings.get('prompt_chunk_size', '')}`",
+                f"- prefill_batch_size: `{evaluation_settings.get('prefill_batch_size', '')}`",
+                f"- completion_batch_size: `{evaluation_settings.get('completion_batch_size', '')}`",
+                f"- eval_enable_thinking: `{evaluation_settings.get('eval_enable_thinking', '')}`",
+                f"- eval_shards: `{evaluation_settings.get('eval_shards', '')}`",
+                "",
+            ]
+        )
+    if isinstance(aggregation, dict) and aggregation:
+        lines.extend(
+            [
+                "## Eval aggregation",
+                "",
+                f"- mode: `{aggregation.get('mode', '')}`",
+                f"- shard_root: `{aggregation.get('shard_root', '')}`",
+                f"- num_shards: `{aggregation.get('num_shards', '')}`",
+                "",
+            ]
+        )
+    lines.extend(
+        [
         "| category | reproduced_correct | reproduced_total | reproduced_accuracy | v20_correct | v20_total | v20_accuracy |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ]
+        ]
+    )
     eval_by_category = {row["category"]: row for row in eval_result["categories"]}
     for category, target in V20_TARGETS["categories"].items():
         row = eval_by_category.get(category, {"correct": 0, "total": 0, "accuracy": 0.0})
