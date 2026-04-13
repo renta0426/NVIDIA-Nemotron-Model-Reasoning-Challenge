@@ -1,0 +1,168 @@
+{
+  "schedule": {
+    "step_unit": "optimizer",
+    "total_optimizer_steps": 8,
+    "effective_schedule_steps": 8,
+    "final_optimizer_step_microbatches": 8,
+    "final_grad_accumulation_flush": true
+  },
+  "created_at": "2026-04-11T17:02:12.166139+00:00",
+  "repo_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge",
+  "run_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1",
+  "profile": {
+    "name": "notebook-current",
+    "resolution": {
+      "name": "notebook-current",
+      "applied_fields": [
+        "batch_size",
+        "enable_thinking",
+        "flush_on_epoch_boundary",
+        "grad_accumulation_steps",
+        "lora_alpha",
+        "lora_dropout",
+        "lora_rank",
+        "lr_schedule_end",
+        "lr_schedule_name",
+        "lr_schedule_step_unit",
+        "lr_warmup_ratio",
+        "mask_prompt",
+        "num_layers",
+        "save_every",
+        "seed",
+        "steps_per_eval",
+        "steps_per_report",
+        "steps_per_report_step_unit"
+      ],
+      "explicit_fields": [
+        "learning_rate",
+        "max_seq_length",
+        "num_epochs",
+        "run_name",
+        "train_csv",
+        "type_sample",
+        "valid_shadow_rows"
+      ]
+    }
+  },
+  "model_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/shadow_model",
+  "shadow_model_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/shadow_model",
+  "train_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_bit33_numreal5_anchortrim_v1.csv",
+  "base_model_name_or_path": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+  "readme_contract": {
+    "max_lora_rank": 32,
+    "max_tokens": 7680,
+    "top_p": 1.0,
+    "temperature": 0.0,
+    "max_num_seqs": 64,
+    "max_model_len": 8192
+  },
+  "sampling": {
+    "seed": 123,
+    "type_samples": {
+      "Numeral Conversion": 0,
+      "Gravitational Constant": 12,
+      "Unit Conversion": 13,
+      "Text Encryption": 15,
+      "Bit Manipulation": 33,
+      "Equation Transformation": 7
+    },
+    "sampled_rows": 80,
+    "sampled_type_counts": {
+      "Bit Manipulation": 33,
+      "Equation Transformation": 7,
+      "Gravitational Constant": 12,
+      "Text Encryption": 15,
+      "Unit Conversion": 13
+    }
+  },
+  "dataset": {
+    "dataset_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/dataset",
+    "train_rows": 80,
+    "valid_rows": 8,
+    "record_summary": {
+      "records": 80,
+      "skipped_short_cot": 0,
+      "type_counts": {
+        "Bit Manipulation": 33,
+        "Equation Transformation": 7,
+        "Gravitational Constant": 12,
+        "Text Encryption": 15,
+        "Unit Conversion": 13
+      }
+    }
+  },
+  "training": {
+    "batch_size": 1,
+    "grad_accumulation_steps": 8,
+    "num_epochs": 0.8,
+    "learning_rate": 1e-06,
+    "max_seq_length": 1024,
+    "mask_prompt": false,
+    "enable_thinking": true,
+    "lora_rank": 32,
+    "lora_alpha": 32.0,
+    "lora_dropout": 0.05,
+    "lora_keys": [
+      "mixer.in_proj",
+      "mixer.out_proj",
+      "mixer.switch_mlp.fc1",
+      "mixer.switch_mlp.fc2",
+      "mixer.shared_experts.up_proj",
+      "mixer.shared_experts.down_proj"
+    ],
+    "trainable_lora_suffixes": [
+      "mixer.q_proj",
+      "mixer.k_proj",
+      "mixer.v_proj",
+      "mixer.o_proj"
+    ],
+    "num_layers": -1,
+    "steps_per_report": 10,
+    "steps_per_report_step_unit": "optimizer",
+    "steps_per_eval_requested": 0,
+    "steps_per_eval": 64,
+    "save_every": 64,
+    "flush_on_epoch_boundary": true,
+    "microsteps_per_epoch": 80,
+    "lr_schedule_name": "cosine_decay",
+    "lr_schedule_end": 0.0,
+    "lr_warmup_ratio": 0.05,
+    "lr_schedule_step_unit": "optimizer",
+    "total_iters": 64,
+    "optimizer_steps": 8,
+    "final_optimizer_step_microbatches": 8,
+    "final_grad_accumulation_flush": true,
+    "fail_on_runtime_contention": false,
+    "resume_adapter_file": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/adapter/adapters.safetensors"
+  },
+  "versions": {
+    "mlx-lm": "0.29.1",
+    "mlx": "0.31.1",
+    "transformers": "4.57.3",
+    "pyyaml": "6.0.3",
+    "pandas": "3.0.1"
+  },
+  "artifacts": {
+    "config_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/mlx_lora_config.yaml",
+    "command_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/train_cmd.sh",
+    "adapter_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/adapter",
+    "sampled_train_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/sampled_train_split_with_cot.csv",
+    "notebook_parity_json": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/notebook_current_parity_report.json",
+    "notebook_parity_markdown": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/notebook_current_parity_report.md"
+  },
+  "notebook_parity": {
+    "status": "mismatches_found",
+    "clear_omissions": [
+      "train_csv",
+      "type_samples",
+      "num_epochs",
+      "learning_rate",
+      "optimizer_steps",
+      "max_seq_length",
+      "lora_target_coverage"
+    ],
+    "artifact_prefix": "notebook_current",
+    "json_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/notebook_current_parity_report.json",
+    "markdown_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v1/notebook_current_parity_report.md"
+  }
+}

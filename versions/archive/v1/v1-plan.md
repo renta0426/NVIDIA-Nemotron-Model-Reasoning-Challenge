@@ -1,5 +1,7 @@
 # v1 plan
 
+Historical plan note: this archive plan preserves its original context, but the current authoritative competition contract is the top-level `README.md` Evaluation / Submitting section (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Read any older notebook/metric defaults below as historical notes rather than as the active contract.
+
 ## Goal
 
 現在の `code/Nemotron Reasoning Challenge - QLoRA Baseline.py` を土台に、メモリ使用量を大きく悪化させずに精度改善を狙う実用版を作る。

@@ -26,6 +26,7 @@ README 記載の本番推論パラメータも前提にしている。
 - `top_p = 1.0`
 - `temperature = 0.0`
 - `max_num_seqs = 64`
+- `gpu_memory_utilization = 0.85`
 - `max_model_len = 8192`
 
 ---

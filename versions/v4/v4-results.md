@@ -1,5 +1,19 @@
 # v4 Results
 
+## Update 2026-04-12
+
+- `versions/v4/code/train.py` `package-peft` now live-reloads the authoritative `README.md` submission wording and hard-fails if local packaging config drifts from the README-overlapping contract.
+- The v4 CUDA packaging default archive name is now `submission.zip`, and the primary packaging manifest now writes `submission_manifest_v4.json` while preserving legacy compatibility copies.
+- v4 packaging artifacts now surface `readme_submission_contract` plus `readme_submission_contract_verified_from_readme_file = true`, alongside the local packaging contract.
+- Added regression coverage in `versions/v4/tests/test_v4_packaging_spec.py`, and updated `versions/v4/tests/test_v4_bootstrap.py` to lock the README-aligned archive name.
+- Runtime execution of this new coverage is still blocked in the current session by the host PTY failure (`posix_openpt failed: Device not configured`), so this segment is static hardening only.
+
+- `versions/v4/code/train_official_first_best_v4_minimal.py` now re-reads the live `README.md` Evaluation table at CLI entry and fails explicitly on missing rows, empty values, malformed numeric values, or constant drift against the current README.
+- `versions/v4/code/train_best_notebook_sft_v4_minimal.py` now does the same, and its manifest/result artifacts now surface the actual README-loaded `readme_eval_contract` plus `readme_contract_verified_from_readme_file = true`.
+- `versions/v4/code/train_official_first_best_v4_minimal.py` stage/pipeline manifests and results now also surface the actual README-loaded `readme_eval_contract` plus `readme_contract_verified_from_readme_file = true` instead of only embedding the in-file constant.
+- `versions/v4/tests/test_v4_minimal_readme_contract.py` now regression-locks those two minimal v4 scripts for happy path, missing row, empty value, malformed value, value drift, and artifact-surface propagation.
+- Runtime execution of the new v4 pytest coverage is still blocked in the current session by the host PTY failure (`posix_openpt failed: Device not configured`), so this segment is static-hardening only.
+
 ## Summary
 
 - `versions/v4/code/train.py` was converted from the copied v3 baseline into a v4-specific Stage C CLI.
@@ -15,6 +29,7 @@
   - `top_p = 1.0`
   - `temperature = 0.0`
   - `max_num_seqs = 64`
+  - `gpu_memory_utilization = 0.85`
   - `max_model_len = 8192`
 
 ## Code / Validation
@@ -260,7 +275,7 @@
 
 ## 2026-03-25 run11 evaluation follow-up
 
-- user requested a later evaluation pass for `v4_rft_stage_c_cleanaccept_balancedrobust_run11` using the same local flow as the prior v4 candidates, still anchored to the `README.md` official settings (`max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `max_model_len = 8192`)
+- user requested a later evaluation pass for `v4_rft_stage_c_cleanaccept_balancedrobust_run11` using the same local flow as the prior v4 candidates, still anchored to the `README.md` official settings (`max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`)
 - quick gate:
   - `shadow_128 overall_accuracy = 0.515625`
   - `format_fail_rate = 0.890625`

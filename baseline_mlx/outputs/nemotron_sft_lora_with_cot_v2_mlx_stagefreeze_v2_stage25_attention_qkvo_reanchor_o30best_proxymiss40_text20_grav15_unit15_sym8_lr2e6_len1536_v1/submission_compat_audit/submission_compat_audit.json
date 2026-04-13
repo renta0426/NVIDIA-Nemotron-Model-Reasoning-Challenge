@@ -1,0 +1,80 @@
+{
+  "created_at": "2026-04-11T11:41:24.249547+00:00",
+  "adapter_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1/adapter",
+  "audit_status": "potentially_exportable_2d_only",
+  "peft_export_ready": true,
+  "blocked_reasons": [],
+  "base_model_name_or_path": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+  "tensor_count": 232,
+  "tensor_rank_counts": [
+    {
+      "tensor_rank": 2,
+      "tensor_count": 232
+    }
+  ],
+  "module_family_counts": [
+    {
+      "module_family": "attention",
+      "tensor_count": 48
+    },
+    {
+      "module_family": "mamba",
+      "tensor_count": 92
+    },
+    {
+      "module_family": "shared_experts",
+      "tensor_count": 92
+    }
+  ],
+  "unsupported_tensor_count": 0,
+  "unsupported_tensor_examples": [],
+  "mlx_adapter_config_excerpt": {
+    "fine_tune_type": "lora",
+    "model": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1/shadow_model",
+    "lora_parameters": {
+      "rank": 32,
+      "dropout": 0.05,
+      "scale": 32.0,
+      "keys": [
+        "mixer.in_proj",
+        "mixer.out_proj",
+        "mixer.shared_experts.up_proj",
+        "mixer.shared_experts.down_proj",
+        "mixer.q_proj",
+        "mixer.k_proj",
+        "mixer.v_proj",
+        "mixer.o_proj"
+      ]
+    }
+  },
+  "peft_adapter_config_preview": {
+    "peft_type": "LORA",
+    "base_model_name_or_path": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+    "r": 32,
+    "lora_alpha": 32.0,
+    "lora_dropout": 0.05,
+    "target_modules": [
+      "mixer.in_proj",
+      "mixer.out_proj",
+      "mixer.shared_experts.up_proj",
+      "mixer.shared_experts.down_proj",
+      "mixer.q_proj",
+      "mixer.k_proj",
+      "mixer.v_proj",
+      "mixer.o_proj"
+    ],
+    "bias": "none",
+    "modules_to_save": null,
+    "use_dora": false,
+    "use_rslora": false,
+    "inference_mode": true
+  },
+  "readme_submission_contract": {
+    "required_files": [
+      "adapter_config.json",
+      "adapter_model.safetensors"
+    ],
+    "max_lora_rank": 32,
+    "single_adapter_submission_zip": true
+  }
+}

@@ -53,7 +53,7 @@ def test_ensure_v4_layout_scaffold_creates_expected_structure(tmp_path: Path) ->
 
     package_cfg = yaml.safe_load((tmp_path / 'conf' / 'package' / 'cuda_submission_smoke.yaml').read_text(encoding='utf-8'))
     eval_cfg = yaml.safe_load((tmp_path / 'conf' / 'eval' / 'candidate_score_serious.yaml').read_text(encoding='utf-8'))
-    assert package_cfg['submission_zip_name'] == 'submission_v4.zip'
+    assert package_cfg['submission_zip_name'] == 'submission.zip'
     assert [dataset['dataset_name'] for dataset in eval_cfg['datasets']] == ['shadow_256', 'hard_shadow_256']
 
 

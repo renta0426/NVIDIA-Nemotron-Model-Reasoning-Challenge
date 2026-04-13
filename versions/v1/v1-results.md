@@ -1,5 +1,12 @@
 # V1 Results
 
+## Update 2026-04-12
+
+- `versions/v1/code/train.py` now re-reads the live `README.md` Evaluation table whenever `load_eval_config()` loads `official_lb`, and fails explicitly on missing rows, empty values, malformed numeric values, or drift between `official_lb.yaml` and the current README contract.
+- Non-official probe configs still load normally; the README guard is intentionally scoped only to `official_lb`, which is the repository's authoritative evaluation profile.
+- `versions/v1/tests/test_eval_readme_contract.py` now regression-locks that guard for happy path, missing row, empty value, malformed value, official config drift, and the explicit non-official bypass path.
+- Runtime execution of this new pytest coverage is still blocked in the current session by the host PTY failure (`posix_openpt failed: Device not configured`), so this segment is static-hardening only.
+
 ## Source of truth
 
 この `v1` 系列のローカル判定も **`README.md` の Evaluation 節**を唯一の基準にする。
@@ -9,6 +16,7 @@
 - `top_p = 1.0`
 - `temperature = 0.0`
 - `max_num_seqs = 64`
+- `gpu_memory_utilization = 0.85`
 - `max_model_len = 8192`
 
 metric は **`\boxed{}` 優先抽出 → heuristic fallback → last numeric fallback** を使う。

@@ -4,6 +4,8 @@ Owner: me
 Scope: 0-1〜0-4 の基盤固定  
 Purpose: 以降の全実験でブレない「評価・分割・プロンプト・目標設定」の唯一の土台を作る
 
+Historical plan note: this file preserves the original planning context, but the current authoritative competition contract is the top-level `README.md` Evaluation / Submitting section (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). If later sections in this historical plan mention older notebook/metric defaults, read them as historical notes rather than as the active contract.
+
 0. この v0 の位置づけ
 
 この v0 は、今後の全ての実験に先立って 絶対に固定すべき前提 を決めるためのもの。  
@@ -168,7 +170,7 @@ project/
 - add_generation_prompt = True
 
 notebook 再現の secondary mode
-比較用に notebook_default も保持する。
+比較用に notebook_default も保持する。**ただし authoritative な採用基準は README / Evaluation page の official mode だけ**であり、ここで書く notebook_default は historical comparison 用に限る。
 
 - max_tokens = 3584
 - temperature = 1.0
@@ -201,7 +203,7 @@ add_generation_prompt: true
 boxed_instruction: "Please put your final answer inside \\boxed{}. For example: \\boxed{your answer}"
 strict_chat_template: true
 Mode B: notebook_default
-副指標。あくまで参考。yaml
+副指標。あくまで参考で、README official 契約を置き換えない historical comparison 用。yaml
 conf/eval/notebook_default.yaml
 name: notebook_default
 max_lora_rank: 32

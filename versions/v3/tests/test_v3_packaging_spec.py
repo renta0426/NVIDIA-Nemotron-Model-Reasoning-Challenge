@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 import yaml
 
 
@@ -19,7 +20,36 @@ sys.modules[SPEC.name] = v3_train
 SPEC.loader.exec_module(v3_train)
 
 
-def test_package_peft_and_write_v3_runbook(tmp_path: Path) -> None:
+def write_submission_contract_readme(tmp_path: Path) -> Path:
+    readme_path = tmp_path / 'README.md'
+    readme_path.write_text(
+        '\n'.join(
+            [
+                'Evaluation',
+                'Submissions are evaluated based on their Accuracy in solving the provided tasks. '
+                'The NVIDIA Nemotron-3-Nano-30B model is loaded with your LoRA adapter '
+                '(which must include an adapter_config.json) using the vLLM inference engine.',
+                'Parameter\tValue',
+                'max_lora_rank\t32',
+                'max_tokens\t7680',
+                'top_p\t1.0',
+                'temperature\t0.0',
+                'max_num_seqs\t64',
+                'gpu_memory_utilization\t0.85',
+                'max_model_len\t8192',
+                'Submitting',
+                'You must submit a LoRA adapter of rank at most 32 for the NVIDIA Nemotron-3-Nano-30B model '
+                'packaged into a submission.zip file.',
+            ]
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+    return readme_path
+
+
+def test_package_peft_and_write_v3_runbook(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(v3_train, 'README_PATH', write_submission_contract_readme(tmp_path))
     adapter_dir = tmp_path / 'adapter'
     adapter_dir.mkdir()
     (adapter_dir / 'adapter_model.safetensors').write_bytes(b'test-weights')
@@ -43,7 +73,7 @@ def test_package_peft_and_write_v3_runbook(tmp_path: Path) -> None:
                 'expected_target_modules': ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj'],
                 'expected_rank_cap': 32,
                 'required_adapter_config_keys': ['base_model_name_or_path', 'target_modules', 'r'],
-                'submission_zip_name': 'submission_v3.zip',
+                'submission_zip_name': 'submission.zip',
             }
         ),
         encoding='utf-8',
@@ -61,9 +91,13 @@ def test_package_peft_and_write_v3_runbook(tmp_path: Path) -> None:
     assert smoke['checks']['target_modules_ok'] is True
     assert smoke['checks']['base_model_ok'] is True
     assert smoke['checks']['submission_zip_ok'] is True
-    assert (output_dir / 'submission_v3.zip').exists()
+    assert smoke['readme_submission_contract_verified_from_readme_file'] is True
+    assert smoke['readme_submission_contract']['submission_archive_name'] == 'submission.zip'
+    assert (output_dir / 'submission.zip').exists()
     assert submission['lora_rank'] == 16
     assert 'adapter_config.json' in submission['submission_zip_contents']
+    assert submission['readme_submission_contract_verified_from_readme_file'] is True
+    assert submission['local_packaging_contract']['submission_zip_name'] == 'submission.zip'
 
     train_pack_path = tmp_path / 'train_pack.parquet'
     pd.DataFrame([{'prompt': 'p', 'answer': '1'}]).to_parquet(train_pack_path, index=False)
@@ -139,3 +173,45 @@ def test_package_peft_and_write_v3_runbook(tmp_path: Path) -> None:
     assert 'bootstrap-v3' in runbook_text
     assert 'render-cuda-repro-spec' in runbook_text
     assert 'local best update -> queue' in promotion_text
+
+
+def test_v3_package_peft_rejects_submission_zip_name_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(v3_train, 'README_PATH', write_submission_contract_readme(tmp_path))
+    adapter_dir = tmp_path / 'adapter'
+    adapter_dir.mkdir()
+    (adapter_dir / 'adapter_model.safetensors').write_bytes(b'test-weights')
+    (adapter_dir / 'adapter_config.json').write_text(
+        json.dumps(
+            {
+                'base_model_name_or_path': 'mock-model',
+                'target_modules': ['q_proj'],
+                'r': 16,
+            }
+        ),
+        encoding='utf-8',
+    )
+    config_path = tmp_path / 'cuda_submission_smoke.yaml'
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                'expected_base_model_name_or_path': 'mock-model',
+                'required_files': ['adapter_config.json', 'adapter_model.safetensors'],
+                'expected_target_modules': ['q_proj'],
+                'expected_rank_cap': 32,
+                'required_adapter_config_keys': ['base_model_name_or_path', 'target_modules', 'r'],
+                'submission_zip_name': 'submission_v3.zip',
+            }
+        ),
+        encoding='utf-8',
+    )
+
+    with pytest.raises(SystemExit, match='submission_zip_name'):
+        v3_train.run_package_peft(
+            SimpleNamespace(
+                config_path=str(config_path),
+                adapter_dir=str(adapter_dir),
+                output_dir=str(tmp_path / 'packaging'),
+            )
+        )

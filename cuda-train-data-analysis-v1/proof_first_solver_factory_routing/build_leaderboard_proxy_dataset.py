@@ -87,17 +87,23 @@ DEFAULT_OUTPUT_DATASET_CSV = ARTIFACTS_DIR / 'leaderboard_proxy_v1_set.csv'
 DEFAULT_OUTPUT_SUMMARY_JSON = ARTIFACTS_DIR / 'leaderboard_proxy_v1_summary.json'
 DEFAULT_OUTPUT_MODEL_COMPARISON_CSV = ARTIFACTS_DIR / 'leaderboard_proxy_v1_model_comparison.csv'
 DEFAULT_OUTPUT_REPORT_MD = REPORTS_DIR / 'leaderboard_proxy_v1_report.md'
-
-README_EVAL_CONTRACT = {
-    'metric': 'Accuracy',
-    'boxed_first_extraction': True,
+README_PATH = REPO_ROOT / 'README.md'
+README_TABLE_CONTRACT = {
     'temperature': 0.0,
     'top_p': 1.0,
     'max_tokens': 7680,
     'max_num_seqs': 64,
+    'gpu_memory_utilization': 0.85,
     'max_model_len': 8192,
     'max_lora_rank': 32,
 }
+
+README_EVAL_CONTRACT = {
+    'metric': 'Accuracy',
+    'boxed_first_extraction': True,
+    **README_TABLE_CONTRACT,
+}
+README_TABLE_KEYS = tuple(README_TABLE_CONTRACT.keys())
 
 BIT_RE = __import__('re').compile(r'^[01]+$')
 
@@ -140,6 +146,49 @@ def load_csv_rows(path: Path) -> list[dict[str, str]]:
         if reader.fieldnames is None:
             raise ValueError(f'CSV header is missing: {path}')
         return [dict(row) for row in reader]
+
+
+def load_readme_eval_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding='utf-8')
+    contract = dict(README_EVAL_CONTRACT)
+    missing_keys: list[str] = []
+    for key in README_TABLE_KEYS:
+        expected_value = README_TABLE_CONTRACT[key]
+        needle = f'{key}\t'
+        found = False
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split('\t', 1)[1].strip()
+            if raw_value == '':
+                raise SystemExit(f'Malformed README.md evaluation row for {key}: missing value')
+            try:
+                if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    contract[key] = int(raw_value)
+                elif isinstance(expected_value, float):
+                    contract[key] = float(raw_value)
+                else:
+                    contract[key] = raw_value
+            except ValueError as exc:
+                raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+            found = True
+            break
+        if not found:
+            missing_keys.append(key)
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return contract
+
+
+def verify_readme_eval_contract_file() -> dict[str, Any]:
+    contract = load_readme_eval_contract_from_readme()
+    for key, expected_value in README_TABLE_CONTRACT.items():
+        actual_value = contract[key]
+        if actual_value != expected_value:
+            raise SystemExit(
+                f'README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}'
+            )
+    return contract
 
 
 def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
@@ -419,6 +468,7 @@ def build_proxy_rows(args: argparse.Namespace) -> tuple[list[dict[str, Any]], di
 
 
 def summarize_proxy(rows: list[dict[str, Any]], role_targets: dict[str, int]) -> dict[str, Any]:
+    readme_eval_contract = verify_readme_eval_contract_file()
     v3f_correct = sum(1 for row in rows if row['v3f_is_correct'])
     current_correct = sum(1 for row in rows if row['current_is_correct'])
     total = len(rows)
@@ -427,7 +477,8 @@ def summarize_proxy(rows: list[dict[str, Any]], role_targets: dict[str, int]) ->
     by_bucket = Counter(str(row.get('leaderboard_proxy_bucket', focus_key(row))) for row in rows)
     by_family = Counter(str(row.get('family_short', '')) for row in rows)
     return {
-        'readme_eval_contract': README_EVAL_CONTRACT,
+        'readme_eval_contract': readme_eval_contract,
+        'readme_eval_contract_verified_from_readme_file': True,
         'total_rows': total,
         'role_targets': role_targets,
         'selected_role_counts': dict(by_role),
@@ -533,7 +584,13 @@ def render_report(summary: dict[str, Any]) -> str:
     lines.append('')
     lines.append('- metric: Accuracy')
     lines.append('- boxed-first extraction: True')
+    lines.append('- max_lora_rank: 32')
+    lines.append('- max_tokens: 7680')
     lines.append('- temperature: 0.0')
+    lines.append('- top_p: 1.0')
+    lines.append('- max_num_seqs: 64')
+    lines.append('- gpu_memory_utilization: 0.85')
+    lines.append('- max_model_len: 8192')
     lines.append('- final artifact target: single submit-compatible LoRA in submission.zip')
     lines.append('')
     lines.append('## 3. Proxy Construction Rule')

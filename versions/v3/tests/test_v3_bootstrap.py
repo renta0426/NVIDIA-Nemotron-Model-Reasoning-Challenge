@@ -57,7 +57,7 @@ def test_ensure_v3_layout_scaffold_creates_expected_structure(tmp_path: Path) ->
     train_cfg = yaml.safe_load((tmp_path / 'conf' / 'train' / 'sft_stage_a_weighted_mlx.yaml').read_text(encoding='utf-8'))
     package_cfg = yaml.safe_load((tmp_path / 'conf' / 'package' / 'cuda_submission_smoke.yaml').read_text(encoding='utf-8'))
     assert train_cfg['weighted_loss'] is True
-    assert package_cfg['submission_zip_name'] == 'submission_v3.zip'
+    assert package_cfg['submission_zip_name'] == 'submission.zip'
 
 
 def test_parser_exposes_v3_commands() -> None:

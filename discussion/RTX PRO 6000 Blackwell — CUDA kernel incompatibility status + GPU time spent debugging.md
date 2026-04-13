@@ -1,4 +1,6 @@
 RTX PRO 6000 Blackwell — CUDA kernel incompatibility status + GPU time spent debugging
+Repository note: this discussion records infrastructure and environment troubleshooting, but it does not replace the repository competition contract. In this repo, the authoritative evaluation and submission contract remains the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat environment observations below as operational context rather than as overrides of the README evaluation or submission rules.
+
 The pre-installed mamba_ssm and causal_conv1d packages in the competition environment are compiled for sm_90, but the RTX PRO 6000 Blackwell GPU requires sm_120.
 
 This means:

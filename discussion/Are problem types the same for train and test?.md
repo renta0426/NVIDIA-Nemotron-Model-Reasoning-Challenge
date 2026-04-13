@@ -1,4 +1,6 @@
 Are problem types the same for train and test?
+Repository note: this discussion is useful context, but it does not replace the repository competition contract. In this repo, the authoritative evaluation and submission contract remains the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat comments below as discussion context, not as overrides of the README or as a guarantee about the hidden evaluation set that replaces the visible sample test file.
+
 There appear to be six different problem types in the training set:
 
 numbers are secretly converted into a different numeral system

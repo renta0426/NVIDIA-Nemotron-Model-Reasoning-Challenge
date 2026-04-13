@@ -1,4 +1,6 @@
 AcceleratorError: CUDA error: no kernel image is available for execution on the device; causal_conv1d; mamba_ssm
+Repository note: this discussion records GPU environment troubleshooting, but it does not replace the repository competition contract. In this repo, the authoritative evaluation and submission contract remains the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat environment guidance below as operational context rather than as overrides of the README evaluation or submission rules.
+
 On Kaggle notebook runtime GPU RTX Pro 6000, fine-tuning metric/nemotron-3-nano-30b-a3b-bf16/transformers/default fails at trainer.train() with:
 
 AcceleratorError: CUDA error: no kernel image is available for execution on the device

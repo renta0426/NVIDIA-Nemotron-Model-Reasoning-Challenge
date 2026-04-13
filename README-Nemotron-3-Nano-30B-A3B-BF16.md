@@ -37,6 +37,8 @@ track_downloads: true
 
 # NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
 
+> Repository note: this file is an upstream/reference model card snapshot. For this repository's competition work, the authoritative evaluation and submission contract is the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat the model-card samples below as model usage references, not as overrides of the repository README contract.
+
 <div align="center" style="line-height: 1;">
 <a href="https://build.nvidia.com/nvidia/nemotron-3-nano-30b-a3b" target="_blank" style="margin: 2px;">
     <img alt="Chat" src="https://img.shields.io/badge/🤖Chat-Nemotron_3_Nano-536af5?color=76B900&logoColor=white" style="display: inline-block; vertical-align: middle;"/>

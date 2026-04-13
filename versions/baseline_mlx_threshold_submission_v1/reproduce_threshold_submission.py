@@ -22,8 +22,10 @@ README_CONTRACT = {
     "top_p": 1.0,
     "temperature": 0.0,
     "max_num_seqs": 64,
+    "gpu_memory_utilization": 0.85,
     "max_model_len": 8192,
 }
+SUMMARY_SCHEMA_VERSION = 2
 
 
 def repo_path(value: str | Path) -> Path:
@@ -53,6 +55,72 @@ def dump_markdown(path: Path, content: str) -> None:
 
 def approx_equal(lhs: float, rhs: float, tol: float = 1e-9) -> bool:
     return math.isclose(lhs, rhs, rel_tol=0.0, abs_tol=tol)
+
+
+def format_inline_list(values: list[str]) -> str:
+    return ", ".join(values) if values else "none"
+
+
+def audit_summary_is_export_ready(audit_summary: Any) -> bool:
+    return isinstance(audit_summary, dict) and audit_summary.get("peft_export_ready") is True
+
+
+def build_readme_contract_state(contract: dict[str, Any]) -> dict[str, Any]:
+    expected_keys = sorted(README_CONTRACT)
+    actual_keys = sorted(contract)
+    missing_keys = [key for key in expected_keys if key not in contract]
+    unexpected_keys = [key for key in actual_keys if key not in README_CONTRACT]
+    mismatched_keys = [
+        key for key in expected_keys if key in contract and contract.get(key) != README_CONTRACT[key]
+    ]
+    return {
+        "expected_key_count": len(expected_keys),
+        "actual_key_count": len(actual_keys),
+        "expected_keys": expected_keys,
+        "actual_keys": actual_keys,
+        "missing_keys": missing_keys,
+        "unexpected_keys": unexpected_keys,
+        "mismatched_keys": mismatched_keys,
+        "matches_current_readme": not missing_keys and not unexpected_keys and not mismatched_keys,
+    }
+
+
+def load_readme_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    contract: dict[str, Any] = {}
+    for key, expected_value in README_CONTRACT.items():
+        needle = f"{key}\t"
+        for line in text.splitlines():
+            if line.startswith(needle):
+                parts = line.split("\t", 1)
+                require(len(parts) == 2, f"Malformed README.md evaluation row for {key}: {line!r}")
+                raw_value = parts[1].strip()
+                require(raw_value != "", f"Malformed README.md evaluation row for {key}: missing value")
+                try:
+                    if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                        contract[key] = int(raw_value)
+                    else:
+                        contract[key] = float(raw_value)
+                except ValueError as exc:
+                    raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+                break
+    missing_keys = [key for key in README_CONTRACT if key not in contract]
+    require(
+        not missing_keys,
+        f"Missing README.md evaluation rows: {', '.join(missing_keys)}",
+    )
+    return contract
+
+
+def verify_readme_contract_file() -> dict[str, Any]:
+    contract = load_readme_contract_from_readme()
+    for key, expected_value in README_CONTRACT.items():
+        actual_value = contract.get(key)
+        require(
+            actual_value == expected_value,
+            f"README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}",
+        )
+    return contract
 
 
 def uv_command(*args: str | Path) -> list[str]:
@@ -153,6 +221,7 @@ def summarize_run(
     require(README_PATH.exists(), f"README.md does not exist: {README_PATH}")
     require(MONOLITH_PATH.exists(), f"Monolith script does not exist: {MONOLITH_PATH}")
     require(run_root.exists(), f"Run root does not exist: {run_root}")
+    verify_readme_contract_file()
 
     paths = run_paths(run_root)
     require(paths["prepare_manifest"].exists(), f"Missing prepare manifest: {paths['prepare_manifest']}")
@@ -162,6 +231,7 @@ def summarize_run(
 
     prepare_manifest = load_json(paths["prepare_manifest"])
     suite_summary = load_json(paths["suite_summary"])
+    prepare_manifest_contract = dict(prepare_manifest.get("readme_contract", {}))
     verify_readme_contract(prepare_manifest)
 
     local_eval = find_evaluation(suite_summary, "readme_local320")
@@ -183,14 +253,18 @@ def summarize_run(
     )
 
     payload: dict[str, Any] = {
+        "summary_schema_version": SUMMARY_SCHEMA_VERSION,
         "threshold_label": threshold_label,
         "readme_path": str(README_PATH),
+        "readme_contract_verified_from_readme_file": True,
         "run_root": str(run_root),
         "prepare_manifest": str(paths["prepare_manifest"]),
         "suite_summary": str(paths["suite_summary"]),
         "adapter_dir": str(paths["adapter_dir"]),
         "shadow_model": str(paths["shadow_model"]),
         "readme_contract": README_CONTRACT,
+        "validated_prepare_manifest_readme_contract": prepare_manifest_contract,
+        "readme_contract_state": build_readme_contract_state(prepare_manifest_contract),
         "local320": local_eval,
         "leaderboard_proxy_v1_set": proxy_eval,
         "min_local_accuracy": min_local_accuracy,
@@ -203,11 +277,12 @@ def summarize_run(
         audit_summary = load_json(paths["audit_summary"])
         payload["existing_audit_summary"] = str(paths["audit_summary"])
         payload["existing_audit_status"] = audit_summary.get("audit_status")
+        payload["existing_peft_export_ready"] = audit_summary_is_export_ready(audit_summary)
     if paths["export_manifest"].exists():
         export_manifest = load_json(paths["export_manifest"])
         payload["existing_export_manifest"] = str(paths["export_manifest"])
         payload["existing_submission_zip"] = export_manifest.get("zip_path")
-        payload["existing_export_valid"] = export_manifest.get("validation", {}).get("valid")
+        payload["existing_validation_valid"] = export_manifest.get("validation", {}).get("valid")
     if paths["submission_zip"].exists():
         payload["existing_submission_zip_size_bytes"] = paths["submission_zip"].stat().st_size
 
@@ -218,8 +293,8 @@ def summarize_run(
         audit_summary = load_json(paths["audit_summary"])
         export_manifest = load_json(paths["export_manifest"])
         require(
-            audit_summary.get("audit_status") == "potentially_exportable_2d_only",
-            f"Unexpected audit status: {audit_summary.get('audit_status')}",
+            audit_summary_is_export_ready(audit_summary),
+            f"Submission audit is not export-ready: status={audit_summary.get('audit_status')!r}",
         )
         require(
             export_manifest.get("validation", {}).get("valid") is True,
@@ -249,12 +324,41 @@ def render_markdown_summary(payload: dict[str, Any]) -> str:
         )
     if payload.get("existing_audit_status") is not None:
         lines.append(f"- existing_audit_status: `{payload['existing_audit_status']}`")
+    if payload.get("existing_peft_export_ready") is not None:
+        lines.append(f"- existing_peft_export_ready: `{payload['existing_peft_export_ready']}`")
     if payload.get("existing_submission_zip") is not None:
         lines.append(f"- existing_submission_zip: `{payload['existing_submission_zip']}`")
+    if payload.get("existing_validation_valid") is not None:
+        lines.append(f"- existing_validation_valid: `{payload['existing_validation_valid']}`")
+    if payload.get("reproduced_audit_status") is not None:
+        lines.append(f"- reproduced_audit_status: `{payload['reproduced_audit_status']}`")
+    if payload.get("reproduced_peft_export_ready") is not None:
+        lines.append(f"- reproduced_peft_export_ready: `{payload['reproduced_peft_export_ready']}`")
     if payload.get("reproduced_submission_zip") is not None:
         lines.append(f"- reproduced_submission_zip: `{payload['reproduced_submission_zip']}`")
     if payload.get("reproduced_validation_valid") is not None:
         lines.append(f"- reproduced_validation_valid: `{payload['reproduced_validation_valid']}`")
+    note_parts: list[str] = []
+    if payload.get("existing_peft_export_ready") is not None and payload.get("existing_validation_valid") is not None:
+        note_parts.append(
+            f"existing exportability from existing_peft_export_ready={payload['existing_peft_export_ready']} "
+            f"and existing_validation_valid={payload['existing_validation_valid']}"
+        )
+    if (
+        payload.get("reproduced_peft_export_ready") is not None
+        and payload.get("reproduced_validation_valid") is not None
+    ):
+        note_parts.append(
+            "reproduced exportability from "
+            f"reproduced_peft_export_ready={payload['reproduced_peft_export_ready']} "
+            f"and reproduced_validation_valid={payload['reproduced_validation_valid']}"
+        )
+    if note_parts:
+        lines.append(
+            "- exportability_note: treat audit_status values as legacy compatibility labels; "
+            + "; ".join(note_parts)
+            + "."
+        )
     if payload.get("dry_run") is not None:
         lines.append(f"- dry_run: `{payload['dry_run']}`")
     lines.extend(
@@ -267,7 +371,18 @@ def render_markdown_summary(payload: dict[str, Any]) -> str:
             f"- top_p: `{payload['readme_contract']['top_p']}`",
             f"- temperature: `{payload['readme_contract']['temperature']}`",
             f"- max_num_seqs: `{payload['readme_contract']['max_num_seqs']}`",
+            f"- gpu_memory_utilization: `{payload['readme_contract']['gpu_memory_utilization']}`",
             f"- max_model_len: `{payload['readme_contract']['max_model_len']}`",
+            "",
+            "## README contract state",
+            "",
+            f"- summary_schema_version: `{payload['summary_schema_version']}`",
+            f"- verified_from_readme_file: `{payload['readme_contract_verified_from_readme_file']}`",
+            f"- matches_current_readme: `{payload['readme_contract_state']['matches_current_readme']}`",
+            f"- contract_key_count: `{payload['readme_contract_state']['actual_key_count']}/{payload['readme_contract_state']['expected_key_count']}`",
+            f"- missing_keys: `{format_inline_list(payload['readme_contract_state']['missing_keys'])}`",
+            f"- unexpected_keys: `{format_inline_list(payload['readme_contract_state']['unexpected_keys'])}`",
+            f"- mismatched_keys: `{format_inline_list(payload['readme_contract_state']['mismatched_keys'])}`",
         ]
     )
     if payload.get("min_local_accuracy") is not None or payload.get("min_proxy_accuracy") is not None:
@@ -345,8 +460,8 @@ def export_submission(
     submission_zip_path = Path(str(export_manifest.get("zip_path", "")))
 
     require(
-        audit_summary.get("audit_status") == "potentially_exportable_2d_only",
-        f"Unexpected reproduced audit status: {audit_summary.get('audit_status')}",
+        audit_summary_is_export_ready(audit_summary),
+        f"Reproduced submission audit is not export-ready: status={audit_summary.get('audit_status')!r}",
     )
     require(export_manifest.get("validation", {}).get("valid") is True, "Reproduced export manifest is not valid")
     require(submission_zip_path.exists(), f"Reproduced submission zip does not exist: {submission_zip_path}")
@@ -356,6 +471,7 @@ def export_submission(
         {
             "reproduced_audit_summary": str(audit_output_root / "submission_compat_audit.json"),
             "reproduced_audit_status": audit_summary.get("audit_status"),
+            "reproduced_peft_export_ready": audit_summary_is_export_ready(audit_summary),
             "reproduced_export_manifest": str(export_output_root / "export_manifest.json"),
             "reproduced_submission_zip": str(submission_zip_path),
             "reproduced_submission_zip_size_bytes": submission_zip_path.stat().st_size,
@@ -415,7 +531,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Single-file threshold submission pipeline for README.md-compliant Nemotron LoRA runs. "
             "It verifies the Kaggle Evaluation-page contract "
             "(rank<=32, max_tokens=7680, top_p=1.0, temperature=0.0, "
-            "max_num_seqs=64, max_model_len=8192) and can regenerate submission.zip "
+            "max_num_seqs=64, gpu_memory_utilization=0.85, max_model_len=8192) and can regenerate submission.zip "
             "from any completed MLX run root that already has adapter + shadow_model artifacts."
         )
     )

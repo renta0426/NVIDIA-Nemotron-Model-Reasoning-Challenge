@@ -17,6 +17,22 @@ DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parent / "artifacts"
 DEFAULT_REPORT_ROOT = Path(__file__).resolve().parent / "reports"
 DEFAULT_RULE_BASE_600 = REPO_ROOT / "baseline" / "cot" / "output-csv" / "rule_based_adapter_readme_inference_samples_rule_base-600.csv"
 DEFAULT_RULE_BASE_800 = REPO_ROOT / "baseline" / "cot" / "output-csv" / "rule_based_adapter_readme_inference_samples_rule_base-800.csv"
+README_PATH = REPO_ROOT / "README.md"
+README_TABLE_ASSUMPTIONS = {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 7680,
+    "max_num_seqs": 64,
+    "gpu_memory_utilization": 0.85,
+    "max_model_len": 8192,
+}
+README_EVAL_ASSUMPTIONS = {
+    "metric": "accuracy",
+    **README_TABLE_ASSUMPTIONS,
+    "boxed_first_extraction": True,
+    "numeric_relative_tolerance": 1e-2,
+}
+README_TABLE_KEYS = tuple(README_TABLE_ASSUMPTIONS.keys())
 
 GENERAL_STABLE_QUOTAS = {
     "gravity_constant": 50,
@@ -104,6 +120,49 @@ def parse_int(value: Any, default: int = 0) -> int:
         return int(float(text))
     except (TypeError, ValueError):
         return default
+
+
+def load_readme_eval_assumptions_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    assumptions = dict(README_EVAL_ASSUMPTIONS)
+    missing_keys: list[str] = []
+    for key in README_TABLE_KEYS:
+        expected_value = README_TABLE_ASSUMPTIONS[key]
+        needle = f"{key}\t"
+        found = False
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split("\t", 1)[1].strip()
+            if raw_value == "":
+                raise SystemExit(f"Malformed README.md evaluation row for {key}: missing value")
+            try:
+                if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    assumptions[key] = int(raw_value)
+                elif isinstance(expected_value, float):
+                    assumptions[key] = float(raw_value)
+                else:
+                    assumptions[key] = raw_value
+            except ValueError as exc:
+                raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+            found = True
+            break
+        if not found:
+            missing_keys.append(key)
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return assumptions
+
+
+def verify_readme_eval_assumptions_file() -> dict[str, Any]:
+    assumptions = load_readme_eval_assumptions_from_readme()
+    for key, expected_value in README_TABLE_ASSUMPTIONS.items():
+        actual_value = assumptions[key]
+        if actual_value != expected_value:
+            raise SystemExit(
+                f"README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}"
+            )
+    return assumptions
 
 
 def parse_float(value: Any, default: float | None = None) -> float | None:
@@ -499,19 +558,12 @@ def build_manifest(
     holdout_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for row in holdouts:
         holdout_counts[row["holdout_kind"]][str(row["fold"])] += 1
+    readme_eval_assumptions = verify_readme_eval_assumptions_file()
     return {
         "phase": "phase0_offline_eval",
         "source_analysis_csv": str(analysis_csv),
-        "readme_eval_assumptions": {
-            "metric": "accuracy",
-            "temperature": 0.0,
-            "top_p": 1.0,
-            "max_tokens": 7680,
-            "max_num_seqs": 64,
-            "max_model_len": 8192,
-            "boxed_first_extraction": True,
-            "numeric_relative_tolerance": 1e-2,
-        },
+        "readme_eval_assumptions": readme_eval_assumptions,
+        "readme_eval_assumptions_verified_from_readme_file": True,
         "benchmark_sets": {
             "general_stable_set": summarize_benchmark(general_rows),
             "binary_hard_set": summarize_benchmark(binary_rows),

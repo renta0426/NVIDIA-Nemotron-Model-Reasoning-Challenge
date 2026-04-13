@@ -23,11 +23,24 @@
 - `top_p = 1.0`
 - `temperature = 0.0`
 - `max_num_seqs = 64`
+- `gpu_memory_utilization = 0.85`
 - `max_model_len = 8192`
 
 ### 0-2. 実行基盤
 
 - 提出互換の本線は `versions/v5/code/train_transformers_submission_v5.py`
+- `versions/v2/v2-results.md` を追加し、最後に残っていた historical version-local ledger gap を埋めた。現 snapshot では `versions/v2/outputs/` と実測 score artifact が無いことを明示している
+- `versions/v5/`, `versions/v5-1/`, `versions/v6/`, `versions/v7/` には Git-visible な `*-results.md` ledger を追加済みで、現 snapshot ではまだ version-local outputs / 実測 score artifact が無いことを明示している
+- `versions/archive/v1/`, `versions/archive/v4/`, `versions/archive/v7/`, `versions/archive/v8/` にも archive-local `*-results.md` ledger を追加し、historical snapshot 側で measured-score artifact が無いこと、active canonical ledger が別にあるかどうか、`archive/v4/submission.zip` のような snapshot-only artifact の扱いを Git-visible にした
+- `archive/v1`, `archive/v4`, `archive/v7` の results ledger では、archive code が保持している version-suffixed packaged-archive names (`submission_v1.zip`, `submission_v4.zip`, `submission_v7.zip`) は historical snapshot-local naming であり、active README contract ではないことも注記している
+- `versions/v5/code/train_transformers_submission_v5.py` とその late variants (`v5-1`, `v6`, `v7`) は、CLI entry で live `README.md` evaluation table を再読込して contract drift / missing row / malformed value を即 fail するように harden 済み
+- その README runtime guard は `versions/v5/tests/test_readme_contract_sync.py` で cross-version に固定しており、happy path / missing row / empty value / malformed value / value drift を 1 本で回帰化している
+- `versions/v4/code/train_official_first_best_v4_minimal.py` と `versions/v4/code/train_best_notebook_sft_v4_minimal.py` も CLI entry で live `README.md` evaluation table を再読込して contract drift / missing row / malformed value を即 fail するように harden 済み
+- その v4 minimal README runtime guard は `versions/v4/tests/test_v4_minimal_readme_contract.py` で固定しており、artifact 側の `readme_eval_contract` / `readme_contract_verified_from_readme_file` surfacing も 1 本で回帰化している
+- `versions/v1/code/train.py` の `official_lb` loader も live `README.md` evaluation table を再読込して、official evaluator config 自体の drift / missing row / malformed value を即 fail するように harden 済み
+- その evaluator-side README runtime guard は `versions/v1/tests/test_eval_readme_contract.py` で固定しており、official-only enforcement と non-official bypass の両方を回帰化している
+- `versions/v0/code/train.py` の `official_lb` loader も同じ README runtime guard を持ち、historical evaluator line 側でも drift / missing row / malformed value を即 fail するように harden 済み
+- その v0 evaluator-side README runtime guard は `versions/v0/tests/test_eval_readme_contract.py` で固定しており、official-only enforcement と non-official bypass の両方を回帰化している
 - ベースモデルは `models/nemotron-3-nano-30b-a3b-bf16`
 - MLX は本線から外す
 

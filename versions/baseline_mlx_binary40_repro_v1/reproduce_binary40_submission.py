@@ -57,8 +57,10 @@ README_CONTRACT = {
     "top_p": 1.0,
     "temperature": 0.0,
     "max_num_seqs": 64,
+    "gpu_memory_utilization": 0.85,
     "max_model_len": 8192,
 }
+SUMMARY_SCHEMA_VERSION = 2
 EXPECTED_LOCAL = {"correct": 229, "rows": 320, "accuracy": 229 / 320}
 EXPECTED_PROXY = {"correct": 129, "rows": 200, "accuracy": 129 / 200}
 
@@ -90,6 +92,82 @@ def require(condition: bool, message: str) -> None:
 
 def approx_equal(lhs: float, rhs: float, tol: float = 1e-9) -> bool:
     return math.isclose(lhs, rhs, rel_tol=0.0, abs_tol=tol)
+
+
+def format_inline_list(values: list[str]) -> str:
+    return ", ".join(values) if values else "none"
+
+
+def build_exportability_fields(
+    audit_summary: dict[str, Any],
+    export_manifest: dict[str, Any],
+    *,
+    prefix: str = "",
+) -> dict[str, Any]:
+    key_prefix = f"{prefix}_" if prefix else ""
+    return {
+        f"{key_prefix}audit_status": audit_summary.get("audit_status"),
+        f"{key_prefix}peft_export_ready": audit_summary.get("peft_export_ready") is True,
+        f"{key_prefix}validation_valid": export_manifest.get("validation", {}).get("valid"),
+    }
+
+
+def build_readme_contract_state(contract: dict[str, Any]) -> dict[str, Any]:
+    expected_keys = sorted(README_CONTRACT)
+    actual_keys = sorted(contract)
+    missing_keys = [key for key in expected_keys if key not in contract]
+    unexpected_keys = [key for key in actual_keys if key not in README_CONTRACT]
+    mismatched_keys = [
+        key for key in expected_keys if key in contract and contract.get(key) != README_CONTRACT[key]
+    ]
+    return {
+        "expected_key_count": len(expected_keys),
+        "actual_key_count": len(actual_keys),
+        "expected_keys": expected_keys,
+        "actual_keys": actual_keys,
+        "missing_keys": missing_keys,
+        "unexpected_keys": unexpected_keys,
+        "mismatched_keys": mismatched_keys,
+        "matches_current_readme": not missing_keys and not unexpected_keys and not mismatched_keys,
+    }
+
+
+def load_readme_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    contract: dict[str, Any] = {}
+    for key, expected_value in README_CONTRACT.items():
+        needle = f"{key}\t"
+        for line in text.splitlines():
+            if line.startswith(needle):
+                parts = line.split("\t", 1)
+                require(len(parts) == 2, f"Malformed README.md evaluation row for {key}: {line!r}")
+                raw_value = parts[1].strip()
+                require(raw_value != "", f"Malformed README.md evaluation row for {key}: missing value")
+                try:
+                    if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                        contract[key] = int(raw_value)
+                    else:
+                        contract[key] = float(raw_value)
+                except ValueError as exc:
+                    raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+                break
+    missing_keys = [key for key in README_CONTRACT if key not in contract]
+    require(
+        not missing_keys,
+        f"Missing README.md evaluation rows: {', '.join(missing_keys)}",
+    )
+    return contract
+
+
+def verify_readme_contract_file() -> dict[str, Any]:
+    contract = load_readme_contract_from_readme()
+    for key, expected_value in README_CONTRACT.items():
+        actual_value = contract.get(key)
+        require(
+            actual_value == expected_value,
+            f"README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}",
+        )
+    return contract
 
 
 def uv_command(*args: str | Path) -> list[str]:
@@ -159,11 +237,13 @@ def verify_best_run() -> dict[str, Any]:
     ):
         require(required_path.exists(), f"Required path does not exist: {required_path}")
 
+    verify_readme_contract_file()
     prepare_manifest = load_json(BEST_PREPARE_MANIFEST)
     suite_summary = load_json(BEST_SUITE_SUMMARY)
     audit_summary = load_json(BEST_AUDIT_SUMMARY)
     export_manifest = load_json(BEST_EXPORT_MANIFEST)
     dataset_summary = load_json(BEST_DATASET_SUMMARY_JSON)
+    prepare_manifest_contract = dict(prepare_manifest.get("readme_contract", {}))
 
     verify_readme_contract(prepare_manifest)
 
@@ -185,8 +265,8 @@ def verify_best_run() -> dict[str, Any]:
     )
 
     require(
-        audit_summary.get("audit_status") == "potentially_exportable_2d_only",
-        f"Unexpected audit status: {audit_summary.get('audit_status')}",
+        audit_summary.get("peft_export_ready") is True,
+        f"Submission audit is not export-ready: status={audit_summary.get('audit_status')!r}",
     )
     require(export_manifest.get("validation", {}).get("valid") is True, "Export manifest is not valid")
     require(export_manifest.get("zip_path") == str(BEST_SUBMISSION_ZIP), "Best run zip path changed unexpectedly")
@@ -197,15 +277,19 @@ def verify_best_run() -> dict[str, Any]:
     )
 
     return {
+        "summary_schema_version": SUMMARY_SCHEMA_VERSION,
         "readme_path": str(README_PATH),
+        "readme_contract_verified_from_readme_file": True,
         "best_run_root": str(BEST_RUN_ROOT),
         "source_resume_run_root": str(SOURCE_RESUME_RUN_ROOT),
         "dataset_csv": str(BEST_DATASET_CSV),
         "dataset_summary_json": str(BEST_DATASET_SUMMARY_JSON),
         "readme_contract": README_CONTRACT,
+        "validated_prepare_manifest_readme_contract": prepare_manifest_contract,
+        "readme_contract_state": build_readme_contract_state(prepare_manifest_contract),
         "local320": local_eval,
         "leaderboard_proxy_v1_set": proxy_eval,
-        "audit_status": audit_summary.get("audit_status"),
+        **build_exportability_fields(audit_summary, export_manifest),
         "submission_zip": str(BEST_SUBMISSION_ZIP),
         "submission_zip_size_bytes": BEST_SUBMISSION_ZIP.stat().st_size,
     }
@@ -231,6 +315,8 @@ def render_markdown_summary(payload: dict[str, Any]) -> str:
         f"- readme_local320: `{local320['correct']}/{local320['rows']} = {local320['accuracy']}`",
         f"- leaderboard_proxy_v1_set: `{proxy['correct']}/{proxy['rows']} = {proxy['accuracy']}`",
         f"- audit_status: `{payload['audit_status']}`",
+        f"- peft_export_ready: `{payload['peft_export_ready']}`",
+        f"- validation_valid: `{payload['validation_valid']}`",
         f"- submission_zip: `{payload['submission_zip']}`",
         f"- submission_zip_size_bytes: `{payload['submission_zip_size_bytes']}`",
         "",
@@ -241,7 +327,18 @@ def render_markdown_summary(payload: dict[str, Any]) -> str:
         f"- top_p: `{payload['readme_contract']['top_p']}`",
         f"- temperature: `{payload['readme_contract']['temperature']}`",
         f"- max_num_seqs: `{payload['readme_contract']['max_num_seqs']}`",
+        f"- gpu_memory_utilization: `{payload['readme_contract']['gpu_memory_utilization']}`",
         f"- max_model_len: `{payload['readme_contract']['max_model_len']}`",
+        "",
+        "## README contract state",
+        "",
+        f"- summary_schema_version: `{payload['summary_schema_version']}`",
+        f"- verified_from_readme_file: `{payload['readme_contract_verified_from_readme_file']}`",
+        f"- matches_current_readme: `{payload['readme_contract_state']['matches_current_readme']}`",
+        f"- contract_key_count: `{payload['readme_contract_state']['actual_key_count']}/{payload['readme_contract_state']['expected_key_count']}`",
+        f"- missing_keys: `{format_inline_list(payload['readme_contract_state']['missing_keys'])}`",
+        f"- unexpected_keys: `{format_inline_list(payload['readme_contract_state']['unexpected_keys'])}`",
+        f"- mismatched_keys: `{format_inline_list(payload['readme_contract_state']['mismatched_keys'])}`",
     ]
     if payload.get("reproduced_submission_zip"):
         lines.extend(
@@ -249,9 +346,32 @@ def render_markdown_summary(payload: dict[str, Any]) -> str:
                 "",
                 "## Re-exported artifact",
                 "",
+                f"- reproduced_audit_status: `{payload.get('reproduced_audit_status')}`",
+                f"- reproduced_peft_export_ready: `{payload.get('reproduced_peft_export_ready')}`",
                 f"- reproduced_submission_zip: `{payload['reproduced_submission_zip']}`",
                 f"- reproduced_validation_valid: `{payload.get('reproduced_validation_valid')}`",
             ]
+        )
+    note_parts: list[str] = []
+    if payload.get("peft_export_ready") is True and payload.get("validation_valid") is not None:
+        note_parts.append(
+            f"source exportability from peft_export_ready={payload['peft_export_ready']} "
+            f"and validation_valid={payload['validation_valid']}"
+        )
+    if (
+        payload.get("reproduced_peft_export_ready") is True
+        and payload.get("reproduced_validation_valid") is not None
+    ):
+        note_parts.append(
+            "reproduced exportability from "
+            f"reproduced_peft_export_ready={payload['reproduced_peft_export_ready']} "
+            f"and reproduced_validation_valid={payload['reproduced_validation_valid']}"
+        )
+    if note_parts:
+        lines.append(
+            "- exportability_note: treat `audit_status` values as legacy compatibility labels; "
+            + "; ".join(note_parts)
+            + "."
         )
     if payload.get("repro_run_root"):
         lines.extend(
@@ -314,11 +434,13 @@ def command_export_existing(args: argparse.Namespace) -> int:
 
     extra: dict[str, Any] = {"export_output_root": str(export_output_root)}
     if not args.dry_run:
+        audit_summary = load_json(audit_output_root / "submission_compat_audit.json")
         export_manifest = load_json(export_output_root / "export_manifest.json")
+        extra["reproduced_audit_summary"] = str(audit_output_root / "submission_compat_audit.json")
         extra["reproduced_export_manifest"] = str(export_output_root / "export_manifest.json")
         extra["reproduced_submission_zip"] = export_manifest.get("zip_path")
         extra["reproduced_zip_size_bytes"] = export_manifest.get("zip_size_bytes")
-        extra["reproduced_validation_valid"] = export_manifest.get("validation", {}).get("valid")
+        extra.update(build_exportability_fields(audit_summary, export_manifest, prefix="reproduced"))
     summary_path = write_summary(output_root, "export-existing", extra)
     print(json.dumps({"summary_path": str(summary_path), **extra}, indent=2, sort_keys=True))
     return 0
@@ -423,6 +545,16 @@ def command_full_reproduce(args: argparse.Namespace) -> int:
         "dataset_summary_json": str(dataset_summary_json),
         "dry_run": args.dry_run,
     }
+    if not args.dry_run:
+        audit_output_root = run_root / "submission_compat_audit"
+        export_output_root = run_root / "submission_export"
+        audit_summary = load_json(audit_output_root / "submission_compat_audit.json")
+        export_manifest = load_json(export_output_root / "export_manifest.json")
+        extra["reproduced_audit_summary"] = str(audit_output_root / "submission_compat_audit.json")
+        extra["reproduced_export_manifest"] = str(export_output_root / "export_manifest.json")
+        extra["reproduced_submission_zip"] = export_manifest.get("zip_path")
+        extra["reproduced_zip_size_bytes"] = export_manifest.get("zip_size_bytes")
+        extra.update(build_exportability_fields(audit_summary, export_manifest, prefix="reproduced"))
     summary_path = write_summary(repo_path(args.summary_output_root), "full-reproduce", extra)
     print(json.dumps({"summary_path": str(summary_path), **extra}, indent=2, sort_keys=True))
     return 0
@@ -434,7 +566,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Single-file reproduction pipeline for the binary40 local/proxy best MLX run. "
             "This wrapper keeps the README.md submission contract front-and-center: "
             "rank<=32, submission.zip output, and evaluation parameters "
-            "max_tokens=7680, top_p=1.0, temperature=0.0, max_num_seqs=64, max_model_len=8192."
+            "max_tokens=7680, top_p=1.0, temperature=0.0, max_num_seqs=64, "
+            "gpu_memory_utilization=0.85, max_model_len=8192."
         )
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

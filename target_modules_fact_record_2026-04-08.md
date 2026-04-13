@@ -1,5 +1,7 @@
 # target_modules Fact Record 2026-04-08
 
+Repository note: this file records observed `target_modules` facts and examples, but it does not define the competition contract. In this repository, the authoritative evaluation and submission contract remains the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat the `target_modules` material below as research reference only; the README does not prescribe a specific `target_modules` list.
+
 この文書は、LoRA の target_modules に関して、この会話で確認した内容を出典ごとに事実のみで整理した記録である。推奨、評価、解釈、優先順位づけは含めない。
 
 ## 1. 競技 README にある事実

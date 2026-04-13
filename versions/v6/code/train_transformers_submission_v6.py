@@ -153,6 +153,24 @@ README_EVAL_CONTRACT: dict[str, Any] = {
     'answer_extraction': 'prioritize \\boxed{} content',
     'inference_engine': 'vLLM',
 }
+README_PATH = REPO_ROOT / 'README.md'
+README_TABLE_KEYS = (
+    'max_lora_rank',
+    'max_tokens',
+    'top_p',
+    'temperature',
+    'max_num_seqs',
+    'gpu_memory_utilization',
+    'max_model_len',
+)
+README_SUBMISSION_REQUIRED_FILES = ('adapter_config.json', 'adapter_model.safetensors')
+README_SUBMISSION_ARCHIVE_NAME = 'submission.zip'
+README_SUBMISSION_CONTRACT = {
+    'required_files': list(README_SUBMISSION_REQUIRED_FILES),
+    'max_lora_rank': README_EVAL_CONTRACT['max_lora_rank'],
+    'single_adapter_submission_zip': True,
+    'submission_archive_name': README_SUBMISSION_ARCHIVE_NAME,
+}
 
 BOXED_PATTERN = re.compile(r"\\boxed\{([^}]*)(?:\}|$)")
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
@@ -191,6 +209,84 @@ def normalize_optional_text(value: Any) -> str | None:
     if not normalized or normalized.lower() == 'nan':
         return None
     return normalized
+
+
+def load_readme_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding='utf-8')
+    contract: dict[str, Any] = {}
+    for key in README_TABLE_KEYS:
+        expected_value = README_EVAL_CONTRACT[key]
+        needle = f'{key}\t'
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split('\t', 1)[1].strip()
+            if raw_value == '':
+                raise SystemExit(f'Malformed README.md evaluation row for {key}: missing value')
+            try:
+                if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    contract[key] = int(raw_value)
+                elif isinstance(expected_value, float):
+                    contract[key] = float(raw_value)
+                else:
+                    contract[key] = raw_value
+            except ValueError as exc:
+                raise SystemExit(f'Malformed README.md evaluation value for {key}: {raw_value!r}') from exc
+            break
+    missing_keys = [key for key in README_TABLE_KEYS if key not in contract]
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return contract
+
+
+def verify_readme_contract_file() -> dict[str, Any]:
+    contract = load_readme_contract_from_readme()
+    for key in README_TABLE_KEYS:
+        expected_value = README_EVAL_CONTRACT[key]
+        actual_value = contract.get(key)
+        if actual_value != expected_value:
+            raise SystemExit(
+                f'README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}'
+            )
+    return contract
+
+
+def load_readme_submission_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding='utf-8')
+    lower_text = text.lower()
+    if 'adapter_config.json' not in text:
+        raise SystemExit(
+            'README.md submitting contract no longer states that the LoRA adapter must include adapter_config.json.'
+        )
+    if README_SUBMISSION_ARCHIVE_NAME.lower() not in lower_text:
+        raise SystemExit(
+            f'README.md submitting contract no longer states that the submission archive is {README_SUBMISSION_ARCHIVE_NAME}.'
+        )
+    if 'submit a lora adapter' not in lower_text:
+        raise SystemExit('README.md submitting contract no longer states that the submission is a single LoRA adapter.')
+    return {
+        'required_files': list(README_SUBMISSION_REQUIRED_FILES),
+        'max_lora_rank': int(load_readme_contract_from_readme()['max_lora_rank']),
+        'single_adapter_submission_zip': True,
+        'submission_archive_name': README_SUBMISSION_ARCHIVE_NAME,
+    }
+
+
+def verify_readme_submission_contract_file() -> dict[str, Any]:
+    contract = load_readme_submission_contract_from_readme()
+    if int(contract['max_lora_rank']) != int(README_SUBMISSION_CONTRACT['max_lora_rank']):
+        raise SystemExit(
+            'README.md submission contract mismatch for max_lora_rank: '
+            f"expected {README_SUBMISSION_CONTRACT['max_lora_rank']}, got {contract['max_lora_rank']}"
+        )
+    if str(contract['submission_archive_name']) != str(README_SUBMISSION_CONTRACT['submission_archive_name']):
+        raise SystemExit(
+            'README.md submission contract mismatch for submission_archive_name: '
+            f"expected {README_SUBMISSION_CONTRACT['submission_archive_name']}, got {contract['submission_archive_name']}"
+        )
+    if bool(contract['single_adapter_submission_zip']) is not True:
+        raise SystemExit('README.md submission contract mismatch for single_adapter_submission_zip: expected true.')
+    return contract
 
 
 def collect_mps_env_settings() -> dict[str, str | None]:
@@ -1142,6 +1238,7 @@ def normalize_adapter_config(
 
 
 def validate_adapter_dir(adapter_dir: Path) -> dict[str, Any]:
+    readme_submission_contract = verify_readme_submission_contract_file()
     config_path = adapter_dir / 'adapter_config.json'
     weights_path = adapter_dir / 'adapter_model.safetensors'
     if not config_path.exists():
@@ -1159,8 +1256,15 @@ def validate_adapter_dir(adapter_dir: Path) -> dict[str, Any]:
             f"base_model_name_or_path must be '{MODEL_ID}', got {payload.get('base_model_name_or_path')!r}"
         )
     rank = payload.get('r')
-    if rank is None or int(rank) > README_EVAL_CONTRACT['max_lora_rank']:
-        errors.append(f"r must be <= 32, got {rank!r}")
+    try:
+        rank_int = int(rank) if rank is not None else None
+    except (TypeError, ValueError):
+        errors.append(f"r must be an integer, got {rank!r}")
+    else:
+        if rank_int is None or rank_int <= 0 or rank_int > int(readme_submission_contract['max_lora_rank']):
+            errors.append(
+                f"r must be between 1 and {readme_submission_contract['max_lora_rank']} (inclusive), got {rank!r}"
+            )
     if payload.get('bias') != 'none':
         errors.append(f"bias must be 'none', got {payload.get('bias')!r}")
     if payload.get('use_dora', False):
@@ -1181,25 +1285,39 @@ def validate_adapter_dir(adapter_dir: Path) -> dict[str, Any]:
 
     return {
         'adapter_dir': str(adapter_dir),
-        'r': int(rank),
+        'r': int(rank_int),
         'target_modules': list(target_modules),
         'base_model_name_or_path': payload.get('base_model_name_or_path'),
         'revision': payload.get('revision'),
         'weights_bytes': weights_path.stat().st_size,
+        'readme_submission_contract': readme_submission_contract,
+        'readme_submission_contract_verified_from_readme_file': True,
     }
 
 
 def make_submission_zip(adapter_dir: Path, zip_path: Path) -> dict[str, Any]:
-    validate_adapter_dir(adapter_dir)
+    readme_submission_contract = verify_readme_submission_contract_file()
+    validation_summary = validate_adapter_dir(adapter_dir)
+    if zip_path.name != str(readme_submission_contract['submission_archive_name']):
+        raise ValueError(
+            f"zip filename must be {readme_submission_contract['submission_archive_name']}, got {zip_path.name}"
+        )
     zip_path.parent.mkdir(parents=True, exist_ok=True)
     zip_path_resolved = zip_path.resolve()
+    zip_entries: list[str] = []
     with ZipFile(zip_path, 'w', compression=ZIP_DEFLATED) as archive:
         for file_path in sorted(adapter_dir.rglob('*')):
             if file_path.is_file() and file_path.resolve() != zip_path_resolved:
-                archive.write(file_path, arcname=file_path.relative_to(adapter_dir))
+                arcname = str(file_path.relative_to(adapter_dir))
+                archive.write(file_path, arcname=arcname)
+                zip_entries.append(arcname)
     return {
         'zip_path': str(zip_path),
         'zip_size_bytes': zip_path.stat().st_size,
+        'zip_entries': zip_entries,
+        'validation_summary': validation_summary,
+        'readme_submission_contract': readme_submission_contract,
+        'readme_submission_contract_verified_from_readme_file': True,
     }
 
 
@@ -2136,8 +2254,6 @@ def run_validation_command(args: argparse.Namespace) -> dict[str, Any]:
 def run_make_submission_command(args: argparse.Namespace) -> dict[str, Any]:
     adapter_dir = require_existing_path(args.adapter_dir, label='adapter dir')
     zip_path = Path(args.zip_path)
-    if zip_path.name != 'submission.zip':
-        raise ValueError(f'zip filename must be submission.zip, got {zip_path.name}')
     summary = make_submission_zip(adapter_dir, zip_path)
     save_json(adapter_dir / 'submission_zip_summary.json', summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -2390,6 +2506,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    verify_readme_contract_file()
     if args.command == 'train-lora':
         train_lora(args)
         return

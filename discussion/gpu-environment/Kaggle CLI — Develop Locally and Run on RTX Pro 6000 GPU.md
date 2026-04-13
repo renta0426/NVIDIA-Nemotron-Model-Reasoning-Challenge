@@ -1,4 +1,6 @@
 Kaggle CLI — Develop Locally and Run on RTX Pro 6000 GPU
+Repository note: this discussion records workflow and environment guidance, but it does not replace the repository competition contract. In this repo, the authoritative evaluation and submission contract remains the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat the CLI workflow notes below as operational guidance rather than as overrides of the README evaluation or submission rules.
+
 I have also added a notebook version for easier navigation (table of contents): [https://www.kaggle.com/code/citerne/from-local-dev-rtx-6000-kaggle-cli-guide]
 
 Practical guide for the NVIDIA Nemotron Model Reasoning Challenge. Hard-won lessons on setting up a CLI → Kaggle GPU workflow, pitfalls to avoid, and everything you need to get started.

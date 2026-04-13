@@ -69,7 +69,27 @@ README_MAX_TOKENS = 7680
 README_TOP_P = 1.0
 README_TEMPERATURE = 0.0
 README_MAX_NUM_SEQS = 64
+README_GPU_MEMORY_UTILIZATION = 0.85
 README_MAX_MODEL_LEN = 8192
+README_PATH = REPO_ROOT / "README.md"
+README_EVAL_CONTRACT = {
+    "max_lora_rank": README_MAX_LORA_RANK,
+    "max_tokens": README_MAX_TOKENS,
+    "top_p": README_TOP_P,
+    "temperature": README_TEMPERATURE,
+    "max_num_seqs": README_MAX_NUM_SEQS,
+    "gpu_memory_utilization": README_GPU_MEMORY_UTILIZATION,
+    "max_model_len": README_MAX_MODEL_LEN,
+}
+README_TABLE_KEYS = tuple(README_EVAL_CONTRACT.keys())
+README_SUBMISSION_REQUIRED_FILES = ("adapter_config.json", "adapter_model.safetensors")
+README_SUBMISSION_ARCHIVE_NAME = "submission.zip"
+README_SUBMISSION_CONTRACT = {
+    "required_files": list(README_SUBMISSION_REQUIRED_FILES),
+    "max_lora_rank": README_MAX_LORA_RANK,
+    "single_adapter_submission_zip": True,
+    "submission_archive_name": README_SUBMISSION_ARCHIVE_NAME,
+}
 BASELINE_MLX_NOTEBOOK_ORIGINAL_LOCAL320_ACCURACY = 215 / 320
 DEFAULT_BEST_SUBMISSION_MIN_LOCAL320_ACCURACY = BASELINE_MLX_NOTEBOOK_ORIGINAL_LOCAL320_ACCURACY
 DEFAULT_BEST_SUBMISSION_MIN_GENERAL_STABLE_ACCURACY = 0.96
@@ -116,6 +136,7 @@ DEFAULT_LORA_KEYS = [
     "mixer.shared_experts.up_proj",
     "mixer.shared_experts.down_proj",
 ]
+TARGET_MODULE_ORDER = ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "up_proj", "down_proj")
 BOXED_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 LR_SCHEDULE_STEP_UNITS = ("optimizer", "micro")
 REPORT_STEP_UNITS = ("optimizer", "micro")
@@ -358,6 +379,7 @@ DEFAULT_STAGE2_BINARY_SOLVERS = (
     "binary_structured_byte_formula_abstract",
     "binary_structured_byte_not_formula",
 )
+DEFAULT_STAGE2_MANUAL_AUDIT_TEMPLATE_SUBTYPES = ("bit_other",)
 DEFAULT_PROXY_V2_FOCUS_BUCKETS = (
     "dominant_structured_safe",
     "supported_affine_xor",
@@ -373,7 +395,7 @@ FINAL_ANSWER_PATTERNS = (
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 BIT8_PATTERN = re.compile(r"^[01]{8}$")
 TRAIN_PROGRESS_LINE_PATTERN = re.compile(
-    r"^Iter (?P<iteration>\d+) \(Opt (?P<optimizer_step>\d+)\): "
+    r"^Iter (?P<iteration>\d+)(?: \(Opt (?P<optimizer_step>\d+)\))?: "
     r"Train loss (?P<train_loss>[-+0-9.eE]+), "
     r"Learning Rate (?P<learning_rate>[-+0-9.eE]+), "
     r"It/sec (?P<iterations_per_second>[-+0-9.eE]+), "
@@ -595,7 +617,11 @@ def extract_console_train_progress(
             continue
         payload = dict(match.groupdict())
         payload["observed_at"] = observed_at
-        payload["steps_per_report_step_unit"] = "optimizer"
+        if payload.get("optimizer_step") in (None, ""):
+            payload["steps_per_report_step_unit"] = "micro"
+            payload.pop("optimizer_step", None)
+        else:
+            payload["steps_per_report_step_unit"] = "optimizer"
         return normalize_train_progress_payload(payload, source="console_log", source_path=console_path)
     return None
 
@@ -1003,6 +1029,41 @@ def run_git_text_command(repo_root: Path, args: Sequence[str]) -> tuple[int, str
     return _run_text_command(("git", "-C", str(Path(repo_root).resolve()), *args))
 
 
+def should_retry_git_index_lock(command_output: str) -> bool:
+    lowered = str(command_output).lower()
+    return (
+        "index.lock" in lowered
+        or "another git process seems to be running" in lowered
+        or (
+            "unable to create" in lowered
+            and ".git/index.lock" in lowered
+        )
+    )
+
+
+def run_git_text_command_with_index_lock_retry(
+    repo_root: Path,
+    args: Sequence[str],
+    *,
+    retry_timeout_seconds: float,
+    retry_poll_seconds: float,
+) -> tuple[int, str, int]:
+    deadline = (
+        time.monotonic() + float(retry_timeout_seconds)
+        if float(retry_timeout_seconds) > 0.0
+        else None
+    )
+    retry_count = 0
+    while True:
+        returncode, output = run_git_text_command(repo_root, args)
+        if returncode == 0 or not should_retry_git_index_lock(output):
+            return returncode, output, retry_count
+        retry_count += 1
+        if deadline is not None and time.monotonic() >= deadline:
+            return returncode, output, retry_count
+        time.sleep(float(retry_poll_seconds))
+
+
 def should_retry_git_push(push_output: str) -> bool:
     lowered = str(push_output).lower()
     return any(
@@ -1106,10 +1167,13 @@ def publish_results_md_to_git(
         "cleared_stale_lock_count": cleared_stale_lock_count,
     }
     try:
-        add_returncode, add_output = run_git_text_command(
+        add_returncode, add_output, add_retry_count = run_git_text_command_with_index_lock_retry(
             resolved_repo_root,
             ("add", "--", staged_relpath),
+            retry_timeout_seconds=180.0,
+            retry_poll_seconds=max(1.0, min(5.0, float(lock_poll_seconds))),
         )
+        summary["add_retry_count"] = add_retry_count
         if add_returncode != 0:
             raise RuntimeError(f"git add failed ({add_returncode}): {add_output}")
         summary["add_output"] = add_output
@@ -1130,10 +1194,13 @@ def publish_results_md_to_git(
             summary["status"] = "dry_run"
             return summary
 
-        commit_returncode, commit_output = run_git_text_command(
+        commit_returncode, commit_output, commit_retry_count = run_git_text_command_with_index_lock_retry(
             resolved_repo_root,
             ("commit", "-m", str(commit_message), "-m", COPILOT_COAUTHORED_BY_TRAILER),
+            retry_timeout_seconds=180.0,
+            retry_poll_seconds=max(1.0, min(5.0, float(lock_poll_seconds))),
         )
+        summary["commit_retry_count"] = commit_retry_count
         if commit_returncode != 0:
             raise RuntimeError(f"git commit failed ({commit_returncode}): {commit_output}")
         summary["commit_output"] = commit_output
@@ -1741,10 +1808,13 @@ def build_corrective_stage2_dataframe(
     binary_solvers: Sequence[str],
     max_symbol_rows: int,
     max_answer_only_ratio: float,
+    max_manual_audit_ratio: float,
     seed: int,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     if max_answer_only_ratio < 0.0 or max_answer_only_ratio > 0.5:
         raise ValueError(f"max_answer_only_ratio must be in [0, 0.5], got {max_answer_only_ratio}")
+    if max_manual_audit_ratio < 0.0 or max_manual_audit_ratio > 0.5:
+        raise ValueError(f"max_manual_audit_ratio must be in [0, 0.5], got {max_manual_audit_ratio}")
 
     solver_set = set(dedupe_strings(binary_solvers))
     if not solver_set:
@@ -1760,8 +1830,12 @@ def build_corrective_stage2_dataframe(
     max_answer_only_rows = int(len(binary_verified) * max_answer_only_ratio)
     if max_answer_only_ratio > 0.0 and max_answer_only_rows <= 0:
         max_answer_only_rows = 1
+    max_manual_audit_rows = int(len(binary_verified) * max_manual_audit_ratio)
+    if max_manual_audit_ratio > 0.0 and max_manual_audit_rows <= 0:
+        max_manual_audit_rows = 1
     answer_only_pool = binary_delta_df[
         binary_delta_df["source_selection_tier"].astype(str).eq("answer_only_keep")
+        & binary_delta_df["teacher_solver_candidate"].astype(str).isin(solver_set)
         & binary_delta_df["template_subtype"].astype(str).isin(
             ["bit_other", "bit_permutation_inversion", "bit_structured_byte_formula"]
         )
@@ -1769,6 +1843,16 @@ def build_corrective_stage2_dataframe(
     binary_answer_only = sample_dataframe_rows(
         answer_only_pool,
         max_rows=max_answer_only_rows,
+        seed=seed,
+    )
+    manual_audit_pool = binary_delta_df[
+        binary_delta_df["source_selection_tier"].astype(str).eq("manual_audit_priority")
+        & binary_delta_df["teacher_solver_candidate"].astype(str).isin(solver_set)
+        & binary_delta_df["template_subtype"].astype(str).isin(DEFAULT_STAGE2_MANUAL_AUDIT_TEMPLATE_SUBTYPES)
+    ].copy()
+    binary_manual_audit = sample_dataframe_rows(
+        manual_audit_pool,
+        max_rows=max_manual_audit_rows,
         seed=seed,
     )
 
@@ -1794,9 +1878,14 @@ def build_corrective_stage2_dataframe(
 
     frames = [
         binary_verified.loc[:, EXPECTED_COLUMNS],
+        binary_manual_audit.loc[:, EXPECTED_COLUMNS],
         binary_answer_only.loc[:, EXPECTED_COLUMNS],
         symbol_rows.loc[:, EXPECTED_COLUMNS],
     ]
+    binary_combined = pd.concat(
+        [binary_verified, binary_manual_audit, binary_answer_only],
+        ignore_index=True,
+    )
     combined = pd.concat(frames, ignore_index=True)
     combined = combined.drop_duplicates(subset="id", keep="first")
     combined = combined.sample(frac=1.0, random_state=seed).reset_index(drop=True)
@@ -1806,8 +1895,11 @@ def build_corrective_stage2_dataframe(
         "binary_solvers": list(solver_set),
         "max_symbol_rows": int(max_symbol_rows),
         "max_answer_only_ratio": float(max_answer_only_ratio),
+        "max_manual_audit_ratio": float(max_manual_audit_ratio),
+        "manual_audit_template_subtypes": list(DEFAULT_STAGE2_MANUAL_AUDIT_TEMPLATE_SUBTYPES),
         "rows": int(len(combined)),
         "binary_verified_rows": int(len(binary_verified)),
+        "binary_manual_audit_rows": int(len(binary_manual_audit)),
         "binary_answer_only_rows": int(len(binary_answer_only)),
         "symbol_rows": int(len(symbol_rows)),
         "type_counts": {
@@ -1816,13 +1908,26 @@ def build_corrective_stage2_dataframe(
         },
         "binary_solver_counts": {
             str(key): int(value)
+            for key, value in binary_combined["teacher_solver_candidate"].astype(str).value_counts().sort_index().items()
+        },
+        "binary_verified_solver_counts": {
+            str(key): int(value)
             for key, value in binary_verified["teacher_solver_candidate"].astype(str).value_counts().sort_index().items()
+        },
+        "binary_helper_solver_counts": {
+            str(key): int(value)
+            for key, value in pd.concat(
+                [binary_manual_audit, binary_answer_only],
+                ignore_index=True,
+            )["teacher_solver_candidate"]
+            .astype(str)
+            .value_counts()
+            .sort_index()
+            .items()
         },
         "binary_selection_tier_counts": {
             str(key): int(value)
-            for key, value in pd.concat([binary_verified, binary_answer_only], ignore_index=True)[
-                "source_selection_tier"
-            ]
+            for key, value in binary_combined["source_selection_tier"]
             .astype(str)
             .value_counts()
             .sort_index()
@@ -1830,9 +1935,7 @@ def build_corrective_stage2_dataframe(
         },
         "binary_assistant_style_counts": {
             str(key): int(value)
-            for key, value in pd.concat([binary_verified, binary_answer_only], ignore_index=True)[
-                "assistant_style"
-            ]
+            for key, value in binary_combined["assistant_style"]
             .astype(str)
             .value_counts()
             .sort_index()
@@ -2384,8 +2487,22 @@ def render_submission_compat_markdown_summary(summary: dict[str, Any]) -> str:
     lines = ["# submission_compat_audit", ""]
     lines.append(f"- adapter_dir: `{summary['adapter_dir']}`")
     lines.append(f"- audit_status: `{summary['audit_status']}`")
+    if summary.get("audit_status_detail") not in (None, ""):
+        lines.append(f"- audit_status_detail: `{summary['audit_status_detail']}`")
     lines.append(f"- peft_export_ready: `{summary['peft_export_ready']}`")
     lines.append(f"- base_model_name_or_path: `{summary['base_model_name_or_path']}`")
+    if summary.get("reference_model_root") not in (None, ""):
+        lines.append(f"- reference_model_root: `{summary['reference_model_root']}`")
+    if summary.get("target_modules") not in (None, ""):
+        lines.append(f"- target_modules: `{summary['target_modules']}`")
+    if summary.get("converted_tensor_count") not in (None, ""):
+        lines.append(f"- converted_tensor_count: `{summary['converted_tensor_count']}`")
+    validation = summary.get("reference_validation") or {}
+    if validation:
+        lines.append(f"- reference_validation_valid: `{validation.get('valid')}`")
+        lines.append(f"- reference_validation_missing_keys: `{len(validation.get('missing_keys', []))}`")
+        lines.append(f"- reference_validation_unexpected_keys: `{len(validation.get('unexpected_keys', []))}`")
+        lines.append(f"- reference_validation_shape_mismatches: `{len(validation.get('shape_mismatches', []))}`")
     lines.append("")
     if summary["blocked_reasons"]:
         lines.append("## Blocked reasons")
@@ -2410,10 +2527,18 @@ def render_submission_compat_markdown_summary(summary: dict[str, Any]) -> str:
     if summary["unsupported_tensor_examples"]:
         lines.append("## Unsupported tensor examples")
         lines.append("")
-        lines.append("| key | shape |")
-        lines.append("| --- | --- |")
+        include_reason = any("reason" in row for row in summary["unsupported_tensor_examples"])
+        if include_reason:
+            lines.append("| key | shape | reason |")
+            lines.append("| --- | --- | --- |")
+        else:
+            lines.append("| key | shape |")
+            lines.append("| --- | --- |")
         for row in summary["unsupported_tensor_examples"]:
-            lines.append(f"| `{row['key']}` | `{row['shape']}` |")
+            if include_reason:
+                lines.append(f"| `{row['key']}` | `{row['shape']}` | `{row.get('reason', '')}` |")
+            else:
+                lines.append(f"| `{row['key']}` | `{row['shape']}` |")
         lines.append("")
     preview = summary.get("peft_adapter_config_preview") or {}
     if preview:
@@ -2585,11 +2710,115 @@ def build_readme_eval_assumptions(args: argparse.Namespace) -> dict[str, Any]:
         "top_p": float(args.top_p),
         "max_tokens": int(args.max_tokens),
         "max_num_seqs": int(args.max_num_seqs),
+        "gpu_memory_utilization": float(args.gpu_memory_utilization),
         "max_model_len": int(args.max_model_len),
         "boxed_first_extraction": True,
         "numeric_relative_tolerance": 1e-2,
         "eval_enable_thinking": bool(args.eval_enable_thinking),
     }
+
+
+def load_readme_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    contract: dict[str, Any] = {}
+    missing_keys: list[str] = []
+    for key in README_TABLE_KEYS:
+        expected_value = README_EVAL_CONTRACT[key]
+        needle = f"{key}\t"
+        found = False
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split("\t", 1)[1].strip()
+            if raw_value == "":
+                raise SystemExit(f"Malformed README.md evaluation row for {key}: missing value")
+            try:
+                if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    contract[key] = int(raw_value)
+                elif isinstance(expected_value, float):
+                    contract[key] = float(raw_value)
+                else:
+                    contract[key] = raw_value
+            except ValueError as exc:
+                raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+            found = True
+            break
+        if not found:
+            missing_keys.append(key)
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return contract
+
+
+def verify_readme_contract_file() -> dict[str, Any]:
+    contract = load_readme_contract_from_readme()
+    for key, expected_value in README_EVAL_CONTRACT.items():
+        actual_value = contract[key]
+        if actual_value != expected_value:
+            raise SystemExit(
+                f"README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}"
+            )
+    return contract
+
+
+def load_readme_submission_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    lower_text = text.lower()
+    if "adapter_config.json" not in text:
+        raise SystemExit(
+            "README.md submitting contract no longer states that the LoRA adapter must include adapter_config.json."
+        )
+    if README_SUBMISSION_ARCHIVE_NAME.lower() not in lower_text:
+        raise SystemExit(
+            f"README.md submitting contract no longer states that the submission archive is {README_SUBMISSION_ARCHIVE_NAME}."
+        )
+    if "submit a lora adapter" not in lower_text:
+        raise SystemExit("README.md submitting contract no longer states that the submission is a single LoRA adapter.")
+    return {
+        "required_files": list(README_SUBMISSION_REQUIRED_FILES),
+        "max_lora_rank": int(load_readme_contract_from_readme()["max_lora_rank"]),
+        "single_adapter_submission_zip": True,
+        "submission_archive_name": README_SUBMISSION_ARCHIVE_NAME,
+    }
+
+
+def verify_readme_submission_contract_file() -> dict[str, Any]:
+    contract = load_readme_submission_contract_from_readme()
+    if int(contract["max_lora_rank"]) != int(README_SUBMISSION_CONTRACT["max_lora_rank"]):
+        raise SystemExit(
+            "README.md submission contract mismatch for max_lora_rank: "
+            f"expected {README_SUBMISSION_CONTRACT['max_lora_rank']}, got {contract['max_lora_rank']}"
+        )
+    if str(contract["submission_archive_name"]) != str(README_SUBMISSION_CONTRACT["submission_archive_name"]):
+        raise SystemExit(
+            "README.md submission contract mismatch for submission_archive_name: "
+            f"expected {README_SUBMISSION_CONTRACT['submission_archive_name']}, got {contract['submission_archive_name']}"
+        )
+    if bool(contract["single_adapter_submission_zip"]) is not True:
+        raise SystemExit("README.md submission contract mismatch for single_adapter_submission_zip: expected true.")
+    return contract
+
+
+def get_effective_readme_contract(args: argparse.Namespace) -> dict[str, Any]:
+    return dict(getattr(args, "_verified_readme_contract", README_EVAL_CONTRACT))
+
+
+def readme_contract_verified_from_file(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "_readme_contract_verified_from_readme_file", False))
+
+
+def get_effective_readme_submission_contract(args: argparse.Namespace) -> dict[str, Any]:
+    contract = getattr(args, "_verified_readme_submission_contract", README_SUBMISSION_CONTRACT)
+    return {
+        "required_files": list(contract["required_files"]),
+        "max_lora_rank": int(contract["max_lora_rank"]),
+        "single_adapter_submission_zip": bool(contract["single_adapter_submission_zip"]),
+        "submission_archive_name": str(contract["submission_archive_name"]),
+    }
+
+
+def readme_submission_contract_verified_from_file(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "_readme_submission_contract_verified_from_readme_file", False))
 
 
 def prepare_benchmark_rows_for_eval(
@@ -2806,6 +3035,8 @@ def evaluate_benchmark_rows(
         "source_paths": [str(path) for path in source_paths],
         "model_root": str(Path(args.model_root).resolve()),
         "adapter_dir": str(Path(args.adapter_dir).resolve()) if args.adapter_dir else "",
+        "readme_contract": get_effective_readme_contract(args),
+        "readme_contract_verified_from_readme_file": readme_contract_verified_from_file(args),
         "readme_eval_assumptions": build_readme_eval_assumptions(args),
         **summary,
     }
@@ -3012,6 +3243,8 @@ def run_eval_benchmark_suite(args: argparse.Namespace) -> None:
         "benchmark_root": str(benchmark_root),
         "model_root": str(Path(args.model_root).resolve()),
         "adapter_dir": str(Path(args.adapter_dir).resolve()) if args.adapter_dir else "",
+        "readme_contract": get_effective_readme_contract(args),
+        "readme_contract_verified_from_readme_file": readme_contract_verified_from_file(args),
         "readme_eval_assumptions": build_readme_eval_assumptions(args),
         "evaluations": suite_rows,
     }
@@ -3083,20 +3316,91 @@ def ensure_nemotron_meta_import_stubs() -> None:
     sys.modules["mamba_ssm.ops.triton.ssd_combined"] = ssd_module
 
 
-def build_peft_target_modules_from_mlx_keys(keys: Sequence[str]) -> list[str]:
-    return dedupe_strings(str(key).strip() for key in keys if str(key).strip())
+def extract_mlx_lora_hparams(adapter_config: dict[str, Any]) -> tuple[int, float, float]:
+    lora_parameters = adapter_config.get("lora_parameters")
+    if not isinstance(lora_parameters, dict):
+        raise ValueError("adapter_config.json does not contain a valid lora_parameters object.")
+    try:
+        rank = int(lora_parameters["rank"])
+    except Exception as exc:
+        raise ValueError(f"Invalid lora rank in adapter_config.json: {lora_parameters.get('rank')}") from exc
+    try:
+        alpha = float(lora_parameters.get("scale", rank))
+    except Exception as exc:
+        raise ValueError(f"Invalid lora scale in adapter_config.json: {lora_parameters.get('scale')}") from exc
+    try:
+        dropout = float(lora_parameters.get("dropout", 0.0))
+    except Exception as exc:
+        raise ValueError(f"Invalid lora dropout in adapter_config.json: {lora_parameters.get('dropout')}") from exc
+    return rank, alpha, dropout
+
+
+def build_peft_target_modules_regex(mlx_keys: Sequence[str]) -> str:
+    normalized_keys = [str(key).strip() for key in mlx_keys if str(key).strip()]
+
+    def has_any_fragment(*fragments: str) -> bool:
+        return any(any(fragment in key for fragment in fragments) for key in normalized_keys)
+
+    terminals: list[str] = []
+    for terminal in TARGET_MODULE_ORDER:
+        if terminal == "q_proj" and has_any_fragment(".mixer.q_proj.", "mixer.q_proj"):
+            terminals.append(terminal)
+        elif terminal == "k_proj" and has_any_fragment(".mixer.k_proj.", "mixer.k_proj"):
+            terminals.append(terminal)
+        elif terminal == "v_proj" and has_any_fragment(".mixer.v_proj.", "mixer.v_proj"):
+            terminals.append(terminal)
+        elif terminal == "o_proj" and has_any_fragment(".mixer.o_proj.", "mixer.o_proj"):
+            terminals.append(terminal)
+        elif terminal == "in_proj" and has_any_fragment(".mixer.in_proj.", "mixer.in_proj"):
+            terminals.append(terminal)
+        elif terminal == "out_proj" and has_any_fragment(".mixer.out_proj.", "mixer.out_proj"):
+            terminals.append(terminal)
+        elif terminal == "up_proj" and has_any_fragment(
+            ".mixer.shared_experts.up_proj.",
+            ".mixer.switch_mlp.fc1.",
+            ".mixer.up_proj.",
+            "mixer.shared_experts.up_proj",
+            "mixer.switch_mlp.fc1",
+            "mixer.up_proj",
+        ):
+            terminals.append(terminal)
+        elif terminal == "down_proj" and has_any_fragment(
+            ".mixer.shared_experts.down_proj.",
+            ".mixer.switch_mlp.fc2.",
+            ".mixer.down_proj.",
+            "mixer.shared_experts.down_proj",
+            "mixer.switch_mlp.fc2",
+            "mixer.down_proj",
+        ):
+            terminals.append(terminal)
+    if not terminals:
+        raise ValueError("Could not derive PEFT target_modules regex from MLX adapter keys.")
+    return ".*\\.(" + "|".join(terminals) + ")$"
+
+
+def resolve_peft_reference_model_root(
+    *,
+    reference_model_root: Path | None,
+    adapter_config: dict[str, Any],
+) -> Path:
+    if reference_model_root is not None:
+        return Path(reference_model_root).resolve()
+    configured_model_root = adapter_config.get("model")
+    if isinstance(configured_model_root, str) and configured_model_root.strip():
+        return Path(configured_model_root).resolve()
+    return DEFAULT_MODEL_ROOT.resolve()
 
 
 def build_reference_peft_lora_shapes(
     *,
     reference_model_root: Path,
-    target_modules: Sequence[str],
+    target_modules: str,
     rank: int,
     alpha: float,
     dropout: float,
 ) -> dict[str, tuple[int, ...]]:
     from accelerate import init_empty_weights
-    from peft import LoraConfig, TaskType, get_peft_model
+    from peft import LoraConfig, TaskType, get_peft_model, get_peft_model_state_dict
     from transformers import AutoConfig, AutoModelForCausalLM
 
     ensure_nemotron_meta_import_stubs()
@@ -3108,7 +3412,7 @@ def build_reference_peft_lora_shapes(
         r=int(rank),
         lora_alpha=float(alpha),
         lora_dropout=float(dropout),
-        target_modules=list(target_modules),
+        target_modules=str(target_modules),
         bias="none",
         use_dora=False,
         modules_to_save=None,
@@ -3116,7 +3420,7 @@ def build_reference_peft_lora_shapes(
     )
     model = get_peft_model(model, peft_config)
     reference_shapes: dict[str, tuple[int, ...]] = {}
-    for key, value in model.state_dict().items():
+    for key, value in get_peft_model_state_dict(model).items():
         if "lora_A" in key or "lora_B" in key:
             reference_shapes[str(key)] = tuple(value.shape)
     return reference_shapes
@@ -3128,7 +3432,7 @@ def build_peft_adapter_config_payload(
     rank: int,
     alpha: float,
     dropout: float,
-    target_modules: Sequence[str],
+    target_modules: str,
 ) -> dict[str, Any]:
     return {
         "alora_invocation_tokens": None,
@@ -3160,7 +3464,7 @@ def build_peft_adapter_config_payload(
         "r": int(rank),
         "rank_pattern": {},
         "revision": None,
-        "target_modules": list(target_modules),
+        "target_modules": str(target_modules),
         "target_parameters": None,
         "task_type": "CAUSAL_LM",
         "trainable_token_indices": None,
@@ -3170,32 +3474,87 @@ def build_peft_adapter_config_payload(
     }
 
 
+def classify_peft_export_source_tensor(key: str) -> str:
+    if ".mixer.q_proj." in key or ".mixer.k_proj." in key or ".mixer.v_proj." in key or ".mixer.o_proj." in key:
+        return "attention"
+    if ".mixer.switch_mlp.fc1." in key:
+        return "switch_fc1"
+    if ".mixer.switch_mlp.fc2." in key:
+        return "switch_fc2"
+    if ".mixer.shared_experts." in key:
+        return "shared_experts"
+    if ".mixer.in_proj." in key:
+        return "in_proj"
+    if ".mixer.out_proj." in key:
+        return "out_proj"
+    return "other"
+
+
+def map_mlx_adapter_tensor_to_peft_entries(key: str, value: Any) -> list[tuple[str, Any]]:
+    prefix, suffix = key.rsplit(".", 1)
+    if suffix not in {"lora_a", "lora_b"}:
+        raise ValueError(f"Unsupported LoRA tensor suffix: {key}")
+    target_suffix = "lora_A.weight" if suffix == "lora_a" else "lora_B.weight"
+
+    if ".mixer.switch_mlp.fc1." in key:
+        if len(value.shape) != 3:
+            raise ValueError(f"switch_mlp.fc1 tensor must be 3D, got {key}: {tuple(value.shape)}")
+        base_prefix = prefix.replace(".mixer.switch_mlp.fc1", ".mixer.experts.{expert_index}.up_proj")
+        return [
+            (f"base_model.model.{base_prefix.format(expert_index=expert_index)}.{target_suffix}", value[expert_index])
+            for expert_index in range(value.shape[0])
+        ]
+
+    if ".mixer.switch_mlp.fc2." in key:
+        if len(value.shape) != 3:
+            raise ValueError(f"switch_mlp.fc2 tensor must be 3D, got {key}: {tuple(value.shape)}")
+        base_prefix = prefix.replace(".mixer.switch_mlp.fc2", ".mixer.experts.{expert_index}.down_proj")
+        return [
+            (f"base_model.model.{base_prefix.format(expert_index=expert_index)}.{target_suffix}", value[expert_index])
+            for expert_index in range(value.shape[0])
+        ]
+
+    if len(value.shape) != 2:
+        raise ValueError(f"Only 2D tensors are supported outside routed experts, got {key}: {tuple(value.shape)}")
+    return [(f"base_model.model.{prefix}.{target_suffix}", value.T)]
+
+
 def convert_mlx_adapter_to_peft_tensors(
     tensors: dict[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     converted: dict[str, Any] = {}
     conversion_rows: list[dict[str, Any]] = []
+    source_rank_counts: dict[int, int] = {}
+    source_family_counts: dict[str, int] = {}
     for key, value in sorted(tensors.items()):
-        if len(value.shape) != 2:
-            raise ValueError(
-                f"Only 2D LoRA tensors are supported for conservative PEFT export, got {key}: {tuple(value.shape)}"
-            )
-        if key.endswith(".lora_a"):
-            target_key = f"base_model.model.{key[:-7]}.lora_A.default.weight"
-        elif key.endswith(".lora_b"):
-            target_key = f"base_model.model.{key[:-7]}.lora_B.default.weight"
-        else:
-            raise ValueError(f"Unsupported adapter tensor key: {key}")
-        converted[target_key] = value.T
-        conversion_rows.append(
-            {
-                "source_key": key,
-                "source_shape": list(value.shape),
-                "target_key": target_key,
-                "target_shape": list(converted[target_key].shape),
-            }
-        )
-    return converted, conversion_rows
+        tensor_rank = len(value.shape)
+        source_rank_counts[tensor_rank] = source_rank_counts.get(tensor_rank, 0) + 1
+        family = classify_peft_export_source_tensor(key)
+        source_family_counts[family] = source_family_counts.get(family, 0) + 1
+        mapped_entries = map_mlx_adapter_tensor_to_peft_entries(key, value)
+        for target_key, mapped_value in mapped_entries:
+            converted[target_key] = mapped_value
+            if len(conversion_rows) < 48:
+                conversion_rows.append(
+                    {
+                        "source_key": key,
+                        "source_shape": list(value.shape),
+                        "target_key": target_key,
+                        "target_shape": list(mapped_value.shape),
+                    }
+                )
+    source_tensor_summary = {
+        "source_tensor_count": len(tensors),
+        "source_tensor_rank_counts": [
+            {"tensor_rank": int(rank), "tensor_count": int(source_rank_counts[rank])}
+            for rank in sorted(source_rank_counts)
+        ],
+        "source_family_counts": [
+            {"family": family, "tensor_count": int(source_family_counts[family])}
+            for family in sorted(source_family_counts)
+        ],
+    }
+    return converted, conversion_rows, source_tensor_summary
 
 
 def validate_converted_peft_tensors(
@@ -3245,44 +3604,37 @@ def run_audit_submission_compat(args: argparse.Namespace) -> None:
     rank_counts: dict[int, int] = {}
     family_counts: dict[str, int] = {}
     unsupported_tensor_examples: list[dict[str, Any]] = []
-    blocked_reasons: list[str] = []
     unsupported_keys: list[str] = []
     for key, value in tensors.items():
         tensor_rank = len(value.shape)
         rank_counts[tensor_rank] = rank_counts.get(tensor_rank, 0) + 1
         family = classify_adapter_module_family(key)
         family_counts[family] = family_counts.get(family, 0) + 1
-        if tensor_rank != 2:
+        try:
+            map_mlx_adapter_tensor_to_peft_entries(key, value)
+        except ValueError as exc:
             unsupported_keys.append(key)
             if len(unsupported_tensor_examples) < 12:
                 unsupported_tensor_examples.append(
-                    {"key": key, "shape": list(value.shape)}
+                    {"key": key, "shape": list(value.shape), "reason": str(exc)}
                 )
 
-    if unsupported_keys:
-        blocked_reasons.append(
-            "MLX adapter contains non-2D LoRA tensors; PEFT/vLLM-equivalent export is not claimed without a verified mapping."
-        )
-    if any(".mixer.switch_mlp." in key for key in unsupported_keys):
-        blocked_reasons.append(
-            "switch_mlp routed-expert tensors are 3D in this adapter, so the current single-file pipeline blocks submission export instead of guessing a PEFT layout."
-        )
-
-    lora_parameters = adapter_config.get("lora_parameters", {})
+    blocked_reasons: list[str] = []
+    audit_status_detail = "validated_peft_reference_match"
     try:
-        rank = int(lora_parameters.get("rank", 0))
-    except Exception:
+        rank, alpha, dropout = extract_mlx_lora_hparams(adapter_config)
+    except ValueError as exc:
+        blocked_reasons.append(str(exc))
         rank = 0
-    try:
-        alpha = float(lora_parameters.get("scale", 0.0))
-    except Exception:
         alpha = 0.0
-    try:
-        dropout = float(lora_parameters.get("dropout", 0.0))
-    except Exception:
         dropout = 0.0
-    raw_keys = coerce_string_list(lora_parameters.get("keys"))
-    target_modules = build_peft_target_modules_from_mlx_keys(raw_keys)
+        audit_status_detail = "blocked_invalid_adapter_config"
+    try:
+        target_modules = build_peft_target_modules_regex(list(tensors.keys()))
+    except ValueError as exc:
+        blocked_reasons.append(str(exc))
+        target_modules = ""
+        audit_status_detail = "blocked_target_modules"
 
     peft_adapter_config_preview = {
         "peft_type": "LORA",
@@ -3298,14 +3650,66 @@ def run_audit_submission_compat(args: argparse.Namespace) -> None:
         "inference_mode": True,
     }
 
-    audit_status = "blocked_routed_expert_3d_tensors" if blocked_reasons else "potentially_exportable_2d_only"
+    converted_tensors: dict[str, Any] = {}
+    conversion_preview: list[dict[str, Any]] = []
+    source_tensor_summary: dict[str, Any] = {}
+    reference_model_root = ""
+    validation = {
+        "missing_keys": [],
+        "unexpected_keys": [],
+        "shape_mismatches": [],
+        "valid": False,
+    }
+
+    if unsupported_keys:
+        blocked_reasons.append(
+            "PEFT export conversion is blocked because some adapter tensors do not map to the README-compatible PEFT layout."
+        )
+        audit_status_detail = "blocked_unsupported_tensors"
+
+    if not blocked_reasons:
+        converted_tensors, conversion_preview, source_tensor_summary = convert_mlx_adapter_to_peft_tensors(tensors)
+        resolved_reference_model_root = resolve_peft_reference_model_root(
+            reference_model_root=getattr(args, "reference_model_root", None),
+            adapter_config=adapter_config,
+        )
+        reference_model_root = str(resolved_reference_model_root)
+        if not resolved_reference_model_root.exists():
+            blocked_reasons.append(f"Reference model root does not exist: {resolved_reference_model_root}")
+            audit_status_detail = "blocked_missing_reference_model_root"
+        else:
+            reference_shapes = build_reference_peft_lora_shapes(
+                reference_model_root=resolved_reference_model_root,
+                target_modules=target_modules,
+                rank=rank,
+                alpha=alpha,
+                dropout=dropout,
+            )
+            validation = validate_converted_peft_tensors(
+                converted_tensors=converted_tensors,
+                reference_shapes=reference_shapes,
+            )
+            if not validation["valid"]:
+                blocked_reasons.append(
+                    "Converted PEFT adapter tensors did not match the Nemotron meta reference. "
+                    f"missing={len(validation['missing_keys'])} "
+                    f"unexpected={len(validation['unexpected_keys'])} "
+                    f"shape_mismatches={len(validation['shape_mismatches'])}"
+                )
+                audit_status_detail = "blocked_reference_validation"
+
+    audit_status = "potentially_exportable_2d_only" if not blocked_reasons else "blocked"
+    if blocked_reasons and audit_status_detail == "validated_peft_reference_match":
+        audit_status_detail = "blocked"
     payload = {
         "created_at": utc_now(),
         "adapter_dir": str(adapter_dir),
         "audit_status": audit_status,
+        "audit_status_detail": audit_status_detail,
         "peft_export_ready": not blocked_reasons,
         "blocked_reasons": blocked_reasons,
         "base_model_name_or_path": str(args.base_model_name_or_path),
+        "reference_model_root": reference_model_root,
         "tensor_count": len(tensors),
         "tensor_rank_counts": [
             {"tensor_rank": int(rank_key), "tensor_count": int(rank_counts[rank_key])}
@@ -3314,17 +3718,19 @@ def run_audit_submission_compat(args: argparse.Namespace) -> None:
         "module_family_counts": summarize_count_mapping(family_counts, "module_family"),
         "unsupported_tensor_count": len(unsupported_keys),
         "unsupported_tensor_examples": unsupported_tensor_examples,
+        "converted_tensor_count": len(converted_tensors),
+        "target_modules": target_modules,
+        "conversion_preview": conversion_preview,
+        "source_tensor_summary": source_tensor_summary,
+        "reference_validation": validation,
         "mlx_adapter_config_excerpt": {
             "fine_tune_type": adapter_config.get("fine_tune_type"),
             "model": adapter_config.get("model"),
-            "lora_parameters": lora_parameters,
+            "lora_parameters": adapter_config.get("lora_parameters"),
         },
         "peft_adapter_config_preview": peft_adapter_config_preview,
-        "readme_submission_contract": {
-            "required_files": ["adapter_config.json", "adapter_model.safetensors"],
-            "max_lora_rank": README_MAX_LORA_RANK,
-            "single_adapter_submission_zip": True,
-        },
+        "readme_submission_contract": get_effective_readme_submission_contract(args),
+        "readme_submission_contract_verified_from_readme_file": readme_submission_contract_verified_from_file(args),
     }
 
     write_json(output_root / "submission_compat_audit.json", payload)
@@ -3341,6 +3747,8 @@ def export_peft_submission_artifacts(
     output_root: Path,
     reference_model_root: Path | None,
     base_model_name_or_path: str,
+    readme_submission_contract: Mapping[str, Any] | None = None,
+    readme_submission_contract_verified_from_readme_file: bool = False,
 ) -> dict[str, Any]:
     from safetensors.numpy import load_file, save_file
 
@@ -3357,43 +3765,21 @@ def export_peft_submission_artifacts(
     tensors = load_file(str(adapter_dir / "adapters.safetensors"))
     if not tensors:
         raise ValueError(f"No tensors found in {adapter_dir / 'adapters.safetensors'}")
-    non_2d_keys = [key for key, value in tensors.items() if len(value.shape) != 2]
-    if non_2d_keys:
-        raise ValueError(
-            "PEFT export is blocked because non-2D tensors are present: "
-            + ", ".join(non_2d_keys[:12])
-        )
-
-    lora_parameters = adapter_config.get("lora_parameters", {})
-    try:
-        rank = int(lora_parameters.get("rank", 0))
-    except Exception:
-        rank = 0
-    try:
-        alpha = float(lora_parameters.get("scale", 0.0))
-    except Exception:
-        alpha = 0.0
-    try:
-        dropout = float(lora_parameters.get("dropout", 0.0))
-    except Exception:
-        dropout = 0.0
-    target_modules = build_peft_target_modules_from_mlx_keys(
-        coerce_string_list(lora_parameters.get("keys"))
-    )
+    rank, alpha, dropout = extract_mlx_lora_hparams(adapter_config)
+    target_modules = build_peft_target_modules_regex(list(tensors.keys()))
     if not target_modules:
         raise ValueError("No target_modules could be derived from MLX adapter config.")
 
-    reference_model_root = (
-        Path(reference_model_root).resolve()
-        if reference_model_root is not None
-        else Path(str(adapter_config.get("model", ""))).resolve()
-    )
-    if not reference_model_root.exists():
-        raise FileNotFoundError(f"Reference model root does not exist: {reference_model_root}")
-
-    converted_tensors, conversion_rows = convert_mlx_adapter_to_peft_tensors(tensors)
-    reference_shapes = build_reference_peft_lora_shapes(
+    resolved_reference_model_root = resolve_peft_reference_model_root(
         reference_model_root=reference_model_root,
+        adapter_config=adapter_config,
+    )
+    if not resolved_reference_model_root.exists():
+        raise FileNotFoundError(f"Reference model root does not exist: {resolved_reference_model_root}")
+
+    converted_tensors, conversion_rows, source_tensor_summary = convert_mlx_adapter_to_peft_tensors(tensors)
+    reference_shapes = build_reference_peft_lora_shapes(
+        reference_model_root=resolved_reference_model_root,
         target_modules=target_modules,
         rank=rank,
         alpha=alpha,
@@ -3431,7 +3817,7 @@ def export_peft_submission_artifacts(
     export_manifest = {
         "created_at": utc_now(),
         "adapter_dir": str(adapter_dir),
-        "reference_model_root": str(reference_model_root),
+        "reference_model_root": str(resolved_reference_model_root),
         "output_root": str(output_root),
         "submission_dir": str(submission_dir),
         "zip_path": str(zip_path),
@@ -3439,6 +3825,24 @@ def export_peft_submission_artifacts(
         "converted_tensor_count": len(converted_tensors),
         "base_model_name_or_path": str(base_model_name_or_path),
         "target_modules": target_modules,
+        "source_tensor_summary": source_tensor_summary,
+        "readme_submission_contract": {
+            "required_files": list(
+                (readme_submission_contract or README_SUBMISSION_CONTRACT)["required_files"]
+            ),
+            "max_lora_rank": int(
+                (readme_submission_contract or README_SUBMISSION_CONTRACT)["max_lora_rank"]
+            ),
+            "single_adapter_submission_zip": bool(
+                (readme_submission_contract or README_SUBMISSION_CONTRACT)["single_adapter_submission_zip"]
+            ),
+            "submission_archive_name": str(
+                (readme_submission_contract or README_SUBMISSION_CONTRACT)["submission_archive_name"]
+            ),
+        },
+        "readme_submission_contract_verified_from_readme_file": bool(
+            readme_submission_contract_verified_from_readme_file
+        ),
         "validation": validation,
         "conversion_preview": conversion_rows[:24],
     }
@@ -3454,6 +3858,10 @@ def run_export_peft_submission(args: argparse.Namespace) -> None:
         if args.reference_model_root is not None
         else None,
         base_model_name_or_path=str(args.base_model_name_or_path),
+        readme_submission_contract=get_effective_readme_submission_contract(args),
+        readme_submission_contract_verified_from_readme_file=readme_submission_contract_verified_from_file(
+            args
+        ),
     )
     print(json.dumps(export_manifest, ensure_ascii=False, indent=2))
 
@@ -3621,7 +4029,7 @@ def render_record_run_result_markdown(payload: dict[str, Any]) -> str:
         lines.append("#### Submission audit")
         lines.append("")
         lines.append(f"- audit_status: `{audit_summary.get('audit_status', '')}`")
-        lines.append(f"- peft_export_ready: `{audit_summary.get('peft_export_ready', False)}`")
+        lines.append(f"- peft_export_ready: `{audit_summary_is_export_ready(audit_summary)}`")
         lines.append(f"- tensor_count: `{audit_summary.get('tensor_count', 0)}`")
         blocked_reasons = audit_summary.get("blocked_reasons") or []
         if blocked_reasons:
@@ -3764,16 +4172,30 @@ def render_live_run_status_markdown(payload: dict[str, Any]) -> str:
     sampling = prepare_manifest.get("sampling", {})
     live_progress = payload.get("live_progress")
     total_optimizer_steps = int(training.get("optimizer_steps", 0) or 0)
+    step_unit = (
+        str(live_progress.get("steps_per_report_step_unit", "")).strip()
+        if isinstance(live_progress, dict) and live_progress.get("steps_per_report_step_unit") not in (None, "")
+        else ""
+    )
+    iteration = int(live_progress.get("iteration", 0) or 0) if isinstance(live_progress, dict) else 0
     optimizer_step = (
-        int(live_progress.get("optimizer_step", 0))
-        if isinstance(live_progress, dict) and live_progress.get("optimizer_step") is not None
-        else 0
+        int(live_progress.get("optimizer_step"))
+        if isinstance(live_progress, dict) and live_progress.get("optimizer_step") not in (None, "")
+        else None
     )
-    optimizer_progress = (
-        f"{optimizer_step}/{total_optimizer_steps} = {optimizer_step / total_optimizer_steps:.2%}"
-        if total_optimizer_steps > 0
-        else str(optimizer_step)
-    )
+    if optimizer_step is None and step_unit == "micro":
+        optimizer_progress = (
+            f"n/a (latest log reports micro step {iteration})"
+            if iteration > 0
+            else "n/a (latest log reports micro steps)"
+        )
+    else:
+        resolved_optimizer_step = int(optimizer_step or 0)
+        optimizer_progress = (
+            f"{resolved_optimizer_step}/{total_optimizer_steps} = {resolved_optimizer_step / total_optimizer_steps:.2%}"
+            if total_optimizer_steps > 0
+            else str(resolved_optimizer_step)
+        )
 
     lines = [f"### Live progress: `{payload['run_name']}`", ""]
     lines.append(f"- status: `{payload['status']}`")
@@ -3851,12 +4273,17 @@ def render_live_run_status_markdown(payload: dict[str, Any]) -> str:
                 lines.append(f"- completed_evaluation_scores: `{'; '.join(completed_score_rows)}`")
         lines.append("")
     elif isinstance(live_progress, dict):
+        step_unit = str(live_progress.get("steps_per_report_step_unit", "") or "")
         lines.append("#### Latest train progress")
         lines.append("")
         lines.append(f"- source: `{live_progress.get('progress_source', '')}`")
         lines.append(f"- source_path: `{live_progress.get('source_path', '')}`")
         lines.append(f"- iteration: `{int(live_progress.get('iteration', 0) or 0)}`")
-        lines.append(f"- optimizer_step: `{int(live_progress.get('optimizer_step', 0) or 0)}`")
+        lines.append(f"- steps_per_report_step_unit: `{step_unit or 'unknown'}`")
+        if live_progress.get("optimizer_step") in (None, "") and step_unit == "micro":
+            lines.append("- optimizer_step: `n/a (micro-step log)`")
+        else:
+            lines.append(f"- optimizer_step: `{int(live_progress.get('optimizer_step', 0) or 0)}`")
         lines.append(f"- train_loss: `{float(live_progress.get('train_loss', 0.0)):.6g}`")
         lines.append(f"- learning_rate: `{float(live_progress.get('learning_rate', 0.0)):.6g}`")
         lines.append(f"- it_per_sec: `{float(live_progress.get('iterations_per_second', 0.0)):.6g}`")
@@ -4066,6 +4493,10 @@ def coerce_score_row(row: Any) -> dict[str, Any]:
     }
 
 
+def audit_summary_is_export_ready(audit_summary: Any) -> bool:
+    return isinstance(audit_summary, dict) and audit_summary.get("peft_export_ready") is True
+
+
 def build_submission_candidate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     evaluation_payloads = payload.get("evaluation_payloads", {})
     local320_summary = evaluation_payloads.get("readme_local320")
@@ -4102,7 +4533,7 @@ def build_submission_candidate_from_payload(payload: dict[str, Any]) -> dict[str
             else None
         ),
         "audit_status": str(audit_summary.get("audit_status", "")) if isinstance(audit_summary, dict) else "",
-        "peft_export_ready": bool(audit_summary.get("peft_export_ready")) if isinstance(audit_summary, dict) else False,
+        "peft_export_ready": audit_summary_is_export_ready(audit_summary),
         "has_export_manifest": isinstance(export_manifest, dict),
         "export_zip_path": str(export_manifest.get("zip_path", "")) if isinstance(export_manifest, dict) else "",
     }
@@ -4125,7 +4556,7 @@ def evaluate_submission_candidate(
 ) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if gates["require_exportable"] and not candidate["peft_export_ready"]:
-        reasons.append("adapter is not submission-exportable under README-compatible 2D-only audit")
+        reasons.append("adapter is not submission-exportable under the README-compatible PEFT audit")
     if float(candidate["local320"]["accuracy"]) < float(gates["min_local320_accuracy"]):
         reasons.append(
             f"readme_local320 {candidate['local320']['accuracy']:.4f} < {float(gates['min_local320_accuracy']):.4f}"
@@ -4214,7 +4645,7 @@ def render_best_submission_markdown(summary: dict[str, Any]) -> str:
                 f"| `{row['run_name']}` | {float(row['local320']['accuracy']):.4f} | "
                 f"{float(row['general_stable']['accuracy']):.4f} | {float(row['proxy_v1']['accuracy']):.4f} | "
                 f"{float(row['proxy_v2']['accuracy']):.4f} | "
-                f"{float(row['specialized']['accuracy']):.4f} | `{bool(row['peft_export_ready'])}` |"
+                f"{float(row['specialized']['accuracy']):.4f} | `{row.get('peft_export_ready') is True}` |"
             )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
@@ -4269,6 +4700,10 @@ def run_package_best_submission(args: argparse.Namespace) -> None:
                 output_root=selected_export_root,
                 reference_model_root=None,
                 base_model_name_or_path=str(args.base_model_name_or_path),
+                readme_submission_contract=get_effective_readme_submission_contract(args),
+                readme_submission_contract_verified_from_readme_file=readme_submission_contract_verified_from_file(
+                    args
+                ),
             )
         if isinstance(selected_export_manifest, dict):
             source_zip = Path(str(selected_export_manifest.get("zip_path", ""))).resolve()
@@ -5562,6 +5997,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         "created_at": utc_now(),
         "repo_root": str(REPO_ROOT),
         "run_root": str(run_root),
+        "readme_contract_verified_from_readme_file": readme_contract_verified_from_file(args),
         "profile": {
             "name": str(getattr(args, "profile", "baseline-original")),
             "resolution": getattr(args, "_profile_resolution", None),
@@ -5570,14 +6006,7 @@ def prepare_training_run(args: argparse.Namespace) -> dict[str, Any]:
         "shadow_model_dir": str(shadow_model_dir),
         "train_csv": str(train_csv),
         "base_model_name_or_path": BASE_MODEL_NAME,
-        "readme_contract": {
-            "max_lora_rank": README_MAX_LORA_RANK,
-            "max_tokens": README_MAX_TOKENS,
-            "top_p": README_TOP_P,
-            "temperature": README_TEMPERATURE,
-            "max_num_seqs": README_MAX_NUM_SEQS,
-            "max_model_len": README_MAX_MODEL_LEN,
-        },
+        "readme_contract": get_effective_readme_contract(args),
         "sampling": {
             "seed": int(args.seed),
             "type_samples": type_samples,
@@ -5880,6 +6309,7 @@ def run_build_corrective_stage2_csv(args: argparse.Namespace) -> None:
         binary_solvers=binary_solvers,
         max_symbol_rows=int(args.max_symbol_rows),
         max_answer_only_ratio=float(args.max_answer_only_ratio),
+        max_manual_audit_ratio=float(args.max_manual_audit_ratio),
         seed=int(args.seed),
     )
     ensure_dir(output_csv.parent)
@@ -6400,6 +6830,7 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
                     temperature=float(args.temperature),
                     top_p=float(args.top_p),
                     max_num_seqs=int(args.max_num_seqs),
+                    gpu_memory_utilization=float(args.gpu_memory_utilization),
                     max_model_len=int(args.max_model_len),
                     prompt_chunk_size=int(args.prompt_chunk_size),
                     prefill_batch_size=int(args.prefill_batch_size),
@@ -6447,7 +6878,7 @@ def run_postprocess_run(args: argparse.Namespace) -> None:
         summary["steps"]["audit_submission"] = {"status": "skipped"}
     persist_summary()
 
-    export_allowed = isinstance(audit_summary, dict) and bool(audit_summary.get("peft_export_ready"))
+    export_allowed = audit_summary_is_export_ready(audit_summary)
     if args.run_export_submission and (export_allowed or not args.export_only_if_ready):
         export_manifest = load_json(export_manifest_path, default=None)
         if skip_existing_steps and export_manifest_path.exists():
@@ -6882,6 +7313,7 @@ def build_parser() -> argparse.ArgumentParser:
     build_corrective_stage2_csv.add_argument("--binary-solver", action="append", default=[])
     build_corrective_stage2_csv.add_argument("--max-symbol-rows", type=int, default=24)
     build_corrective_stage2_csv.add_argument("--max-answer-only-ratio", type=float, default=0.0)
+    build_corrective_stage2_csv.add_argument("--max-manual-audit-ratio", type=float, default=0.0)
     build_corrective_stage2_csv.add_argument("--seed", type=int, default=DEFAULT_SEED)
     build_corrective_stage2_csv.add_argument("--output-csv", type=Path, required=True)
     build_corrective_stage2_csv.add_argument("--summary-json", type=Path, default=None)
@@ -6953,6 +7385,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_benchmark_csv.add_argument("--temperature", type=float, default=README_TEMPERATURE)
     eval_benchmark_csv.add_argument("--top-p", type=float, default=README_TOP_P)
     eval_benchmark_csv.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    eval_benchmark_csv.add_argument("--gpu-memory-utilization", type=float, default=README_GPU_MEMORY_UTILIZATION)
     eval_benchmark_csv.add_argument("--max-model-len", type=int, default=README_MAX_MODEL_LEN)
     eval_benchmark_csv.add_argument("--prompt-chunk-size", type=int, default=16)
     eval_benchmark_csv.add_argument("--prefill-batch-size", type=int, default=16)
@@ -6983,6 +7416,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_benchmark_suite.add_argument("--temperature", type=float, default=README_TEMPERATURE)
     eval_benchmark_suite.add_argument("--top-p", type=float, default=README_TOP_P)
     eval_benchmark_suite.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    eval_benchmark_suite.add_argument("--gpu-memory-utilization", type=float, default=README_GPU_MEMORY_UTILIZATION)
     eval_benchmark_suite.add_argument("--max-model-len", type=int, default=README_MAX_MODEL_LEN)
     eval_benchmark_suite.add_argument("--prompt-chunk-size", type=int, default=16)
     eval_benchmark_suite.add_argument("--prefill-batch-size", type=int, default=16)
@@ -7011,11 +7445,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=BASE_MODEL_NAME,
     )
+    audit_submission_compat.add_argument("--reference-model-root", type=Path, default=None)
     audit_submission_compat.set_defaults(func=run_audit_submission_compat)
 
     export_peft_submission = subparsers.add_parser(
         "export-peft-submission",
-        help="Convert a 2D-only MLX LoRA adapter into README submission.zip files after structural validation.",
+        help="Convert an MLX LoRA adapter into README submission.zip files after PEFT-shape validation.",
     )
     export_peft_submission.add_argument("--adapter-dir", type=Path, required=True)
     export_peft_submission.add_argument("--output-root", type=Path, required=True)
@@ -7325,6 +7760,7 @@ def build_parser() -> argparse.ArgumentParser:
     postprocess_run.add_argument("--temperature", type=float, default=README_TEMPERATURE)
     postprocess_run.add_argument("--top-p", type=float, default=README_TOP_P)
     postprocess_run.add_argument("--max-num-seqs", type=int, default=README_MAX_NUM_SEQS)
+    postprocess_run.add_argument("--gpu-memory-utilization", type=float, default=README_GPU_MEMORY_UTILIZATION)
     postprocess_run.add_argument("--max-model-len", type=int, default=README_MAX_MODEL_LEN)
     postprocess_run.add_argument("--prompt-chunk-size", type=int, default=16)
     postprocess_run.add_argument("--prefill-batch-size", type=int, default=16)
@@ -7441,6 +7877,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = build_parser()
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     args = parser.parse_args(raw_argv)
+    args._verified_readme_contract = verify_readme_contract_file()
+    args._readme_contract_verified_from_readme_file = True
+    args._verified_readme_submission_contract = verify_readme_submission_contract_file()
+    args._readme_submission_contract_verified_from_readme_file = True
     profile_resolution = apply_training_profile(args, raw_argv=raw_argv)
     if profile_resolution is not None:
         args._profile_resolution = profile_resolution

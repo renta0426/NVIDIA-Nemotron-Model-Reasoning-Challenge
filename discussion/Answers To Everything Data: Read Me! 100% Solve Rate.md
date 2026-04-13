@@ -1,3 +1,5 @@
+Repository note: this discussion captures reverse-engineering and symbolic-solver ideas from the public data, but it does not replace the repository competition contract. In this repo, the authoritative evaluation and submission contract remains the top-level `README.md` (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Treat solve-rate claims below as exploratory analysis, not as a replacement for the required LoRA adapter submission format or the hidden evaluation set.
+
 Adarsh Kumar
 Posted 4 hours ago
 

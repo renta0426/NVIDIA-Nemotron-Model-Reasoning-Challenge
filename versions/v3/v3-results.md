@@ -1,5 +1,16 @@
 # V3 Results
 
+## Update 2026-04-12
+
+- `versions/v3/code/train.py` `package-peft` now live-reloads the authoritative `README.md` submission wording and hard-fails if local packaging config drifts from the README-overlapping contract.
+- The v3 CUDA packaging default archive name is now `submission.zip` instead of the older version-suffixed local name, matching README Submitting.
+- v3 packaging artifacts now surface `readme_submission_contract` plus `readme_submission_contract_verified_from_readme_file = true`, while keeping the local packaging contract explicit in the emitted JSON.
+- Regression coverage was extended in:
+  - `versions/v3/tests/test_v3_packaging_spec.py`
+  - `versions/v3/tests/test_cuda_reproduction_packaging.py`
+  - `versions/v3/tests/test_v3_bootstrap.py`
+- Runtime execution remains blocked in this session by the host PTY failure (`posix_openpt failed: Device not configured`), so this update is static hardening only.
+
 ## Executive summary
 
 `v3` で得られた主な成果は、**Mac/MLX 上で v3 の実験基盤を最後まで実働化し、strict logging 付きで Stage A / Stage B の weighted SFT pilot を完走させたこと**です。

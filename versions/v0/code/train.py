@@ -41,6 +41,25 @@ BASELINE_OUTPUT_DIR = OUTPUT_ROOT / "baselines"
 
 DOCS_DIR = VERSION_ROOT / "docs"
 TESTS_DIR = VERSION_ROOT / "tests"
+README_PATH = REPO_ROOT / "README.md"
+README_TABLE_KEYS = (
+    "max_lora_rank",
+    "max_tokens",
+    "top_p",
+    "temperature",
+    "max_num_seqs",
+    "gpu_memory_utilization",
+    "max_model_len",
+)
+README_TABLE_VALUE_TYPES = {
+    "max_lora_rank": int,
+    "max_tokens": int,
+    "top_p": float,
+    "temperature": float,
+    "max_num_seqs": int,
+    "gpu_memory_utilization": float,
+    "max_model_len": int,
+}
 
 DEFAULT_PUBLIC_SMOKE_PATH = PUBLIC_SMOKE_DIR / "test_public.csv"
 DEFAULT_PUBLIC_SMOKE_MANIFEST_PATH = PUBLIC_SMOKE_DIR / "test_public_manifest.csv"
@@ -248,6 +267,40 @@ def save_table(frame: pd.DataFrame, path: Path) -> None:
     raise ValueError(f"Unsupported table format: {path}")
 
 
+def load_readme_eval_contract() -> dict[str, int | float]:
+    text = README_PATH.read_text(encoding="utf-8")
+    contract: dict[str, int | float] = {}
+    for key in README_TABLE_KEYS:
+        value_type = README_TABLE_VALUE_TYPES[key]
+        needle = f"{key}\t"
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split("\t", 1)[1].strip()
+            if raw_value == "":
+                raise SystemExit(f"Malformed README.md evaluation row for {key}: missing value")
+            try:
+                contract[key] = value_type(raw_value)
+            except ValueError as exc:
+                raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+            break
+    missing_keys = [key for key in README_TABLE_KEYS if key not in contract]
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return contract
+
+
+def verify_official_eval_config_against_readme(eval_config: EvalConfig) -> None:
+    contract = load_readme_eval_contract()
+    for key in README_TABLE_KEYS:
+        expected_value = contract[key]
+        actual_value = getattr(eval_config, key)
+        if actual_value != expected_value:
+            raise SystemExit(
+                f"README.md evaluation table mismatch for official_lb.{key}: expected {expected_value}, got {actual_value}"
+            )
+
+
 def load_eval_config(name_or_path: str) -> EvalConfig:
     config_path = Path(name_or_path)
     if not config_path.exists():
@@ -255,7 +308,10 @@ def load_eval_config(name_or_path: str) -> EvalConfig:
     if not config_path.exists():
         raise FileNotFoundError(f"Evaluation config was not found: {name_or_path}")
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    return EvalConfig(**data)
+    eval_config = EvalConfig(**data)
+    if eval_config.name == "official_lb":
+        verify_official_eval_config_against_readme(eval_config)
+    return eval_config
 
 
 def build_user_content(raw_prompt: str, boxed_instruction: str) -> str:

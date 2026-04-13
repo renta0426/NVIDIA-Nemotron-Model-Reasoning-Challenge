@@ -20,6 +20,28 @@ DEFAULT_TRAIN_CSV_PATH = REPO_ROOT / 'data' / 'train.csv'
 DEFAULT_BOXED_PROMPT_INSTRUCTION = r"Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`"
 BEST_CONFIG_NAME = 'best_notebook_bf16_official_ultralowlr_minimal'
 BEST_NOTES = 'Minimal standalone reproduction of the current verified-best BF16 notebook SFT recipe aligned to README boxed-answer evaluation.'
+README_EVAL_CONTRACT: dict[str, Any] = {
+    'base_model': 'NVIDIA Nemotron-3-Nano-30B',
+    'max_lora_rank': 32,
+    'max_tokens': 7680,
+    'top_p': 1.0,
+    'temperature': 0.0,
+    'max_num_seqs': 64,
+    'gpu_memory_utilization': 0.85,
+    'max_model_len': 8192,
+    'answer_extraction': 'prioritize \\boxed{} content',
+    'inference_engine': 'vLLM',
+}
+README_PATH = REPO_ROOT / 'README.md'
+README_TABLE_KEYS = (
+    'max_lora_rank',
+    'max_tokens',
+    'top_p',
+    'temperature',
+    'max_num_seqs',
+    'gpu_memory_utilization',
+    'max_model_len',
+)
 
 BEST_TRAINING_CONFIG: dict[str, Any] = {
     'name': BEST_CONFIG_NAME,
@@ -58,6 +80,46 @@ def normalize_optional_text(value: Any) -> str | None:
     if not normalized or normalized.lower() == 'nan':
         return None
     return normalized
+
+
+def load_readme_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding='utf-8')
+    contract: dict[str, Any] = {}
+    for key in README_TABLE_KEYS:
+        expected_value = README_EVAL_CONTRACT[key]
+        needle = f'{key}\t'
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split('\t', 1)[1].strip()
+            if raw_value == '':
+                raise SystemExit(f'Malformed README.md evaluation row for {key}: missing value')
+            try:
+                if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    contract[key] = int(raw_value)
+                elif isinstance(expected_value, float):
+                    contract[key] = float(raw_value)
+                else:
+                    contract[key] = raw_value
+            except ValueError as exc:
+                raise SystemExit(f'Malformed README.md evaluation value for {key}: {raw_value!r}') from exc
+            break
+    missing_keys = [key for key in README_TABLE_KEYS if key not in contract]
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return contract
+
+
+def verify_readme_contract_file() -> dict[str, Any]:
+    contract = load_readme_contract_from_readme()
+    for key in README_TABLE_KEYS:
+        expected_value = README_EVAL_CONTRACT[key]
+        actual_value = contract.get(key)
+        if actual_value != expected_value:
+            raise SystemExit(
+                f'README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}'
+            )
+    return contract
 
 
 def require_existing_path(path_value: str | Path, *, label: str) -> Path:
@@ -313,6 +375,7 @@ def prepare_manifest(
     metrics_path: Path,
     skipped_rows: int,
     prompt_instruction: str,
+    readme_eval_contract: dict[str, Any],
 ) -> dict[str, Any]:
     manifest = {
         'version': 'v4',
@@ -352,6 +415,8 @@ def prepare_manifest(
             'final_line_weight': float(cfg.get('final_line_weight', 1.0)),
             'answer_span_weights': dict(cfg.get('answer_span_weights', {})),
         },
+        'readme_eval_contract': readme_eval_contract,
+        'readme_contract_verified_from_readme_file': True,
     }
     return manifest
 
@@ -631,6 +696,7 @@ def run_train_best(args: argparse.Namespace) -> None:
     metrics_path = output_dir / f'{candidate_id}_metrics.jsonl'
     adapter_dir = output_dir / f'adapter_{candidate_id}'
 
+    readme_eval_contract = verify_readme_contract_file()
     base_model = resolve_base_model(args.base_model)
     prompt_instruction = resolve_prompt_instruction(None)
     pack_summary = build_notebook_pack(
@@ -680,6 +746,7 @@ def run_train_best(args: argparse.Namespace) -> None:
         metrics_path=metrics_path,
         skipped_rows=skipped_train + skipped_valid,
         prompt_instruction=prompt_instruction,
+        readme_eval_contract=readme_eval_contract,
     )
     save_json(manifest_path, manifest)
 
@@ -694,6 +761,8 @@ def run_train_best(args: argparse.Namespace) -> None:
         )
     else:
         result = render_mock_adapter(adapter_dir=adapter_dir, base_model=base_model, cfg=cfg, result_path=result_path)
+    result['readme_eval_contract'] = readme_eval_contract
+    result['readme_contract_verified_from_readme_file'] = True
     save_json(result_path, result)
 
     print(

@@ -1,5 +1,7 @@
 # v7 plan
 
+Historical plan note: this archive plan preserves its original context, but the current authoritative competition contract is the top-level `README.md` Evaluation / Submitting section (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). Read any older notebook/metric defaults below as historical notes rather than as the active contract.
+
 ## Goal
 
 データセットの 6 系列という構造を正面から使い、generalist adapter と hard-template specialist adapter を作って最後に merge する最上位候補を作る。

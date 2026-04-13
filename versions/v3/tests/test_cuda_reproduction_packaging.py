@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 import yaml
 
 
@@ -18,7 +19,36 @@ sys.modules[SPEC.name] = v3_train
 SPEC.loader.exec_module(v3_train)
 
 
-def test_render_cuda_repro_spec_and_package_peft(tmp_path: Path) -> None:
+def write_submission_contract_readme(tmp_path: Path) -> Path:
+    readme_path = tmp_path / 'README.md'
+    readme_path.write_text(
+        '\n'.join(
+            [
+                'Evaluation',
+                'Submissions are evaluated based on their Accuracy in solving the provided tasks. '
+                'The NVIDIA Nemotron-3-Nano-30B model is loaded with your LoRA adapter '
+                '(which must include an adapter_config.json) using the vLLM inference engine.',
+                'Parameter\tValue',
+                'max_lora_rank\t32',
+                'max_tokens\t7680',
+                'top_p\t1.0',
+                'temperature\t0.0',
+                'max_num_seqs\t64',
+                'gpu_memory_utilization\t0.85',
+                'max_model_len\t8192',
+                'Submitting',
+                'You must submit a LoRA adapter of rank at most 32 for the NVIDIA Nemotron-3-Nano-30B model '
+                'packaged into a submission.zip file.',
+            ]
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+    return readme_path
+
+
+def test_render_cuda_repro_spec_and_package_peft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(v3_train, 'README_PATH', write_submission_contract_readme(tmp_path))
     train_output_root = tmp_path / 'train_outputs'
     train_output_root.mkdir(parents=True)
     v3_train.TRAIN_OUTPUT_ROOT = train_output_root
@@ -103,7 +133,7 @@ def test_render_cuda_repro_spec_and_package_peft(tmp_path: Path) -> None:
                 'expected_target_modules': ['q_proj', 'v_proj'],
                 'expected_rank_cap': 32,
                 'required_adapter_config_keys': ['base_model_name_or_path', 'target_modules', 'r'],
-                'submission_zip_name': 'submission_v3.zip',
+                'submission_zip_name': 'submission.zip',
             }
         ),
         encoding='utf-8',
@@ -114,5 +144,6 @@ def test_render_cuda_repro_spec_and_package_peft(tmp_path: Path) -> None:
     smoke = json.loads((packaging_dir / 'peft_smoke_result.json').read_text(encoding='utf-8'))
     submission = json.loads((packaging_dir / 'submission_manifest_v3.json').read_text(encoding='utf-8'))
     assert smoke['checks']['submission_zip_ok'] is True
-    assert (packaging_dir / 'submission_v3.zip').exists()
+    assert smoke['readme_submission_contract_verified_from_readme_file'] is True
+    assert (packaging_dir / 'submission.zip').exists()
     assert submission['lora_rank'] == 16

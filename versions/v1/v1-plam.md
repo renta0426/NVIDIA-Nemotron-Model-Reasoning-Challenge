@@ -8,6 +8,8 @@ Prerequisite: v0-plan.md 完了済み
 Scope: 1-1〜1-5 の基盤構築  
 Purpose: 今後の全実験で使い回す「評価・分割・分類・多視点診断」の中核を固定する
 
+Historical plan note: this file preserves the original planning context, but the current authoritative competition contract is the top-level `README.md` Evaluation / Submitting section (`max_lora_rank = 32`, `max_tokens = 7680`, `top_p = 1.0`, `temperature = 0.0`, `max_num_seqs = 64`, `gpu_memory_utilization = 0.85`, `max_model_len = 8192`, final artifact `submission.zip`). If later sections in this historical plan mention older notebook/metric defaults, read them as historical notes rather than as the active contract.
+
 0. この v1 の位置づけ
 
 v0 で固定したのは、以下だった。

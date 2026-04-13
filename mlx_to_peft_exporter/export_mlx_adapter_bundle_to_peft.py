@@ -30,9 +30,11 @@ DEFAULT_OUTPUT_ROOT = (
     / "mlx_to_peft_exporter/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2_peft_export"
 )
 DEFAULT_BASE_MODEL_NAME_OR_PATH = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
+README_PATH = REPO_ROOT / "README.md"
 README_REQUIRED_FILES = ("adapter_config.json", "adapter_model.safetensors")
 README_MAX_LORA_RANK = 32
-TARGET_MODULE_ORDER = ("in_proj", "out_proj", "up_proj", "down_proj")
+README_SUBMISSION_ARCHIVE_NAME = "submission.zip"
+TARGET_MODULE_ORDER = ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "up_proj", "down_proj")
 
 
 def utc_now() -> str:
@@ -50,6 +52,57 @@ def load_json(path: Path) -> Any:
 
 def write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def load_readme_submission_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    lower_text = text.lower()
+    if "adapter_config.json" not in text:
+        raise SystemExit(
+            "README.md submitting contract no longer states that the LoRA adapter must include adapter_config.json."
+        )
+    if README_SUBMISSION_ARCHIVE_NAME.lower() not in lower_text:
+        raise SystemExit(
+            f"README.md submitting contract no longer states that the submission archive is {README_SUBMISSION_ARCHIVE_NAME}."
+        )
+    if "submit a lora adapter" not in lower_text:
+        raise SystemExit("README.md submitting contract no longer states that the submission is a single LoRA adapter.")
+    max_lora_rank: int | None = None
+    for line in text.splitlines():
+        if not line.startswith("max_lora_rank\t"):
+            continue
+        raw_value = line.split("\t", 1)[1].strip()
+        if raw_value == "":
+            raise SystemExit("Malformed README.md evaluation row for max_lora_rank: missing value")
+        try:
+            max_lora_rank = int(raw_value)
+        except ValueError as exc:
+            raise SystemExit(f"Malformed README.md evaluation value for max_lora_rank: {raw_value!r}") from exc
+        break
+    if max_lora_rank is None:
+        raise SystemExit("Missing README.md evaluation rows: max_lora_rank")
+    return {
+        "required_files": list(README_REQUIRED_FILES),
+        "max_lora_rank": max_lora_rank,
+        "single_adapter_submission_zip": True,
+        "submission_archive_name": README_SUBMISSION_ARCHIVE_NAME,
+    }
+
+
+def verify_readme_submission_contract_file() -> dict[str, Any]:
+    contract = load_readme_submission_contract_from_readme()
+    if int(contract["max_lora_rank"]) != README_MAX_LORA_RANK:
+        raise SystemExit(
+            f"README.md submission contract mismatch for max_lora_rank: expected {README_MAX_LORA_RANK}, got {contract['max_lora_rank']}"
+        )
+    if str(contract["submission_archive_name"]) != README_SUBMISSION_ARCHIVE_NAME:
+        raise SystemExit(
+            "README.md submission contract mismatch for submission_archive_name: "
+            f"expected {README_SUBMISSION_ARCHIVE_NAME}, got {contract['submission_archive_name']}"
+        )
+    if bool(contract["single_adapter_submission_zip"]) is not True:
+        raise SystemExit("README.md submission contract mismatch for single_adapter_submission_zip: expected true.")
+    return contract
 
 
 def ensure_nemotron_meta_import_stubs() -> None:
@@ -99,7 +152,15 @@ def build_target_modules_regex(mlx_keys: list[str]) -> str:
 
     terminals: list[str] = []
     for terminal in TARGET_MODULE_ORDER:
-        if terminal == "in_proj" and has_any_fragment(".mixer.in_proj.", "mixer.in_proj"):
+        if terminal == "q_proj" and has_any_fragment(".mixer.q_proj.", "mixer.q_proj"):
+            terminals.append(terminal)
+        elif terminal == "k_proj" and has_any_fragment(".mixer.k_proj.", "mixer.k_proj"):
+            terminals.append(terminal)
+        elif terminal == "v_proj" and has_any_fragment(".mixer.v_proj.", "mixer.v_proj"):
+            terminals.append(terminal)
+        elif terminal == "o_proj" and has_any_fragment(".mixer.o_proj.", "mixer.o_proj"):
+            terminals.append(terminal)
+        elif terminal == "in_proj" and has_any_fragment(".mixer.in_proj.", "mixer.in_proj"):
             terminals.append(terminal)
         elif terminal == "out_proj" and has_any_fragment(".mixer.out_proj.", "mixer.out_proj"):
             terminals.append(terminal)
@@ -210,6 +271,8 @@ def build_reference_peft_shapes(
 
 
 def classify_source_tensor(key: str) -> str:
+    if ".mixer.q_proj." in key or ".mixer.k_proj." in key or ".mixer.v_proj." in key or ".mixer.o_proj." in key:
+        return "attention"
     if ".mixer.switch_mlp.fc1." in key:
         return "switch_fc1"
     if ".mixer.switch_mlp.fc2." in key:
@@ -366,6 +429,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    readme_submission_contract = verify_readme_submission_contract_file()
     source_adapter_dir = Path(args.source_adapter_dir).resolve()
     output_root = ensure_dir(Path(args.output_root).resolve())
     submission_dir = ensure_dir(output_root / "submission_adapter")
@@ -381,8 +445,10 @@ def main() -> None:
     if not isinstance(adapter_config, dict):
         raise ValueError(f"Invalid adapter_config.json: {adapter_config_path}")
     rank, alpha, dropout, _raw_target_keys = extract_lora_hparams(adapter_config)
-    if rank > README_MAX_LORA_RANK:
-        raise ValueError(f"LoRA rank {rank} exceeds README submission limit {README_MAX_LORA_RANK}.")
+    if rank > int(readme_submission_contract["max_lora_rank"]):
+        raise ValueError(
+            f"LoRA rank {rank} exceeds README submission limit {readme_submission_contract['max_lora_rank']}."
+        )
 
     source_tensors = load_file(str(adapter_weights_path))
     if not source_tensors:
@@ -442,11 +508,8 @@ def main() -> None:
         "rank": int(rank),
         "lora_alpha": float(alpha),
         "lora_dropout": float(dropout),
-        "readme_submission_contract": {
-            "required_files": list(README_REQUIRED_FILES),
-            "max_lora_rank": README_MAX_LORA_RANK,
-            "submission_archive_name": "submission.zip",
-        },
+        "readme_submission_contract": readme_submission_contract,
+        "readme_submission_contract_verified_from_readme_file": True,
         "source_summary": source_summary,
         "converted_tensor_count": len(converted_tensors),
         "validation": validation,

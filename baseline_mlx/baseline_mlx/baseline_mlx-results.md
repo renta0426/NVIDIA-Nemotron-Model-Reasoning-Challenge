@@ -9,7 +9,9 @@
 - `top_p = 1.0`
 - `temperature = 0.0`
 - `max_num_seqs = 64`
+- `gpu_memory_utilization = 0.85`
 - `max_model_len = 8192`
+- final artifact: `submission.zip`
 
 補足:
 

@@ -1,0 +1,254 @@
+{
+  "status": "mismatches_found",
+  "source_notebook": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2.ipynb",
+  "source_cells": {
+    "lora": 8,
+    "training": 10,
+    "packaging": 14
+  },
+  "profile": "notebook-current",
+  "observed_log": null,
+  "core_checks": [
+    {
+      "name": "train_csv",
+      "expected": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv",
+      "actual": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_v1.csv",
+      "status": "mismatch"
+    },
+    {
+      "name": "type_samples",
+      "expected": {
+        "Numeral Conversion": 300,
+        "Gravitational Constant": 400,
+        "Unit Conversion": 700,
+        "Text Encryption": 700,
+        "Bit Manipulation": 1021,
+        "Equation Transformation": 200
+      },
+      "actual": {
+        "Numeral Conversion": 0,
+        "Gravitational Constant": 10,
+        "Unit Conversion": 7,
+        "Text Encryption": 18,
+        "Bit Manipulation": 34,
+        "Equation Transformation": 11
+      },
+      "status": "mismatch"
+    },
+    {
+      "name": "seed",
+      "expected": 123,
+      "actual": 123,
+      "status": "aligned"
+    },
+    {
+      "name": "batch_size",
+      "expected": 1,
+      "actual": 1,
+      "status": "aligned"
+    },
+    {
+      "name": "grad_accumulation_steps",
+      "expected": 8,
+      "actual": 8,
+      "status": "aligned"
+    },
+    {
+      "name": "num_epochs",
+      "expected": 2.0,
+      "actual": 0.8,
+      "status": "mismatch"
+    },
+    {
+      "name": "learning_rate",
+      "expected": 0.0001,
+      "actual": 1e-06,
+      "status": "mismatch"
+    },
+    {
+      "name": "lr_scheduler",
+      "expected": "cosine",
+      "actual": "cosine_decay",
+      "status": "aligned",
+      "note": "MLX cosine_decay is the notebook cosine equivalent."
+    },
+    {
+      "name": "warmup_ratio",
+      "expected": 0.05,
+      "actual": 0.05,
+      "status": "aligned"
+    },
+    {
+      "name": "optimizer_steps",
+      "expected": 832,
+      "actual": 8,
+      "status": "mismatch",
+      "note": "Notebook parity requires flushing grad accumulation at each epoch boundary, not only at the final global remainder."
+    },
+    {
+      "name": "max_seq_length",
+      "expected": 4096,
+      "actual": 1024,
+      "status": "mismatch"
+    },
+    {
+      "name": "logging_steps",
+      "expected": "10 optimizer",
+      "actual": "10 optimizer",
+      "status": "aligned",
+      "note": "HF logging_steps counts optimizer updates, not raw microsteps."
+    },
+    {
+      "name": "save_strategy",
+      "expected": "no",
+      "actual": 0,
+      "status": "aligned",
+      "note": "MLX save_every<=0 means final-only save, matching save_strategy='no'."
+    },
+    {
+      "name": "mask_prompt",
+      "expected": false,
+      "actual": false,
+      "status": "aligned",
+      "note": "HF notebook does not enable assistant_only_loss/completion_only_loss here; MLX parity should therefore keep mask_prompt=False."
+    },
+    {
+      "name": "lora_rank",
+      "expected": 32,
+      "actual": 32,
+      "status": "aligned"
+    },
+    {
+      "name": "lora_alpha",
+      "expected": 32.0,
+      "actual": 32.0,
+      "status": "aligned"
+    },
+    {
+      "name": "lora_dropout",
+      "expected": 0.05,
+      "actual": 0.05,
+      "status": "aligned"
+    }
+  ],
+  "lora_target_mapping": {
+    "expected_regex": ".*\\.(in_proj|out_proj|up_proj|down_proj)$",
+    "actual_keys": [
+      "mixer.in_proj",
+      "mixer.k_proj",
+      "mixer.o_proj",
+      "mixer.out_proj",
+      "mixer.q_proj",
+      "mixer.shared_experts.down_proj",
+      "mixer.shared_experts.up_proj",
+      "mixer.v_proj"
+    ],
+    "required_generic_keys": [
+      "mixer.down_proj",
+      "mixer.in_proj",
+      "mixer.out_proj",
+      "mixer.up_proj"
+    ],
+    "missing_generic_keys": [
+      "mixer.down_proj",
+      "mixer.up_proj"
+    ],
+    "extra_mlx_equivalents": [
+      "mixer.k_proj",
+      "mixer.o_proj",
+      "mixer.q_proj",
+      "mixer.shared_experts.down_proj",
+      "mixer.shared_experts.up_proj",
+      "mixer.v_proj"
+    ],
+    "status": "mismatch",
+    "note": "MLX keys must cover the notebook's in/out/up/down projection intent; extra switch/shared-expert keys are intentional Nemotron-H MoE mappings."
+  },
+  "framework_specific_mappings": [
+    {
+      "notebook": "bf16=True",
+      "mlx": "DEFAULT_MODEL_ROOT is a BF16 MLX checkpoint."
+    },
+    {
+      "notebook": "gradient_checkpointing=True, use_reentrant=False",
+      "mlx": "build_mlx_lora_config forces grad_checkpoint=True."
+    },
+    {
+      "notebook": "logging_steps=10 optimizer updates",
+      "mlx": "steps_per_report=10 with steps_per_report_step_unit=optimizer for comparable loss/LR checkpoints."
+    },
+    {
+      "notebook": "messages dataset without assistant_only_loss/completion_only_loss",
+      "mlx": "Use mask_prompt=False for parity with full-sequence loss."
+    },
+    {
+      "notebook": "dataloader_num_workers=2",
+      "mlx": "No equivalent knob in mlx_lm LoRA config."
+    },
+    {
+      "notebook": "remove_unused_columns=False, report_to='none', packing=False",
+      "mlx": "Not applicable to mlx_lm dataset/config surface."
+    }
+  ],
+  "mlx_scaffolding": [
+    {
+      "name": "valid_shadow_rows",
+      "actual": 8,
+      "note": "HF notebook has no validation loop; MLX uses a tiny shadow validation set only for observability."
+    },
+    {
+      "name": "steps_per_eval",
+      "requested": 0,
+      "resolved_behavior": "iter1_and_final_only",
+      "note": "steps_per_eval<=0 resolves to total_iters so there are no intermediate validations."
+    },
+    {
+      "name": "lr_schedule_step_unit",
+      "actual": "optimizer",
+      "note": "Optimizer-step scheduling is required for notebook parity under mlx_lm grad accumulation."
+    },
+    {
+      "name": "shadow_model",
+      "actual": true,
+      "note": "MLX load path uses a patched shadow_model to avoid tokenizer/runtime mismatches."
+    },
+    {
+      "name": "tokenizer_special_tokens",
+      "actual": true,
+      "note": "MLX training load normalizes eos_token_ids and sets pad_token=eos_token when absent, matching the HF log alignment to eos/pad token id 11."
+    },
+    {
+      "name": "final_grad_accumulation_flush",
+      "actual": true,
+      "note": "MLX trainer is patched so the final partial accumulation matches notebook optimizer-step count."
+    }
+  ],
+  "packaging_note": {
+    "notebook": {
+      "required_files": [
+        "adapter_config.json",
+        "adapter_model.safetensors"
+      ],
+      "base_model_name_or_path": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+      "inference_mode": true,
+      "lora_dropout": 0.0
+    },
+    "mlx_current": {
+      "required_files": [
+        "adapter_config.json",
+        "adapters.safetensors"
+      ],
+      "bundle": "mlx_adapter_bundle.zip",
+      "note": "This script still emits a local MLX bundle and does not claim PEFT/vLLM submission compatibility."
+    }
+  },
+  "clear_omissions": [
+    "train_csv",
+    "type_samples",
+    "num_epochs",
+    "learning_rate",
+    "optimizer_steps",
+    "max_seq_length",
+    "lora_target_coverage"
+  ]
+}

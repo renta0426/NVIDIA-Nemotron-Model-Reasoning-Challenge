@@ -36,15 +36,23 @@ DEFAULT_HELPER_MODULE = (
 DEFAULT_DELTA_CSV = ARTIFACTS_DIR / 'binary_route_aware_delta.csv'
 DEFAULT_MERGED_CSV = ARTIFACTS_DIR / 'train_split_with_cot_v2_plus_binary_route_aware.csv'
 DEFAULT_MANIFEST_JSON = ARTIFACTS_DIR / 'binary_route_aware_delta_manifest.json'
+README_PATH = REPO_ROOT / 'README.md'
+README_TABLE_CONTRACT = {
+    'temperature': 0.0,
+    'top_p': 1.0,
+    'max_tokens': 7680,
+    'max_num_seqs': 64,
+    'gpu_memory_utilization': 0.85,
+    'max_lora_rank': 32,
+    'max_model_len': 8192,
+}
 
 README_EVAL_CONTRACT = {
     'metric': 'Accuracy',
     'answer_extraction': 'prioritize \\boxed{} content',
-    'temperature': 0.0,
-    'max_tokens': 7680,
-    'max_lora_rank': 32,
-    'max_model_len': 8192,
+    **README_TABLE_CONTRACT,
 }
+README_TABLE_KEYS = tuple(README_TABLE_CONTRACT.keys())
 
 EXACT_SOLVER_ALLOWLIST = {
     'binary_structured_byte_formula',
@@ -84,6 +92,49 @@ DELTA_OUTPUT_COLUMNS = CORE_OUTPUT_COLUMNS + [
     'num_examples',
     'source_dataset',
 ]
+
+
+def load_readme_eval_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding='utf-8')
+    contract = dict(README_EVAL_CONTRACT)
+    missing_keys: list[str] = []
+    for key in README_TABLE_KEYS:
+        expected_value = README_TABLE_CONTRACT[key]
+        needle = f'{key}\t'
+        found = False
+        for line in text.splitlines():
+            if not line.startswith(needle):
+                continue
+            raw_value = line.split('\t', 1)[1].strip()
+            if raw_value == '':
+                raise SystemExit(f'Malformed README.md evaluation row for {key}: missing value')
+            try:
+                if isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    contract[key] = int(raw_value)
+                elif isinstance(expected_value, float):
+                    contract[key] = float(raw_value)
+                else:
+                    contract[key] = raw_value
+            except ValueError as exc:
+                raise SystemExit(f"Malformed README.md evaluation value for {key}: {raw_value!r}") from exc
+            found = True
+            break
+        if not found:
+            missing_keys.append(key)
+    if missing_keys:
+        raise SystemExit(f"Missing README.md evaluation rows: {', '.join(missing_keys)}")
+    return contract
+
+
+def verify_readme_eval_contract_file() -> dict[str, Any]:
+    contract = load_readme_eval_contract_from_readme()
+    for key, expected_value in README_TABLE_CONTRACT.items():
+        actual_value = contract[key]
+        if actual_value != expected_value:
+            raise SystemExit(
+                f'README.md evaluation table mismatch for {key}: expected {expected_value}, got {actual_value}'
+            )
+    return contract
 
 
 @dataclass(frozen=True)
@@ -557,7 +608,8 @@ def build_delta(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[st
         'base_dataset_csv': str(args.base_dataset_csv),
         'helper_module': str(args.helper_module),
         'artifacts_dir': str(ARTIFACTS_DIR),
-        'readme_eval_contract': README_EVAL_CONTRACT,
+        'readme_eval_contract': verify_readme_eval_contract_file(),
+        'readme_eval_contract_verified_from_readme_file': True,
         'seed': args.seed,
         'requested_exact_quota': args.exact_quota,
         'requested_answer_only_quota': args.answer_only_quota,

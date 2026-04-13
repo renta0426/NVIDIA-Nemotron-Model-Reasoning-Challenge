@@ -54,6 +54,16 @@ DEFAULT_STAGE_A_R32_ALPHA64_CONFIG_PATH = CONF_TRAIN_ROOT / 'sft_stage_a_r32_alp
 DEFAULT_STAGE_B_HARDENING_CONFIG_PATH = CONF_TRAIN_ROOT / 'sft_stage_b_hardening.yaml'
 DEFAULT_STAGE_B_A6000_COMPAT_CONFIG_PATH = CONF_TRAIN_ROOT / 'sft_stage_b_a6000_compat.yaml'
 DEFAULT_PEFT_SMOKE_CONFIG_PATH = CONF_PACKAGE_ROOT / 'peft_smoke.yaml'
+README_PATH = REPO_ROOT / 'README.md'
+README_SUBMISSION_REQUIRED_FILES = ('adapter_config.json', 'adapter_model.safetensors')
+README_MAX_LORA_RANK = 32
+README_SUBMISSION_ARCHIVE_NAME = 'submission.zip'
+README_SUBMISSION_CONTRACT = {
+    'required_files': list(README_SUBMISSION_REQUIRED_FILES),
+    'max_lora_rank': README_MAX_LORA_RANK,
+    'single_adapter_submission_zip': True,
+    'submission_archive_name': README_SUBMISSION_ARCHIVE_NAME,
+}
 
 DEFAULT_V1_METADATA_PATH = REPO_ROOT / 'versions' / 'v1' / 'data' / 'processed' / 'train_metadata_v1.parquet'
 DEFAULT_V1_SPLITS_PATH = REPO_ROOT / 'versions' / 'v1' / 'data' / 'processed' / 'train_splits_v1.parquet'
@@ -173,6 +183,58 @@ def ensure_runtime_directories() -> None:
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def load_readme_submission_contract_from_readme() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding='utf-8')
+    lower_text = text.lower()
+    if 'adapter_config.json' not in text:
+        raise SystemExit(
+            'README.md submitting contract no longer states that the LoRA adapter must include adapter_config.json.'
+        )
+    if README_SUBMISSION_ARCHIVE_NAME.lower() not in lower_text:
+        raise SystemExit(
+            f'README.md submitting contract no longer states that the submission archive is {README_SUBMISSION_ARCHIVE_NAME}.'
+        )
+    if 'submit a lora adapter' not in lower_text:
+        raise SystemExit('README.md submitting contract no longer states that the submission is a single LoRA adapter.')
+    max_lora_rank: int | None = None
+    for line in text.splitlines():
+        if not line.startswith('max_lora_rank\t'):
+            continue
+        raw_value = line.split('\t', 1)[1].strip()
+        if raw_value == '':
+            raise SystemExit('Malformed README.md evaluation row for max_lora_rank: missing value')
+        try:
+            max_lora_rank = int(raw_value)
+        except ValueError as exc:
+            raise SystemExit(f'Malformed README.md evaluation value for max_lora_rank: {raw_value!r}') from exc
+        break
+    if max_lora_rank is None:
+        raise SystemExit('Missing README.md evaluation rows: max_lora_rank')
+    return {
+        'required_files': list(README_SUBMISSION_REQUIRED_FILES),
+        'max_lora_rank': max_lora_rank,
+        'single_adapter_submission_zip': True,
+        'submission_archive_name': README_SUBMISSION_ARCHIVE_NAME,
+    }
+
+
+def verify_readme_submission_contract_file() -> dict[str, Any]:
+    contract = load_readme_submission_contract_from_readme()
+    if int(contract['max_lora_rank']) != int(README_SUBMISSION_CONTRACT['max_lora_rank']):
+        raise SystemExit(
+            'README.md submission contract mismatch for max_lora_rank: '
+            f"expected {README_SUBMISSION_CONTRACT['max_lora_rank']}, got {contract['max_lora_rank']}"
+        )
+    if str(contract['submission_archive_name']) != str(README_SUBMISSION_CONTRACT['submission_archive_name']):
+        raise SystemExit(
+            'README.md submission contract mismatch for submission_archive_name: '
+            f"expected {README_SUBMISSION_CONTRACT['submission_archive_name']}, got {contract['submission_archive_name']}"
+        )
+    if bool(contract['single_adapter_submission_zip']) is not True:
+        raise SystemExit('README.md submission contract mismatch for single_adapter_submission_zip: expected true.')
+    return contract
 
 
 def render_placeholder_yaml(*, section: str, name: str) -> str:
@@ -2166,8 +2228,35 @@ def run_package_peft(args: argparse.Namespace) -> None:
     expected_base_model = cfg.get('expected_base_model_name_or_path')
     local_base_model_path = cfg.get('local_base_model_path')
     submission_zip_name = str(cfg.get('submission_zip_name', 'submission.zip'))
+    readme_submission_contract = verify_readme_submission_contract_file()
+    if expected_rank_cap != int(readme_submission_contract['max_lora_rank']):
+        raise SystemExit(
+            'README.md submission contract mismatch for expected_rank_cap: '
+            f"expected {readme_submission_contract['max_lora_rank']}, got {expected_rank_cap}"
+        )
+    missing_readme_required_files = [
+        filename for filename in readme_submission_contract['required_files'] if filename not in required_files
+    ]
+    if missing_readme_required_files:
+        raise SystemExit(
+            'README.md submission contract mismatch for required_files: missing '
+            + ', '.join(missing_readme_required_files)
+        )
+    if submission_zip_name != str(readme_submission_contract['submission_archive_name']):
+        raise SystemExit(
+            'README.md submission contract mismatch for submission_zip_name: '
+            f"expected {readme_submission_contract['submission_archive_name']}, got {submission_zip_name}"
+        )
+    local_packaging_contract = {
+        'required_files': required_files,
+        'expected_rank_cap': expected_rank_cap,
+        'submission_zip_name': submission_zip_name,
+    }
 
     checks: dict[str, Any] = {}
+    checks['readme_required_files_ok'] = True
+    checks['readme_rank_cap_ok'] = True
+    checks['readme_submission_zip_name_ok'] = True
     for filename in required_files:
         checks[f'file_{filename}'] = (adapter_dir / filename).exists()
 
@@ -2241,6 +2330,9 @@ def run_package_peft(args: argparse.Namespace) -> None:
         'all_required_files_present': all(checks[f'file_{filename}'] for filename in required_files),
         'adapter_config': adapter_config,
         'submission_zip': str(submission_zip_path),
+        'readme_submission_contract': readme_submission_contract,
+        'readme_submission_contract_verified_from_readme_file': True,
+        'local_packaging_contract': local_packaging_contract,
     }
     result_path = out_dir / 'peft_smoke_result.json'
     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -2256,6 +2348,9 @@ def run_package_peft(args: argparse.Namespace) -> None:
         'smoke_checks': checks,
         'submission_zip': str(submission_zip_path),
         'submission_zip_contents': zip_contents,
+        'readme_submission_contract': readme_submission_contract,
+        'readme_submission_contract_verified_from_readme_file': True,
+        'local_packaging_contract': local_packaging_contract,
     }
     submission_path = out_dir / 'submission_manifest.json'
     submission_path.write_text(json.dumps(submission_manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

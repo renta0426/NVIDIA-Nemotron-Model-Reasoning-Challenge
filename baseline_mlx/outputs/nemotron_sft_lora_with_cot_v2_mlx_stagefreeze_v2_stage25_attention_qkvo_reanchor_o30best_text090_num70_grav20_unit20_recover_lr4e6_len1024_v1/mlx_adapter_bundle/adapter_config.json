@@ -1,0 +1,69 @@
+{
+    "adapter_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text090_num70_grav20_unit20_recover_lr4e6_len1024_v1/adapter",
+    "batch_size": 1,
+    "config": null,
+    "data": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text090_num70_grav20_unit20_recover_lr4e6_len1024_v1/dataset",
+    "enable_thinking": true,
+    "fine_tune_type": "lora",
+    "flush_on_epoch_boundary": true,
+    "grad_accumulation_steps": 8,
+    "grad_checkpoint": true,
+    "iters": 60,
+    "learning_rate": 4e-06,
+    "lora_parameters": {
+        "rank": 32,
+        "dropout": 0.05,
+        "scale": 32.0,
+        "keys": [
+            "mixer.in_proj",
+            "mixer.out_proj",
+            "mixer.switch_mlp.fc1",
+            "mixer.switch_mlp.fc2",
+            "mixer.shared_experts.up_proj",
+            "mixer.shared_experts.down_proj",
+            "mixer.q_proj",
+            "mixer.k_proj",
+            "mixer.v_proj",
+            "mixer.o_proj"
+        ]
+    },
+    "lr_schedule": {
+        "name": "cosine_decay",
+        "arguments": [
+            4e-06,
+            8,
+            0.0
+        ]
+    },
+    "mask_prompt": false,
+    "max_seq_length": 1024,
+    "microsteps_per_epoch": 200,
+    "model": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text090_num70_grav20_unit20_recover_lr4e6_len1024_v1/shadow_model",
+    "num_layers": -1,
+    "optimizer": "adamw",
+    "optimizer_config": {
+        "adam": {},
+        "adamw": {},
+        "muon": {},
+        "sgd": {},
+        "adafactor": {}
+    },
+    "project_name": null,
+    "report_to": null,
+    "resume_adapter_file": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/adapter/adapters.safetensors",
+    "save_every": 60,
+    "seed": 123,
+    "steps_per_eval": 60,
+    "steps_per_report": 10,
+    "steps_per_report_step_unit": "optimizer",
+    "test": false,
+    "test_batches": 500,
+    "train": true,
+    "trainable_lora_suffixes": [
+        "mixer.q_proj",
+        "mixer.k_proj",
+        "mixer.v_proj",
+        "mixer.o_proj"
+    ],
+    "val_batches": -1
+}
