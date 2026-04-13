@@ -70,6 +70,19 @@ FINAL_ANSWER_PATTERNS = (
 )
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 PAD_TO = 32
+EVAL_RECORD_COLUMNS = (
+    "id",
+    "category",
+    "expected_answer",
+    "rendered_prompt",
+    "raw_output",
+    "extracted_answer",
+    "is_correct",
+    "fallback_type",
+    "format_bucket",
+    "has_boxed",
+    "boxed_count",
+)
 
 V20_TARGETS = {
     "overall_accuracy": 8340 / 9500,
@@ -963,6 +976,46 @@ def write_eval_outputs(
     write_text(output_root / "benchmark_eval_summary.md", render_eval_markdown_summary(evaluation_name, payload))
 
 
+def load_eval_checkpoint_records(checkpoint_path: Path) -> list[dict[str, Any]]:
+    if not checkpoint_path.exists():
+        return []
+    frame = pd.read_csv(
+        checkpoint_path,
+        keep_default_na=False,
+        converters={
+            "is_correct": lambda value: str(value).strip().lower() in {"true", "1", "1.0"},
+            "has_boxed": lambda value: str(value).strip().lower() in {"true", "1", "1.0"},
+            "boxed_count": lambda value: int(float(value)) if str(value).strip() else 0,
+        },
+    )
+    records = frame.to_dict(orient="records")
+    for record in records:
+        record["id"] = str(record.get("id", ""))
+        record["category"] = str(record.get("category", ""))
+        record["expected_answer"] = str(record.get("expected_answer", ""))
+        record["rendered_prompt"] = str(record.get("rendered_prompt", ""))
+        record["raw_output"] = str(record.get("raw_output", ""))
+        record["extracted_answer"] = str(record.get("extracted_answer", ""))
+        record["fallback_type"] = str(record.get("fallback_type", ""))
+        record["format_bucket"] = str(record.get("format_bucket", ""))
+        record["is_correct"] = bool(record.get("is_correct", False))
+        record["has_boxed"] = bool(record.get("has_boxed", False))
+        record["boxed_count"] = int(record.get("boxed_count", 0))
+    return records
+
+
+def append_eval_checkpoint_records(checkpoint_path: Path, records: Sequence[dict[str, Any]]) -> None:
+    if not records:
+        return
+    ensure_dir(checkpoint_path.parent)
+    pd.DataFrame.from_records(records, columns=EVAL_RECORD_COLUMNS).to_csv(
+        checkpoint_path,
+        mode="a",
+        header=not checkpoint_path.exists(),
+        index=False,
+    )
+
+
 def run_train(args: argparse.Namespace) -> dict[str, Any]:
     artifacts = prepare_run(args)
     step_plan = load_step_plan(artifacts.step_plan_path)
@@ -1148,6 +1201,15 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
     training_result = load_json(training_result_path)
     model_root = Path(training_result["shadow_model_dir"]).resolve()
     adapter_dir = Path(training_result["adapter_dir"]).resolve()
+    eval_root = run_root / "aopen_eval"
+    progress_path = eval_root / "benchmark_eval_progress.json"
+    summary_path = eval_root / "benchmark_eval_summary.json"
+    checkpoint_path = eval_root / "benchmark_eval_records_checkpoint.csv"
+    ensure_dir(eval_root)
+    if summary_path.exists() and progress_path.exists():
+        progress_payload = load_json(progress_path)
+        if progress_payload.get("status") == "complete":
+            return load_json(summary_path)
     model, tokenizer = load_model_for_eval(model_root, adapter_dir, lazy_load=bool(args.lazy_load))
 
     benchmark_rows = load_training_rows()
@@ -1168,12 +1230,17 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
     completion_batch_size = min(max_num_seqs, max(1, int(args.completion_batch_size)))
     force_single_generate = bool(args.force_single_generate)
 
-    records: list[dict[str, Any]] = []
     total_prompts = len(prompt_tokens)
-    progress_path = run_root / "aopen_eval" / "benchmark_eval_progress.json"
-    ensure_dir(progress_path.parent)
+    records = load_eval_checkpoint_records(checkpoint_path)
+    if len(records) > total_prompts:
+        raise RuntimeError(
+            f"Eval checkpoint has more rows than the benchmark: {len(records)} > {total_prompts}. "
+            f"Remove {checkpoint_path} and rerun."
+        )
+    if records:
+        print(f"Resuming eval from {len(records)}/{total_prompts}")
 
-    for chunk_start in range(0, total_prompts, chunk_size):
+    for chunk_start in range(len(records), total_prompts, chunk_size):
         chunk_prompts = prompt_tokens[chunk_start : chunk_start + chunk_size]
         chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompts)]
         chunk_rendered_prompts = prompts[chunk_start : chunk_start + len(chunk_prompts)]
@@ -1204,13 +1271,14 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
                 for prompt_tokens_single in chunk_prompts
             ]
 
+        chunk_records: list[dict[str, Any]] = []
         for row, rendered_prompt, raw_output in zip(chunk_rows, chunk_rendered_prompts, chunk_outputs):
             derived = analyze_raw_output(str(raw_output))
             prediction = str(derived["extracted_answer"])
             problem_id = str(row["id"])
             category = category_map.get(problem_id, "")
             is_correct = verify_answer(str(row["answer"]), prediction)
-            records.append(
+            chunk_records.append(
                 {
                     "id": problem_id,
                     "category": category,
@@ -1218,15 +1286,17 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
                     "rendered_prompt": rendered_prompt,
                     "raw_output": str(raw_output),
                     "extracted_answer": prediction,
-                    "is_correct": is_correct,
-                    "fallback_type": derived["fallback_type"],
-                    "format_bucket": derived["format_bucket"],
-                    "has_boxed": derived["has_boxed"],
-                    "boxed_count": derived["boxed_count"],
+                    "is_correct": bool(is_correct),
+                    "fallback_type": str(derived["fallback_type"]),
+                    "format_bucket": str(derived["format_bucket"]),
+                    "has_boxed": bool(derived["has_boxed"]),
+                    "boxed_count": int(derived["boxed_count"]),
                 }
             )
+        append_eval_checkpoint_records(checkpoint_path, chunk_records)
+        records.extend(chunk_records)
 
-        rows_completed = min(chunk_start + len(chunk_prompts), total_prompts)
+        rows_completed = len(records)
         progress_payload = {
             "created_at": utc_now(),
             "status": "running",
@@ -1237,6 +1307,7 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
             "temperature": float(args.temperature),
             "top_p": float(args.top_p),
             "max_num_seqs": int(args.max_num_seqs),
+            "checkpoint_path": str(checkpoint_path.resolve()),
         }
         write_json(progress_path, progress_payload)
         print(f"Eval progress: {rows_completed}/{total_prompts}")
@@ -1276,12 +1347,14 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
         **summary,
     }
     write_eval_outputs(
-        output_root=run_root / "aopen_eval",
+        output_root=eval_root,
         evaluation_name="aopen_train_csv_full",
         records=records,
         scored_rows=scored_rows,
         payload=payload,
     )
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
     write_json(progress_path, {"created_at": utc_now(), "status": "complete", "rows_total": total_prompts, "rows_completed": total_prompts})
     return payload
 

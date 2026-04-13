@@ -69,12 +69,18 @@
 
 - run_root: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad`
 - status: `training in progress`
-- latest_observed_step: `7/245`
-- latest_train_loss: `0.3535739640982697`
-- trained_tokens: `763998`
-- latest_elapsed_seconds: `110.2308`
+- latest_observed_step: `42/245`
+- latest_train_loss: `0.23436028881402557`
+- trained_tokens: `4627965`
+- latest_elapsed_seconds: `110.2152`
 - peak_memory_gb: `307.9588`
 - note: switched the exact-snapshot full run from dynamic per-microbatch padding to fixed train padding after host RAM climbed toward the 512 GB ceiling; batch membership/order, LR schedule, LoRA targets, and snapshot inputs remain unchanged
+
+## Eval robustness update
+
+- Full `eval-aopen` now checkpoints chunk-level progress into `aopen_eval/benchmark_eval_records_checkpoint.csv`.
+- If the 9500-row evaluation is interrupted, rerunning the same command resumes from the recorded row count instead of restarting from zero.
+- If `benchmark_eval_summary.json` already exists with `benchmark_eval_progress.json.status == complete`, the script returns that summary immediately instead of recomputing.
 
 ## Assumptions not explicit in the public v20 config
 
