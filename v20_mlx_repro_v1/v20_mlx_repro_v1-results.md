@@ -38,6 +38,18 @@
 - elapsed_seconds: `102.3078`
 - peak_memory_gb: `288.8066`
 
+### 2b. train smoke (fixed padding)
+
+- run_root: `v20_mlx_repro_v1/outputs/smoke_train_v20_fixedpad`
+- optimizer_steps: `1/1`
+- examples_in_step: `32`
+- microbatches_in_step: `2`
+- train_loss: `0.3943503541745424`
+- step_tokens: `104294`
+- elapsed_seconds: `114.7402`
+- peak_memory_gb: `307.9246`
+- note: keeps the v20 optimizer batch contract unchanged (`batch_size=32`, `micro_batch_size=16`) while forcing a single train shape at `max_seq_length=8192` to avoid MLX compile-shape cache growth
+
 ### 3. eval smoke
 
 - eval_root: `v20_mlx_repro_v1/outputs/smoke_train_v20/aopen_eval`
@@ -52,6 +64,17 @@
 | gravity | 0 | 1 | 0.000000 |
 | numeral | 1 | 1 | 1.000000 |
 | unit_conversion | 0 | 1 | 0.000000 |
+
+## Current live run
+
+- run_root: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad`
+- status: `training in progress`
+- latest_observed_step: `7/245`
+- latest_train_loss: `0.3535739640982697`
+- trained_tokens: `763998`
+- latest_elapsed_seconds: `110.2308`
+- peak_memory_gb: `307.9588`
+- note: switched the exact-snapshot full run from dynamic per-microbatch padding to fixed train padding after host RAM climbed toward the 512 GB ceiling; batch membership/order, LR schedule, LoRA targets, and snapshot inputs remain unchanged
 
 ## Assumptions not explicit in the public v20 config
 
