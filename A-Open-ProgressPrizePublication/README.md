@@ -56,14 +56,14 @@ All Roman numerals in the training set are between 1 and 100.
 
 I enumerated all the numerals. I also have a step-by-step process of solving the numeral.
 
-The code to generate the chain of thought is available here and an example output is available here.
+The code to generate the chain of thought is available here[/nemotron/blob/master/reasoners/numeral.py] and an example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=1deaf759].
 
 Unit conversion / Gravity
 This task asks to figure out a scalar value, and multiplication to apply the scalar value on the question input. I am aiming for a 100% (1594/1594) solve rate on unit conversion and a 100% (1597/1597) solve rate on gravity.
 
 The multiplication and division are split into multiple steps, so that it is easier to train the model to not make mistakes.
 
-The code to generate the chain of thought is available here for unit conversion and here for gravity. An example output is available here for unit conversion and here for gravity.
+The code to generate the chain of thought is available here[/nemotron/blob/master/reasoners/unit_conversion.py] for unit conversion and here[https://github.com/tonghuikang/nemotron/blob/master/reasoners/gravity.py] for gravity. An example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=0047365c] for unit conversion and here[https://nemotron.huikang.dev/synthetic.html?problem=0040ff76] for gravity.
 
 Cipher
 This task asks to decrypt a substitution cipher. Given several example encryptions of Wonderland-themed sentences, the model must deduce the character-level mapping and apply it to decrypt a new sentence.
@@ -75,16 +75,16 @@ The solution is straightforward
 Compute the current character mapping
 Collate the unmapped characters
 Assign the unmapped characters
-The code to generate the chain of thought is available here and an example output is available here.
+The code to generate the chain of thought is available here[https://github.com/tonghuikang/nemotron/blob/master/reasoners/cipher.py] and an example output is available here[https://nemotron.huikang.dev/synthetic.html?problem=017a161b].
 
-Apparently, Nemotron is quite bad at spelling. I think perfect performance at this subtask is a baseline expectation to medal in the final leaderboard.
+Apparently, Nemotron is quite bad at spelling[https://nemotron.huikang.dev/training.html?logpath=04-10-04-33&category=spelling]. I think perfect performance at this subtask is a baseline expectation to medal in the final leaderboard.
 
 Bit manipulation
 This task asks to discover a per-bit transformation rule from input-output examples of 8-bit binary numbers.
 
 I am aiming for an 85.1% (1364/1602) solve rate.
 
-Please refer to the full-length post on how I approach the bit manipulation problem.
+Please refer to the full-length post[baseline/nemotron-unsloth-sft-training/Strategy to solve 85% of bit manipulation.md] on how I approach the bit manipulation problem.
 
 Equation
 This task asks to discover the arithmetic rule applied to two-number equations. Given examples like 64-65 = 201, the model must figure out what operator maps the two operands to the result.
