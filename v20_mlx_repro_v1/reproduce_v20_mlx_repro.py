@@ -629,6 +629,8 @@ def build_training_manifest(args: argparse.Namespace, step_plan: Sequence[StepPl
             "max_num_seqs": int(args.max_num_seqs),
             "max_model_len": int(args.max_model_len),
             "enable_thinking": bool(args.eval_enable_thinking),
+            "eval_shards": int(args.eval_shards),
+            "eval_shard_index": int(args.eval_shard_index),
         },
     }
 
@@ -917,6 +919,45 @@ def load_category_map() -> dict[str, str]:
     return {str(row["id"]): str(row["category"]) for row in rows}
 
 
+def compute_eval_slice(total_rows: int, shard_count: int, shard_index: int) -> tuple[int, int]:
+    if shard_count <= 0:
+        raise ValueError(f"eval_shards must be positive; got {shard_count}")
+    if shard_index < 0 or shard_index >= shard_count:
+        raise ValueError(f"eval_shard_index must be in [0, {shard_count}); got {shard_index}")
+    base = total_rows // shard_count
+    remainder = total_rows % shard_count
+    start = shard_index * base + min(shard_index, remainder)
+    size = base + (1 if shard_index < remainder else 0)
+    return start, start + size
+
+
+def resolve_eval_root(run_root: Path, *, shard_count: int, shard_index: int) -> Path:
+    base_eval_root = run_root / "aopen_eval"
+    if shard_count <= 1:
+        return base_eval_root
+    return base_eval_root / "shards" / f"shard_{shard_index:02d}_of_{shard_count:02d}"
+
+
+def build_scored_rows(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    scored_rows: list[dict[str, Any]] = []
+    for row in records:
+        scored_rows.append(
+            {
+                "id": row["id"],
+                "category": row["category"],
+                "gold_answer": row["expected_answer"],
+                "prediction": row["extracted_answer"],
+                "is_correct": bool(row["is_correct"]),
+                "fallback_type": row["fallback_type"],
+                "format_bucket": row["format_bucket"],
+                "has_boxed": row["has_boxed"],
+                "boxed_count": row["boxed_count"],
+                "raw_output": row["raw_output"],
+            }
+        )
+    return scored_rows
+
+
 def summarize_benchmark_scores(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     correct = sum(int(bool(row.get("is_correct"))) for row in rows)
     total = len(rows)
@@ -1201,7 +1242,11 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
     training_result = load_json(training_result_path)
     model_root = Path(training_result["shadow_model_dir"]).resolve()
     adapter_dir = Path(training_result["adapter_dir"]).resolve()
-    eval_root = run_root / "aopen_eval"
+    eval_shards = max(1, int(args.eval_shards))
+    eval_shard_index = int(args.eval_shard_index)
+    if eval_shards == 1 and eval_shard_index != 0:
+        raise ValueError("--eval-shard-index must be 0 when --eval-shards=1")
+    eval_root = resolve_eval_root(run_root, shard_count=eval_shards, shard_index=eval_shard_index)
     progress_path = eval_root / "benchmark_eval_progress.json"
     summary_path = eval_root / "benchmark_eval_summary.json"
     checkpoint_path = eval_root / "benchmark_eval_records_checkpoint.csv"
@@ -1215,6 +1260,9 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
     benchmark_rows = load_training_rows()
     if int(args.eval_limit) > 0:
         benchmark_rows = benchmark_rows[: int(args.eval_limit)]
+    total_benchmark_rows = len(benchmark_rows)
+    row_start, row_end = compute_eval_slice(total_benchmark_rows, eval_shards, eval_shard_index)
+    benchmark_rows = benchmark_rows[row_start:row_end]
     category_map = load_category_map()
     prompts = build_eval_prompts(tokenizer, [row["prompt"] for row in benchmark_rows], enable_thinking=bool(args.eval_enable_thinking))
     prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
@@ -1238,7 +1286,13 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
             f"Remove {checkpoint_path} and rerun."
         )
     if records:
-        print(f"Resuming eval from {len(records)}/{total_prompts}")
+        if eval_shards > 1:
+            print(
+                f"Resuming shard {eval_shard_index + 1}/{eval_shards} eval from "
+                f"{len(records)}/{total_prompts} (rows {row_start}:{row_end})"
+            )
+        else:
+            print(f"Resuming eval from {len(records)}/{total_prompts}")
 
     for chunk_start in range(len(records), total_prompts, chunk_size):
         chunk_prompts = prompt_tokens[chunk_start : chunk_start + chunk_size]
@@ -1302,33 +1356,139 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
             "status": "running",
             "rows_total": total_prompts,
             "rows_completed": rows_completed,
+            "rows_total_global": total_benchmark_rows,
+            "row_start": row_start,
+            "row_end": row_end,
             "chunk_size": chunk_size,
             "max_tokens": int(args.max_tokens),
             "temperature": float(args.temperature),
             "top_p": float(args.top_p),
             "max_num_seqs": int(args.max_num_seqs),
+            "eval_shards": eval_shards,
+            "eval_shard_index": eval_shard_index,
             "checkpoint_path": str(checkpoint_path.resolve()),
         }
         write_json(progress_path, progress_payload)
-        print(f"Eval progress: {rows_completed}/{total_prompts}")
+        if eval_shards > 1:
+            print(
+                f"Eval shard progress {eval_shard_index + 1}/{eval_shards}: "
+                f"{rows_completed}/{total_prompts} (rows {row_start}:{row_end})"
+            )
+        else:
+            print(f"Eval progress: {rows_completed}/{total_prompts}")
 
-    scored_rows: list[dict[str, Any]] = []
-    for row in records:
-        scored_rows.append(
-            {
-                "id": row["id"],
-                "category": row["category"],
-                "gold_answer": row["expected_answer"],
-                "prediction": row["extracted_answer"],
-                "is_correct": bool(row["is_correct"]),
-                "fallback_type": row["fallback_type"],
-                "format_bucket": row["format_bucket"],
-                "has_boxed": row["has_boxed"],
-                "boxed_count": row["boxed_count"],
-                "raw_output": row["raw_output"],
-            }
-        )
+    scored_rows = build_scored_rows(records)
+    summary = summarize_benchmark_scores(scored_rows)
+    evaluation_name = (
+        "aopen_train_csv_full"
+        if eval_shards <= 1
+        else f"aopen_train_csv_shard_{eval_shard_index:02d}_of_{eval_shards:02d}"
+    )
+    payload = {
+        "created_at": utc_now(),
+        "evaluation_name": evaluation_name,
+        "benchmark_csv": str(TRAIN_CSV_PATH.resolve()),
+        "model_root": str(model_root),
+        "adapter_dir": str(adapter_dir),
+        "readme_contract": README_EVAL_CONTRACT,
+        "source_documents": [
+            relative_to_repo(README_PATH),
+            relative_to_repo(AOPEN_ROOT / "README.md"),
+            relative_to_repo(AOPEN_ROOT / "データ戦略を理解する.md"),
+            relative_to_repo(AOPEN_ROOT / "学習SFTパイプライン.md"),
+        ],
+        "rows_total_global": total_benchmark_rows,
+        "row_start": row_start,
+        "row_end": row_end,
+        "eval_shards": eval_shards,
+        "eval_shard_index": eval_shard_index,
+        "v20_target_training_set_accuracy": V20_TARGETS["overall_accuracy"],
+        **summary,
+    }
+    write_eval_outputs(
+        output_root=eval_root,
+        evaluation_name=evaluation_name,
+        records=records,
+        scored_rows=scored_rows,
+        payload=payload,
+    )
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
+    write_json(
+        progress_path,
+        {
+            "created_at": utc_now(),
+            "status": "complete",
+            "rows_total": total_prompts,
+            "rows_completed": total_prompts,
+            "rows_total_global": total_benchmark_rows,
+            "row_start": row_start,
+            "row_end": row_end,
+            "eval_shards": eval_shards,
+            "eval_shard_index": eval_shard_index,
+        },
+    )
+    return payload
 
+
+def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    training_result_path = run_root / "training_result.json"
+    if not training_result_path.exists():
+        raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
+    training_result = load_json(training_result_path)
+    model_root = Path(training_result["shadow_model_dir"]).resolve()
+    adapter_dir = Path(training_result["adapter_dir"]).resolve()
+    base_eval_root = run_root / "aopen_eval"
+    shard_root = base_eval_root / "shards"
+    if not shard_root.exists():
+        raise FileNotFoundError(f"Missing shard eval directory at {shard_root}")
+
+    shard_entries: list[tuple[Path, dict[str, Any]]] = []
+    for summary_path in sorted(shard_root.glob("*/benchmark_eval_summary.json")):
+        shard_entries.append((summary_path.parent, load_json(summary_path)))
+    if not shard_entries:
+        raise FileNotFoundError(f"No shard benchmark_eval_summary.json files found under {shard_root}")
+
+    shard_entries.sort(key=lambda entry: (int(entry[1].get("row_start", 0)), entry[0].name))
+    expected_shards = int(shard_entries[0][1].get("eval_shards", len(shard_entries)))
+    if expected_shards <= 1:
+        raise RuntimeError("Shard merge requires eval_shards > 1 in shard summaries.")
+    if len(shard_entries) != expected_shards:
+        raise RuntimeError(f"Expected {expected_shards} shard summaries, found {len(shard_entries)} under {shard_root}")
+
+    total_rows_global = int(shard_entries[0][1].get("rows_total_global", 0))
+    next_row_start = 0
+    records: list[dict[str, Any]] = []
+    for expected_index, (shard_dir, payload) in enumerate(shard_entries):
+        shard_index = int(payload.get("eval_shard_index", -1))
+        row_start = int(payload.get("row_start", -1))
+        row_end = int(payload.get("row_end", -1))
+        shard_total = int(payload.get("overall", {}).get("total", -1))
+        shard_rows_total_global = int(payload.get("rows_total_global", total_rows_global))
+        if shard_index != expected_index:
+            raise RuntimeError(f"Expected shard index {expected_index}, found {shard_index} in {shard_dir}")
+        if shard_rows_total_global != total_rows_global:
+            raise RuntimeError(
+                f"Global row count mismatch for {shard_dir}: {shard_rows_total_global} != {total_rows_global}"
+            )
+        if row_start != next_row_start:
+            raise RuntimeError(f"Shard coverage gap or overlap before {shard_dir}: expected {next_row_start}, found {row_start}")
+        if row_end < row_start:
+            raise RuntimeError(f"Invalid shard row range in {shard_dir}: {row_start}:{row_end}")
+        shard_records = load_eval_checkpoint_records(shard_dir / "benchmark_eval_raw_outputs.csv")
+        if len(shard_records) != shard_total or len(shard_records) != (row_end - row_start):
+            raise RuntimeError(
+                f"Shard row mismatch in {shard_dir}: raw_outputs={len(shard_records)} summary_total={shard_total} "
+                f"row_span={row_end - row_start}"
+            )
+        records.extend(shard_records)
+        next_row_start = row_end
+
+    if next_row_start != total_rows_global:
+        raise RuntimeError(f"Shard coverage incomplete: merged {next_row_start} rows, expected {total_rows_global}")
+
+    scored_rows = build_scored_rows(records)
     summary = summarize_benchmark_scores(scored_rows)
     payload = {
         "created_at": utc_now(),
@@ -1343,19 +1503,44 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
             relative_to_repo(AOPEN_ROOT / "データ戦略を理解する.md"),
             relative_to_repo(AOPEN_ROOT / "学習SFTパイプライン.md"),
         ],
+        "rows_total_global": total_rows_global,
+        "row_start": 0,
+        "row_end": total_rows_global,
+        "eval_shards": expected_shards,
+        "eval_shard_index": -1,
+        "aggregation": {
+            "mode": "sharded",
+            "shard_root": str(shard_root.resolve()),
+            "num_shards": expected_shards,
+        },
         "v20_target_training_set_accuracy": V20_TARGETS["overall_accuracy"],
         **summary,
     }
     write_eval_outputs(
-        output_root=eval_root,
+        output_root=base_eval_root,
         evaluation_name="aopen_train_csv_full",
         records=records,
         scored_rows=scored_rows,
         payload=payload,
     )
-    if checkpoint_path.exists():
-        checkpoint_path.unlink()
-    write_json(progress_path, {"created_at": utc_now(), "status": "complete", "rows_total": total_prompts, "rows_completed": total_prompts})
+    write_json(
+        base_eval_root / "benchmark_eval_progress.json",
+        {
+            "created_at": utc_now(),
+            "status": "complete",
+            "rows_total": total_rows_global,
+            "rows_completed": total_rows_global,
+            "rows_total_global": total_rows_global,
+            "row_start": 0,
+            "row_end": total_rows_global,
+            "eval_shards": expected_shards,
+            "eval_shard_index": -1,
+            "aggregation": "sharded",
+        },
+    )
+    root_checkpoint_path = base_eval_root / "benchmark_eval_records_checkpoint.csv"
+    if root_checkpoint_path.exists():
+        root_checkpoint_path.unlink()
     return payload
 
 
@@ -1431,6 +1616,8 @@ def update_results_files(args: argparse.Namespace, run_result: dict[str, Any], e
 
 
 def run_full(args: argparse.Namespace) -> dict[str, Any]:
+    if int(args.eval_shards) != 1 or int(args.eval_shard_index) != 0:
+        raise ValueError("full-run does not support sharded eval; use train + eval-aopen per shard + merge-aopen-eval.")
     run_result = run_train(args)
     eval_result = run_eval_aopen(args)
     update_results_files(args, run_result, eval_result)
@@ -1449,7 +1636,11 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
     if not training_result_path.exists():
         raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
     if not eval_summary_path.exists():
-        raise FileNotFoundError(f"Missing benchmark_eval_summary.json at {eval_summary_path}")
+        shard_root = run_root / "aopen_eval" / "shards"
+        if shard_root.exists():
+            run_merge_aopen_eval(args)
+        if not eval_summary_path.exists():
+            raise FileNotFoundError(f"Missing benchmark_eval_summary.json at {eval_summary_path}")
     run_result = load_json(training_result_path)
     eval_result = load_json(eval_summary_path)
     update_results_files(args, run_result, eval_result)
@@ -1524,6 +1715,8 @@ def parse_args() -> argparse.Namespace:
         target.add_argument("--prefill-batch-size", type=int, default=8)
         target.add_argument("--completion-batch-size", type=int, default=8)
         target.add_argument("--eval-limit", type=int, default=0)
+        target.add_argument("--eval-shards", type=int, default=1)
+        target.add_argument("--eval-shard-index", type=int, default=0)
         target.add_argument(
             "--eval-enable-thinking",
             action=argparse.BooleanOptionalAction,
@@ -1547,6 +1740,13 @@ def parse_args() -> argparse.Namespace:
     eval_aopen = subparsers.add_parser("eval-aopen", help="Run A-Open-style evaluation on data/train.csv using the trained adapter.")
     add_shared_args(eval_aopen)
     eval_aopen.set_defaults(func=run_eval_aopen)
+
+    merge_eval = subparsers.add_parser(
+        "merge-aopen-eval",
+        help="Merge shard-local A-Open eval outputs into run_root/aopen_eval/ and update the root summary.",
+    )
+    add_shared_args(merge_eval)
+    merge_eval.set_defaults(func=run_merge_aopen_eval)
 
     full = subparsers.add_parser("full-run", help="Prepare, train, evaluate, and update the tracked results files.")
     add_shared_args(full)
