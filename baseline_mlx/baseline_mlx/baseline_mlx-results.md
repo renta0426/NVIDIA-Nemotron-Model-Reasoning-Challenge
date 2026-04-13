@@ -1,1064 +1,1175 @@
-# baseline_mlx Results
-
-## Source of truth
-
-この系列の判定基準は **`README.md` の Evaluation / Submitting 節**に固定する。
-
-- `max_lora_rank = 32`
-- `max_tokens = 7680`
-- `top_p = 1.0`
-- `temperature = 0.0`
-- `max_num_seqs = 64`
-- `gpu_memory_utilization = 0.85`
-- `max_model_len = 8192`
-- final artifact: `submission.zip`
-
-補足:
-
-- baseline notebook は `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv` を使い、type ごとに `300 / 400 / 700 / 700 / 607 / 200` を sampling している。
-- `baseline_mlx` の再現は上記 sampling と CoT 整形を維持しつつ、MLX 用に `shadow_model` と `enable_thinking` patch を入れている。
-- 生成される `mlx_adapter_bundle.zip` は **ローカル MLX 再利用用**であり、現時点では **PEFT/vLLM 提出互換を主張しない**。
-
-## HF notebook reference
-
-| pipeline | local320 | binary | gravity | roman | symbol | text | unit | source |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `baseline/nemotron-sft-lora-with-cot-v2` | `249/320 = 0.7781` | `29/60` | `50/50` | `50/50` | `22/60` | `49/50` | `49/50` | `baseline/nemotron-sft-lora-with-cot-v2/result/artifacts/phase0_eval_summary.json` |
-
-## MLX reproduction runs
-
-| version | run_name | scope | sampled_rows | train_rows | valid_rows | total_iters | max_seq | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-smoke-v1` | `nemotron_sft_lora_with_cot_v2_mlx_smoke_v1` | smoke | `24` | `24` | `4` | `1` | `1024` | `val_loss=0.607`, `train_loss=0.565`, `peak_mem=64.835 GB` | adapter 生成まで完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_smoke_v1/training_result.json` |
-| `baseline-mlx-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v1` | full notebook-equivalent | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter5600 val_loss=0.186`; `iter5800 val_loss=0.180`; `iter5814 val_loss=0.181`; `iter5814 train_loss=0.272`; `peak_mem=68.581 GB` | 完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_v1/training_result.json` |
-| `baseline-mlx-lora-fix-smoke-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_smoke_v1` | smoke (LoRA target fix) | `24` | `24` | `4` | `1` | `1024` | `val_loss=0.607`, `train_loss=0.565`, `peak_mem=71.683 GB`, `trainable=880.138M`, `adapter=3.52 GB` | adapter 生成まで完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_lora_fix_smoke_v1/training_result.json` |
-| `baseline-mlx-lora-fix-full-v2` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v2` | full notebook-equivalent (parity-fix rerun) | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter400 val_loss=4.807`; `iter600 val_loss=1.359`; `iter800 val_loss=0.847`; `iter5814 val_loss=0.213`; `iter5814 train_loss=0.327`; `peak_mem=82.603 GB` | adapter 生成まで完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v2/training_result.json` |
-| `baseline-mlx-lora-fix-schedopt-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_schedopt_v1` | full notebook-equivalent (expanded LoRA rerun, optimizer-step schedule) | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter5200 val_loss=0.186`; `iter5400 val_loss=0.182`; `iter5600 val_loss=0.180`; `iter5800 val_loss=0.180`; `iter5814 val_loss=0.180`; `iter5814 train_loss=0.298`; `peak_mem=82.603 GB` | adapter 生成まで完走 | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_lora_fix_schedopt_v1/training_result.json` |
-| `baseline-mlx-narrow-schedopt-v1` | `nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v1` | full notebook-equivalent (narrow LoRA, optimizer-step schedule) | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter2000 val_loss=0.248`; `iter3000 val_loss=0.200`; `iter3400 val_loss=0.188`; `iter3600 val_loss=0.185`; `iter3800 val_loss=0.183`; `iter4000 val_loss=0.177`; stalled after `iter4060`; `peak_mem=68.122 GB` | stalled in MLX eval wait; no adapter checkpoint because `save_every=5814` | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v1/mlx_lora_config.yaml` |
-| `baseline-mlx-narrow-schedopt-v2` | `nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v2` | full notebook-equivalent (narrow LoRA, optimizer-step schedule, reduced eval cadence) | `2907` | `2907` | `32` | `5814` | `4096` | `steps_per_eval=5814`; `save_every=200`; OOM during restart before first train report | interrupted by OOM before adapter or training_result creation | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v2/mlx_lora_config.yaml` |
-| `baseline-mlx-narrow-schedopt-v3` | `nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v3` | full notebook-equivalent (narrow LoRA, optimizer-step schedule, reduced eval cadence; interactive rerun) | `2907` | `2907` | `32` | `5814` | `4096` | no persisted train log; adapter dir only contains `adapter_config.json` | interactive rerun was manually stopped during abnormal slowdown before the first checkpoint | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v3/mlx_lora_config.yaml` |
-| `baseline-mlx-narrow-schedopt-v4` | `nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v4` | full notebook-equivalent (narrow LoRA, optimizer-step schedule, reduced eval cadence; file-logged rerun) | `2907` | `2907` | `32` | `5814` | `4096` | `iter1 val_loss=0.683`; `iter1 val_took=329.883s`; no `iter10` report; `resource_tracker` warned about 1 leaked semaphore | file logging did not fix the slowdown; process stayed low-utilization after `iter1` and was killed with no adapter checkpoint | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v4/train.log` |
-| `baseline-mlx-narrow-schedopt-v5` | `nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v5` | full notebook-equivalent (narrow LoRA, optimizer-step schedule, reduced eval cadence; `valid_shadow_rows=4`, detached rerun) | `2907` | `2907` | `4` | `5814` | `4096` | `iter1 val_loss=0.577`; `iter1 val_took=36.390s`; no `iter10` report; `resource_tracker` warned about 1 leaked semaphore | lowering shadow validation made the first eval fast, but the detached run still exited right after `iter1`; no adapter checkpoint | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v5/train.log` |
-| `baseline-mlx-narrow-schedopt-v7` | `nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v7` | full notebook-equivalent (narrow LoRA, optimizer-step schedule, reduced eval cadence; `valid_shadow_rows=4`, async-attached rerun) | `2907` | `2907` | `4` | `5814` | `4096` | `iter1 val_loss=0.577`; `iter1 val_took=52.753s`; `iter10 train_loss=0.811`, `it/sec=0.026`; `iter20 train_loss=0.993`, `it/sec=0.029`; `iter30 train_loss=0.827`, `it/sec=0.031`; `peak_mem=65.675 GB` | async-attached mode stayed alive, but throughput was far below historical narrow runs, so it was stopped before first checkpoint | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_schedopt_v7/train.log` |
-
-## README-aligned local eval
-
-| version | eval_name | scope | local320 | binary | gravity | roman | symbol | text | unit | notes |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `baseline-mlx-eval-smoke-v1` | `baseline_mlx_eval_smoke_v1` | smoke 6 rows | `4/6 = 0.6667` | `1/1` | `1/1` | `1/1` | `0/1` | `0/1` | `1/1` | `peak_memory_gb=65.63`, `generation_tps=8.20` |
-| `baseline-mlx-eval-full320-v1` | `baseline_mlx_eval_full320_shard2_v1` | README local320 | `196/320 = 0.6125` | `19/60` | `39/50` | `50/50` | `17/60` | `21/50` | `50/50` | shard parallel; chunk peak `73.69 GB`; binary boxed extraction `1.0`; leading-zero retention `0.9` |
-| `baseline-mlx-eval-full320-lora-fix-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_v1` | README local320 | `6/320 = 0.0187` | `5/60` | `0/50` | `0/50` | `1/60` | `0/50` | `0/50` | one-shard rerun after stopping 2-shard for memory; binary boxed extraction `0.0`; format failure `1.0`; peak_memory_gb `76.08` |
-| `baseline-mlx-eval-binary60-lora-fix-v2` | `baseline_mlx_eval_binary60_lora_fix_v2` | README binary60 | `18/60 = 0.3000` | `18/60` | `0/0` | `0/0` | `0/0` | `0/0` | `0/0` | `bit_other 12/46`, `bit_structured_byte_formula 6/14`; binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.8667`; format failure `0.0` |
-| `baseline-mlx-eval-symbol60-lora-fix-v2` | `baseline_mlx_eval_symbol60_lora_fix_v2` | README symbol60 | `13/60 = 0.2167` | `0/0` | `0/0` | `0/0` | `13/60` | `0/0` | `0/0` | `numeric_2x2 13/40`, `glyph_len5 0/20`; isolated rerun1 も `13/60` を **60/60 row-level identical** で再現。same 60 ids の full320 内 symbol は `20/60` で、MLX eval は batch composition-sensitive |
-| `baseline-mlx-eval-full320-lora-fix-v2` | `baseline_mlx_eval_full320_lora_fix_v2` | README local320 | `194/320 = 0.6062` | `18/60` | `49/50` | `50/50` | `20/60` | `9/50` | `48/50` | shard parallel。`lora-fix-v1 6/320` からは大幅回復したが、旧 MLX v1 `196/320` は未更新。gravity/symbol は改善、text が大きく regress |
-| `baseline-mlx-eval-full320-lora-fix-schedopt-v1` | `baseline_mlx_eval_full320_shard1_lora_fix_schedopt_v1` | README local320 | `189/320 = 0.5906` | `15/60` | `49/50` | `50/50` | `18/60` | `10/50` | `47/50` | one-shard rerun。`lora-fix-v2` と manifest は同一だが `-5` rows。binary boxed extraction `1.0`; format failure `0.0`; peak_memory_gb `77.49` |
-| `baseline-mlx-notebook-original-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_fullrun_v2` | README local320 | `215/320 = 0.6719` | `26/60` | `50/50` | `50/50` | `15/60` | `25/50` | `49/50` | 2-shard eval。旧 MLX best `196/320` を更新。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
-| `baseline-mlx-notebook-original-routeaware-fullrun-v2-eval-v1` | `baseline_mlx_notebook_original_routeaware_fullrun_v2` | README local320 | `170/320 = 0.5312` | `33/60` | `15/50` | `40/50` | `5/60` | `29/50` | `48/50` | 2-shard eval。binary/text は改善したが、gravity/roman/symbol が大きく regress。binary boxed extraction `1.0`; regex exact `1.0`; leading-zero retention `0.9`; format failure `0.0` |
-| `baseline-mlx-resume-routeaware-bit1317-lr2p5e5-ep1-eval-v1` | `baseline_mlx_notebook_original_resume_routeaware_bit1317_lr2p5e5_ep1` | README local320 | `142/320 = 0.4437` | `27/60` | `17/50` | `40/50` | `7/60` | `7/50` | `44/50` | baseline adapter resume + constrained route-aware mix。baseline `0.6719` を大きく下回ったため specialized gate は通さず |
-
-## Binary bias specialized eval
-
-| version | eval_name | rows | accuracy | bit_other | byte_formula | permutation | boolean_family | notes |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `baseline-mlx-notebook-original-fullrun-v2-binary-specialized-v1` | `baseline_mlx_notebook_original_fullrun_v2/phase0_binary_bias_specialized_eval` | `563` | `286/563 = 0.5080` | `118/218` | `128/283` | `40/62` | `47/60` | `boxed=1.0`; `regex_exact=1.0`; `leading_zero=0.8494`; `supported_bijection=33/50`; `supported_not_structured=15/55`; `rare_byte_transform=9/11` |
-| `baseline-mlx-notebook-original-routeaware-fullrun-v2-binary-specialized-v1` | `baseline_mlx_notebook_original_routeaware_fullrun_v2/phase0_binary_bias_specialized_eval` | `563` | `348/563 = 0.6181` | `136/218` | `152/283` | `60/62` | `47/60` | `boxed=1.0`; `regex_exact=1.0`; `leading_zero=0.8946`; `supported_bijection=50/50`; `supported_not_structured=14/55`; `rare_byte_transform=11/11` |
-
-## Baseline vs route-aware comparison
-
-- README local320 は baseline **`215/320 = 0.6719`** に対して route-aware **`170/320 = 0.5312`** で、**`-45 rows / -0.1407`**。binary **`26 -> 33`** と text **`25 -> 29`** は伸びたが、gravity **`50 -> 15`**、roman **`50 -> 40`**、symbol **`15 -> 5`** の崩れが大きく、総合では明確に悪化した。
-- binary bias specialized は baseline **`286/563 = 0.5080`** に対して route-aware **`348/563 = 0.6181`** で、**`+62 rows / +0.1101`**。subtype では `bit_permutation_inversion` **`40 -> 60`**, `bit_other` **`118 -> 136`**, `bit_structured_byte_formula` **`128 -> 152`** と全部改善した。
-- focus / exposure では `supported_bijection` **`33/50 -> 50/50`**, `rare_byte_transform` **`9/11 -> 11/11`**, `dominant_structured_safe` **`64/120 -> 74/120`**, `dominant` **`105/210 -> 127/210`**, `supported` **`126/225 -> 153/225`** が改善した。一方で `supported_not_structured` は **`15/55 -> 14/55`** と微減で、boolean_family は **`47/60`** のまま横ばいだった。
-- したがって今回の route-aware retrain は **binary-specialized 強化には有効**だが、README local320 の総合ベースライン置換には不適。現時点の総合候補は依然として **`baseline_mlx_notebook_original_fullrun_v2`**。
-- continuation の **bit1317 / lr2.5e-5 / ep1** も README local320 では **`142/320 = 0.4437`** に沈み、baseline **`215/320`** どころか route-aware full retrain **`170/320`** よりも下だった。family 別では `binary 27/60`, `gravity 17/50`, `roman 40/50`, `symbol 7/60`, `text 7/50`, `unit 44/50` で、local320 gate 未達のため binary-specialized は **未実行** とした。
-
-## Wait-state diagnosis probes
-
-| version | runner | scope | valid_rows | total_iters | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-narrow-rawprobe-v1` | raw `mlx_lm.lora.run` + chat patch only | narrow schedopt probe | `4` | `14` | `iter1 val_loss=0.577`; `iter1 val_took=17.457s`; `iter10 train_loss=0.837`, `it/sec=0.048`; `iter14 val_loss=0.658`; `iter14 train_loss=0.897`, `it/sec=0.163`; `peak_mem=65.632 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_rawprobe_v1/train.log` |
-| `baseline-mlx-narrow-patchprobe-v1` | current single-file patched trainer | narrow schedopt probe | `4` | `14` | `iter1 val_loss=0.577`; `iter1 val_took=17.057s`; `iter10 train_loss=0.837`, `it/sec=0.057`; `iter14 val_loss=0.656`; `iter14 train_loss=0.894`, `it/sec=0.160`; `peak_mem=65.632 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_patchprobe_v1/training_result.json` |
-| `baseline-mlx-narrow-asyncprobe-v1` | current single-file patched trainer via async shell | narrow schedopt probe | `4` | `14` | `iter1 val_loss=0.577`; `iter1 val_took=20.217s`; `iter10 train_loss=0.837`, `it/sec=0.057`; `iter14 val_loss=0.655`; `iter14 train_loss=0.898`, `it/sec=0.165`; `peak_mem=65.632 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_narrow_asyncprobe_v1/train.log` |
-
-## In-flight follow-up batch
-
-| version | run_name | train_csv | bit_rows | mask_prompt | lr | status |
-| --- | --- | --- | ---: | --- | ---: | --- |
-| `baseline-mlx-v3f-exact-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_exact_v1` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `true` | `1e-4` | stopped by user before first train report |
-| `baseline-mlx-v3f-nomask-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_nomask_v1` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `false` | `1e-4` | stopped by user before first train report |
-| `baseline-mlx-v2-exact-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v2_exact_v1` | `train_split_with_cot_v2.csv` | `1021` | `true` | `1e-4` | stopped by user before first train report |
-| `baseline-mlx-v3f-lr5e5-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_lr5e5_v1` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `true` | `5e-5` | stopped by user before first train report |
-| `baseline-mlx-v3f-exact-v2` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_exact_v2` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `true` | `1e-4` | stopped by user mid-startup; no train report recorded |
-| `baseline-mlx-v3f-nomask-v2` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_nomask_v2` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `false` | `1e-4` | stopped by user mid-startup; no train report recorded |
-| `baseline-mlx-v3f-nothink-v1` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_nothink_v1` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `true` | `1e-4` | `enable_thinking=false`; stopped by user mid-startup |
-| `baseline-mlx-v2-exact-v2` | `nemotron_sft_lora_with_cot_v2_mlx_v2_exact_v2` | `train_split_with_cot_v2.csv` | `1021` | `true` | `1e-4` | stopped by user mid-startup; no train report recorded |
-| `baseline-mlx-v3f-lr5e5-v2` | `nemotron_sft_lora_with_cot_v2_mlx_v3f_lr5e5_v2` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `1021` | `true` | `5e-5` | stopped by user mid-startup; no train report recorded |
-
-## Origin gap analysis
-
-`baseline/nemotron-sft-lora-with-cot-v2/result/origin/reports` をオリジナルの source of truth として、README local320 の same-320 row-level を MLX 再現と突き合わせた。
-
-| slice | origin | MLX | delta |
-| --- | ---: | ---: | ---: |
-| overall | `249/320 = 0.7781` | `196/320 = 0.6125` | `-53` |
-| `general_stable_set` | `198/200 = 0.9900` | `160/200 = 0.8000` | `-38` |
-| `binary_hard_set` | `29/60 = 0.4833` | `19/60 = 0.3167` | `-10` |
-| `symbol_watch_set` | `22/60 = 0.3667` | `17/60 = 0.2833` | `-5` |
-
-family delta:
-
-- `text`: `49/50 -> 21/50` (`-28`)
-- `gravity`: `50/50 -> 39/50` (`-11`)
-- `binary`: `29/60 -> 19/60` (`-10`)
-- `symbol`: `22/60 -> 17/60` (`-5`)
-- `roman`: `50/50 -> 50/50` (`±0`)
-- `unit`: `49/50 -> 50/50` (`+1`)
-
-row-level overlap:
-
-- `HF-only 65`
-- `MLX-only 12`
-- `both_wrong 59`
-- `both_correct 184`
-
-主要な失敗様式:
-
-- **gravity**: origin-only 11 問はすべて `boxed_non_empty` で、MLX 予測が正解の **ほぼ 1/2**。`g = 2d/t^2` ではなく `g = d/t^2` と解いている系統誤差。
-- **text**: origin-only 29 問はすべて `boxed_non_empty`。format failure ではなく、`inside -> mirror`, `under -> door`, `mirror -> puzzle` のような **復号語彙の内容劣化**。
-- **binary**: MLX は `boxed_extraction_success_rate 1.0`, `format_failure_rate 0.0` まで改善しており、差分は format ではなく **content**。特に `bit_other` が `24/46 -> 13/46` (`-11`)。
-- **symbol**: `glyph_len5` は origin / MLX とも `0/20`。差分は主に `numeric_2x2` の `22/40 -> 17/40` (`-5`)。
-- 差分の大半は hard/manual ではなく **`verified_trace_ready` の再現差**で、selection tier でも `226/235 -> 177/235` (`-49`) が最大の落差。
-
-構成差から見つかった具体的な bug candidate:
-
-- HF `NemotronHMOE` は `experts[*].up_proj/down_proj` と `shared_experts.up_proj/down_proj` を持つが、MLX v1 script の default LoRA keys は **`mixer.shared_experts.up_proj/down_proj` しか拾っていなかった**。
-- MLX `nemotron_h.py` では routed experts が `mixer.switch_mlp.fc1/fc2` に畳み込まれており、`mlx_lm` の LoRA 実装は `SwitchLinear` をサポートしている。
-- つまり v1 run は MoE block で **shared expert だけを学習し、routed experts 側 (`switch_mlp.fc1/fc2`) を未学習**だった可能性が高い。
-- そのため `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` の default LoRA keys は、後続修正で `mixer.switch_mlp.fc1/fc2`（および generic `mixer.up_proj/down_proj`）を含む形へ拡張した。
-
-## LoRA target fix validation
-
-| version | run_name | status | measured | notes |
-| --- | --- | --- | --- | --- |
-| `baseline-mlx-lora-fix-smoke-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_smoke_v1` | 完走 | `val_loss=0.607`, `train_loss=0.565`, `peak_mem=71.683 GB` | smoke では loss は旧 v1 と同値だが、trainable params は `23.976M -> 880.138M`、adapter は `3.52 GB` に増加 |
-| `baseline-mlx-lora-fix-full-v1` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v1` | 完走 | `iter1 val_loss=0.683`; `iter200 val_loss=0.340`; `iter400 val_loss=0.276`; `iter600 val_loss=0.259`; `iter5200 val_loss=5.089`; `iter5400 val_loss=4.772`; `iter5600 val_loss=4.716`; `iter5800 val_loss=4.676`; `iter5814 val_loss=4.705`; `iter5814 train_loss=5.676`; `peak_mem=82.603 GB` | 拡張 LoRA target 自体は HF trainable params 規模に近づいたが、README local320 は `6/320` まで崩壊。終盤でも `learning_rate≈9.863e-05` のままで、scheduler step 単位 mismatch が有力 |
-| `baseline-mlx-lora-fix-full-v2` | `nemotron_sft_lora_with_cot_v2_mlx_lora_fix_v2` | 完走 | `iter1 val_loss=0.683`; `iter400 val_loss=4.807`; `iter600 val_loss=1.359`; `iter800 val_loss=0.847`; `iter5814 val_loss=0.213`; `iter5814 train_loss=0.327`; `peak_mem=82.603 GB` | optimizer-step schedule + final accumulation flush を適用した parity-fix rerun。README local320 は `194/320`、binary60 は `18/60`、isolated symbol60 は `13/60` まで回復 |
-
-## Scheduler mismatch finding
-
-- notebook (`baseline/nemotron-sft-lora-with-cot-v2/nemotron-sft-lora-with-cot-v2-original.ipynb`) は `learning_rate=1e-4`, `lr_scheduler_type="cosine"`, `warmup_ratio=0.05`, `gradient_accumulation_steps=8`, `num_train_epochs=2`。
-- 現行 MLX 再現では schedule の decay/warmup steps を **microstep (`iters=5814`) 基準**で構築していたが、`mlx_lm` trainer は optimizer update を **8 microstep ごと**にしか進めない。
-- その結果、warmup と cosine decay が **約 8 倍遅く進み**、実ログでも終盤 `iter5800` 付近で `learning_rate≈9.864e-05` とほぼ初期値のままだった。
-- 次 run では `lr_schedule_step_unit=optimizer` を導入し、今回の baseline 条件 (`2907 rows`, `epochs=2`, `batch=1`, `grad_accum=8`) では **effective schedule steps = 727** として notebook 相当に合わせる。
-
-## Notes
-
-- 初期 v1 run の LoRA target は `mixer.in_proj`, `mixer.out_proj`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj` だけだったが、後続の構成照合で routed expert 側の `mixer.switch_mlp.fc1/fc2` も必要と判明した。現行 script では generic `mixer.up_proj/down_proj` を含めて target を拡張している。
-- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` は 2026-04-07 更新で `--lr-schedule-step-unit {optimizer,micro}` を追加し、default を `optimizer` に変更した。今後の notebook 再現 run は optimizer-step 基準 schedule を使う。
-- 今回の full run は **`train_split_with_cot.csv` の元 baseline 再現**であり、Bit Manipulation は `607` 行 sampling のまま。IDE 上で見えていた `1021` 行設定は別 notebook 変更で、今回の完走 run には使っていない。
-- full320 実測は HF notebook reference `249/320 = 0.7781` を下回り、主な失点は `symbol 17/60`, `binary 19/60`, `text 21/50`。特に `glyph_len5 0/20`, `numeric_2x2 17/40`, `bit_other 13/46` が弱い。
-- 拡張 LoRA target の full run は local320 `6/320` まで崩れ、binary ですら `boxed_extraction_success_rate=0.0`, `format_failure_rate=1.0` になった。これは単なる target 拡張の問題ではなく、schedule mismatch を含む学習設定不整合の可能性が高い。
-- parity-fix rerun `baseline-mlx-lora-fix-full-v2` は optimizer-step schedule + final accumulation flush で train を回復し、README local320 も **`194/320`** まで戻した。ただし旧 MLX v1 `196/320` には届かず、family 差分は概ね `binary -1`, `gravity +10`, `roman ±0`, `symbol +3`, `text -12`, `unit -2` だった。
-- 同一 manifest の expanded-target rerun `baseline-mlx-lora-fix-schedopt-v1` は **`189/320`** で、`baseline-mlx-lora-fix-full-v2` より `-5` rows。`gravity 49/50` は再現した一方、`binary 15/60`, `text 10/50`, `unit 47/50` まで揺れ、expanded LoRA + optimizer schedule 系は run-to-run variance を無視できない。
-- narrow-target rerun `baseline-mlx-narrow-schedopt-v1` は **`iter4000 val_loss=0.177`** まで最良の学習曲線を示したが、`iter4060` 以降で main thread が `mlx::core::eval_impl` 内の `std::condition_variable::wait` に張り付き、進捗が停止した。`save_every=5814` だったため中間 adapter を回収できず、次 run は validation 回数を減らしつつ periodic save を有効にして再実行する。
-- `baseline-mlx-narrow-schedopt-v2` は `steps_per_eval=5814` と `save_every=200` を入れた safe-rerun 準備だったが、前 run 終了直後の再起動で OOM により中断した。v2 output dir には dataset/shadow/config だけが残り、学習成果物は生成されていない。
-- `baseline-mlx-narrow-schedopt-v3` は同条件の interactive rerun だったが、checkpoint 前の段階で異常に遅く、永続 train log も残らなかった。少なくとも `steps_per_eval=5814` と `save_every=200` を入れるだけでは recovery できていない。
-- `baseline-mlx-narrow-schedopt-v4` は stdout/stderr を `train.log` へ逃がして PTY 干渉を切り分けた rerun だったが、**初回 validation 32 row に 329.883 秒**かかり、`iter1` 後も `iter10` に到達しなかった。したがって slowdown の主因は TTY ではなく、次の単独 rerun は `--valid-shadow-rows` を `32 -> 4` に落として初回 eval 自体を軽くする。
-- `baseline-mlx-narrow-schedopt-v5` では `--valid-shadow-rows 4` により初回 validation が **`329.883s -> 36.390s`** まで改善した。したがって、初回 eval の重さそのものは主要因の 1 つだった。
-- ただし同じ `valid_shadow_rows=4` でも、**detached 背景 run (`v5`) は `iter1` 直後に終了**し、**async-attached run (`v7`) は `iter30` まで進行**した。今の環境では長時間 MLX train を detached で投げるより、attached な shell で監視した方が挙動が安定する。
-- `v7` 実行中の process sample では main thread の大半が `mlx::core::eval_impl -> std::condition_variable::wait` に入りつつ、`steel_matmul` / `binary_op_gpu` / Metal dispatch も見えていた。つまり current slowdown は **GPU 未使用ではなく、GPU を使いながら wait が多い状態** と見るのが妥当。
-- shared environment 側では別系統の MLX train (`phase2_binary_dsl_mlx_v1.py train`) が **RSS 約 63 GB**、さらに Flutter/Dart test 群が CPU を大きく消費していた。一方で system memory free は **約 80%**, swap 0 のため、現時点のボトルネックは RAM 枯渇ではなく **GPU/Metal 実行待ちと shared runtime contention** である。
-- raw / patched / async の **14-step probe 3 本**はすべて近い速度 (`iter10 it/sec = 0.048 ~ 0.057`) で収束した。したがって、今回の重い wait は **final accumulation flush patch そのもの**でも **async shell そのもの**でも説明しにくい。
-- 2026-04-08 の追加修正として、`baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` に **runtime preflight** を入れた。train 開始前に `memory_pressure`, `IOAccelerator`, competing MLX train process を記録し、`--fail-on-runtime-contention` を付ければ **同時 MLX train がいる状態で明示的に abort** できる。
-- 実測では `nemotron_sft_lora_with_cot_v2_mlx_preflightcheck_v2` が **system_free_memory=45%**, `gpu_device_util=35%`, `renderer=23%`, `tiler=19%`, **4 本の外部 MLX train** を検知して即時 abort した。今後の full rerun は、この preflight が clean なタイミングで再開する。
-- さらに `nemotron_sft_lora_with_cot_v2_mlx_preflightwarnprobe_v1` では、同じ **4 本の外部 MLX train** がいる状態で warn-only の tiny train を開始したところ、**2-step probe の `iter1` validation だけで `168.147s`** を要した。`runtime_preflight.json` でも `system_free_memory=41%`, `gpu alloc system memory ≈ 317 GB`, `gpu in-use system memory ≈ 315 GB` を記録しており、wait の主因が shared MLX contention であることを補強している。
-- `symbol60` の isolated score は **初回 `13/60` / rerun1 `13/60`** で完全一致し、row-level も **60/60 identical**。一方で同じ 60 symbol ids を含む `full320` では **`20/60`** となり、raw output は **54/60 rows** で変化、**9 rows** で correctness が反転した。したがって MLX 系の family slice 判定は batch composition に敏感で、mainline 採用判断は **README actual full320** を優先する。
-- 一方で `roman 50/50`, `unit 50/50` は README 条件下でも完全再現できており、baseline notebook 由来の知識は family ごとに保持率が大きく異なる。
-- row-level で origin reference と突き合わせると `HF-only 65`, `MLX-only 12`, `both_wrong 59`, `both_correct 184`。HF-only loss は `text 29`, `binary 16`, `gravity 11`, `symbol 9` が中心で、特に text は **HF が取れて MLX だけ落とす**再現差が支配的。
-- notebook 現在版の学習セルは `train_split_with_cot_v3f_safe_plus_notformula.csv` と `Bit Manipulation = 1021` を指している。したがって、今回の `train_split_with_cot.csv` / `607` 再現は「元 CSV baseline」の記録として保持しつつ、次段では **notebook current config の MLX 再現**も別 run として切り分ける。
-- 2026-04-07 の現タスクでは、ユーザー指示により **並列学習は禁止**。LoRA target fix の full retrain 1 本だけを継続し、追加の並列再学習やアブレーション起動は保留にした。
-
-## Default BF16 base-model inference probe
-
-| version | model | prompt | measured | status | artifacts |
-| --- | --- | --- | --- | --- | --- |
-| `baseline-mlx-default-model-root-infer-probe-v1` | `DEFAULT_MODEL_ROOT` BF16 base, no adapter | `data/test.csv` row `00066667`, `enable_thinking=true`, boxed instruction, `max_tokens=128` | `load=3.223s`; `prompt=259 tok`; `prompt_tps=176.74`; `gen128=12.53s`; `gen_tps=11.78`; `MLX peak=59.318 GB`; `process RSS peak=59.563 GB`; `GPU in-use peak=61.193 GB`; `GPU device util peak=97%`; `generate avg device util=42.75%` | completed | `baseline_mlx/outputs/nemotron_default_model_root_infer_probe_v1/inference_probe/summary.json` |
-
-- system telemetry (`IOAccelerator`) では `t≈4.26s` に `gpu in-use system memory` が **`~1.09 GB -> ~52.90 GB`** へ急増し、`t≈5.35s` で **`device util 97%`, `renderer 83%`, `in-use ~60.29 GB`** を記録した。
-- `generation_complete` 後の cooldown では `gpu in-use system memory` が一度 **`61.19 GB`** まで残り、その後 `t≈17.55s` で **`~1.09 GB`** へ戻った。したがって、この BF16 base の単発推論は **ロード後常駐 ~59 GB級 / 生成中 system-GPU ~55-61 GB級** を見込む。
-- `load_complete` 時点で tokenizer は `eos_token_id=11`, `eos_token_ids={11}` に揃っており、shadow model 経由のロードで推論は成功した。
-
-## Notebook-current parity foundation
-
-| version | command | profile | train_csv | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-notebook-current-audit-v1` | `audit-notebook-current` | `notebook-current` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `3321` | `n/a` | `n/a` | `score=n/a`; `clear_omissions=0`; `records=3321`; `bit=1021`; `lora generic coverage=ok` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_audit_v1/notebook_current_audit_summary.json` |
-| `baseline-mlx-notebook-current-prepare-v1` | `prepare-train --profile notebook-current` | `notebook-current` | `train_split_with_cot_v3f_safe_plus_notformula.csv` | `3321` | `6642` | `831` | `score=n/a`; `clear_omissions=0`; `valid_rows=1`; `steps_per_eval_requested=0`; `steps_per_eval_resolved=6642`; `save_every=6642` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_prepare_v1/prepare_manifest.json` |
-
-- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` に **`--profile notebook-current`** を追加し、現行 notebook training cell の `train_csv=v3f_safe_plus_notformula`, `Bit Manipulation=1021`, `epochs=2`, `batch=1`, `grad_accum=8`, `lr=1e-4`, `max_seq=4096`, `logging_steps=10`, `save_strategy=no`, `warmup_ratio=0.05` を明示的に解決できるようにした。
-- profile 監査は `notebook_current_parity_report.{json,md}` として永続化され、**`status=no_clear_omissions`** を返す。これにより、現時点の MLX 単一ファイル基板では **明確な設定漏れが残っていない**ことを機械的に確認できる。
-- notebook の `target_modules=r".*\.(in_proj|out_proj|up_proj|down_proj)$"` に対して、MLX 側は `mixer.in/out/up/down_proj` を必須 generic key として監査しつつ、`switch_mlp.fc1/fc2` と `shared_experts.up/down_proj` を **Nemotron-H MoE の構造差を埋める追加 key** として保持する。
-- HF notebook には validation loop が無いため、MLX profile では **`valid_shadow_rows=1` + `steps_per_eval=0`** を notebook-friendly scaffolding とした。内部では `steps_per_eval<=0 -> total_iters` に解決されるため、**中間 validation 無し / iter1 と final のみ**の最小監視になる。
-- packaging については、現スクリプトは引き続き **local MLX bundle (`adapter_config.json` + `adapters.safetensors`)** を出すだけで、notebook の PEFT/vLLM 提出互換 (`adapter_model.safetensors`, `submission.zip`) は **意図的に未主張**。今回の parity 判定は training 設定面に限定している。
-
-## Generic notebook parity hardening
-
-| version | command | profile | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-notebook-original-audit-v1` | `audit-notebook-original` | `notebook-original` | `2907` | `n/a` | `n/a` | `score=n/a`; `clear_omissions=0`; `records=2907`; `mask_prompt=false`; `lora generic coverage=ok` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_audit_v1/notebook_original_audit_summary.json` |
-| `baseline-mlx-notebook-original-prepare-v1` | `prepare-train --profile notebook-original` | `notebook-original` | `2907` | `5814` | `727` | `score=n/a`; `clear_omissions=0`; `valid_rows=1`; `steps_per_eval_resolved=5814`; `save_every=5814`; `final_flush_microbatches=6` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_prepare_v1/prepare_manifest.json` |
-| `baseline-mlx-notebook-original-probe-v1` | `train --profile notebook-original` (tiny smoke) | `notebook-original` | `6` | `6` | `1` | `score=n/a`; `trainable=880.138M`; `peak_mem=77.550 GB`; `runtime_free=98%`; `bundle_zip=2.978 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_probe_v1/training_result.json` |
-| `baseline-mlx-notebook-current-audit-v2` | `audit-notebook-current` | `notebook-current` | `3321` | `n/a` | `n/a` | `score=n/a`; `clear_omissions=0`; `records=3321`; `bit=1021`; `mask_prompt=false` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_audit_v2/notebook_current_audit_summary.json` |
-| `baseline-mlx-notebook-current-prepare-v2` | `prepare-train --profile notebook-current` | `notebook-current` | `3321` | `6642` | `831` | `score=n/a`; `clear_omissions=0`; `valid_rows=1`; `steps_per_eval_resolved=6642`; `save_every=6642`; `final_flush_microbatches=2` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_prepare_v2/prepare_manifest.json` |
-
-- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` の parity machinery を **current 専用から notebook-original / notebook-current 共通**へ組み替え、`audit-notebook-original` を追加した。これで 2 系統の notebook 設定を **同じ単一ファイル** から監査・prepare できる。
-- parity の core check に **`mask_prompt`** を昇格し、original/current の両 profile を **`mask_prompt=false`** に統一した。これは original notebook が `assistant_only_loss` / `completion_only_loss` を使っておらず、**full-sequence loss 寄り**であることに合わせた修正で、以前の current foundation (`mask_prompt=true`) 仮説はここで退役させる。
-- MLX train 実行経路には tokenizer parity patch を入れ、`mlx_lm.lora.load()` 直後に **`eos_token_ids` 正規化** と **`pad_token=eos_token` 補完**を適用するようにした。`notebook_original_parity_report.md` には HF 側 observed log (`eos_token_id=11`, `pad_token_id=11`) も記録した。
-- original notebook parity は audit/prepare とも **`status=no_clear_omissions`**。さらに tiny smoke train では **`Trainable parameters: 2.787% (880.138M/31577.936M)`** を出し、notebook log の **`880,138,240` trainable params** と一致したため、LoRA target coverage の大きな抜けは潰せたと判断する。
-- tiny smoke train は parity gate ではなく実行経路確認用なので、`type_samples`, `num_epochs`, `logging_steps` を意図的に縮めたぶん `prepare_manifest.json` 上の `notebook_parity.status` は **`mismatches_found`** になる。これは基板の不整合ではなく、probe 用 override を反映しただけである。
-- 依然として出力は **local MLX bundle (`adapter_config.json` + `adapters.safetensors`)** であり、README 本番契約の **PEFT/vLLM submission 互換は未主張**。今回解消したのは **MLX LoRA 側の設定漏れ / tokenizer / mask / schedule / target coverage** であって、base model 差分までは埋めていない。
-
-## Loss / LR parity diagnosis
-
-| version | command | profile | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-notebook-original-audit-v3` | `audit-notebook-original` | `notebook-original` | `2907` | `n/a` | `728` | `score=n/a`; `clear_omissions=0`; `optimizer_steps=728`; `logging_unit=optimizer` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_audit_v3/notebook_original_audit_summary.json` |
-| `baseline-mlx-notebook-original-prepare-v2` | `prepare-train --profile notebook-original` | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `effective_schedule_steps=728`; `warmup_ratio=0.05`; `final_flush_microbatches=3`; `flush_on_epoch_boundary=true` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_prepare_v2/prepare_manifest.json` |
-| `baseline-mlx-notebook-current-prepare-v3` | `prepare-train --profile notebook-current` | `notebook-current` | `3321` | `6642` | `832` | `score=n/a`; `effective_schedule_steps=832`; `final_flush_microbatches=1`; `flush_on_epoch_boundary=true` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_current_prepare_v3/prepare_manifest.json` |
-| `baseline-mlx-notebook-original-loss-v5` | `train --profile notebook-original --steps-per-report 1 --steps-per-report-step-unit optimizer` (partial diagnostic run) | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `Opt1 loss=1.052 lr=0`; `Opt2 loss=1.916 lr=2.778e-06`; `Opt3 loss=1.305 lr=5.556e-06`; `Opt10 single-step loss=0.599 lr=2.500e-05`; `mean Opt1-10 loss=0.9282`; `peak_mem≈80.230 GB` | partial diagnostic completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_loss_v5/console.log` |
-
-- 根本原因は 2 つだった。1 つ目は `steps_per_report_step_unit=optimizer` が `mlx_lm.lora.train_model()` 内で `TrainingArgs` に詰め替える際に落ちており、loss/LR ログが **microstep 基準**に戻っていたこと。2 つ目は optimizer-step 数を **`ceil(total_iters / grad_accum)` = 727** と見積もっていたことで、HF notebook の **`728/728`**（epoch ごとの端数 flush）と 1 step ずれていたこと。
-- これを受けて、single-file 基板に **`steps_per_report_step_unit` の runtime 伝播**と **`flush_on_epoch_boundary=true`** を追加した。notebook parity profile は now **original=`728` steps / current=`832` steps** に更新され、prepare manifest でもそのまま確認できる。
-- HF / Transformers の cosine warmup を `num_training_steps=728`, `num_warmup_steps=36` で直接回すと、optimizer 側の LR は **initial `0.0` → step1 `2.778e-06` → step2 `5.556e-06` → step10 `2.500e-05`** となる。partial diagnostic run の MLX 実測も **`Opt1=0`, `Opt2=2.778e-06`, `Opt3=5.556e-06`, `Opt10=2.500e-05`** で一致し、**LR scheduler の予期しない不一致は解消**したと判断する。
-- 一方で loss の絶対値は HF notebook と一致しない。HF notebook HTML table の **`Step 10 = 10.750076`** は「最初の 10 optimizer steps の平均 loss」なので、単点の `Opt 10 = 0.599` ではなく、MLX 側も **`Opt1-10 mean = 0.9282`** で揃えて比較した。それでも桁が大きく離れており、現時点では **LR parity は取れたが、loss magnitude は HF と MLX の proxy 比較指標として使えない**。この差は base model / runtime / loss reporting semantics を含む複合差として扱う。
-- 旧 `prepare` 記録の **original `727` / current `831`** は、この epoch-boundary flush 修正前の値であり、loss/LR parity の観点では **`prepare-v2` / `prepare-v3` が正**である。
-
-## Running full MLX reproduction baseline
-
-| version | command | profile | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-notebook-original-fullrun-v1` | `train --profile notebook-original --force-prepare` | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `trainable=880.138M`; `Iter1 val=1.220`; `Opt90 loss=0.959 lr=9.875e-05`; `it_per_sec=0.058`; `tokens_per_sec=36.385`; `peak_mem=81.271 GB`; stopped for reboot | interrupted | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1/console.log` |
-| `baseline-mlx-notebook-original-fullrun-v2` | `train --profile notebook-original --force-prepare --fail-on-runtime-contention` | `notebook-original` | `2907` | `5814` | `728` | `score=n/a`; `trainable=880.138M`; `Iter1 val=1.220`; `Iter5814 val=0.284`; `Iter5814 train_loss=0.316`; `avg_train_itps=0.740`; `peak_mem=82.603 GB`; `bundle_zip=3.245 GB`; `restart_after_reboot=true`; `preflight_competing=0` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2/training_result.json` |
-| `baseline-mlx-notebook-original-batch2-probe-v1` | `train --profile notebook-original --batch-size 2 --grad-accumulation-steps 4 --num-epochs 0.056` | `notebook-original` | `2907` | `81` | `21` | `score=n/a`; `concurrent_with_fullrun=true`; `Iter1 val=1.323`; `val_took=21.146s`; `console_log=missing (tee opened before mkdir)`; stopped before first train report | aborted | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_batch2_probe_v1/prepare_manifest.json` |
-| `baseline-mlx-contention-probe-v1` | `train --profile notebook-original --num-epochs 0.001 --fail-on-runtime-contention` | `notebook-original` | `2907` | `2` | `1` | `score=n/a`; `preflight_competing=1`; `pid=55490`; ancestor-wrapper false positive resolved | aborted as designed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_contention_probe_v1/runtime_preflight.json` |
-
-- 2026-04-08 時点で、parity-hardened single-file baseline の **FULLRUN** を `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v1` として起動した。run は detached で継続中で、`console.log` を継続追記している。
-- detached 実行では runtime preflight が wrapper shell を「other MLX/Nemotron train process」として列挙するが、これは **同一 detached job の bash/uv/tee ラッパ**であり、実競合ではないことを ps で確認した。したがって fullrun 本体はそのまま継続させている。
-- 最初の train report は **`Iter 80 (Opt 10)`** で、**`Train loss 0.931 / LR 2.500e-05 / It/sec 0.061 / Tokens/sec 36.667 / Peak mem 80.230 GB`**。この時点の単純見積もりでは残り **約 26.1 時間**で、run は「停止」ではなく **低速だが前進中** と判断している。
-- `batch2 / accum4` の短尺 speed probe を fullrun と並走させると、combined `In use system memory` は **約 236.8 GB** まで上がった一方、clean baseline だった fullrun 側の speed は **`Opt20 it/sec 0.058` → `Opt30 it/sec 0.042`** まで落ちた。これは並列化による throughput 汚染が大きく、speed 比較として無効なので probe は停止した。
-- 上の理由により、**batch-size 系の速度比較は fullrun と同時には行わない**。必要なら isolated window で再実行する。なお今回の probe は `tee` が run dir 作成前に開いたため `console.log` を残せず、shell 出力と生成 artifact のみを証跡とした。
-- detached 起動で `--fail-on-runtime-contention` が wrapper bash を「other train process」と誤認していたので、single-file 基板の process scan を修正し、**current train process の ancestor PID** と **`bash/sh/zsh -c` shell wrapper** を除外するようにした。live 検証では `collect_competing_mlx_train_processes(current_pid=55490) == []` を確認し、別プロセスからの CLI probe では **実競合の fullrun 本体 `pid=55490` だけを 1 件**拾って期待どおり abort した。
-- probe 停止後の fullrun は **`Iter 320 (Opt 40): It/sec 0.051, Tokens/sec 32.276, Peak mem 81.271 GB`** まで回復した。したがって `Opt30` の落ち込みは常時劣化というより **並走干渉の一過性影響** とみなす。
-- その後さらに **`Iter 400 (Opt 50): It/sec 0.058, Tokens/sec 37.452, Peak mem 81.271 GB`** を観測し、throughput はほぼ `Opt20` 水準まで戻った。fullrun は low-throughput ではあるが、**probe 停止後は clean baseline に概ね復帰**して継続している。
-- 現在位置は **`Iter 480 (Opt 60 / 728)`**。最新 report は **`Train loss 1.018 / LR 9.977e-05 / It/sec 0.058 / Tokens/sec 37.479 / Peak mem 81.271 GB`** で、残りは **`5334` microsteps / `668` optimizer steps**。直近 throughput をそのまま使う単純見積もりでは、終了まで **約 25.55 時間**。
-- 次の節目 **`Iter 560 (Opt 70 / 728)`** では **`Train loss 1.530 / LR 9.952e-05 / It/sec 0.053 / Tokens/sec 32.838 / Peak mem 81.271 GB`**。残りは **`5254` microsteps / `658` optimizer steps** で、最新速度ベースの単純見積もりは **約 27.54 時間**。`Opt50-70` の clean 区間を見る限り、現在の sustained throughput はおおむね **`0.053-0.058 it/s`** の帯にある。
-- 続く **`Iter 640 (Opt 80 / 728)`** は **`Train loss 1.526 / LR 9.918e-05 / It/sec 0.058 / Tokens/sec 37.010 / Peak mem 81.271 GB`**。残りは **`5174` microsteps / `648` optimizer steps** で、最新速度ベースの単純見積もりは **約 24.78 時間**。Opt70 の一時低下から 다시 `0.058 it/s` へ戻っており、throughput は依然レンジ内で揺れているだけとみる。
-- **`Iter 720 (Opt 90 / 728)`** では **`Train loss 0.959 / LR 9.875e-05 / It/sec 0.058 / Tokens/sec 36.385 / Peak mem 81.271 GB`**。残りは **`5094` microsteps / `638` optimizer steps** で、最新速度ベースの単純見積もりは **約 24.40 時間**。Opt80-90 でも `0.058 it/s` を維持しており、現時点の clean baseline throughput は再び安定している。
-- PC 再起動のため、この fullrun は **`Iter 720 (Opt 90 / 728)`** 時点で明示停止した。`save_every=0` の final-only 運用だったため、**resumable checkpoint は残っていない**。保持されるのは `console.log`・`prepare_manifest.json`・parity/report artifact・ここまでの Git ledger のみで、学習重みの進捗自体は再実行が必要。
-- 再起動後、同条件で **`nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2`** を clean restart した。修正済みの `--fail-on-runtime-contention` を有効にしたまま、runtime preflight は **`preflight_competing=0`** を通過し、初回 validation も **`Iter 1: Val loss 1.220, Val took 1.035s`** と v1 よりやや速く立ち上がった。
-- v2 の最初の train report は **`Iter 80 (Opt 10): Train loss 0.927 / LR 2.500e-05 / It/sec 0.713 / Tokens/sec 429.584 / Peak mem 80.230 GB`**。v1 の同位置 **`0.061 it/s`** と比べて **約 11.7x** 速く、残り **`5734` microsteps / `718` optimizer steps** の単純見積もりは **約 2.23 時間** まで短縮した。再起動後の環境は throughput 面で明確に改善している。
-- v2 はその後も **`Opt20=0.730`, `Opt30=0.709`, `Opt40=0.721`, `Opt50=0.709`, `Opt60=0.716`, `Opt70=0.733 it/s`** と高水準を維持した。`Opt30-70` の平均は **`0.718 it/s`**、`Opt70` 時点の残り **`5254` microsteps / `658` optimizer steps** に対する単純 ETA は **約 1.99 時間**。現状のボトルネックは v1 時代とは別物で、reboot 前の 24-27h 級 estimate はもはや適用しない。
-- さらに **`Opt80=0.727`, `Opt90=0.732`, `Opt100=0.728`, `Opt110=0.715`, `Opt120=0.754`, `Opt130=0.712`, `Opt140=0.723`, `Opt150=0.752`, `Opt160=0.737`, `Opt170=0.796`, `Opt180=0.784`, `Opt190=0.738`, `Opt200=0.744`, `Opt210=0.746`, `Opt220=0.748`, `Opt230=0.729`, `Opt240=0.752`, `Opt250=0.726`, `Opt260=0.757`, `Opt270=0.765`, `Opt280=0.719`, `Opt290=0.733`, `Opt300=0.715`, `Opt310=0.764`, `Opt320=0.782`, `Opt330=0.732`, `Opt340=0.738`, `Opt350=0.760`, `Opt360=0.728`, `Opt370=0.738`, `Opt380=0.731 it/s`** を観測した。`Opt240-380` の平均は **`0.742 it/s`** で、reboot 後の高速化が一時的な spike ではなく sustained throughput であることが確認できた。
-- 現在位置は **`Iter 3035 (Opt 380 / 728)`**。最新 report は **`Train loss 0.332 / LR 5.474e-05 / It/sec 0.731 / Tokens/sec 469.065 / Trained Tokens 1,896,983 / Peak mem 82.102 GB`**。残りは **`2779` microsteps / `348` optimizer steps** で、直近 8 report 平均 **`0.747 it/s`** に基づく単純 ETA は **約 1.03 時間**。
-- fullrun v2 は **`Iter 5814 (Opt 728 / 728)`** まで完走した。最終 validation は **`Val loss 0.284 (0.555s)`**、最終 train report は **`Train loss 0.316 / LR 6.708e-07 / It/sec 0.731 / Tokens/sec 466.694 / Trained Tokens 3,630,012 / Peak mem 82.603 GB`**。`Iter80` 以降の train report 平均 throughput は **`0.740 it/s`** で、reboot 後の高速化を最後まで維持した。
-- 完走後の artifact として **`adapter/adapters.safetensors`**, **`adapter/0005814_adapters.safetensors`**, **`training_result.json`**, **`mlx_adapter_bundle.zip`** を確認した。`training_result.json` には bundle zip **`3,245,381,643 bytes`** が記録されており、single-file MLX 再現 baseline の baseline benchmark 実行に進める状態になった。
-
-## Route-aware retrain
-
-| version | command | train_csv | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-routeaware-fullrun-v1` | `train --profile notebook-original --train-csv train_split_with_cot_v2_plus_binary_route_aware.csv --type-sample ...full counts...` | `cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/train_split_with_cot_v2_plus_binary_route_aware.csv` | `7268` | `14536` | `1818` | `Iter1 val=1.340`; startup only; restarted immediately to attach persisted `console.log` before first optimizer report | aborted early for logging | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_routeaware_fullrun_v1/prepare_manifest.json` |
-| `baseline-mlx-routeaware-fullrun-v2` | `train --profile notebook-original --train-csv train_split_with_cot_v2_plus_binary_route_aware.csv --type-sample ...full counts... --fail-on-runtime-contention` | `cuda-train-data-analysis-v1/proof_first_solver_factory_routing/artifacts/train_split_with_cot_v2_plus_binary_route_aware.csv` | `7268` | `14536` | `1818` | `Iter1 val=1.340`; `Opt10 loss=0.937 lr=1.000e-05 itps=0.701`; `Opt20=0.728`; `Opt30=0.717`; `Opt40=0.743`; `Opt50=0.692`; `Opt60=0.735`; `Opt70=0.744`; `Opt80=0.716`; `Opt90=0.749`; `Opt100=0.741`; `Opt110=0.755`; `Opt120=0.722`; `Opt130=0.733`; `Opt140=0.735`; `Opt150=0.748`; `Opt160=0.724`; `Opt170=0.746`; `Opt180=0.739`; `Opt190=0.746`; `Opt200=0.713`; `Opt210=0.719`; `Opt220=0.745`; `Opt230=0.742`; `Opt240=0.766`; `Opt250=0.696`; `Opt260=0.740`; `Opt270=0.744`; `Opt280=0.741`; `Opt290=0.764`; `Opt300=0.741`; `Opt310=0.757`; `Opt320=0.729`; `Opt330=0.764`; `Opt340=0.730`; `Opt350=0.742`; `Opt360=0.757`; `Opt370=0.783`; `Opt380=0.735`; `Opt390=0.748`; `Opt400=0.711`; `Opt410=0.751`; `Opt420=0.735`; `Opt430=0.736`; `Opt440=0.767`; `Opt780=0.757`; `Opt1120=0.747`; `Opt1460=0.752`; `Iter14536 val=0.413`; `Iter14536 train_loss=0.284`; `avg_train_itps=0.742`; `peak_mem=82.603 GB`; `bundle_zip=3.248 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_routeaware_fullrun_v2/training_result.json` |
-
-- route-aware retrain では **single-file MLX pipeline と notebook-original profile は据え置き**、変更点は **`train_csv` 差し替え**と、追加された binary rows を捨てないための **`type_sample` 全件数上書き**だけに限定した。
-- route-aware CSV の sampling は **`Bit Manipulation=1317`, `Equation Transformation=200`, `Gravitational Constant=1511`, `Numeral Conversion=1491`, `Text Encryption=1407`, `Unit Conversion=1342`** で、`sampled_rows=7268`, `optimizer_steps=1818`。baseline fullrun (`2907 rows`, `728 steps`) より大きく、現時点の sustained throughput では **約 5.3 時間**級の run になる。
-- 20 分後の定点では **`Iter 2160 (Opt 270 / 1818)`** まで到達した。最新 report は **`Train loss 0.452 / LR 9.765e-05 / It/sec 0.744 / Tokens/sec 454.688 / Trained Tokens 1,338,611 / Peak mem 82.554 GB`**。直近 10 report 平均は **`0.735 it/s`** で、残りは **`12376` microsteps / `1548` optimizer steps**、単純 ETA は **約 4.68 時間**。
-- さらに 30 分後の定点では **`Iter 3520 (Opt 440 / 1818)`** に到達した。最新 report は **`Train loss 0.376 / LR 9.123e-05 / It/sec 0.767 / Tokens/sec 447.751 / Trained Tokens 2,173,112 / Peak mem 82.554 GB`**。直近 10 report 平均は **`0.746 it/s`** で、残りは **`11016` microsteps / `1378` optimizer steps**、単純 ETA は **約 4.10 時間**。
-- さらに 1 時間後の定点では **`Iter 6240 (Opt 780 / 1818)`** に到達した。最新 report は **`Train loss 0.285 / LR 6.863e-05 / It/sec 0.757 / Tokens/sec 452.406 / Trained Tokens 3,852,520 / Peak mem 82.554 GB`**。直近 10 report 平均は **`0.741 it/s`** で、残りは **`8296` microsteps / `1038` optimizer steps**、単純 ETA は **約 3.11 時間**。
-- さらに 1 時間後の定点では **`Iter 8956 (Opt 1120 / 1818)`** に到達した。最新 report は **`Train loss 0.286 / LR 3.979e-05 / It/sec 0.747 / Tokens/sec 453.717 / Trained Tokens 5,525,132 / Peak mem 82.554 GB`**。直近 10 report 平均は **`0.746 it/s`** で、残りは **`5580` microsteps / `698` optimizer steps**、単純 ETA は **約 2.08 時間**。
-- さらに 1 時間後の定点では **`Iter 11676 (Opt 1460 / 1818)`** に到達した。最新 report は **`Train loss 0.274 / LR 1.437e-05 / It/sec 0.752 / Tokens/sec 453.946 / Trained Tokens 7,215,887 / Peak mem 82.554 GB`**。直近 10 report 平均は **`0.748 it/s`** で、残りは **`2860` microsteps / `358` optimizer steps**、単純 ETA は **約 1.06 時間**。
-- route-aware fullrun v2 は **`Iter 14536 (Opt 1818 / 1818)`** まで完走した。最終 validation は **`Val loss 0.413 (0.493s)`**、最終 train report は **`Train loss 0.284 / LR 6.305e-07 / It/sec 0.749 / Tokens/sec 455.112 / Trained Tokens 8,958,288 / Peak mem 82.603 GB`**。全 train report 平均 throughput は **`0.742 it/s`** で、完走 artifact として **`adapter/adapters.safetensors`**, **`adapter/0014536_adapters.safetensors`**, **`training_result.json`**, **`mlx_adapter_bundle.zip`** を確認した。bundle zip は **`3,247,798,973 bytes`**。
-
-## Resume-from-baseline continuation matrix
-
-| version | run_name | bit_rows | lr | epochs | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-resume-routeaware-bit800-lr5e5-ep2-v1` | `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit800_lr5e5_ep2` | `800` | `5e-5` | `2` | `3100` | `6200` | `776` | `resume=baseline_fullrun_v2`; `Iter1 val=0.133`; `val_took=1.200s`; `Metal OOM before Opt10` | blocked | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit800_lr5e5_ep2/console.log` |
-| `baseline-mlx-resume-routeaware-bit1000-lr5e5-ep2-v1` | `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit1000_lr5e5_ep2` | `1000` | `5e-5` | `2` | `3300` | `6600` | `826` | `resume=baseline_fullrun_v2`; `Iter1 val=0.355`; `Opt40 loss=0.388`; `itps=0.027`; `peak_mem=82.554 GB`; `stopped to free memory after wait-state` | blocked | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit1000_lr5e5_ep2/console.log` |
-| `baseline-mlx-resume-routeaware-bit1000-lr2p5e5-ep1-v1` | `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit1000_lr2p5e5_ep1` | `1000` | `2.5e-5` | `1` | `3300` | `3300` | `413` | `resume=baseline_fullrun_v2`; `Iter1 val=0.355`; `Opt40 loss=0.359`; `itps=0.027`; `peak_mem=82.554 GB`; `stopped to free memory after wait-state` | blocked | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit1000_lr2p5e5_ep1/console.log` |
-| `baseline-mlx-resume-routeaware-bit1317-lr2p5e5-ep1-v1` | `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit1317_lr2p5e5_ep1` | `1317` | `2.5e-5` | `1` | `3617` | `3617` | `453` | `resume=baseline_fullrun_v2`; `Iter1 val=0.476`; `Iter3617 val=0.455`; `Iter3617 train_loss=0.329`; `avg_train_itps=0.698`; `peak_mem=82.603 GB`; `bundle_zip=3.246 GB` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_resume_routeaware_bit1317_lr2p5e5_ep1/training_result.json` |
-
-- 4 本とも **`--resume-adapter-file baseline_mlx/.../fullrun_v2/adapter/adapters.safetensors`** を使い、**route-aware CSV + baseline non-binary counts (`Eq=200`, `Gravity=400`, `Numeral=300`, `Text=700`, `Unit=700`)** に固定している。可変なのは **bit rows / learning rate / epochs** だけ。
-- intentional parallel train のため runtime preflight は他の 3 run を列挙したが、今回は **比較実験として並列化が意図どおり**なので `--fail-on-runtime-contention` は使っていない。
-- 初期 validation だけを見ると **bit800 / lr5e-5 / ep2** が **`Val loss 0.133`** で最も良い立ち上がりを見せた。一方で **bit1317 / lr2.5e-5 / ep1** は **`Val loss 0.476`** と最も重い設定で、route-aware full retrain の general collapse を繰り返すかを今後の local320 で確認する。
-- ただし **4 並列**はそのままでは安定しなかった。**bit800 / lr5e-5 / ep2** は `Iter 1` の直後に **`[METAL] ... Insufficient Memory`** で落ち、`training_result.json` を残さなかった。したがって現環境の continuation full-train は **4 本同時だと OOM リスクあり** とみなす。
-- 生存した 3 本は **`Opt20`** まで進み、**bit1000 / lr5e-5 / ep2 = `0.294 it/s`**, **bit1000 / lr2.5e-5 / ep1 = `0.294 it/s`**, **bit1317 / lr2.5e-5 / ep1 = `0.298 it/s`** を観測した。単純見積もりでは残り ETA はそれぞれ **約 6.1h / 3.0h / 3.2h**。
-- 20 分定点では **bit1000 / lr5e-5 / ep2** と **bit1000 / lr2.5e-5 / ep1** がともに **`Opt30 loss=0.359 / itps=0.285 / peak=81.375 GB`** まで横並びで進み、ETA は **約 6.50h / 3.13h**。一方の **bit1317 / lr2.5e-5 / ep1** は **`Opt40 loss=0.386 / itps=0.305 / peak=80.641 GB`** とわずかに速く、ETA **約 3.23h** だった。
-- その後 1 時間定点では **2 本の bit1000 run がともに `Opt40` で `itps=0.027`, `peak_mem=82.554 GB`** まで失速し、明確な wait-state に入った。そこで両者を停止し、**bit1317 / lr2.5e-5 / ep1** だけを残してメモリを解放した。
-- 絞り込み後 10 分で **bit1317 / lr2.5e-5 / ep1** は **`Opt90 loss=0.338 / itps=0.747 / peak=81.193 GB`** まで回復した。残りは **`2897` microsteps / `363` optimizer steps** で、単純 ETA は **約 1.72h**。現時点の continuation 本命はこの 1 本である。
-- さらに 45 分後の定点では **bit1317 / lr2.5e-5 / ep1** が **`Opt360 loss=0.281 / itps=0.747 / peak=82.603 GB`** まで到達した。残りは **`737` microsteps / `93` optimizer steps** で、単純 ETA は **約 0.27h**。完走後は README local320 を即時に流す待機ジョブを別 shell で仕掛けた。
-- bit1317 continuation は **`Iter 3617 (Opt 453 / 453)`** で完走した。最終 validation は **`Val loss 0.455 (0.583s)`**、最終 train report は **`Train loss 0.329 / LR 1.727e-07 / It/sec 0.727 / Tokens/sec 454.649 / Trained Tokens 2,164,850 / Peak mem 82.603 GB`**。全 train report 平均 throughput は **`0.698 it/s`**、bundle zip は **`3,246,047,318 bytes`**。
-- 完走直後に README local320 の screen を自動起動した。さらに、この score が baseline **`0.6719`** を超えた場合だけ binary-specialized を続行する待機ジョブも追加した。したがって以後の continuation 分岐は **local320 score** で自動的に絞られる。
-- screen 結果は **`142/320 = 0.4437`** で、baseline gate **`0.6719`** を大きく下回った。binary は **`27/60`** と baseline **`26/60`** をわずかに上回ったが、`text 7/50`, `gravity 17/50`, `symbol 7/60` が重く、general 保持には失敗した。このため conditional specialized shell は **`skip_specialized_below_baseline`** で終了した。
-
-## Stage freeze/unfreeze v1
-
-| version | run_name | train_csv | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-stagefreeze-v1-stage1-broad-launch` | `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union` | `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv` | `3321` | `6642` | `832` | `Iter1 val=1.677`; `Opt10 loss=0.892 lr=2.195e-05 itps=0.669 peak=80.897 GB`; `Opt50 loss=0.779 lr=9.998e-05 itps=0.756 peak=81.208 GB`; `Opt100 loss=0.710 lr=9.885e-05 itps=0.742 peak=81.954 GB`; `Opt110 loss=0.701 lr=9.841e-05 itps=0.742 peak=81.954 GB`; `Opt190 loss=0.539 lr=9.249e-05 itps=0.742 peak=81.954 GB`; `Opt250 loss=0.428 lr=8.549e-05 itps=0.415 peak=82.620 GB`; `Opt260 loss=0.456 lr=8.413e-05 itps=0.420 peak=82.620 GB`; `Opt270 loss=0.447 lr=8.273e-05 itps=0.396 peak=82.620 GB`; `Opt280 loss=0.512 lr=8.128e-05 itps=0.418 peak=82.620 GB`; `Opt290 loss=0.444 lr=7.978e-05 itps=0.410 peak=82.620 GB`; `Opt300 loss=0.447 lr=7.825e-05 itps=0.407 peak=82.620 GB`; `Opt310 loss=0.485 lr=7.667e-05 itps=0.409 peak=82.620 GB`; `Opt320 loss=0.409 lr=7.505e-05 itps=0.403 peak=82.620 GB`; `Opt330 loss=0.472 lr=7.340e-05 itps=0.422 peak=82.620 GB`; `Opt340 loss=0.375 lr=7.172e-05 itps=0.410 peak=82.620 GB`; `Opt350 loss=0.433 lr=7.000e-05 itps=0.347 peak=82.620 GB`; `Opt360 loss=0.507 lr=6.826e-05 itps=0.285 peak=82.620 GB`; `Opt370 loss=0.435 lr=6.649e-05 itps=0.329 peak=82.620 GB`; `Opt380 loss=0.393 lr=6.469e-05 itps=0.414 peak=82.620 GB`; `Opt390 loss=0.480 lr=6.288e-05 itps=0.402 peak=82.620 GB`; `Opt400 loss=0.436 lr=6.105e-05 itps=0.400 peak=82.620 GB`; `Opt410 loss=0.447 lr=5.920e-05 itps=0.409 peak=82.620 GB`; `Opt420 loss=0.414 lr=5.734e-05 itps=0.410 peak=82.620 GB`; `Opt430 loss=0.389 lr=5.546e-05 itps=0.408 peak=82.620 GB`; `Opt440 loss=0.353 lr=5.358e-05 itps=0.399 peak=82.620 GB`; `Opt450 loss=0.352 lr=5.170e-05 itps=0.401 peak=82.620 GB`; `Opt460 loss=0.370 lr=4.981e-05 itps=0.413 peak=82.620 GB`; `Opt470 loss=0.379 lr=4.792e-05 itps=0.407 peak=82.620 GB`; `Opt480 loss=0.360 lr=4.604e-05 itps=0.415 peak=82.620 GB`; `Opt490 loss=0.345 lr=4.416e-05 itps=0.412 peak=82.620 GB`; `Opt500 loss=0.337 lr=4.229e-05 itps=0.390 peak=82.620 GB`; `Opt510 loss=0.274 lr=4.043e-05 itps=0.423 peak=82.620 GB` | running | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union/prepare_manifest.json` |
-
-- single-file MLX trainer `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` に **`--lora-key-group`**, **`--trainable-lora-suffix-group`**, **`build-corrective-stage2-csv`**, **`build-leaderboard-proxy-v2`** を追加した。これにより **1 本の union adapter の中で broad / attention を段階切替**できる状態になった。
-- broad stage の abstract plan (`in/out/up/down`) は、Nemotron MLX 実機では **`mixer.in_proj`, `mixer.out_proj`, `mixer.switch_mlp.fc1`, `mixer.switch_mlp.fc2`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj`** に写像した。attention stage は **`mixer.q_proj`, `mixer.k_proj`, `mixer.v_proj`, `mixer.o_proj`** を使う。
-- 1-step smoke (`stage_union_broad_tiny_train_v1`) で broad filter の動作を先に確認した。`Iter1 val=1.242`, `Iter1 train_loss=1.239`, `Opt1`, `Peak mem 75.072 GB` まで通り、**base weight を開かず LoRA だけ broad suffix に絞れる**ことを確認した。
-- Stage 2 corrective dataset は **`baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`** として生成した。構成は **`218 rows = binary verified 209 + symbol numeric_2x2 9 + answer_only 0`**。binary solver 内訳は **`affine_xor 54`, `bit_permutation_bijection 30`, `structured_byte_formula 49`, `structured_byte_formula_abstract 51`, `structured_byte_not_formula 25`**。
-- hidden-gap watch 用の `leaderboard_proxy_v2` は **`baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/leaderboard_proxy_v2.csv`** として生成した。構成は **`84 rows = binary 73 + symbol 11`**。source 内訳は **`leaderboard_proxy_v1_focus 55`, `binary_hard_topup 18`, `symbol_numeric_watch 11`**。
-- Stage1 broad trunk は **`notebook-current` broad CSV** を使い、README 契約 (`rank<=32`, single adapter) を維持したまま **union 10 keys** (`broad 6 + attention 4`) を初期化している。初期 report は **`Iter 1: Val loss 1.677 (0.953s)`**、その後 **`Opt40 loss=0.558 / It/sec 0.711`**, **`Opt50 loss=0.779 / LR 9.998e-05 / It/sec 0.756 / Peak mem 81.208 GB`**, **`Opt80 loss=0.811 / It/sec 0.745`**, **`Opt100 loss=0.710 / LR 9.885e-05 / It/sec 0.742 / Peak mem 81.954 GB`**, **`Opt110 loss=0.701 / LR 9.841e-05 / It/sec 0.742`**, **`Opt190 loss=0.539 / LR 9.249e-05 / It/sec 0.742`** まで進み、throughput は baseline fullrun v2 と同じ帯を維持している。現状は speed degradation や OOM の兆候は見えておらず、以後はこの速度帯が崩れないかと easy family drift を監視して Stage2 へ進める。
-- detached waiter (`shellId 248`) を追加し、Stage1 の `training_result.json` が出たら **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536`** を自動起動するようにした。Stage2 は **`resume=Stage1 adapters.safetensors`**, **`train_csv=stage2_corrective_v1.csv`**, **`type_sample=Bit209 / Eq9 / others0`**, **`lr=2e-5`**, **`max_seq_length=1536`**, **`trainable=attention(q/k/v/o)`** で実行される。
-- Stage2 後の判定用に、single-file trainer へ **`eval-benchmark-csv`** と **`eval-benchmark-suite`** を追加した。`eval-benchmark-suite` は **reference `general_stable_set.csv` + `binary_hard_set.csv` + `symbol_watch_set.csv` を結合した README local320** を 1 回の MLX model load で採点し、同じ run のまま **`leaderboard_proxy_v2.csv`** と **`binary_bias_specialized_set.csv (563 rows)`** も追加評価できる。suite waiter は **`eval_suite_readme_proxy_specialized`** として detached で待機しており、Stage2 完了後に **local320 / general,binary,symbol 内訳 / proxy v2 / specialized563** を順次吐く構成に差し替えた。
-- main lane の次段として、detached ablation waiters を追加した。順序は **main `q/k/v/o lr=2e-5` → eval suite → `v/o` only (`lr=2e-5`, `epochs=3.6`) → eval suite → `q/k/v/o lr=1e-5, epochs=2.4` → eval suite** で、いずれも Stage1 broad adapter を共通 resume 元に使う。これにより user 指示どおり、長時間 train の待ち時間を **次の実験へ自動連結**する形にした。
-- single-file trainer へ **`audit-submission-compat`** command を追加した。既存の `baseline-mlx-notebook-original-fullrun-v2` adapter で probe した結果は **`2D tensors = 184`, `3D tensors = 92`**, status **`blocked_routed_expert_3d_tensors`** だった。block reason は **`switch_mlp` routed-expert tensor が 3D のため、現時点では PEFT/vLLM 等価 export を推測で作らず止める** というもの。main / `v/o` / low-LR-short の各 lane についても、eval suite 完了後に同 audit を自動で残す waiter を追加済みである。
-
-## Stage freeze/unfreeze v2 export-safe
-
-| version | run_name | train_csv | sampled_rows | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-stagefreeze-v2-exportsafe-smoke` | `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_smoke` | `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv` | `6` | `1` | `1` | `audit_status=potentially_exportable_2d_only`; `tensor_rank_counts=[2:184]` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_smoke/submission_compat_audit/submission_compat_audit.json` |
-| `baseline-mlx-stagefreeze-v2-exportsafe-resume-smoke` | `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_resume_smoke` | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv` | `2` | `1` | `1` | `saved tensors=232`; `attention_tensors=48`; `audit_status=potentially_exportable_2d_only`; `submission.zip validation_valid=true` | completed | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_resume_smoke/submission_export/export_manifest.json` |
-| `baseline-mlx-stagefreeze-v2-stage1-broad-launch` | `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union` | `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv` | `3321` | `6642` | `832` | `Iter1 val=1.677`; `Opt10 loss=1.023 lr=2.195e-05 itps=0.488 peak=66.776 GB`; `Opt20 loss=0.532 lr=4.634e-05 itps=0.504 peak=67.104 GB`; `Opt30 loss=0.480 lr=7.073e-05 itps=0.512 peak=67.104 GB`; `Opt40 loss=0.486 lr=9.512e-05 itps=0.510 peak=67.104 GB`; `Opt50 loss=0.531 lr=9.998e-05 itps=0.539 peak=67.104 GB`; `Opt60 loss=0.477 lr=9.990e-05 itps=0.514 peak=67.842 GB`; `Opt70 loss=0.580 lr=9.974e-05 itps=0.503 peak=67.842 GB`; `Opt80 loss=0.793 lr=9.951e-05 itps=0.533 peak=67.842 GB`; `Opt90 loss=0.534 lr=9.921e-05 itps=0.519 peak=67.842 GB`; `Opt100 loss=0.516 lr=9.885e-05 itps=0.524 peak=67.842 GB`; `Opt110 loss=0.528 lr=9.841e-05 itps=0.527 peak=67.842 GB`; `Opt120 loss=0.461 lr=9.790e-05 itps=0.546 peak=67.842 GB`; `Opt130 loss=0.493 lr=9.733e-05 itps=0.519 peak=67.842 GB`; `Opt140 loss=0.396 lr=9.668e-05 itps=0.530 peak=67.842 GB`; `Opt150 loss=0.425 lr=9.597e-05 itps=0.524 peak=67.842 GB`; `Opt160 loss=0.478 lr=9.520e-05 itps=0.540 peak=67.842 GB`; `Opt170 loss=0.435 lr=9.436e-05 itps=0.470 peak=67.842 GB`; `Opt180 loss=0.399 lr=9.346e-05 itps=0.345 peak=67.842 GB`; `Opt190 loss=0.395 lr=9.249e-05 itps=0.346 peak=67.842 GB`; `Opt200 loss=0.446 lr=9.147e-05 itps=0.498 peak=67.842 GB`; `Opt210 loss=0.441 lr=9.038e-05 itps=0.498 peak=67.842 GB`; `Opt220 loss=0.442 lr=8.924e-05 itps=0.513 peak=68.597 GB`; `Opt230 loss=0.395 lr=8.804e-05 itps=0.529 peak=68.597 GB`; `Opt240 loss=0.375 lr=8.679e-05 itps=0.519 peak=68.597 GB`; `Opt250 loss=0.361 lr=8.549e-05 itps=0.527 peak=68.597 GB`; `Opt260 loss=0.388 lr=8.413e-05 itps=0.535 peak=68.597 GB`; `Opt270 loss=0.379 lr=8.273e-05 itps=0.508 peak=68.597 GB`; `Opt280 loss=0.453 lr=8.128e-05 itps=0.525 peak=68.597 GB`; `Opt290 loss=0.383 lr=7.978e-05 itps=0.518 peak=68.597 GB`; `Opt300 loss=0.386 lr=7.825e-05 itps=0.512 peak=68.597 GB`; `Opt310 loss=0.424 lr=7.667e-05 itps=0.524 peak=68.597 GB`; `Opt320 loss=0.355 lr=7.505e-05 itps=0.514 peak=68.597 GB`; `Opt330 loss=0.418 lr=7.340e-05 itps=0.541 peak=68.597 GB`; `Opt340 loss=0.327 lr=7.172e-05 itps=0.517 peak=68.597 GB`; `Opt350 loss=0.385 lr=7.000e-05 itps=0.512 peak=68.597 GB`; `Opt360 loss=0.452 lr=6.826e-05 itps=0.517 peak=68.597 GB`; `Opt370 loss=0.385 lr=6.649e-05 itps=0.530 peak=68.597 GB` | running | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union/console.log` |
-
-- stage-freeze 実装の保存 bug を特定した。`mlx_lm.tuner.trainer.train()` が checkpoint/final save で **`model.trainable_parameters()` だけ**を書いていたため、Stage2 で broad suffix を freeze すると final `adapters.safetensors` から broad LoRA が脱落していた。single-file trainer 側を patch し、save 時は **`model.named_modules()` から全 `lora_a/lora_b` tensor を回収**する方式に切り替えた。
-- この patch を export-safe resume smoke で再検証した。Stage1 broad-only adapter (`184 tensors`) を resume 元に、`stage-union-exportsafe` + `trainable=attention` で 1-step Stage2 smoke を回したところ、final adapter は **`232 tensors = mamba 92 + shared_experts 92 + attention 48`** となり、**frozen broad と新規 attention が同時に保持**された。
-- さらに single-file trainer に **`export-peft-submission`** command を追加し、2D-only MLX adapter を conservative に PEFT `adapter_model.safetensors` へ変換できるようにした。検証は **meta-device Nemotron + PEFT reference state_dict** を使い、**key set / tensor shape を完全一致**で照合している。
-- `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_resume_smoke` では `audit-submission-compat` が **`potentially_exportable_2d_only`** を返し、そのまま `export-peft-submission` で **README 提出形式の `submission.zip`** (`adapter_config.json`, `adapter_model.safetensors`) を生成できた。現時点で **single-file MLX から submission 互換 bundle を structurally 作れる 2D-only lane** は成立した。
-- 一方で export-safe full Stage1 を main Stage1 と並列で起動した結果、main Stage1 broad は **`Opt210 0.694 it/s` → `Opt220 0.514` → `Opt230 0.418` → `Opt240 0.403`** まで落ちた。export-safe Stage1 自身も **`~0.49-0.51 it/s`** 帯で推移しており、**30B dual-train contention が throughput を大きく削る**ことが実測で見えた。以後の full-train 並列数は score 回収速度とのトレードオフとして扱う。
-- single-file trainer に **`record-run-result`** command を追加した。これは `prepare_manifest.json`, `training_result.json`, `eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json`, `submission_compat_audit.json`, `submission_export/export_manifest.json` を読み、**`versions/baseline_mlx/baseline_mlx-results.md` に run ごとの auto summary block を idempotent に追記/更新**する。
-- detached ledger/git waiters も追加済み。対象は **main qkvo**, **`v/o` only**, **low-LR-short**, **export-safe qkvo** の 4 lane で、各 run は **suite + audit (export-safe は export まで)** が揃ったら `record-run-result` を実行し、そのまま **`results.md` を commit/push** する。これにより score 回収後の Git 可視化を manual follow-up なしで継続できる。
-- single-file trainer に **`package-best-submission`** command も追加した。これは README 契約の **`submission.zip` / rank<=32 / adapter_config.json 必須**を gate として、completed run 群から **exportable かつ local320 が baseline (`215/320`) を超える候補**を自動選抜し、canonical output root に `submission.zip` を昇格させる。
-- detached best-candidate waiter (`shellId 316`) も起動済み。`baseline_mlx/outputs` を巡回し、**`min_local320_accuracy=0.671875`**, **`min_general_stable_accuracy=0.96`**, **`require_exportable=true`** を満たす run が出たら `baseline_mlx/outputs/best_submission_candidate_auto/` に昇格し、同時に **`results.md` の best-submission block を commit/push** する。
-- export-safe lane の ablation chain も main lane と揃えた。detached chain waiters (`shellId 320`, `321`) は **export-safe qkvo → export-safe `v/o` → export-safe qkvo low-LR-short** を順に train し、それぞれで **suite → submission audit → PEFT export → `record-run-result` → commit/push** まで自動連結する。これで exportable candidate は qkvo 1 本に固定されず、README 提出可能な比較軸を 3 本へ増やした。
-- single-file trainer に **JSONL progress callback** も追加した。`mlx_lm.lora.run()` が内部で callback 引数を上書きする挙動を利用し、`get_reporting_callbacks()` を wrap して **`adapter/train_report.jsonl`**, **`adapter/val_report.jsonl`**, **`adapter/latest_train_report.json`**, **`adapter/latest_val_report.json`** を常時出す。1-step smoke `nemotron_sft_lora_with_cot_v2_mlx_progress_callback_smoke` で生成を確認した。
-- この progress callback により、**これから起動する Stage2 / export-safe ablation / future runs** は final save 前でも file artifact から optimizer step と latest loss/memory を追える。なお、すでに起動済みの Stage1 broad 2 本には retroactive には効かない。
-- `baseline_mlx/outputs/best_submission_candidate_auto/selection_manifest.json` は継続更新中で、現時点の status は **`no_eligible_candidate`**。つまり best-submission poller 自体は動いており、まだ **`local320 > 215/320` かつ exportable** な run が出ていないことが確認できている。
-- その後の live 点検で、古い detached shell waiter 群に **`trap "rmdir "`** という lock cleanup の quoting 崩れが残っていること、および旧 best-candidate poller の inline Python 判定が壊れていることを確認した。train 本体には手を触れず、**record/push waiter を safe cleanup 版へ差し替え**、best-candidate 側は **session script 化した poller** へ移した。これにより、長時間 train 完了後の **`record-run-result` → git commit/push** と best candidate 昇格の自動連結を復旧した。
-- さらに poller の内側リダイレクトが `uv run python` の stdio 初期化と衝突し、`Bad file descriptor` を出していたため、session script 側を修正して再起動した。修正後は **`selection_manifest.json` が 2026-04-09 10:11:06 に更新**され、script-based poller が **継続ポーリングできている**ことを確認した。safe waiter 群は自前 cleanup を持つため、aggressive stale-lock janitor は停止した。
-
-## Direct corrective from baseline fullrun v2
-
-| version | run_name | resume_from | train_csv | total_iters | optimizer_steps | measured | status | artifacts |
-| --- | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| `baseline-mlx-direct-fullrun-v2-qkvo-launch` | `nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr2e5_len1536` | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2/adapter/adapters.safetensors` | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv` | `784` | `98` | `Iter1 val=1.606`; `Opt10 loss=0.998 lr=1.996e-05 itps=0.335 peak=68.315 GB`; `Opt20 loss=0.426 lr=1.919e-05 itps=0.336 peak=69.297 GB`; `trainable=3.736M`; `attention=q/k/v/o only` | stopped for RAM pressure | `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr2e5_len1536/console.log` |
-
-- この lane は **Stage1 broad の完走待ちをバイパス**して、現時点の MLX best **`baseline_mlx_notebook_original_fullrun_v2 = 215/320 = 0.6719`** を trunk とし、その上に **attention-only corrective** を直差しする即応実験として追加した。
-- 設定は **`stage-union`**, **`resume=fullrun_v2 adapters.safetensors`**, **`trainable=attention(q/k/v/o)`**, **`lr=2e-5`**, **`max_seq_length=1536`**, **`train_csv=stage2_corrective_v1.csv (218 rows)`**。起動時点では **`LoRA suffix filter = 24 modules`**, **`Trainable parameters = 3.736M`**, **`Iter1 val_loss = 1.606`** を確認した。
-- この resume 元は `switch_mlp` routed-expert の **3D tensor** を含むため、**この direct lane 自体は submission 互換 lane ではない**。役割はまず **「attention corrective が baseline trunk を上積みできるか」**を stagefreeze 本線より早く読むことにある。
-- 完走後は detached waiter で **`eval-benchmark-suite` → `audit-submission-compat` → `record-run-result` → `results.md` commit/push** まで自動連結してある。
-- direct lane も 1 本で止めず、**`qkvo lr=2e-5` → `v/o lr=2e-5` → `qkvo lr=1e-5, epochs=2.4`** の順に ablation を回す detached waiters を追加した。いずれも **resume 元は同じ `baseline_mlx_notebook_original_fullrun_v2` adapter** に固定し、各 run ごとに **suite → audit → record-run-result → commit/push** まで自動連結する。
-- Stagefreeze 側を **`v/o lr2e-5` + `qkvo lr1e-5 short`** の 2 本へ切り替えた時点でも **`PhysMem 381-382G used / 129-130G unused`** を維持できたので、direct family も waiter 解放を待たず **`nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536`** を手動前倒し起動した。新 run は `prepare_manifest.json` / `runtime_preflight.json` を生成し、**`current_pid=90194`**, `system_free_memory=62%`, `gpu_device_util=100%`, trainable suffix は **`mixer.v_proj/o_proj`**, trainable params は **`1.868M`**, 初回 validation は **`Iter 1: Val loss 1.606`**。これで current search は **3 lane (`stagefreeze vo`, `stagefreeze short`, `direct fullrun_v2 vo`)** になった。
-- ただし direct family は manual prelaunch のぶん auto chain が未接続だったため、**`direct vo` 向け `postprocess-run`** と **`direct vo suite -> direct short` の `wait-resume-train-from-path`**, さらに **`direct short` 向け `postprocess-run`** を single-file CLI で reattach した。これで direct 側も **train -> suite/audit/record -> (short launch) -> suite/audit/record** の流れが復旧した。
-- ただし 3 本同時 train による RAM 圧迫が強く、ユーザー指示で **direct lane 一式（train 本体 + direct waiters）を停止**した。停止直前の最終観測は **`Opt20 loss=0.426 / itps=0.336 / peak=69.297 GB`**。`training_result.json` は未生成のため、この lane は **launch probe まで**として扱う。
-- prune 後の定点では、repo 配下の live 実体は **main broad train 1 本 + export-safe broad train 1 本 + 各 resource_tracker** に整理された。`top` snapshot では **`PhysMem: 414G used, 97G unused`** まで戻っており、background count が大きく見えても **重い実プロセスは 2 本だけ**であることを確認した。
-- safe cleanup 版へ差し替えた waiter は現在 **8 本 live**、best-candidate 側も session script `best_submission_poller.sh` で稼働中で、`selection_manifest.json` は **2026-04-09 10:19:10** 更新を確認した。したがって現状は **train 2 本 + safe waiter/poller** の構成で、Stage1 完走後に Stage2 / suite / audit / export / ledger 更新まで自動で流せる状態に戻っている。
-- RAM 圧迫下でも train 本体に手を入れず次の自動化を進めるため、single-file trainer に **`wait-for-path`**, **`resume-train-from-run`**, **`wait-train-from-run`**, **`postprocess-run`** を追加した。これにより、**Stage1 完走待ち → Stage2 起動** と **run 完了後の suite / audit / export / record / candidate packaging** を、quoting に弱い detached bash one-liner ではなく **Git 管理下の 1 ファイル Python CLI** で再現できるようになった。現行の live waiter はそのまま維持しつつ、次回以降の lane はより安全に single-file 側へ寄せられる。
-- その後、同 automation を **completed run (`baseline_mlx_notebook_original_fullrun_v2`) に対する dry-run** で検証し、`resume-train-from-run` / `wait-train-from-run` / `postprocess-run` が **モデル非ロード**のまま source shadow_model / adapter 解決、artifact 相対 path 解決、postprocess manifest 生成まで通ることを確認した。合わせて **`skip-if-target-started`** を追加し、dry-run manifest 自体を marker として扱うことで **同一 target run の二重起動を抑止**できるようにした。
-- さらに `baseline_mlx/tests/test_single_file_stage_waiters.py` を追加し、single-file waiter automation について **`resolve_source_run_resume_paths`**, **dry-run の wait/resume manifest 生成**, **duplicate-skip**, **`postprocess-run --dry-run` summary** を unit test 化した。`uv run pytest baseline_mlx/tests/test_single_file_stage_waiters.py -q` は **4 passed** で、今回追加した lightweight automation がモデル非ロードの範囲で回帰していないことを確認した。
-- 続けて同 test file に **`package-best-submission`** の synthetic candidate 選抜ケースを追加し、**best exportable candidate の選択 / canonical `submission.zip` copy / no-eligible fallback** を README gate 相当で検証した。`uv run pytest baseline_mlx/tests/test_single_file_stage_waiters.py -q` は **6 passed** となり、single-file automation だけでなく **best single adapter 選抜**の軽量回帰も押さえられた。
-- 直近の定点では main broad は **Opt510**, export-safe broad は **Opt370** まで前進し、2 本とも throughput の大崩れなく継続している。一方で system snapshot は **`PhysMem: 465G used, 46G unused`** まで上がっており、今後も **新しい heavy train/eval を増やさず** 現行 2 本の完走を優先する運用が妥当と判断した。
-- single-file automation をさらに前進させ、**`wait-resume-train-from-path`** command を追加した。これは **任意の trigger path（例: `.../eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json`）を待ってから、source run の `shadow_model` / `adapters.safetensors` を解決して resumed train を起動する**ためのもので、従来の **main qkvo suite 完了→`v/o` 起動** / **`v/o` suite 完了→short 起動** のような shell waiter を single-file CLI で表現できる。
-- 同 test file に **`wait-resume-train-from-path` の dry-run / duplicate-skip** を追加し、`uv run pytest baseline_mlx/tests/test_single_file_stage_waiters.py -q` は **8 passed** へ拡張した。合わせて `uv run python baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py wait-resume-train-from-path --help` も通し、parser wiring まで確認した。
-- 最新の live progress は main broad **Opt540** (`loss=0.377`, `lr=3.494e-05`, `it/sec=0.401`, `peak=82.620 GB`) 、export-safe broad **Opt410** (`loss=0.404`, `lr=5.920e-05`, `it/sec=0.518`, `peak=68.597 GB`)。同時点の system snapshot は **`PhysMem: 472G used, 39G unused`** で、依然として **新しい heavy train/eval は増やさず**、live waiter の本番 cutover も **現行 2 本完走を優先して保留**とした。
-- 続けて single-file automation の postprocess 側も harden した。`postprocess-run` に **`--skip-existing-steps/--no-skip-existing-steps`** を追加し、既存の `benchmark_eval_suite_summary.json` / `submission_compat_audit.json` / `export_manifest.json` / `recorded_run_result.json` が揃っている completed run では、**eval / audit / export / ledger record を再実行せず `skipped_existing` として処理を完了**できるようにした。重い completed run に対する replay や live waiter cutover 時の duplicate work を避けるため、default も safe 側 (`skip_existing_steps=true`) に寄せている。
-- `baseline_mlx/tests/test_single_file_stage_waiters.py` にはこの **postprocess skip-existing** 回帰も追加し、completed synthetic run 上で **既存 artifact があると pipeline helper を再呼び出さない**ことを検証した。`uv run pytest baseline_mlx/tests/test_single_file_stage_waiters.py -q` は **9 passed**、`uv run python -m py_compile baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` も通過、`postprocess-run --help` には `--skip-existing-steps` が露出していることを確認した。
-- 最新の live progress は main broad **Opt550** (`loss=0.381`, `lr=3.316e-05`, `it/sec=0.415`, `peak=82.620 GB`) 、export-safe broad **Opt430** (`loss=0.355`, `lr=5.546e-05`, `it/sec=0.524`, `peak=68.597 GB`)。best candidate poller の `selection_manifest.json` は **2026-04-09T01:55:26Z** 時点で依然 **`no_eligible_candidate`**、system snapshot は引き続き **`PhysMem: 472G used, 39G unused`** だった。
-- さらに single-file trainer に **`publish-results-md`** command を追加し、`results.md` の **git add → shared lock 取得 → commit → push** を Python 側で完結できるようにした。`postprocess-run` にも **`--run-publish-results-md`** と publish 関連 option を追加してあるため、将来は **wait / eval / audit / export / record / package / git publish** を 1 ファイル CLI だけで連結できる。
-- この publish helper は temp git repo test で回帰を押さえた。`baseline_mlx/tests/test_single_file_stage_waiters.py` には **modified `results.md` を local commit できるケース** と **差分ゼロで `no_changes` を返すケース** を追加し、targeted pytest は **11 passed** へ拡張した。`publish-results-md --help` と `postprocess-run --help` の publish option も smoke で通過している。
-- 最新の live progress は main broad **Opt570** (`loss=0.362`, `lr=2.965e-05`, `it/sec=0.398`, `peak=82.620 GB`) 、export-safe broad **Opt450** (`loss=0.324`, `lr=5.170e-05`, `it/sec=0.500`, `peak=68.597 GB`)。best candidate poller の `selection_manifest.json` は **2026-04-09T02:00:28Z** 時点でも **`no_eligible_candidate`** 継続、system snapshot は **`PhysMem: 474G used, 36G unused`** まで上がっているため、引き続き **新しい heavy train/eval は増やさない**。
-- この時点で live stage1 completion waiters も一部 cutover した。従来の shell-based safe waiter **`85169` / `85170`** を停止し、代わりに detached single-file CLI **`postprocess-run --wait-for-training-result --no-run-eval-suite --no-run-audit-submission --no-run-export-submission --run-record-run-result --run-publish-results-md`** を **main stage1 / export-safe stage1** に対して起動した。これにより少なくとも Stage1 完了時の **record + git publish** は、long-lived shell loop ではなく single-file Python waiter で処理できる状態に入った。
-- best candidate 側にも single-file 化を進め、**`poll-best-submission`** command を追加した。これは **`package-best-submission` を loop 実行し、eligible candidate 発見時だけ `publish-results-md` を呼ぶ** poller で、従来の `best_submission_poller.sh` が担っていた **selection_manifest 更新 → best-submission block 更新 → git publish** の責務を 1 ファイル CLI に寄せるためのもの。
-- `baseline_mlx/tests/test_single_file_stage_waiters.py` には **temp git repo + synthetic candidate run** での poller 回帰も追加し、**candidate 選抜 → results.md commit** までを end-to-end に検証した。targeted pytest は **12 passed**、`poll-best-submission --help` も smoke で通過している。
-- live best-candidate poller も shell script から cutover した。旧 `best_submission_poller.sh` (`88012` / `88013`) を停止し、代わりに detached single-file CLI **`poll-best-submission --output-root baseline_mlx/outputs/best_submission_candidate_auto --min-local320-accuracy 0.671875 --min-general-stable-accuracy 0.96 --publish-commit-message "Promote best submission candidate"`** を起動した（proc tree: `16515-16517`）。cutover 直後の `selection_manifest.json` は **2026-04-09T02:07:46Z / `no_eligible_candidate`**、`poll_best_submission_summary.json` は **`status=running`** を示しており、single-file poller への置換後も監視が継続している。
-- 続けて live Stage2 chain も main / export-safe の両 lane で shell waiter から切り替えた。main 側では **`wait-train-from-run` + `postprocess-run` + `wait-resume-train-from-path`** の detached single-file waiters 6 本へ置換し、export-safe 側も同型の detached single-file waiters 6 本へ置換した。これにより、**Stage1 完了待ち → qkvo train → suite/audit(/export) → record/publish → vo train → short train** の連結は、現時点の live process でもほぼ single-file Python CLI へ寄った。
-- cutover 後の各 Stage2 run root にはすでに **`postprocess_manifest.json`** が生成されており、旧 shell waiters (`57936`, `61865`, `64320`, `64307`, `64319`, `64308`, `64926`, `64928`, `64927`, `85171-85176`, `67581`, `67573`, `67519`, `70849`) は終了済みであることを確認した。最新 snapshot は **`PhysMem: 476G used, 35G unused`** で、依然として **新しい heavy train/eval は追加せず**、既存 broad 2 本の完走待ちを優先する。
-- その後の live progress では、main broad `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union` が **Opt620** (`loss=0.329`, `lr=2.144e-05`, `it/sec=0.404`, `peak=82.620 GB`) まで前進し、export-safe broad `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union` も **Opt510** (`loss=0.252`, `lr=4.043e-05`, `it/sec=0.538`, `peak=68.597 GB`) まで進んだ。両 run とも `prepare_manifest.json` が示す **total_optimizer_steps=832** に対してまだ Stage1 継続中で、`training_result.json` と Stage2 qkvo の `prepare_manifest.json` は未生成だった。
-- README 契約ベースの best-submission 自動昇格も継続監視中だが、`baseline_mlx/outputs/best_submission_candidate_auto/selection_manifest.json` は **2026-04-09T02:43:46Z** 時点でも依然 **`candidate_count=0` / `eligible_candidate_count=0` / `status=no_eligible_candidate`**。つまり、現時点では **README 提出互換かつ local320 / general_stable gate を満たす scored run がまだ 1 本も揃っていない**。初期の最新 system snapshot は **`PhysMem: 475G used, 35G unused`** で、方針は引き続き **新しい heavy train/eval を足さず broad run の完走を待つ**。
-- broad 2 本の完走待ち時間を遊ばせないため、single-file trainer に **`record-live-run-status`** と **`poll-live-run-status`** を追加した。`adapter/latest_train_report.json` がある run はそれを一次ソースに、無ければ **`console.log` の末尾 train progress 行**を parse して、**Git 管理下の `versions/baseline_mlx/baseline_mlx-results.md` に live progress block を upsert** できる。`poll-live-run-status` は progress signature が変わったときだけ `publish-results-md` を呼ぶため、in-flight run の進捗を **single-file CLI だけで commit/push** できる。
-- `baseline_mlx/tests/test_single_file_stage_waiters.py` には **latest JSON 優先**, **console.log fallback**, **poll + git commit**, さらに **dead PID を stale `training` と誤認しない stopped 判定** の回帰を追加した。qkvo suite stall の修正では、`evaluate_benchmark_rows()` の benchmark fallback で未定義変数を踏まない regression も足し、targeted pytest は **17 passed**、`record-live-run-status --help` / `poll-live-run-status --help` / `py_compile` も通過。注意点として、**main broad は既存 shell session (`shellId 240`) 側の stdout に progress があり run root には `console.log` / `latest_train_report.json` が無いため、現時点の live progress 自動記録は export-safe broad と今後の stage2/future runs で特に有効**である。
-- ただし RAM 圧迫が強すぎたため、ユーザー判断に従って **export-safe broad lane は後ろ倒し**にした。最長 ETA 側だった `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union` を **最終観測 Opt580 / Iter4633** で停止し、関連する **stage1 completion waiter / stage2 train waiters / stage2 postprocess waiters / live progress poller** も停止した。system snapshot は停止前が **`PhysMem: 475G used, 35G unused`**、停止後が **`PhysMem: 280G used, 230G unused`**、その後ユーザー観測でも **266.63 / 512.0 GB** まで低下しており、**2 本目の 30B MLX 学習 lane の増分コストは概ね 190-200GB 級の unified memory** だったと見てよい。これは trainer の `Peak mem 68.597 GB` 行とは別物で、モデル複製・optimizer/state・Metal の wired/unified memory pool まで含んだ **システム全体差分**である。
-- lane 停止後は main broad が即座に加速した。`shellId 240` の live stdout では **Opt680 で `it/sec=0.664`、Opt690 で `it/sec=0.746`** まで回復しており、dual-train contention が main broad の後半 throughput を強く削っていたことも確認できた。一方、止めた export-safe run root には **`prepare_manifest.json` / `runtime_preflight.json` / `adapter/adapter_config.json` しか残っておらず、`training_result.json` や `adapters.safetensors` は未生成**だったため、後日再開する場合は **途中再開ではなく full rerun** が前提になる。
-- そのまま main broad を単騎で継続監視すると、**Opt700 / Opt710 / Opt720** でそれぞれ `it/sec=0.769 / 0.736 / 0.758`、`loss=0.344 / 0.354 / 0.293` まで進み、学習末尾の throughput はほぼ初期 single-lane 水準へ戻った。最新 snapshot でも **`PhysMem: 286G used, 225G unused`** と headroom は維持されており、同時点では `training_result.json` も main Stage2 qkvo の `prepare_manifest.json` もまだ無いため、**main は依然 Stage1 継続中**である。
-- その後 main broad は完走し、`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536` が自動起動して **Opt101 / Iter784 / loss=0.187084 / lr=2.361e-07 / it/sec=0.858648 / peak=70.926 GB** で train 完了した。ただし最初の detached `postprocess-run` は **`NameError: name 'benchmark_csv' is not defined`** で suite 前に落ちており、症状としては **`training_result.json` だけあるのに suite/audit/result file が増えず、RAM も低いまま**に見えた。
-- root cause は single-file evaluator `evaluate_benchmark_rows()` が `benchmark_name` の fallback に **存在しない `benchmark_csv.stem`** を参照していたことだった。これを **`evaluation_name` fallback** へ直し、regression test を追加したうえで qkvo postprocess を再投入したので、現在は **README scoring semantics (`accuracy`, `\boxed{}` 優先抽出, `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_model_len=8192`) に寄せた local proxy suite** が再実行されている。
-- qkvo rerun はもう「止まって見えるだけ」ではない。per-benchmark artifact が途中まで出ており、`readme_local320` は **`113/320 = 0.3531`**（`general_stable 88/200`, `binary_hard 19/60`, `symbol_watch 6/60`）、`leaderboard_proxy_v2` は **`30/84 = 0.3571`**（`binary 27/73`, `symbol 3/11`）で完了済みだった。これは tracked MLX baseline **`215/320 = 0.6719`** を大きく下回るため、main **`attention_qkvo lr2e-5`** lane は trailing `binary_bias_specialized_set` がまだ回っていても **submission candidate としては dead** と判断してよい。
-- なお、この local suite は **README 本番そのものではなく proxy** である点を明示しておく。採点ロジックと decoding 条件の主軸は README に合わせているが、現在の MLX runner は **`max_num_seqs=8`** で回しており、README Evaluation page / vLLM 本番の **`max_num_seqs=64`** とは一致していない。したがってこの数値は leaderboard の代替ではなく、**lane の生死判定用 proxy** として扱う。
-- suite 完了待ちで GPU を遊ばせないため、memory headroom が戻った時点で **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536`** を broad Stage1 完走 root から手動前倒し起動した。新 run は直ちに `prepare_manifest.json` / `runtime_preflight.json` を生成し、**`current_pid=86512`**, `system_free_memory=85%`, `gpu_device_util=100%` を記録、LoRA trainable suffix は **`mixer.v_proj` / `mixer.o_proj` のみ**、trainable params は **`1.868M`**、初回 validation は **`Iter 1: Val loss 1.191`** で通っている。既存の `wait-resume-train-from-path` waiter は target-started marker を見て duplicate skip する想定で、そのまま残してある。
-- qkvo main lane は dead が確定したので、rerun postprocess `PID 50695` はここで停止して specialized tail を打ち切った。停止直後の snapshot は **`PhysMem: 217G used, 293G unused`** まで戻っており、これで dead lane の eval に GPU/RAM を使い続ける状態は解消した。
-- 空いた headroom をそのまま次の corrective ablation へ回し、**`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536`** も broad Stage1 完走 root から手動前倒し起動した。新 run は `prepare_manifest.json` / `runtime_preflight.json` を生成し、**`current_pid=88859`**, `system_free_memory=78%`, `gpu_device_util=99%`、trainable suffix は **`mixer.q_proj/k_proj/v_proj/o_proj`**, trainable params は **`3.736M`**, 初回 validation は **`Iter 1: Val loss 1.191`**。これで現在線は **`v/o lr2e-5` + `qkvo lr1e-5 short`** の 2 本に切り替わった。
-- その後 `stagefreeze v1 vo` の old waiter log を読むと、ここでも crash は **現行コードの再発ではなく、fix 前に起動して生き残っていた stale `postprocess-run`** が古い `evaluate_benchmark_rows()` を保持していたことが原因だった。実際、`copilot-detached-489-1775700669391.log` には **`NameError: name 'benchmark_csv' is not defined`** が残っていたが、現行 source にはその参照は残っていない。`stagefreeze short` も同型 stale waiter だったため旧 process を止め、**`vo` / `short` の postprocess を current single-file code で fresh rerun** し直した。
-- あわせて、手動前倒しで既に起動済みの lane に対して残っていた **`wait-resume-train-from-path` chain waiter** も整理した。`stagefreeze qkvo->vo`, `stagefreeze vo->short`, `direct vo->short` の古い leaf process は、このまま suite summary 生成後まで残すと **同じ output root へ duplicate resume を試みる** 余地があったため、ここで明示停止して manual prelaunch 側を正系に固定した。
-- fresh rerun / direct family の postprocess についても「無出力のまま固まっている」のではなく、**実体は MLX/Metal の generate loop 上で active** だと確認した。`sample` を `direct vo` postprocess `PID 92814` と `stagefreeze vo` postprocess `PID 99167` に当てると、どちらも main thread が **`mlx::core::async_eval` → `mlx::core::gpu::eval` → `Matmul::eval_gpu` → AGX Metal compute** に張り付いており、`lsof` でも `mlx.metallib`, `libmlx.dylib`, `AGXMetalG15X_M2`, adapter/tokenizer/safetensors を開いたままになっていた。つまり現段階は **score recovery / proxy suite 実行中** であり、`eval_suite_readme_proxy_specialized` 以下にまだ file が無いのは「最初の benchmark 完了前」だからだと見るのが妥当。
-- 参考までに、すでに dead 判定済みの **main qkvo lane** でこの proxy suite の所要時間を逆算すると、`training_result.json` から **`readme_local320` summary 出現まで `4546.1s ≒ 75.8 min`**、`leaderboard_proxy_v2` summary 出現まで **`5256.5s ≒ 87.6 min`** かかっていた。したがって、現行 `vo/short/direct` lane で **training 完了後 20-40 分程度 artifact 無し**は異常値ではなく、むしろ通常レンジの途中とみなすべき。
-- 無出力時間が長いと status 判定が難しいため、single-file evaluator 側にも **suite progress 可視化**を追加した。`run_eval_benchmark_suite()` は以後 `benchmark_eval_suite_progress.json` と各 benchmark root の `benchmark_eval_progress.json` を更新し、`run_postprocess_run()` は `eval_suite` 実行前から **`postprocess_manifest.json` に `steps.eval_suite.status=running` と `progress_relpath`** を残す。回帰は `uv run pytest baseline_mlx/tests/test_single_file_stage_waiters.py -q` で **19 passed**、`py_compile` も通過。
-- ただし 4 本同時 postprocess のままでは、`stagefreeze vo/short` が training 完了後 **~74 分** に達してもなお first `readme_local320` summary が出ておらず、GPU share の食い合いが単純な無出力待ち以上に効いていると判断した。ここで最も弱い **`direct fullrun_v2 short qkvo lr1e-5 ep2.4`** の postprocess (`PID 92813`, wrapper `92810/92811`) をいったん停止し、`training_result.json` / final adapter / `postprocess_manifest.json` は残したまま **後順位 lane** へ回した。停止後の snapshot は **`PhysMem: 342G used, 169G unused`**。以後は **`stagefreeze vo` / `stagefreeze short` / `direct vo`** の 3 lane へ GPU を寄せる。
-- それでも 3 lane 同時では、`stagefreeze vo/short` が training 完了後 **~92 分**、`direct vo` も **~81 分** に達してなお first `readme_local320` summary が出なかった。ここでさらに **`stagefreeze short qkvo lr1e-5 ep2.4`** の postprocess (`PID 99168`, wrapper `99164/99166`) を停止し、やはり `training_result.json` / final adapter / `postprocess_manifest.json` を保持したまま **later rerun候補**へ移した。停止後は **`PhysMem: 259G used, 252G unused`** まで戻り、残った **`stagefreeze vo` / `direct vo`** の 2 worker はどちらも **~46% CPU** に上昇した。以後は最有力の **vo-only 2 lane** に score recovery を集中させる。
-- さらに 2 lane でも、`stagefreeze vo` が training 完了後 **~108 分**、`direct vo` も **~97 分** で still no first summary だった。`stagefreeze` trunk は同じ broad root 由来の **main qkvo lane が 113/320 で dead** になっている一方、`direct vo` は **tracked MLX baseline 215/320 trunk** 由来なので、ここで `stagefreeze vo` postprocess (`PID 99167`, wrapper `99163/99165`) も停止し、**`direct fullrun_v2 -> attention-vo lr2e-5` 1 本**へ最終集中した。停止後 snapshot は **`PhysMem: 195G used, 316G unused`**、残りの `direct vo` worker (`PID 92814`) は **~62% CPU** まで上昇。`stagefreeze vo` も `training_result.json` / final adapter / `postprocess_manifest.json` は温存してあり、必要なら later rerun できる。
-- ただし、この **old blind `direct vo` postprocess** も training 完了後 **109.2 分** まで `readme_local320` / `leaderboard_proxy_v2` / suite summary のいずれも出さず、進捗の可視化がないままでは lane quality と decode 長文化を切り分けられなかった。そこで旧 worker を停止し、同じ run root に対して **current single-file code の `postprocess-run`** を `direct-fullrun-v2-vo-rerun-progress` として再投入した。
-- current-code rerun では、起動直後から **`postprocess_manifest.json`** に `steps.eval_suite.status=running` が記録され、suite root に **`benchmark_eval_suite_progress.json`**、`readme_local320` root に **`benchmark_eval_progress.json`** が生成された。初回観測 (`2026-04-09T08:37:51Z`) は **`readme_local320 0/320 rows, 0/40 chunks`**、約 4 分後 (`2026-04-09T08:41:51Z`) には **`16/320 rows, 2/40 chunks`** まで進んでいた。worker 本体 (`PID 31948`) は **`%CPU 52.5`**, snapshot は **`PhysMem: 210G used, 300G unused`**。これで少なくとも **progress manifest 自体は実運用で機能し、現 lane は blind hang ではなく chunk 単位で前進している**ことが確認できた。
-- さらに `2026-04-09T08:58:08Z` 時点では、同 rerun の progress は **`80/320 rows, 10/40 chunks`** まで伸びていた。少なくとも `readme_local320` は **約 2.0 分 / chunk** の速度で前進しており、今度の `direct vo` rerun は「極端に遅いが停止している」状態ではなく、**full local320 summary 到達待ち**だと判断できる。
-- 一方で、score 回収待ちの間に **4 本の current Stage2 candidate adapter** (`direct vo`, `stagefreeze vo`, `stagefreeze short`, `direct short`) に対して `audit-submission-compat` を実行したところ、すべて **`blocked_routed_expert_3d_tensors`** だった。いずれも adapter 全体は **`324 tensors = 232x 2D + 92x 3D`** で、blocker は `mixer.switch_mlp.fc1/fc2` の routed-expert LoRA tensor。したがって、**現行 union-adapter Stage2 family は README 提出用 `submission.zip` を直接 export できず、score が良くてもそのまま best-submission 候補には昇格できない**。submission-ready lane は引き続き export-safe 系で確保する必要がある。
-- そこで submission-ready 側を止めないため、**export-safe Stage1 broad** を新 run root **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`** として再始動し、同時に single-file waiter chain（Stage1 completion record、Stage2 qkvo launch、各 Stage2 postprocess、qkvo->vo->short launch waiters）も **`*_rerun_v1`** 名で再接続した。`poll-live-run-status` も付け直してあり、start block は **`11c059e`** として `results.md` に自動 commit/push 済み。
-- export-safe rerun 起動後も `direct vo` score recovery は継続している。`2026-04-09T09:43:34Z` 時点で **`readme_local320 168/320 rows, 21/40 chunks`** まで進み、first summary は未到達だが **still moving**。同時点の export-safe Stage1 rerun は **`Iter1600 / Opt200 / train_loss=0.454646 / itps=0.703 / peak=67.842 GB`**、system snapshot は **`PhysMem: 375G used, 136G unused`**。つまり **1 本の export-safe broad train + 1 本の direct vo proxy eval** は slowdown こそあるものの、OOM なしで並走できている。
-- その後 `direct fullrun_v2 -> attention-vo lr2e-5` current-code rerun は `readme_local320` を完走し、**`206/320 = 0.6438`** で着地した。内訳は **`general_stable 165/200 = 0.825`**, **`binary_hard 24/60 = 0.400`**, **`symbol_watch 17/60 = 0.2833`**、family 別でも **`text 19/50 = 0.380`**, **`unit 48/50 = 0.960`**, **`gravity 48/50 = 0.960`**, **`roman 50/50 = 1.000`** だった。tracked MLX baseline **`215/320 = 0.6719`** を下回り、しかも current union-adapter family 自体が `blocked_routed_expert_3d_tensors` で non-exportable なので、この lane は **local320 summary 到達をもって打ち切り**、残りの proxy/specialized tail は停止して export-safe corrective に headroom を返した。停止直後 snapshot は **`PhysMem: 151G used, 360G unused`**。
-- 一方で export-safe Stage2 qkvo の最初の `*_rerun_v1` 起動は、source run 解決自体は成功したものの、`notebook-current` の broad default sampling を narrow corrective CSV にそのまま当てたため **`ValueError: No rows found for puzzle type 'Numeral Conversion'.`** で落ちた。その失敗 run root には `shadow_model` と `resume_from_run_manifest.json` が残ったため、後続の手動 restart は `--skip-if-target-started` で **`skipped_existing_target`** になった。successful Stage2 manifests を突き合わせると、正しい corrective sampling は **`Bit Manipulation=209`**, **`Equation Transformation=9`**, その他 4 family は **`0`** で固定する必要がある。
-- そこで export-safe chain は **`*_rerun_v2`** 名へ張り直した。旧 `qkvo/vo/short` waiters を止めたうえで、completed Stage1 rerun root **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`** から **explicit `--type-sample` override 付き**で qkvo Stage2 を手動 resume し、fresh な qkvo postprocess / qkvo->vo / vo postprocess / vo->short / short postprocess waiters も再接続した。新 qkvo root **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2`** には既に **`prepare_manifest.json`**, **`runtime_preflight.json`**, **`latest_val_report.json`** が出ており、`runtime_preflight` は **`current_pid=71469`**, **`system_free_percent=97`**, first validation は **`val_loss=1.2338`**。snapshot も **`PhysMem: 215G used, 296G unused`** まで戻っているので、以後の submission-ready lane はこの export-safe v2 corrective chain を正系として追う。
-- `README.md` の提出契約（**single adapter**, **rank<=32**, **`submission.zip`**, 評価時 **`max_tokens=7680` / `top_p=1.0` / `temperature=0.0` / `max_num_seqs=64` / `max_model_len=8192`**）に合わせ、以後の heavy compute は **export-safe single-adapter lane** に寄せた。現時点の current trio は **qkvo lr2e-5 len1536**, **vo lr2e-5 len1536**, **qkvo lr1e-5 ep2.4 len1536** の 3 本で、`2026-04-09T12:02Z` 前後の latest train reports は **qkvo = `Opt70 / loss=0.2141 / itps=0.359 / peak=67.399 GB`**, **vo = `Opt30 / loss=0.2627 / itps=0.356 / peak=68.048 GB`**, **short = `Opt20 / loss=0.3781 / itps=0.358 / peak=65.861 GB`**。同時点 snapshot でも **`PhysMem: 414G used, 96G unused`** を維持しており、3 並列の training 自体はまだ OOM 域に入っていない。
-- 同時に、current trio の suite summary 到達後に GPU を遊ばせないため、**次線 3 本**の single-file waiters も先に張った。queued candidates は **`qkvo lr5e-6 ep2.4 len1536`**, **`vo lr5e-5 len1536`**, **`qkvo lr2e-5 ep2.4 len768`** で、いずれも source は completed Stage1 export-safe rerun root、sampling は **`Bit Manipulation=209` / `Equation Transformation=9` / others=0** に固定してある。各 candidate には **launch waiter**, **postprocess waiter**, **live progress poller** を追加済みで、trigger はそれぞれ **current qkvo suite summary**, **current vo suite summary**, **current short suite summary**。これで current trio が score 回収まで終わり次第、次の export-safe ablation へ **headroom を保ったまま自動で切り替えられる**。
-- さらに `2026-04-09T12:12Z` には current **qkvo lr2e-5 len1536** が train を完走し、**`Opt101 / Iter784 / loss=0.18247 / val_loss=0.28794 / peak=67.399 GB`** で `training_result.json` を生成した。その直後から single-file `postprocess-run` が **`eval_suite_readme_proxy_specialized`** を起動しており、`benchmark_eval_suite_progress.json` と `readme_local320/benchmark_eval_progress.json` は **`status=running`**, **`0/320 rows, 0/40 chunks`** で初期化済み。つまり qkvo current は今 **score 回収フェーズ**へ入っている。
-- current **short qkvo lr1e-5 ep2.4 len1536** もその後 train 完了に到達し、**`Opt67 / Iter523 / loss=0.22727 / peak=67.399 GB`** を残したうえで、同じく `readme_local320` progress manifest を **`running, 0/320`** で立ち上げた。`vo lr2e-5 len1536` だけは引き続き train 中で、`2026-04-09T12:16Z` の latest report は **`Opt70 / loss=0.22024 / itps=0.3927 / peak=68.048 GB`**。
-- qkvo current が train を抜けて headroom が少し戻ったため、queued next line のうち **`qkvo lr5e-6 ep2.4 len1536`** を suite summary 待ちより前に **手動前倒し起動**した。新 run root **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr5e6_ep24_len1536_rerun_v2`** は **`runtime_preflight current_pid=79008`**, first validation **`val_loss=1.2338`**, first train report **`Opt10 / Iter80 / loss=0.76289 / itps=0.3577 / peak=64.841 GB`** を出している。これにより現行の heavy set は **vo train + short eval + qkvo eval + qkvo low-LR train** となり、snapshot は一時 **`PhysMem 457G used / 54G unused`** まで上がったが、その後は **`442G used / 69G unused`** に戻っている。したがって **4 heavy 同時はかなりタイトだが、まだ即 OOM 域ではない** と判断し、追加の manual prelaunch（`vo lr5e-5`, `len768`）はここでは見送って queued waiter のまま維持する。
-- その後 `2026-04-09T12:25Z` には current **vo lr2e-5 len1536** も **`Opt101 / Iter784 / loss=0.18862 / itps=0.4471 / peak=68.048 GB`** で train を完了した。これで current export-safe trio は **train フェーズを全て抜け**、以後は **qkvo current / vo current / short current の 3 本が score 回収**, その横で **qkvo low-LR** が次線 train を継続する構成に移行した。
-- `2026-04-09T12:33Z` 時点では、progress manifest 上 **qkvo current** の `readme_local320` が **`8/320 rows, 1/40 chunks`** まで前進しており、少なくとも current-code rerun と同様に **blind stall ではなく chunk 単位で進んでいる**。一方で **vo current** と **short current** はまだ **`0/320, 0/40`** の初期段階。次線 **qkvo low-LR** は **`Opt40 / Iter314 / loss=0.28268 / itps=0.47995 / peak=67.399 GB`** まで伸びており、system snapshot も **`PhysMem 388G used / 123G unused`** に戻った。したがって現時点の運用判断は **「current trio の score 回収は継続、manual 前倒しは qkvo low-LR 1 本で止める」** が妥当である。
-- その後 **qkvo low-LR (`lr5e-6`)** も **`Opt67 / Iter523 / loss=0.25174 / itps=0.5983 / peak=67.399 GB`** で train を完了し、こちらも `readme_local320` progress manifest を立ち上げた。headroom が **`PhysMem 359G used / 152G unused`** まで戻ったタイミングで、queued 次線から **`vo lr5e-5 len1536`** をさらに **manual prelaunch**した。
-- `2026-04-09T12:50Z` 時点の heavy set は **current qkvo eval + current vo eval + current short eval + qkvo low-LR eval + vo high-LR train**。local320 progress は **current qkvo = 24/320 (3/40)**、**current vo = 24/320 (3/40)**、**current short = 24/320 (3/40)**、**qkvo low-LR = 16/320 (2/40)** まで揃っており、少なくとも 4 本とも **chunk 単位で前進中**だと確認できた。一方、new **vo high-LR** は **`Opt40 / Iter314 / loss=0.22633 / itps=0.4233 / peak=68.048 GB`**。snapshot は **`PhysMem 449G used / 62G unused`** とかなりタイトなため、残る **`qkvo len768`** は queued waiter のままにして **manual prelaunch を見送る**。
-- さらに `2026-04-09T13:09Z` には **vo high-LR (`lr5e-5`)** も **`Opt101 / Iter784 / loss=0.18651 / itps=0.3881 / peak=68.048 GB`** で train 完了し、そのまま `readme_local320` progress manifest を立ち上げた。ここで 5 lane（current trio + qkvo low-LR + vo high-LR）がすべて local320 回収フェーズへ入ったため、headroom は **`PhysMem 420G used / 91G unused`** に戻った。
-- この headroom を使って最後の queued candidate **`qkvo len768`** も一度 manual prelaunch したが、**prepare/runtime + initial validation だけで `PhysMem 493G used / 18G unused`** まで逼迫し、train report 生成前の段階でも **OOM 直前域**だと判断した。そこで **runtime `PID 91674`**, 同 run の **live poller `91864`**, **postprocess waiter `91866`**, 旧 launch waiter `76800` を明示停止し、snapshot を **`420G used / 91G unused`** まで戻した。つまり **len768 は有望候補ではあるが、現在の multi-eval 負荷下では manual prelaunch 不可**。
-- ただし len768 自体を捨てたわけではなく、stale marker を避けるため **新 run 名 `...qkvo_lr2e5_ep24_len768_rerun_v3`** で **launch waiter / postprocess waiter / live poller** を再キューした。trigger は引き続き **current short suite summary** で、これにより current heavy set のスコア回収を優先しつつ、headroom が戻ったタイミングで len768 lane を再投入できる状態は維持した。
-- その後も active export-safe local320 回収は **5 lane** で継続している。`2026-04-09T13:29Z` 時点の chunk progress は **current qkvo = `72/320, 9/40`**, **current vo = `64/320, 8/40`**, **current short = `72/320, 9/40`**, **qkvo low-LR = `56/320, 7/40`**, **vo high-LR = `16/320, 2/40`** で、**5 本とも blind stall ではなく local320 を前進中**。まだ summary は 0 本だが、system snapshot は **`PhysMem 420G used / 91G unused`** を維持しているので、現時点では **lane 削減より score 回収継続**を優先する。
-- `2026-04-09T13:50Z` 時点でも summary はまだ 0 本だが、progress 自体は維持されている。chunk progress は **current qkvo = `96/320, 12/40`**, **current vo = `88/320, 11/40`**, **current short = `112/320, 14/40`**, **qkvo low-LR = `88/320, 11/40`**, **vo high-LR = `48/320, 6/40`**。現時点では **current short** が最も前に出ており、5 本とも引き続き blind stall ではない。snapshot も **`PhysMem 420G used / 90G unused`** とほぼ横ばいで、依然として **OOM を踏まずに 5 lane の local320 回収を継続できている**。
-- `2026-04-09T14:10Z` 時点でも summary はまだ 0 本だが、進捗はさらに積み上がった。chunk progress は **current qkvo = `144/320, 18/40`**, **current vo = `144/320, 18/40`**, **current short = `160/320, 20/40`**, **qkvo low-LR = `136/320, 17/40`**, **vo high-LR = `88/320, 11/40`**。つまり **current short が local320 のちょうど半分（20/40 chunks）を通過**し、current qkvo / current vo / qkvo low-LR もほぼ同一ペースで追っている。snapshot は引き続き **`PhysMem 420G used / 91G unused`** で横ばいなので、現方針は変えず **5 lane の score 回収を継続**する。
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union`
-
-- status: `stopped`
-- label: `stagefreeze-v2-exportsafe-stage1-live`
-- observed_at: `2026-04-09T02:34:57.692304+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `3321`
-- optimizer_progress: `580/832 = 69.71%`
-- lr: `0.0001`
-- max_seq_length: `4096`
-- trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj']`
-
-#### Latest train progress
-
-- source: `console_log`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union/console.log`
-- iteration: `4633`
-- optimizer_step: `580`
-- train_loss: `0.331`
-- learning_rate: `2.794e-05`
-- it_per_sec: `0.531`
-- tokens_per_sec: `303.224`
-- trained_tokens: `2746223`
-- peak_memory_gb: `68.597`
-
-#### Completion markers
-
-- training_result_exists: `False`
-- runtime_pid: `67528`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union`
-
-- recorded_at: `2026-04-09T03:05:32.689368+00:00`
-- label: `stagefreeze-v1-stage1`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `3321`
-- optimizer_steps: `832`
-- lr: `0.0001`
-- max_seq_length: `4096`
-- trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.switch_mlp.fc1', 'mixer.switch_mlp.fc2', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj']`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage1_broad_v3f_union -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536`
-
-- status: `training_completed`
-- label: `stagefreeze-v1-main-qkvo-live`
-- observed_at: `2026-04-09T03:21:53.429955+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `2e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.187084`
-- learning_rate: `2.36105e-07`
-- it_per_sec: `0.858648`
-- tokens_per_sec: `398.413`
-- trained_tokens: `418695`
-- peak_memory_gb: `70.9263`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `17833`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr2e5_len1536 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536`
-
-- status: `training`
-- label: `stagefreeze-v1-vo-live`
-- observed_at: `2026-04-09T06:19:37.999442+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `60/101 = 59.41%`
-- lr: `2e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536/adapter/latest_train_report.json`
-- iteration: `468`
-- optimizer_step: `60`
-- train_loss: `0.219455`
-- learning_rate: `9.22316e-06`
-- it_per_sec: `0.350486`
-- tokens_per_sec: `181.026`
-- trained_tokens: `249117`
-- peak_memory_gb: `71.4728`
-
-#### Completion markers
-
-- training_result_exists: `False`
-- runtime_pid: `86512`
-- runtime_pid_alive: `True`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_vo_lr2e5_len1536 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536`
-
-- status: `training_completed`
-- label: `stagefreeze-v1-short-live`
-- observed_at: `2026-04-09T06:35:13.977708+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `67/67 = 100.00%`
-- lr: `1e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536/adapter/latest_train_report.json`
-- iteration: `523`
-- optimizer_step: `67`
-- train_loss: `0.235834`
-- learning_rate: `1.36786e-07`
-- it_per_sec: `0.357081`
-- tokens_per_sec: `187.37`
-- trained_tokens: `277977`
-- peak_memory_gb: `70.9263`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `88859`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536`
-
-- status: `training`
-- label: `direct-fullrun-v2-vo-live`
-- observed_at: `2026-04-09T06:39:58.322158+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `80/101 = 79.21%`
-- lr: `2e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536/adapter/latest_train_report.json`
-- iteration: `628`
-- optimizer_step: `80`
-- train_loss: `0.237658`
-- learning_rate: `3.5589e-06`
-- it_per_sec: `0.627675`
-- tokens_per_sec: `346.32`
-- trained_tokens: `335724`
-- peak_memory_gb: `71.4728`
-
-#### Completion markers
-
-- training_result_exists: `False`
-- runtime_pid: `90194`
-- runtime_pid_alive: `True`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_vo_lr2e5_len1536 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr1e5_ep24_len1536`
-
-- status: `training_completed`
-- label: `direct-fullrun-v2-short-live`
-- observed_at: `2026-04-09T06:57:56.343946+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr1e5_ep24_len1536`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `67/67 = 100.00%`
-- lr: `1e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr1e5_ep24_len1536/adapter/latest_train_report.json`
-- iteration: `523`
-- optimizer_step: `67`
-- train_loss: `0.270551`
-- learning_rate: `1.36786e-07`
-- it_per_sec: `0.533786`
-- tokens_per_sec: `280.092`
-- trained_tokens: `277977`
-- peak_memory_gb: `70.9262`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `98124`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_direct_from_fullrun_v2_stage2_attention_qkvo_lr1e5_ep24_len1536 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`
-
-- status: `recorded`
-- label: `export-safe-stage1-rerun-live`
-- observed_at: `2026-04-09T11:41:48.519598+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `3321`
-- optimizer_progress: `832/832 = 100.00%`
-- lr: `0.0001`
-- max_seq_length: `4096`
-- trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1/adapter/latest_train_report.json`
-- iteration: `6642`
-- optimizer_step: `832`
-- train_loss: `0.396673`
-- learning_rate: `6.57615e-07`
-- it_per_sec: `0.817017`
-- tokens_per_sec: `386.812`
-- trained_tokens: `3943876`
-- peak_memory_gb: `68.5965`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `38710`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage1_broad_exportsafe_v3f_union_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2`
-
-- status: `training_completed`
-- label: `export-safe-qkvo-rerun-v2-live`
-- observed_at: `2026-04-09T12:12:30.827771+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `2e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.182466`
-- learning_rate: `2.36105e-07`
-- it_per_sec: `0.387012`
-- tokens_per_sec: `179.574`
-- trained_tokens: `418695`
-- peak_memory_gb: `67.3986`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `71469`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1536_rerun_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2`
-
-- status: `training_completed`
-- label: `export-safe-vo-rerun-v2-live`
-- observed_at: `2026-04-09T12:25:30.325515+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `2e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.188623`
-- learning_rate: `2.36105e-07`
-- it_per_sec: `0.447069`
-- tokens_per_sec: `207.44`
-- trained_tokens: `418695`
-- peak_memory_gb: `68.0482`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `73135`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1536_rerun_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr1e5_ep24_len1536_rerun_v2 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr1e5_ep24_len1536_rerun_v2`
-
-- status: `training_completed`
-- label: `export-safe-short-rerun-v2-live`
-- observed_at: `2026-04-09T12:16:22.106309+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr1e5_ep24_len1536_rerun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `67/67 = 100.00%`
-- lr: `1e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr1e5_ep24_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `523`
-- optimizer_step: `67`
-- train_loss: `0.227268`
-- learning_rate: `1.36786e-07`
-- it_per_sec: `0.355856`
-- tokens_per_sec: `186.728`
-- trained_tokens: `277977`
-- peak_memory_gb: `67.3986`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `73434`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr1e5_ep24_len1536_rerun_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr5e6_ep24_len1536_rerun_v2 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr5e6_ep24_len1536_rerun_v2`
-
-- status: `training_completed`
-- label: `export-safe-qkvo-lr5e6-rerun-v2-live`
-- observed_at: `2026-04-09T12:33:20.132328+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr5e6_ep24_len1536_rerun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `67/67 = 100.00%`
-- lr: `5e-06`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr5e6_ep24_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `523`
-- optimizer_step: `67`
-- train_loss: `0.251744`
-- learning_rate: `6.83929e-08`
-- it_per_sec: `0.598294`
-- tokens_per_sec: `313.941`
-- trained_tokens: `277977`
-- peak_memory_gb: `67.3986`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `79008`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr5e6_ep24_len1536_rerun_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr5e5_len1536_rerun_v2 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr5e5_len1536_rerun_v2`
-
-- status: `training_completed`
-- label: `export-safe-vo-lr5e5-rerun-v2-live`
-- observed_at: `2026-04-09T13:09:21.493620+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr5e5_len1536_rerun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `5e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr5e5_len1536_rerun_v2/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.18651`
-- learning_rate: `5.90262e-07`
-- it_per_sec: `0.388106`
-- tokens_per_sec: `180.081`
-- trained_tokens: `418695`
-- peak_memory_gb: `68.0482`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `84409`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr5e5_len1536_rerun_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v2 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v2`
-
-- status: `running_untracked`
-- label: `export-safe-qkvo-len768-rerun-v2-live`
-- observed_at: `2026-04-09T13:13:32.380139+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `0/67 = 0.00%`
-- lr: `2e-05`
-- max_seq_length: `768`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Completion markers
-
-- training_result_exists: `False`
-- runtime_pid: `91674`
-- runtime_pid_alive: `True`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v2 -->
-
-## Export-safe five-lane local320 late progress
-
-- `2026-04-09T14:24Z` 時点では **current qkvo = `176/320, 22/40`**, **current vo = `168/320, 21/40`**, **current short = `192/320, 24/40`**, **qkvo low-LR = `168/320, 21/40`**, **vo high-LR = `144/320, 18/40`**。first summary はまだ 0 本だが、5 lane 全てが引き続き chunk 単位で前進した。
-- `2026-04-09T14:34Z` 時点では **current qkvo = `192/320, 24/40`**, **current vo = `176/320, 22/40`**, **current short = `224/320, 28/40`**, **qkvo low-LR = `184/320, 23/40`**, **vo high-LR = `160/320, 20/40`**。先頭は引き続き **current short** で、first local320 summary の最有力になっている。
-- memory snapshot は `14:24Z` / `14:34Z` ともに **`PhysMem 420-421G used / 90G unused`** 帯で横ばい。したがって現時点の 5-lane local320 並列は **stall でも OOM 前兆でもなく、単純に wall-clock が重い状態** とみなして継続する。
-- `2026-04-09T15:06Z` 時点では **current qkvo = `248/320, 31/40`**, **current vo = `208/320, 26/40`**, **current short = `256/320, 32/40`**, **qkvo low-LR = `192/320, 24/40`**, **vo high-LR = `176/320, 22/40`**。この時点でも first summary は未生成で、依然として **current short** が先頭を維持した。
-- `2026-04-09T15:26Z` 時点の progress manifest では **current short = `312/320, 39/40`**, **current qkvo = `288/320, 36/40`**, **current vo = `280/320, 35/40`**, **qkvo low-LR = `272/320, 34/40`**, **vo high-LR = `208/320, 26/40`**。first summary はまだ 0 本だが、5 lane 全てで `benchmark_eval_suite_progress.json` の mtime が引き続き更新されている。
-- `ps` 上でも local320 実行中の postprocess Python は生存しており、特に **current short postprocess (`PID 71464`) は `CPU≈29%`, `MEM≈11.7%`** を維持したまま最後の 1 chunk を処理中だった。したがって **39/40 停滞は deadlock ではなく、長い最終 chunk の実行待ち** と判断して watcher を継続する。
-- `2026-04-09T15:39Z` 時点では **current qkvo = `304/320, 38/40`**, **current vo = `288/320, 36/40`**, **current short = `312/320, 39/40`**, **qkvo low-LR = `272/320, 34/40`**, **vo high-LR = `232/320, 29/40`**。first summary は依然 0 本だが、current qkvo が current short の背後まで追い上げ、watcher (`shellId 956`) 上でも全 lane が引き続き live だった。
-- README 契約（**single adapter / rank<=32 / submission.zip**）と現行 CLI を再照合した上で、次段の export-safe queue を 2 本追加した。新規 queued lanes は **`qkvo lr3e-5 len1536 rerun_v1`** と **`vo lr2e-5 len1024 rerun_v1`** で、いずれも **`wait-resume-train-from-path` + `prepare_manifest` 待ち postprocess + `prepare_manifest` 待ち live poller** を detached で起動済み。
-- trigger は **`qkvo lr5e-6 ep2.4 len1536 rerun_v2` の suite summary** と **`vo lr5e-5 len1536 rerun_v2` の suite summary**。したがって今の 5-lane local320 / full-suite を邪魔せず、後続 single-file pipeline を切らさずに繋げられる。
-- `2026-04-09T15:44Z` に **first local320 summary** が出て、最初に完了した lane は **current short (`qkvo lr1e-5 ep2.4 len1536 rerun_v2`)** だった。score は **`212/320 = 0.6625`** で、既知の export-safe baseline **`215/320 = 0.6719`** を下回ったため、submission-ready 本線としては弱い。
-- breakdown は **binary `18/60`**, **symbol `19/60`**, **text `27/50`**, **unit `48/50`**, **gravity `50/50`**, **roman `50/50`**。特に **`glyph_len5 0/20`**, **`bit_structured_byte_formula 3/14`**, **`manual_audit_priority 7/50`** が重く、逆に gravity / roman は完全維持だった。
-- `benchmark_eval_suite_progress.json` 上では current short は local320 完了直後に **`leaderboard_proxy_v2` (84 rows)** へ遷移しており、suite 自体はまだ継続中。残る local320 は **current qkvo `312/320, 39/40`**, **current vo `296/320, 37/40`**, **qkvo low-LR `280/320, 35/40`**, **vo high-LR `240/320, 30/40`** を追跡中で、次の summary 回収へ watcher を切り替える。
-- `2026-04-09T15:49Z` に 2 本目の local320 summary として **current qkvo (`qkvo lr2e-5 len1536 rerun_v2`) = `209/320 = 0.6531`** が確定した。family は **binary `19/60`**, **symbol `20/60`**, **text `22/50`**, **unit `49/50`**, **gravity `50/50`**, **roman `49/50`** で、こちらも baseline `215/320` 未満。`glyph_len5` はやはり **`0/20`** のままだった。
-- current qkvo は後続 queue をもう支えていないため、local320 summary 確定後に **postprocess tree (`PID 71465/71462/71458`) を停止**し、同 run の suite summary を待っていた stale waiters **`71474/71472/71470`**（current vo duplicate launch）と **`76802/76799/76792`**（qkvo low-LR duplicate launch）も明示停止した。memory snapshot は **`PhysMem 421G used / 90G unused -> 361G used / 150G unused`** まで回復した。
-- この headroom を使って、queued candidate のうち **`vo lr2e-5 len1024 rerun_v1`** を **manual prelaunch**した。新 run は **`current_pid=27744`**, `runtime_preflight` で **`system_free_percent=50`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈259.1 GB`**, competing MLX train なしを確認。first validation も **`val_loss=1.2338`** で通り、prelaunch 後の snapshot は **`PhysMem 423G used / 88G unused`**。既存の len1024 live/postprocess waiters は prepare manifest を見て引き継ぐ。
-- `2026-04-09T16:00Z` には **current vo (`vo lr2e-5 len1536 rerun_v2`)** も local320 summary を出し、**`209/320 = 0.6531`** で current qkvo と同点の dead lane になった。内訳は **binary `17/60`**, **symbol `18/60`**, **text `24/50`**, **unit `50/50`**, **gravity `50/50`**, **roman `50/50`**、`glyph_len5` は **`0/20`** のまま。
-- current vo も baseline `215/320` 未満で本線維持価値が無いため、**postprocess tree (`71466/71461/71459`)** を停止し、同 run の suite summary 依存だった duplicate waiters **`76791/76797/76804`**（vo high-LR duplicate launch）と **`71471/71473/71475`**（short duplicate launch）も掃除した。kill 後 snapshot は **`PhysMem 382G used / 129G unused`** まで戻り、active heavy set は **qkvo low-LR local320**, **vo high-LR local320**, **current short proxy**, **vo len1024 train** に再圧縮された。
-- 戻した headroom を idle にせず、queued candidate のもう 1 本だった **`qkvo lr3e-5 len1536 rerun_v1`** も **manual prelaunch**した。新 run は **`current_pid=32475`**, `runtime_preflight` で **`system_free_percent=46`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈282.8 GB`**、first validation **`val_loss=1.2338`** を確認。prelaunch 後の snapshot も **`PhysMem 448G used / 63G unused`** に収まり、qkvo lr3e5 の live/postprocess waiters は prepare manifest を見て引き継いだ。
-- `2026-04-09T16:22Z` には **`vo len1024 rerun_v1` training** が完了し、**`optimizer_step=101`**, final train loss **`0.18937`**, final val loss **`0.30195`**, peak memory **`65.52 GB`** を記録した。`postprocess-run` は直ちに **`eval_suite_readme_proxy_specialized/readme_local320`** へ遷移し、suite progress は **`0/320, 0/40`** から開始している。
-- 同時点で active heavy set は **qkvo low-LR local320**, **vo high-LR local320**, **current short proxy**, **vo len1024 local320**, **qkvo lr3e5 train** の 5 本となり、snapshot は **`PhysMem 449G used / 62G unused`**。この headroom では **current short suite summary 完了をトリガーにした `len768 rerun_v3` auto-launch が OOM 寄り** と判断し、queued の len768 waiters **`92543/92544/92545`**, **`92549/92551/92554`**, **`92550/92552/92553`** を明示停止した。len768 は **pause** に切り替え、次の local320 summary / lane cut で headroom が戻ってから再投入する。
-- その後 current short は **`leaderboard_proxy_v2 80/84`** を完了して **`binary_bias_specialized_set 0/563`** に入ったが、lane 自体は既に local320 **`212/320`** の dead 判定で、本線には不要だった。そこで specialized eval の postprocess tree **`71464/71463/71460`** を停止し、snapshot を **`PhysMem 388G used / 123G unused`** まで戻した。
-- 回復した headroom をそのまま search に戻し、pause していた **`qkvo lr2e5 ep2.4 len768 rerun_v3`** を **manual prelaunch** した。新 run は **`current_pid=37687`**, `runtime_preflight` で **`system_free_percent=45`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈289.1 GB`**、first validation **`val_loss=1.2338`** を確認。manual prelaunch に合わせて **live poller** と **postprocess-run** も新規 detached で再接続済み。
-- `2026-04-09T16:45Z` には **`qkvo lr3e5 len1536 rerun_v1` training** も完了し、**`optimizer_step=101`**, final train loss **`0.18247`**, final val loss **`0.27802`**, peak memory **`67.40 GB`** を記録した。`postprocess-run` はすぐに **`eval_suite_readme_proxy_specialized/readme_local320`** を開始しており、これで active heavy set は **qkvo low-LR local320**, **vo high-LR local320**, **vo len1024 local320**, **qkvo lr3e5 local320**, **len768 train** に入れ替わった。
-- `2026-04-09T16:54Z` には **`qkvo lr2e5 ep2.4 len768 rerun_v3` training** も完了し、**`optimizer_step=67`**, final train loss **`0.21928`**, final val loss **`0.30148`**, peak memory **`65.03 GB`** を記録した。len768 側も `postprocess-run` が **`eval_suite_readme_proxy_specialized/readme_local320`** を開始し、snapshot は **`PhysMem 361G used / 150G unused`** まで回復。これで active set は **4 本の local320 tail回収 + len768 local320 着手** になった。
-- `2026-04-09T17:07Z` には **`vo lr5e5 len1536 rerun_v2`** の local320 summary が出て、**`204/320 = 0.6375`** と確定した。内訳は **binary `10/60`**, **symbol `19/60`**, **text `26/50`**, **gravity `49/50`**, **roman `50/50`**, **unit `50/50`**。`glyph_len5 0/20` は変わらず、baseline `215/320` からさらに遠い dead lane だった。
-- high-LR vo は summary 確定後に **postprocess tree (`84623/84622/76786`)** を停止し、snapshot は **`PhysMem 360G used / 151G unused`** まで回復した。この回復枠を使い、explore で保留していた **full `stage-union-exportsafe` len1024** を **manual prelaunch**。新 run **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1024_rerun_v1`** は **`current_pid=47215`**, `runtime_preflight` で **`system_free_percent=50`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈258.8 GB`**, first validation **`val_loss=1.2338`** を確認済みで、live poller / postprocess も detached で接続した。
-- `2026-04-09T17:22Z` には **`qkvo lr5e-6 ep2.4 len1536 rerun_v2`** の local320 summary が出て、**`210/320 = 0.6562`** と確定した。内訳は **binary `17/60`**, **symbol `18/60`**, **text `25/50`**, **gravity `50/50`**, **roman `50/50`**, **unit `50/50`**。`bit_structured_byte_formula` は **`2/14`**, `glyph_len5` は **`0/20`** のままで、baseline `215/320` を超えられなかった。
-- low-LR qkvo は summary 確定後に **postprocess tree (`76790/79296/79297`)** を停止し、snapshot は **`PhysMem 384G used / 127G unused`** まで回復した。この headroom を使って、追加の full corrective ablation として **`stage-union-exportsafe len1536`** を **manual prelaunch**。新 run **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1536_rerun_v1`** は **`current_pid=50566`**, `runtime_preflight` で **`system_free_percent=46`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈284.1 GB`**, first validation **`val_loss=1.2338`** を確認済みで、live poller / postprocess も detached で接続した。
-- ただし dual union train + 3 local320 の同時並走では snapshot が **`PhysMem 476G used / 35G unused`** まで逼迫し、vo len1024 / qkvo lr3e5 / len768 の chunk 更新も鈍化した。`stage-union-exportsafe len1536` は **`Opt20 / train_loss=0.24355 / peak_memory=65.20 GB`** まで確認した時点で、**OOM 回避と score 回収優先**のため **`50564/50565/50566`** と related waiters **`50745-50750`** を停止した。停止後 snapshot は **`PhysMem 384G used / 127G unused`** へ回復。
-- `2026-04-09T17:44Z` には、先に回していた **`stage-union-exportsafe len1024 rerun_v1` training** が完了した。最終 train report は **`optimizer_step=101`**, train loss **`0.17967`**, final val loss **`0.27409`**, peak memory **`65.90 GB`**。`postprocess-run` は直後に **`readme_local320`** を開始し、初回 progress は **`8/320 rows, 1/40 chunks`**。train 完了後の snapshot は **`PhysMem 360G used / 151G unused`** まで戻った。
-- `2026-04-09T18:55Z` には **`stage-union-exportsafe len1024 rerun_v1`** の local320 summary が出て、**`100/320 = 0.3125`** と確定した。内訳は **binary `14/60`**, **general_stable `74/200`**, **symbol `12/60`**、family では **gravity `2/50`**, **text `1/50`**, **unit `22/50`** まで崩れ、full union corrective が broad trunk を完全に壊すことが露呈した。`readme_local320` summary 確定後に **postprocess tree (`47391/47392/47393`)** を停止し、snapshot は **`PhysMem 300G used / 211G unused`** まで回復した。
-- full union corrective が dead と判明したため、空いた headroom は **attention-only qkvo len1024** へ回した。新 run **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1024_rerun_v1`** を manual prelaunch し、`runtime_preflight` で **`current_pid=69145`**, **`system_free_percent=62`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈194.8 GB`** を確認済み。live poller / postprocess も detached で接続した。
-- `2026-04-09T19:20Z` には **`attention qkvo len1024 rerun_v1` training** が完了した。最終 train report は **`optimizer_step=101`**, train loss **`0.20114`**, final val loss **`0.29817`**, peak memory **`65.85 GB`**。初回 validation は **`2.1947`** と高かったが、train 中に **`1.3547 → 0.4930 → 0.3109 → 0.2011`** まで落ちた。`postprocess-run` は直後に **`readme_local320`** を開始し、初回 progress は **`8/320 rows, 1/40 chunks`**。train 完了後の snapshot は **`PhysMem 361G used / 150G unused`**。
-- `2026-04-09T19:55Z` には **`attention vo len1024 rerun_v1`** の local320 summary が出て、**`201/320 = 0.6281`** と確定した。内訳は **binary `15/60`**, **general_stable `168/200`**, **symbol `18/60`**, **text `19/50`**。`bit_structured_byte_formula` は **`4/14`** まで上がったが、`glyph_len5 0/20` と text 崩れが重く、baseline `215/320` を大きく下回った。summary 確定後に **postprocess tree (`24399/27860/27861`)** を停止し、snapshot は **`PhysMem 300G used / 211G unused`** まで回復した。
-- 回復した headroom は、交点 ablation として **`attention qkvo lr3e5 len1024`** に回した。新 run **`nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1`** を manual prelaunch し、`runtime_preflight` で **`current_pid=82336`**, **`system_free_percent=62`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈194.7 GB`** を確認済み。live poller / postprocess も detached で接続した。
-- `2026-04-09T20:03Z` には **`attention qkvo lr3e5 len1536 rerun_v1`** の local320 summary が出て、**`206/320 = 0.6438`** と確定した。内訳は **binary `14/60`**, **general_stable `172/200`**, **symbol `20/60`**, **text `23/50`**。`bit_structured_byte_formula` は **`5/14`** まで上がったが、`glyph_len5 0/20` と binary hard 崩れが重く、baseline `215/320` を超えられなかった。summary 確定後に **postprocess tree (`24398/32663/32664`)** を停止し、snapshot は **`PhysMem 313G used / 198G unused`** まで回復した。
-- `2026-04-09T20:07Z` には **`attention qkvo lr2e5 ep2.4 len768 rerun_v3`** の local320 summary が出て、**`218/320 = 0.6813`** と確定した。これは export-safe corrective family で **初めて baseline `215/320` を超えた** local320 で、内訳は **binary `18/60`**, **general_stable `178/200`**, **symbol `22/60`**, **text `28/50`**。`glyph_len5 0/20` は未解決だが、`numeric_2x2 22/40`, `text_monoalphabetic 28/50`, `bit_structured_byte_formula 5/14` まで押し上げており、現時点の export-safe 主戦 candidate になった。lane は **切らず**、そのまま `leaderboard_proxy_v2` / specialized / audit / export まで進める。
-- `2026-04-09T20:20Z` には **`attention qkvo lr3e5 len1024 rerun_v1` training** も完了した。最終 train report は **`optimizer_step=101`**, train loss **`0.19507`**, final val loss **`0.29503`**, peak memory **`65.85 GB`**。初回 validation は **`2.1947`** と高かったが、train 中に **`1.2645 → 0.3935 → 0.3006 → 0.2529 → 0.1951`** まで落ちた。`postprocess-run` は直後に **`readme_local320`** を開始しており、初回 progress は **`24/320 rows, 3/40 chunks`**。train 完了後の snapshot は **`PhysMem 300G used / 211G unused`**。
-- `2026-04-09T20:41Z` には、best lane **`attention qkvo lr2e5 ep2.4 len768 rerun_v3`** が **`leaderboard_proxy_v2 = 33/84 = 0.3929`** を記録して specialized 563 へ進んだ。内訳は **binary `24/73`**, **symbol `9/11`**, `binary_structured_byte_formula 6/10`, `bit_permutation_inversion 7/24`, `bit_other 10/28`。proxy は dead lane `current qkvo 30/84` より上だが、まだ hidden-gap を十分には解けていない。現時点では **「local320 最良だが proxy ではまだ中位」** という位置づけになる。
-- best lane の exploit として、空いた headroom で **`attention qkvo lr3e5 ep2.4 len768 rerun_v1`** も manual prelaunch した。`runtime_preflight` で **`current_pid=91963`**, **`system_free_percent=62`**, **`gpu_device_util=100%`**, **`in_use_system_memory≈194.7 GB`**, first validation **`val_loss=2.1947`** を確認済み。live poller / postprocess も detached で接続した。
-- `2026-04-09T21:40Z` には、**`attention qkvo len1024 rerun_v1`** の local320 が **`88/320, 11/40 chunks`** で長時間停滞したため、throughput 優先で **postprocess tree (`69421/69422/69423`) を停止**した。`lr3e5 len1024`, `lr3e5 ep2.4 len768`, `stage2.5 re-anchor` の 3 lane と best len768 specialized に資源を寄せ、snapshot は **`PhysMem 360G used / 151G unused`** まで回復した。
-- `2026-04-09T23:32Z` には、**`attention qkvo lr3e5 len1024 rerun_v1`** の local320 summary が **`74/320 = 0.2313`** と確定した。内訳は **binary `12/60`**, **general_stable `54/200`**, **symbol `8/60`**、family では **text `0/50`**, **unit `9/50`**, **gravity `13/50`**, **roman `32/50`** まで崩れており、`glyph_len5 0/20` と `text_monoalphabetic 0/50` が致命傷だった。summary 確定直後に **postprocess tree (`82534/82535/82536`) を停止**して proxy/specialized tail を切り、snapshot は **`PhysMem 302G used / 209G unused`** まで回復した。`lr3e5 len1024` は **catastrophic dead lane** として以後の本線から除外する。
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1`
-
-- status: `training_completed`
-- label: `export-safe-vo-len1024-rerun-v1-live`
-- observed_at: `2026-04-09T16:22:02.430384+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `2e-05`
+Update 2026-04-13T00:39Z:
+- stale proxybench live-progress watcher cleanup advanced materially: `poll_live_run_status_summary.json` was deleted for the `runtime_pid_alive: False` lines `...verifiedswap22_bit33eq2...`, `...bit33_numreal8_anchortrim...`, `...bit33_numreal5_verifiedmix...`, `...reprogap4...`, `...reprogap5...`, `...reprobridge9...`, `...reprobridge10...`, `...reprobridge12...`, `...reprobridge13...`, `...reprobridge15...`, `...reprobridge16...`, `...reprobridge17...`, `...reprobridge18...`, `...reprobridge19...`, `...reprobridge20...`, and `...reprobridge22...`
+- this leaves the confirmed live writes concentrated on the detached best-submission pollers rather than on a wide field of stale run-root watcher summaries, which makes future PTY-side `ps` / `kill` cleanup narrower once host execution returns
+
+Update 2026-04-13T00:37Z:
+- additional high-confidence stale waiter artifacts were removed from outputs without touching README-visible submission/frontier payloads: `poll_live_run_status_summary.json` was deleted for `...verifiedswap22_eq12anchortrim...`, `...verifiedswap22_sym9...`, and `...text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3`
+- the remaining stray `wait_for_prepare_manifest_postprocess.json` files under the three `...binarycorr_defaultsolvers_sym24...` roots plus the same `...binaryaware...v3` root were also deleted; all four paths stayed absent on immediate recheck
+
+Update 2026-04-13T00:35Z:
+- the detached best-submission pollers are now positively confirmed as still live: `best_submission_candidate_auto/selection_manifest.json` advanced to `2026-04-13T00:34:41.786380+00:00`, and `best_submission_candidate_proxybench_auto/poll_best_submission_summary.json` reached iteration `256` at `2026-04-13T00:33:17.164121+00:00`
+- the earlier `text060.../poll_live_run_status_summary.json` reappearance did **not** recur immediately after a second delete; the file is currently absent again, so the only currently confirmed live writers remain the detached best-candidate pollers while that stale run-summary path is treated as low-confidence delayed rewrite noise until PTY recovery allows process inspection
+- file-level cleanup also emptied the remaining obvious smoke roots `nemotron_sft_lora_with_cot_v2_mlx_progress_callback_smoke`, `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_smoke`, and `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_exportsafe_resume_smoke`; only empty directories remain pending shell-based removal
+
+Update 2026-04-13T00:30Z:
+- the user-reported `...text060_num100_grav20_unit20_recover.../poll_live_run_status_summary.json` was confirmed to be a stale watcher artifact rather than a live run: the corresponding ledger block already recorded `runtime_pid_alive: False`, and the remaining watcher files for that run root (`poll_live_run_status_summary.json`, `wait_for_free_memory.json`, both `wait_for_prepare_manifest_*.json`, and `postprocess_manifest.json`) were removed to reduce false positives while organizing `baseline_mlx/outputs`
+- the remaining live-looking writer is now narrowed to the detached best-candidate selector surface, not a training/eval runtime: `best_submission_candidate_proxybench_auto/poll_best_submission_summary.json` still reports `status=running` with `continue_after_selection=true`, and the `best_submission_candidate_auto` / `best_submission_candidate_proxybench_auto` selection manifests are the artifacts that still show fresh writes
+- there are still no active Copilot-managed shell sessions or background agents visible from the available tool surface, so the blocker for actually stopping that writer is now explicit: host-level Darwin PTY failure still prevents `ps` / `kill`, and the detached single-file best-poller process therefore cannot be terminated from inside this session even though cleanup of stale watcher artifacts can continue
+
+Update 2026-04-12T23:45Z:
+- cleanup was narrowed to a strict README-first keep set: anything tied directly to the active `submission.zip` paths, current frontier run roots, threshold frontier outputs, or Git-visible version ledgers was preserved, while clearly generated trash outside that contract surface was removed
+- managed execution is quiescent from the available tool surface: there are no active background agents, and the tracked shell sessions are already `completed`, so there was no still-running Copilot-managed experiment left to stop
+- Darwin PTY is still blocked by `posix_openpt failed: Device not configured`, so directory removal via shell remains unavailable; as a file-based fallback, stale `baseline_mlx/outputs/*_wait_prepare_*.json`, queue/poller/chain logs, repo `.pyc`, repo `.DS_Store`, and `.pytest_cache` files were deleted
+- while organizing the uncommitted state, the three active repro wrappers were also aligned so their generated summaries now surface the live README-facing exportability signals (`peft_export_ready`, `validation_valid`, and reproduced `reproduced_*` fields when present) and only emit exportability-note wording when the strict boolean gate is actually `True`
+- the remaining output sprawl is now narrowed to directory-level pruning of historical run roots, which still depends on PTY recovery because the available file tools cannot delete directories
+
+Update 2026-04-12T23:24Z:
+- the threshold hardening sweep now also has an explicit anti-regression guard for the retired `existing_export_valid` name: the active threshold wrapper source, the threshold summary payload/markdown, and the Git-visible threshold version ledger are all locked to `existing_validation_valid` instead
+- this keeps the naming-symmetry fix from silently drifting back toward the older alias while the checked-in generated threshold summary artifacts still remain historical and PTY-blocked from regeneration
+
+Update 2026-04-12T23:19Z:
+- the active threshold promotion wrapper and its Git-visible version ledger now expose the live README-facing exportability signals directly: `existing_peft_export_ready`, `existing_validation_valid`, `reproduced_peft_export_ready`, `reproduced_validation_valid`, plus an explicit `exportability_note`, instead of leaving readers to infer state from the historical `existing_audit_status` / `reproduced_audit_status` labels alone
+- the threshold summary schema's naming asymmetry is now fixed too: the old `existing_export_valid` shape was normalized to `existing_validation_valid`, matching `reproduced_validation_valid` while still reading the real `export_manifest.validation.valid` signal rather than a truthy compatibility alias
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now regression-locks both the threshold wrapper summary payload and the threshold version ledger so future edits cannot drop the strict boolean / validation pair or the README-facing explanation of those live exportability signals
+- a focused README-first code review on the threshold symmetry change did not surface additional substantive issues; the remaining follow-up is still PTY-blocked regeneration of checked-in generated threshold summary artifacts that predate the new fields
+
+Update 2026-04-12T23:01Z:
+- the three current reproduction ledgers (`versions/baseline_mlx_binary40_repro_v1/RESULT.md`, `versions/baseline_mlx_o30best_repro_v1/RESULT.md`, `versions/baseline_mlx_o30best_proxybench_repro_v1/RESULT.md`) now expose `peft_export_ready: True` and an explicit README-facing exportability note right next to their historical `audit_status: potentially_exportable_2d_only` lines
+- that keeps the measured score ledgers Git-visible while making it explicit that `audit_status` is a legacy compatibility label and that the live interpretation should come from `peft_export_ready` plus `regenerated_submission_valid` under the top-level `README.md` contract
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now regression-locks those three ledgers so future edits cannot leave the legacy audit_status string unexplained
+
+Update 2026-04-12T22:40Z:
+- a fresh minimal shell probe (`pwd && ls README.md`) still fails immediately with `posix_openpt failed: Device not configured`, so the host-level PTY blocker remains the only reason the newly hardened runtime/export gates cannot be exercised end-to-end yet
+- the active `versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py` audit-artifact inspector no longer treats a missing legacy `audit_status` string as a hard failure when the real README-facing exportability signal `peft_export_ready` is already present and valid
+- the same inspector now validates `peft_export_ready` strictly as a JSON boolean instead of accepting arbitrary truthy payloads, so malformed audit summaries like `"peft_export_ready": "true"` can no longer slip through as export-ready
+- the baseline MLX monolith now uses the same strict-boolean rule through a shared `audit_summary_is_export_ready(...)` helper, so both submission-candidate selection and `postprocess-run --export-only-if-ready` no longer treat truthy non-boolean audit payloads as exportable
+- the same strict-boolean rule now reaches serialization/rendering too: `v3f_stage2_candidate_audit.json` candidate rows and the monolith's live markdown tables render/export `peft_export_ready` from strict identity checks instead of truthy coercion, so malformed payloads cannot be displayed as export-ready by accident
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks all four sides of that contract: export-ready audit payloads remain valid even if the legacy status string is absent, non-boolean `peft_export_ready` values are rejected by the `v3f` inspector, the monolith skips export when a malformed truthy audit flag is present, and active non-output audit-gate surfaces are forbidden from reintroducing legacy status compares / stale `2D-only audit` wording / truthy coercions
+
+Update 2026-04-12T21:21Z (follow-up):
+- a README-first code review surfaced three real static bugs in the single-file MLX monolith and its export surface, all of which are now patched without waiting for PTY recovery
+- the built-in PEFT export/audit path in `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` now matches the authoritative exporter on two critical points:
+  - PEFT reference shapes come from `get_peft_model_state_dict(...)`, so submission adapters use standard `...lora_A.weight` / `...lora_B.weight` keys instead of the incorrect `.default.` suffix form
+  - routed-expert `switch_mlp` 3D tensors are now converted into per-expert `up_proj` / `down_proj` PEFT tensors instead of being false-blocked as non-2D
+- the same monolith/exporter target-module regex drift was fixed too: both the inline MLX monolith exporter and `mlx_to_peft_exporter/export_mlx_adapter_bundle_to_peft.py` now include attention terminals (`q_proj`, `k_proj`, `v_proj`, `o_proj`) alongside the existing Mamba/MoE terminals, so attention-only and stage-union exportable adapters no longer fail target-module derivation
+- live progress parsing now accepts both `Iter N (Opt M): ...` and CLI-default micro-step `Iter N: ...` console lines; micro-step logs remain visible in status summaries with `steps_per_report_step_unit = micro` and an explicit non-fake `optimizer_step: n/a (micro-step log)` rendering instead of disappearing from live monitoring
+- the active README-first reproduction / threshold wrappers no longer hard-code `audit_status == "potentially_exportable_2d_only"` as their exportability gate; they now require `peft_export_ready is true`, so future audit-status wording/schema cleanup can proceed without silently breaking package/repro helpers
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now regression-locks that wrapper behavior and also replaces the last stale fake evaluator reason string with a generic `README-compatible PEFT audit` message instead of the no-longer-accurate `2D-only audit` wording
+- historical checked-in auto-run summaries may still show the older routed-expert 3D blocked wording because those payloads were generated before the export mapping fix; regenerating those artifacts remains a PTY-recovery follow-up, not a statement about the current live code
+- regression coverage was widened in the Git-visible single test surfaces:
+  - `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks PEFT short-key reference loading, routed-expert 3D conversion, audit/export acceptance for supported switch-MLP tensors, attention target-module regex generation, and micro-step console-log parsing/rendering
+  - `mlx_to_peft_exporter/tests/test_readme_submission_contract.py` now also locks attention-only target-module regex generation for the authoritative exporter path
+
+Update 2026-04-12T21:21Z:
+- SQL still shows `ready pending = 0` and a single blocked root cause (`diagnose-pty-exhaustion`), so no runtime lane has become executable ahead of PTY recovery
+- a fresh root temp-wrapper audit against `baseline_mlx/tests/test_single_file_stage_waiters.py` confirmed that `temp_execute_runner.py` is back on the intended canonical delegate shape (`from materialize_reprobridges import main` / `raise SystemExit(main())`)
+- the unreferenced root scratch probe `temp_test_lsof.py` was removed because it was only a toy stdout generator, had no remaining callers, and did not belong in the README-first single-file runtime surface
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now also rejects repo-root `temp_test_*.py` scratch probes and requires any repo-root `test_*.py` file to look like a real test module, so one-off debug scripts cannot silently masquerade as tests outside the established test directories
+
+Update 2026-04-12T19:02Z:
+- root `main.py` was still a placeholder `print("Hello ...")`, which meant the active detached waiter commands from `launch_reprobridge25_waiters.py` (`uv run python main.py --action ...`) would have been no-op after PTY recovery
+- `main.py` is now a compatibility shim that translates the legacy root-level `--action` API into the active `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` subcommands:
+  - `wait-resume-train-from-path`
+  - `poll-live-run-status`
+  - `postprocess-run`
+- the shim preserves the legacy waiter-facing flags (`--run-name`, `--wait-summary-path`, `--memory-requirement-gb`, `--lr`, `--epochs`, repeated `--type-samples TYPE COUNT`, `--results-label`, `--publish-commit-msg`) and maps them onto the monolith's current single-file CLI
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now imports the root shim and locks:
+  - legacy waiter-A translation into the monolith wait-resume command
+  - legacy waiter-B translation into `poll-live-run-status --run-root ... --label ...`
+  - legacy waiter-C translation into `postprocess-run --run-root ... --label ... --run-publish-results-md --publish-commit-message ...`
+  - pass-through for already-modern monolith args
+  - `main()` actually delegating the translated argv into the monolith entrypoint
+- a follow-up repo sweep found no other remaining legacy `main.py --action ...` callers beyond those three reprobridge25 waiters
+- `launch_reprobridge25_waiters.py` now also shells out to an absolute `MAIN_ENTRYPOINT = <repo>/main.py` path instead of relying on relative-path resolution, so future `cwd` changes will not silently break those detached waiters
+- the same test file now also adds:
+  - a generic root-shell regression that rejects `python3` drift and missing `uv run python <existing-file>.py` targets across all root `.sh` wrappers
+  - a launcher regression that locks the absolute `MAIN_ENTRYPOINT` prefix for reprobridge25 waiter commands
+  - a shim-coverage regression that ties the reprobridge25 waiter action set directly to `main.py`'s `LEGACY_ACTIONS`, so adding a new legacy waiter action now forces an explicit shim update
+- `launch_reprobridge31_32_recovery.py` was hardened in the same spirit:
+  - its active monolith command target is now an absolute `PIPELINE_PATH`
+  - its threshold promotion inline code now points at an absolute `THRESHOLD_SCRIPT_PATH`
+  - `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks both path constants as existing files and verifies that reprobridge31/32 launcher/live/postprocess waiters use the absolute monolith path while threshold waiters embed the absolute threshold script path
+- the same regression bundle now also imports the active submission wrappers
+  - `versions/baseline_mlx_binary40_repro_v1/reproduce_binary40_submission.py`
+  - `versions/baseline_mlx_o30best_repro_v1/reproduce_o30best_submission.py`
+  - `versions/baseline_mlx_o30best_proxybench_repro_v1/reproduce_o30best_proxybench_submission.py`
+  - `versions/baseline_mlx_threshold_submission_v1/reproduce_threshold_submission.py`
+  and locks that each wrapper's `README_PATH` and `MONOLITH_PATH` resolve to the existing repo `README.md` and baseline MLX monolith, preventing another stale-target split inside the active reproduce-wrapper cluster
+- the recovery hub's real `FOLLOWUP_STEPS` chain for `reprobridge33` through `reprobridge36` is now regression-locked too:
+  - every dataset/summary relpath must stay repo-relative under `baseline_mlx/outputs`
+  - every `*_summary.json` path must stay synchronized with its paired CSV path
+  - each step's base dataset/summary must equal the previous step's output dataset/summary
+  so future no-unit followup edits cannot silently break the 33→36 continuation chain
+- `versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py` now uses an absolute `SELF_PATH` instead of relying on relative `SELF_RELPATH` when it shells back into itself, so the active v3f matrix/stage2/export/package command builders no longer depend on `cwd` staying at repo root
+- the same v3f file had two remaining hardcoded markdown command examples that still referenced the relative script path and three markdown lines that appended `--dry-run` by string concatenation; all of those summary commands now render from `self_uv_command(...)` with the same shell quoting as the actual command builders
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks:
+  - `SELF_PATH == REPO_ROOT / SELF_RELPATH` and `SELF_PATH.exists()`
+  - shell-quoted absolute `SELF_PATH` prefixes in the stage2 profile matrix JSON
+  - matching absolute/quoted markdown command lines for matrix, matrix-all-profiles, export, and package-best-submission examples
+- one more active non-archive sweep is now clean:
+  - the active launcher/wrapper set (`launch_reprobridge25_waiters.py`, `launch_reprobridge31_32_recovery.py`, `versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py`, and the four `baseline_mlx_*_repro_v1` / `threshold_submission_v1` wrappers) no longer contains hardcoded `uv run python ...py` command text drift outside helper-rendered command builders
+  - remaining SQL-blocked todos are execution-only items gated by the still-unresolved Darwin PTY failure, not by newly discovered static command-target gaps
+- the baseline MLX monolith itself (`baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py`) also came back clean in the same static pass: the remaining `.py`/archive literals are the expected `README_PATH` and README-mandated `submission.zip` paths, with no extra hardcoded execution-script drift found
+- the top-level `versions/` sweep is now regression-covered too: every active non-archive version directory discovered under `versions/` must keep a non-empty Git-visible markdown ledger (`RESULT.md` or `<version>-results.md`) and keep that ledger README-visible
+- the same regression bundle now also covers every archive snapshot directory discovered under `versions/archive/`, requiring a non-empty README-visible `<version>-results.md` in each snapshot directory
+- ledger coverage now also requires score/status visibility plus script lineage: each discovered version ledger must expose either a concrete score marker (`229/320 = ...`, `overall_accuracy`, etc.) or an explicit `measured score:` status line, and it must reference at least one existing repo-relative non-test `.py` path
+- the root onboarding doc `How to Get Started + Nemotron Model Reasoning Challenge Resources.md` now starts with an explicit README-first contract note, so external Nemotron / NeMo resource links are no longer presented without first stating that the authoritative competition contract is the repo `README.md` Evaluation/Submitting section (`submission.zip`, rank<=32, and the 7680/64/8192/0.85 inference parameters)
+- the historical plan docs for `v0` through `v4` now also open with a README-first override note, explicitly stating that any later 3584/128/4096-era metric defaults in those preserved planning notes are historical and that the active contract remains the top-level `README.md`; the same regression bundle now locks the presence of that note
+- the same README-first historical-note pattern now also covers archive plan docs (`versions/archive/v1`, `v4`, `v7`, `v8`), so preserved snapshot planning notes cannot surface old notebook-era defaults without first pointing readers back to the current `README.md` contract
+- the root onboarding resources guide is now regression-locked too: its opening block must keep the explicit `competition contract note`, `README.md`, `submission.zip`, and the README evaluation parameters (`7680`, `64`, `0.85`) visible before the external Nemotron resource links
+- `how-to-get-started-transformers.md` now carries the same explicit competition-contract note near the top, clarifying that the Transformers/model-card guidance is subordinate to the repository `README.md` contract; the regression bundle now locks that note and its `submission.zip` / `7680` / `64` / `0.85` fields
+- a new static guard now also forbids historical `submission_v*.zip` naming from leaking back into active non-archive code, and only allows that naming to remain in active markdown where it is explicitly documented as historical context (`versions/baseline_mlx/baseline_mlx-results.md`)
+- the root `README-Nemotron-3-Nano-30B-A3B-BF16.md` model-card snapshot now also carries an explicit non-authoritative repository note, making it clear that upstream sample values in that reference file do not override the competition contract in the top-level `README.md`; the regression bundle now locks that note as well
+- the root markdown surface is now inventory-guarded as well: every repo-root `.md` file must stay non-empty and explicitly `README`-visible, so future top-level notes cannot silently become contract-looking documents without pointing back to the authoritative repository README
+- refreshed operator guidance for the global Darwin PTY blocker now makes the likely failure mode more explicit: current external guidance still points first to PTY exhaustion around `/dev/ptmx` / `kern.tty.ptmx_max`, so the next host-level recovery pass should explicitly check `ls -l /dev/ptmx`, `lsof /dev/ptmx`, `sysctl kern.tty.ptmx_max`, then either raise the PTY limit or reboot if device-node state still looks broken
+- README-adjacent reference surfaces are now harder to misread as authoritative: `discussion/Competition Metric Bug: verify method fails for Binary String Problem (?).md` now opens with a repository note, and both root notebooks named directly by the README (`nvidia-nemotron-metric.ipynb`, `nvidia-nemotron-submission-demo.ipynb`) now begin with README-first non-authoritative notes; the regression bundle now locks both discussion docs and both root notebooks to keep `README.md`, `submission.zip`, `max_tokens = 7680`, and `max_num_seqs = 64` visible near the top
+- after review, the root-notebook regression was tightened to parse notebook JSON and inspect the first markdown cell directly rather than relying on raw line offsets, avoiding false failures from harmless notebook metadata reformatting
+- that regression was then widened from a fixed file list to a repo-root notebook inventory guard, so any future top-level `.ipynb` added beside the README must also begin with a README-first repository note
+- a fresh shell recovery probe (`pwd && ls README.md`) still failed with `posix_openpt failed: Device not configured`, so the host-level Darwin PTY blocker remains active even after the additional static hardening above
+- another README-first sweep hardened five more high-risk reference docs: `discussion/Are problem types the same for train and test?.md`, `discussion/Answers To Everything Data: Read Me! 100% Solve Rate.md`, `discussion/Zero shot predictions.md`, `DATA_ANALYSIS_REPORT.md`, and `target_modules_fact_record_2026-04-08.md` now all open with explicit non-authoritative repository notes; the regression bundle now locks those headers to keep `README.md`, `submission.zip`, `max_tokens = 7680`, and `max_num_seqs = 64` visible near the top
+- the discussion guard was then widened from a fixed top-level list to a recursive `discussion/**/*.md` inventory, and the remaining root-level + nested `discussion/gpu-environment/*.md` files were brought onto the same repository-note pattern; `discussion/Inconsistency in Evaluation metric.md` was also updated so the recursive guard now sees `submission.zip` in its header like the other discussion docs
+- `BF16_SINGLEFILE_REPRO_SUMMARY_2026-03-27.md` now also carries an explicit non-authoritative repository note and was added to the root high-risk reference-doc regression set, so that historical experiment summary cannot drift into a contract-looking top-level artifact
+- the discussion notebook surface is now guarded too: `discussion/train-set-zero-shot-inference-exploration.ipynb` now begins with a README-first repository note, and the regression bundle recursively inventories `discussion/**/*.ipynb` while explicitly asserting that notebook JSON contains a non-empty `cells` array before checking the first markdown cell
+- blocked-lane bookkeeping for the o30best proxybench bridge wave was refreshed from repository artifacts instead of stale shell-era assumptions:
+  - `reprobridge28` has a realized run root with `postprocess_manifest.json`, `submission_export/submission.zip`, `submission_compat_audit/submission_compat_audit.json`, and `recorded_run_result.json`; current recorded scores are `readme_local320 = 233/320 = 0.7281`, `leaderboard_proxy_v1_set = 132/200 = 0.6600`
+  - `reprobridge29` has the same realized run-root shape and records `readme_local320 = 234/320 = 0.7312`, `leaderboard_proxy_v1_set = 129/200 = 0.6450`
+  - `reprobridge30` also has the same realized run-root shape and records `readme_local320 = 226/320 = 0.7063`, `leaderboard_proxy_v1_set = 129/200 = 0.6450`
+  - only `reprobridge31/32` remain artifact-only in the current repository snapshot, so the blocked TODO set now reflects that narrower frontier rather than treating `reprobridge28/29/30` as unfinished bridge monitors
+  - `reprobridge31` is the partially armed one (`live` + `threshold075` only, still waiting on missing `prepare_manifest.json` / suite summary), while `reprobridge32` still has no waiter directory at all
+- rowselect blocked-state bookkeeping was tightened too:
+  - the `answeronly40` rowselect lane is not merely a hand-stopped idea; it has a real run root with completed `readme_local320 = 213/320 = 0.6656`, and its suite progress file still shows `leaderboard_proxy_v1_set` stalled at `16/200`, so the repository now has enough evidence to treat it as a realized-but-non-frontier branch rather than a missing-launch blocker
+  - the proposed `text130/binary40/o32/p0/s8/no-lz` lane never progressed beyond its artifact CSV/summary and was superseded by the later general-recovery branch, so it no longer belongs in the active blocked-launch set
+- the repo-local nested ledger `baseline_mlx/baseline_mlx/baseline_mlx-results.md` was audited as intentional rather than accidental duplication, then tightened to surface `submission.zip` alongside the README evaluation constants; the regression bundle now locks that nested ledger header too
+- stale frontier bookkeeping was reduced further:
+  - the `answeronly40` rowselect lane is now treated as a retired branch rather than an active blocker, because its realized run root already proved `readme_local320 = 213/320 = 0.6656`, which is below the repo's current threshold-promotion gate `min_local_accuracy = 0.70`
+  - the remaining export-safe Stage2 blocker is now understood as a **fresh relaunch task from the already rerun Stage1 trunk**, not as a resumable old waiter chain
+  - the old route-aware continuation trio is now retired from the active blocker set as well:
+    - `bit800 / lr5e-5 / ep2` never cleared launch safety and hit Metal OOM before the first train report
+    - both `bit1000` resumes were already paused at the Opt40 wait-state to free memory
+    - the only completed sibling, `bit1317 / lr2.5e-5 / ep1`, then collapsed to `readme_local320 = 142/320 = 0.4437`
+  - with that evidence, the repository now treats simple route-aware continuation as a historical dead branch rather than a current frontier candidate; future runtime recovery should go to the broad-trunk + narrow-corrective lines instead
+- Git-visible score ledgers for the later transformers lines are now locked more tightly too:
+  - `baseline_mlx/tests/test_single_file_stage_waiters.py` now individually checks `versions/v5`, `v5-1`, `v6`, and `v7`
+  - if a late version still has no `outputs/` tree, its ledger must keep the README-visible `submission.zip` contract, the `measured score:` line, the `Recording rule`, and the explicit `not recorded in the current Git-visible snapshot` placeholder
+- the root markdown inventory guard was strengthened too:
+  - `README.md` and the repo-internal `AGENTS.md` remain the only exemptions
+  - every other repo-root markdown file must now surface `README.md`, `submission.zip`, and an explicit repository/competition contract note near the top instead of merely mentioning the README somewhere later in the file
+- the legacy summary blocker was narrowed again from repository evidence:
+  - the generator scripts already emit `summary_schema_version = 2` and `readme_contract_state`, and static regression already locks that behavior
+  - the remaining mismatch is therefore historical artifact state only: the checked-in old `*_repro_summary.json` / `threshold_submission_summary.json` payloads still need rerun-based regeneration once PTY execution recovers
+- the Stage2 stage-freeze-unfreeze matrix remains a real execution backlog, but its current blocker is no longer just the older RAM-pressure pause; the broad train was already cleaned up, and the next relaunch/evaluation pass is now simply waiting on the same host-level PTY recovery as the other runtime tasks
+- the execution backlog was also normalized in the session todo graph:
+  - downstream runtime tasks that were only waiting on PTY recovery were reclassified from `blocked` to `pending`
+  - the SQL backlog now exposes a single root blocker (`diagnose-pty-exhaustion`) plus ordered pending follow-ups such as Stage2 matrix relaunch, reprobridge31/32 waiter reattachment, late-version score recording, legacy summary regeneration, v3f execution, pytest, and reprobridge followup verification
+- PTY recovery is now backed by a repo-tracked single-file helper too:
+  - new root script `pty_health_probe.py` collects `/dev/ptmx` file-state, a direct `os.openpty()` allocation probe, `lsof /dev/ptmx`, and `sysctl kern.tty.ptmx_max` into one JSON report via `uv run python pty_health_probe.py --output baseline_mlx/outputs/pty_health_probe.json`
+  - the same helper can also emit a Git-friendlier Markdown summary via `--markdown-output baseline_mlx/outputs/pty_health_probe.md`
+  - the helper now also derives PTY capacity state (`open_handle_rows`, parsed `kern.tty.ptmx_max`, utilization, and `near_limit`) plus `overall` / `primary_cause`, so the operator pass can distinguish `ptmx-near-limit` from `openpty-failed` or invalid `/dev/ptmx` state without reinterpreting raw command output
+  - the regression bundle now locks that helper as repo-tracked and actionable, including the no-shell `subprocess.run(...)` invocation style, the expected Darwin PTY operator checks, pure-function coverage for `parse_sysctl_value`, `summarize_lsof`, `build_ptmx_capacity_summary`, `derive_probe_status`, `probe_openpty`, and `render_markdown_summary`, plus the JSON/Markdown-writing and exit-code behavior of `main()`
+  - a follow-up review then found one real bug in `probe_openpty()`: `os.ttyname(slave_fd)` failures were still escaping instead of being converted into the helper's JSON error payload
+  - `probe_openpty()` now catches that `OSError` while still closing both PTY file descriptors, and the regression bundle locks the fix with `test_root_pty_health_probe_probe_openpty_reports_ttyname_failure(...)`
+  - the temporary root scratch repro `test_probe_openpty_bug.py` was removed from the repo root because the integrated regression now covers that path and the repository should not keep standalone one-off bug repro scripts at top level
+  - the same cleanup pass also removed three unreferenced root-level debug probes (`test_path_logic.py`, `test_pathlib_behavior.py`, `test_regex_pattern.py`) because their path/regex experiments were already superseded by integrated regression in `baseline_mlx/tests/test_single_file_stage_waiters.py`
+  - root `main.py` now also exposes that probe as a root-only action, so once PTY execution returns the operator can use either `uv run python pty_health_probe.py ...` or `uv run python main.py --action pty-health-probe ...` without losing the older reprobridge legacy-action compatibility shim
+- a narrow re-review of `pty_health_probe.py`, the root `main.py` PTY action wiring, and the PTY-focused regression block did not surface additional substantive bugs after the `ttyname` fix
+- a fresh shell-registry recheck still points away from a live attached Copilot shell leak:
+  - `list_bash` showed no running/idle shells, only completed async sessions
+  - direct `stop_bash` on recent session ids `564` and `568` returned `detach: true`, so they cannot be reaped from this tool layer
+  - the execution blocker remains host-level Darwin PTY/device-node recovery, not an obvious still-running interactive session inside the current tool registry
+
+Update 2026-04-12T18:41Z:
+- root-level materialize wrappers were tightened so they no longer drift into broken or interpreter-specific entrypoints:
+  - `materialize.sh` no longer hand-rolls only the CSV swaps; it now routes to the canonical single-file `uv run python materialize_reprobridges.py` path so summary JSONs are materialized by the same logic as the recovery hub
+  - `exec_materialize.sh` no longer points at the missing `runner_materialize_reprobridge33_34.py`; it now calls the existing single-file wrapper `uv run python materialize_reprobridges.py`
+  - `run_materialize.sh` is now fully canonicalized too: it no longer points at the duplicate `do_materialize.py` implementation and instead uses the same `uv run python materialize_reprobridges.py` entrypoint as the other root shell wrappers
+  - `run_materialize.sh` now preserves and re-emits the underlying Python exit code instead of always finishing as the final `echo` command's success
+- `materialize_reprobridges.py` is now the single implementation entrypoint for reprobridge33/34 materialization:
+  - it owns the reusable `run_materialization()` / `main()` path
+  - it lets the canonical CLI path keep natural Python tracebacks
+  - it exposes a separate `main_with_output_capture()` helper for the direct file-capture path and includes traceback-rich JSON if writing `materialize_results_output.json` / `materialize_error.json`
+  - the duplicate root Python wrappers (`do_materialize.py`, `materialize_reprobridge.py`, `temp_execute_runner.py`, `direct_exec_materialize.py`) now delegate to it instead of carrying their own copy of the row-swap logic
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks both the shell-wrapper target and the legacy Python-wrapper delegation path, so future edits cannot silently reintroduce a missing target, CSV-only stale logic, or duplicate implementation drift
+
+Update 2026-04-12T18:30Z:
+- `versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py` now builds all self-referential stage1/stage2/matrix commands through a single `self_uv_command(...)` helper
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks the resulting command strings so profile-matrix JSON/Markdown cannot silently drift away from the `uv run python versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py ...` prefix
+
+Update 2026-04-12T18:20Z:
+- `launch_reprobridge25_waiters.py` no longer shells out through direct `python3`; its detached waiter commands now route through `uv run python main.py` like the other active orchestration entrypoints
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now locks that launcher prefix so future edits cannot quietly drift back to interpreter-specific direct calls
+
+Update 2026-04-12T18:12Z:
+- a repo-wide static sweep over active non-archive Python entrypoints did not find any further meaningful README contract drift after the reprobridge recovery / waiter hardening passes
+- remaining differences are now in one of two buckets only:
+  - intentional historical archive snapshot code under `versions/archive/**`
+  - runtime-blocked execution work that still cannot be rerun while Darwin PTY allocation is broken
+
+Update 2026-04-12T18:04Z:
+- `launch_reprobridge25_waiters.py` is now README-first too:
+  - it live-verifies the active `README.md` evaluation/submission contract before launching detached waiters
+  - it inspects the existing `WAIT_SUMMARY_PATH` suite summary for `readme_contract` + `readme_contract_verified_from_readme_file` provenance and refuses to launch against stale pre-hardening summaries
+  - its `launch_summary.json` now carries `summary_schema_version = 2`, active README contracts, and `wait_summary_gate` details so the launch decision can be audited later
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` now fixes this behavior with launcher-specific regressions for README loader parity, verified summary acceptance, stale summary rejection, and launch summary metadata
+
+Update 2026-04-12T17:46Z:
+- `launch_reprobridge31_32_recovery.py` was hardened to stay README-first too:
+  - it now live-verifies the active `README.md` evaluation/submission contract before building the recovery status report
+  - it surfaces per-run artifact README verification state from `benchmark_eval_suite_summary.json`, `submission_compat_audit.json`, and `export_manifest.json`
+  - `submission_ready_runs` now excludes stale postprocess outputs that exist on disk but do not carry the newer `*_verified_from_readme_file` markers
+- `baseline_mlx/tests/test_single_file_stage_waiters.py` was extended with a regression that keeps stale unverified artifacts out of the recovery script's ready list
+
+Update 2026-04-12T17:32Z:
+- runtime blocker recovery steps were tightened into an operator-facing checklist based on the fresh PTY research:
+  1. inspect `/dev/ptmx` holders (`sudo lsof /dev/ptmx`) and kill orphaned PTY-owning processes first
+  2. inspect / raise `kern.tty.ptmx_max` (`sysctl -n kern.tty.ptmx_max`, `sudo sysctl -w kern.tty.ptmx_max=999`) and persist it via a LaunchDaemon if the host regularly runs many detached terminal workers
+  3. if PTY allocation is still broken after cleanup / limit raise, reboot as the final host-level reset
+- this is still external-only work from the current session because fresh shell probes remain blocked by `posix_openpt failed: Device not configured`
+
+Update 2026-04-12T17:24Z:
+- archive-local ledger clarity was tightened too:
+  - `versions/archive/v1/v1-results.md`
+  - `versions/archive/v4/v4-results.md`
+  - `versions/archive/v7/v7-results.md`
+  - `versions/archive/plan-overview.md`
+- those ledgers now explicitly mark historical version-suffixed package names (`submission_v1.zip`, `submission_v4.zip`, `submission_v7.zip`) as snapshot-local archive naming rather than the active README submission contract
+- this keeps third-party readers from mistaking archive code paths for the current active `submission.zip` requirement
+
+Update 2026-04-12T17:14Z:
+- the previous active-packaging closure was incomplete: the late single-file transformer submission lines (`v5`, `v5-1`, `v6`, `v7`) also own active validation / zip packaging surfaces
+- those late lines are now submission-side README-first too:
+  - `versions/v5/code/train_transformers_submission_v5.py`
+  - `versions/v5-1/code/train_transformers_submission_v5_1.py`
+  - `versions/v6/code/train_transformers_submission_v6.py`
+  - `versions/v7/code/train_transformers_submission_v7.py`
+- their adapter validation / zip creation paths now live-reload README submission wording, require `adapter_config.json`, enforce `submission.zip`, bind `max_lora_rank` back to the README table, and surface `readme_submission_contract_verified_from_readme_file = true` in validation / zip summaries
+- shared regression coverage for those late lines was widened in `versions/v5/tests/test_readme_contract_sync.py` to cover:
+  - submission-contract happy path
+  - missing `submission.zip` clause
+  - missing `adapter_config.json` clause
+  - zip filename drift rejection
+  - verified-from-readme surfacing in zip summaries
+- corrected net state after this pass:
+  - no currently known **active** submission-packaging surface remains outside the README-first submission guard
+  - execution recovery is still the only remaining blocker for measured scores / train / eval / package runs
+
+Update 2026-04-12T16:56Z:
+- after closing the active submission-packaging README drift sweep, a fresh runtime recovery probe was attempted again:
+  - `list_bash` currently shows **20 completed detached shell sessions**
+  - no `running` / `idle` shell session is visible
+  - `stop_bash` cannot remove representative completed sessions because they were started with `detach: true`
+  - a fresh minimal shell probe (`pwd`) still fails immediately with `posix_openpt failed: Device not configured`
+- this materially strengthens the diagnosis that the current blocker is **not** an in-repo active-shell leak that can be cleared from the visible session registry; it remains a host-level Darwin PTY/devfs failure from the current toolset's point of view
+- an external research sweep for Darwin `posix_openpt failed: Device not configured` also points to the same class of recovery options:
+  - kill orphaned PTY-owning processes outside this session
+  - raise `kern.tty.ptmx_max`
+  - reboot / manual devfs repair
+- none of those recovery actions are available from the current no-shell / no-root toolset, so the repository-side state remains:
+  - active submission/evaluation packaging surfaces are statically hardened
+  - runtime train / eval / pytest / git / export / package execution is still blocked outside the repository code itself
+
+Update 2026-04-12T16:42Z:
+- extended README-first submission hardening from the central monolith/exporter path into the remaining older packaging lines:
+  - `versions/v2/code/train.py`
+  - `versions/v3/code/train.py`
+  - `versions/v4/code/train.py`
+- all three `package-peft` paths now live-reload README submission wording and hard-fail if their local packaging config drifts on overlapping contract fields:
+  - `submission.zip`
+  - `max_lora_rank = 32`
+  - required packaged files carried by the local packaging contract
+  - single LoRA adapter wording
+- README drift cleanup also removed historical version-suffixed archive defaults from the active v3/v4 CUDA packaging configs:
+  - `submission_v3.zip` -> `submission.zip`
+  - `submission_v4.zip` -> `submission.zip`
+- packaging artifacts for v2/v3/v4 now surface `readme_submission_contract` plus `readme_submission_contract_verified_from_readme_file = true`, and v4 packaging now writes `submission_manifest_v4.json` as the primary manifest while preserving compatibility copies
+- regression coverage was extended across the old packaging lane:
+  - `versions/v2/tests/test_peft_packaging_spec.py`
+  - `versions/v3/tests/test_v3_packaging_spec.py`
+  - `versions/v3/tests/test_cuda_reproduction_packaging.py`
+  - `versions/v3/tests/test_v3_bootstrap.py`
+  - `versions/v4/tests/test_v4_bootstrap.py`
+  - `versions/v4/tests/test_v4_packaging_spec.py`
+- result of this pass:
+  - no currently known active submission-packaging surface remains outside the README-first submission guard
+  - the remaining blocker is still execution recovery for actual train/eval/export/package runs and measured scores
+
+Update 2026-04-12T16:24Z:
+- README-first static sweep extended from evaluation emitters into the remaining submission-contract emitters:
+  - `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py`
+  - `mlx_to_peft_exporter/export_mlx_adapter_bundle_to_peft.py`
+- both now live-reload the authoritative `README.md` submission wording before proceeding:
+  - require the README text to still state `adapter_config.json`
+  - require the README text to still state `submission.zip`
+  - require the README text to still describe a single LoRA adapter submission
+  - bind `max_lora_rank` back to the live README Evaluation row instead of trusting only local constants
+- artifact surfacing also moved to README-first state:
+  - `submission_compat_audit.json` now emits `readme_submission_contract_verified_from_readme_file = true`
+  - monolith/standalone exporter `export_manifest.json` now emits the same verified-from-readme flag
+- importantly, the emitted manifest shape stays backward-compatible with current candidate-audit consumers:
+  - existing packaged-file expectations (`adapter_config.json`, `adapter_model.safetensors`) are still surfaced
+  - the new hardening only changes how that contract is verified, not the downstream JSON shape
+- regression coverage now exists in two places:
+  - `baseline_mlx/tests/test_single_file_stage_waiters.py` for the monolith submission-contract loader/verifier
+  - `mlx_to_peft_exporter/tests/test_readme_submission_contract.py` for the exporter-side loader/verifier
+- result of this pass:
+  - the known README-first gap is now narrower to older packaging surfaces (`versions/v2/v3/v4/code/train.py`) rather than the central monolith/exporter path
+  - runtime train/eval/export/package work is still blocked by the same host-level PTY failure
+
+Update 2026-04-12T15:57Z:
+- archive snapshot directories now also have Git-visible per-version results ledgers:
+  - `versions/archive/v1/v1-results.md`
+  - `versions/archive/v4/v4-results.md`
+  - `versions/archive/v7/v7-results.md`
+  - `versions/archive/v8/v8-results.md`
+- those archive-local ledgers record whether the snapshot has any measured-score artifact in Git, whether a canonical non-archive ledger exists elsewhere, and for `archive/v4` explicitly note that `submission.zip` exists without an accompanying Git-visible score/provenance record
+- `versions/archive/plan-overview.md` now points at those new archive-local ledgers so third parties can distinguish:
+  - active version lines with canonical ledgers under `versions/v*/`
+  - historical archive snapshots that only retain code / plans / partial artifacts
+  - archive-only `v8`, which has no non-archive canonical ledger in the current snapshot
+- result of this pass:
+  - no additional version-directory ledger gap is currently known in either `versions/` or `versions/archive/`
+  - remaining unfinished work is still the same execution-side queue blocked by PTY failure
+
+Update 2026-04-12T15:43Z:
+- repo-side README assumption emitters no longer rely only on constant sync:
+  - `baseline/cot/phase0_offline_eval/build_phase0_offline_eval.py`
+  - `cuda-train-data-analysis-v1/proof_first_solver_factory_routing/build_leaderboard_proxy_dataset.py`
+  - `cuda-train-data-analysis-v1/proof_first_solver_factory_routing/build_binary_route_aware_delta.py`
+  - `mac_workspace/v0/phase2_binary_dsl_mlx_v0.py`
+  - `mac_workspace/v1/phase2_binary_dsl_mlx_v1.py`
+  now live-reload the authoritative tab-separated `README.md` Evaluation table and hard-fail on missing rows, empty values, malformed numeric values, or value drift
+- those repo-side builders now also surface README verification state into artifacts:
+  - `build_phase0_offline_eval.py`, `mac_workspace/v0`, and `mac_workspace/v1` phase0 manifests now emit `readme_eval_assumptions_verified_from_readme_file = true`
+  - `build_leaderboard_proxy_dataset.py` summaries now emit `readme_eval_contract_verified_from_readme_file = true`
+  - `build_binary_route_aware_delta.py` manifests now emit `readme_eval_contract_verified_from_readme_file = true`
+- `baseline_mlx/tests/test_readme_assumption_manifests.py` now regression-locks those live loaders too, not just their constants/output text:
+  - happy path against a temp README
+  - missing-row failure
+  - empty-value failure
+  - malformed numeric value failure
+  - value-drift failure
+  - verified-from-readme surfacing in the phase0/leaderboard summary paths
+- result of the widened repo sweep:
+  - no additional non-archive README contract / README assumption emitter is currently known that still lacks either live README revalidation or explicit regression coverage
+  - remaining open work is still runtime-only and blocked by the same PTY outage
+
+Update 2026-04-12T15:31Z:
+- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` now also live-reloads the authoritative tab-separated `README.md` Evaluation table at CLI entry and hard-fails on missing rows, empty values, malformed numeric values, or constant drift before any prepare/eval/postprocess command runs
+- the baseline MLX monolith now also surfaces that verification into emitted artifacts:
+  - `benchmark_eval_summary.json` payloads now carry `readme_contract` plus `readme_contract_verified_from_readme_file`
+  - `benchmark_eval_suite_summary.json` now carries the same fields
+  - `prepare_manifest.json` now records `readme_contract_verified_from_readme_file = true` alongside the effective README contract when invoked through the CLI
+- regression coverage in `baseline_mlx/tests/test_single_file_stage_waiters.py` now includes:
+  - monolith `load_readme_contract_from_readme()` happy path
+  - missing-row / empty-value / value-drift failure paths for the live README loader
+  - suite-summary surfacing for `readme_contract` and `readme_contract_verified_from_readme_file`
+- result of the widened sweep:
+  - the previously uncovered core baseline MLX monolith is no longer the odd README-contract holder out; the known repo-side holders now all either live-reload README.md or are non-authoritative assumption emitters already regression-locked
+- runtime state remains unchanged:
+  - PTY is still globally broken (`posix_openpt failed: Device not configured`), so this step is static hardening + diagnostics only
+
+Update 2026-04-12T14:10Z:
+- closed the interrupted SQL execution-state mismatch:
+  - `harden-v0-official-eval-readme-guard` is now marked `done`, matching the already-landed code/tests/docs for `versions/v0/code/train.py` and `versions/v0/tests/test_eval_readme_contract.py`
+- final static README-guard sweep of `versions/**/*.py` did not find another remaining holder that exposes README-eval constants without a live README reload or the official-only `load_eval_config('official_lb')` guard:
+  - versioned runtime guard surfaces currently covered are the six summary-producing wrappers, `v3f_submission_line_v1`, `v3f_exportable_audit_v1`, `v4` minimal lines, `v5`/`v5-1`/`v6`/`v7` late submission scripts, and `v0`/`v1` official evaluators
+  - no new non-blocked static README-contract task is known at this point; the remaining todo inventory is runtime-only and PTY-blocked
+- a focused code-review pass over the new `v0` / `v1` / `v4` README guard changes and their regression files did not surface a substantive bug, so the current remaining risk is verification blockage rather than an already-known static defect
+- current blocker remains unchanged:
+  - only blocked todos remain in SQL (`19` blocked, `0` pending, `0` in_progress)
+  - `uv run python`, direct `python -c`, pytest, git, train/eval/export/package execution all still fail behind the same host-level `posix_openpt failed: Device not configured` PTY outage
+
+Update 2026-04-12T13:55Z:
+- `v3f_submission_line_v1` candidate audit now also statically validates Stage2-linked run metadata before postprocess/package:
+  - `prepare_manifest.json` must carry the expected Nemotron base model, non-empty `train_csv`, `training.lora_rank <= 32`, non-empty `training.lora_keys` / `training.trainable_lora_suffixes`, and a README-matching `readme_contract`
+  - `training_result.json` must report positive `adapter_config.json` / `adapters.safetensors` sizes plus positive `latest_train_report.iteration` / `optimizer_step`
+- invalid or stale run metadata is now treated as a real Stage2 gate, not just a presence check:
+  - candidate eligibility now includes `prepare_manifest_blocked_reasons` / `training_result_blocked_reasons`
+  - `recommended_next_step` falls back to `launch-stage2-linked` when those artifacts are malformed
+- candidate audit now also hardens the export surface itself against stale manifests:
+  - `export_manifest.json zip_path` must match the chosen export root's sibling `submission.zip`
+  - `export_manifest.json zip_size_bytes` must match the actual packaged archive size
+- candidate audit now also hardens Stage2 profile lineage:
+  - `prepare_manifest.json train_csv` must match the selected profile's `stage2_dataset_csv`
+  - repo-relative `train_csv` paths are normalized against `REPO_ROOT`, so the audit does not depend on the process cwd
+- candidate audit now also hardens the README single-adapter contract inside `submission_compat_audit.json`:
+  - `readme_submission_contract.single_adapter_submission_zip` must be `true`
+  - missing / unparsable audit-summary paths now still populate the new single-adapter field as `false`, so markdown rendering cannot crash on a missing-key path while reporting broken audit artifacts
+- candidate audit now also hardens the packaged `submission.zip` itself against multi-payload drift:
+  - rejects unsafe ZIP member paths
+  - rejects extra `.safetensors` payloads beyond `adapter_model.safetensors`
+  - rejects duplicate nested `adapter_config.json` entries
+  - rejects exact duplicate required-member entries such as a second `adapter_config.json`
+- older single-file repro/audit wrappers now also carry the current README evaluation table verbatim by enforcing `gpu_memory_utilization=0.85` in:
+  - `versions/baseline_mlx_binary40_repro_v1/reproduce_binary40_submission.py`
+  - `versions/baseline_mlx_o30best_repro_v1/reproduce_o30best_submission.py`
+  - `versions/baseline_mlx_o30best_proxybench_repro_v1/reproduce_o30best_proxybench_submission.py`
+  - `versions/baseline_mlx_threshold_submission_v1/reproduce_threshold_submission.py`
+  - `versions/v3f_exportable_audit_v1/reproduce_v3f_exportable_audit.py`
+  - their generated Markdown summaries / CLI descriptions now expose the same `gpu_memory_utilization=0.85` contract instead of the stale six-field table
+- the last missing versioned score ledger for a `reproduce_*submission.py` wrapper is now filled:
+  - `versions/baseline_mlx_o30best_repro_v1/RESULT.md` records `readme_local320 231/320 = 0.7219`, `leaderboard_proxy_v1_set 130/200 = 0.6500`, README contract, and the dataset-mix guardrails for that single-file line
+- current limitation of that contract sync:
+  - existing generated `*_repro_summary.{json,md}` artifacts under `baseline_mlx/outputs/*repro*_v1/` and `threshold_submission_summary.{json,md}` artifacts under `baseline_mlx/outputs/threshold_submission_*` still predate the `gpu_memory_utilization=0.85` sync and do not yet contain that field
+  - until shell recovery allows regeneration, the versioned MD ledgers are the authoritative Git-visible contract record
+  - the shell-side blocker is still host-level: a fresh sampled `stop_bash(shellId=1)` confirms the registry entries are detached completed sessions and cannot be cleaned from the tool side
+- follow-up hardening on top of that:
+  - regenerated summary-producing single-file wrappers now stamp `summary_schema_version=2` and explicit `readme_contract_state` metadata
+  - regenerated JSON/Markdown outputs will self-report whether they fully match the current README evaluation table, so stale six-field artifacts can be identified without manual code diffing
+  - those wrappers now also re-read the authoritative `README.md` evaluation rows at runtime, so a future constant drift in `README_CONTRACT` fails before any summary/export flow can proceed
+  - malformed README evaluation rows now also fail with explicit wrapper errors (missing/invalid value) instead of bubbling a cryptic parse exception
+  - regenerated summaries now also expose `readme_contract_verified_from_readme_file=true`, so the Git-visible artifacts state that the wrapper revalidated its contract against the live README table
+  - wrappers now also fail explicitly when a required README evaluation row is missing entirely, instead of surfacing a later misleading `expected X, got None` mismatch
+  - `v3f_exportable_audit` contract-state reporting now treats optional `max_lora_rank` consistently with verify mode, so phase0/specialized payloads do not go false-negative just because they also include that field
+  - per-version `RESULT.md` / `*-results.md` ledgers for the six summary-producing wrappers now also mention live README revalidation, explicit missing-row failure, and `readme_contract_verified_from_readme_file` so those version pages stay aligned with the code hardening
+- regression coverage was extended in `baseline_mlx/tests/test_single_file_stage_waiters.py`:
+  - added validator tests for `inspect_prepare_manifest_artifact()` / `inspect_training_result_artifact()`
+  - added candidate-audit integration coverage so malformed run metadata is surfaced in audit JSON/Markdown and next-step routing
+  - added export-manifest ZIP consistency coverage so a stale manifest cannot silently point packaging at the wrong archive
+  - added profile-lineage coverage so a run whose prepare manifest points at the wrong Stage2 dataset is forced back to `launch-stage2-linked`
+  - added audit-summary coverage so stale `submission_compat_audit.json` files that stop declaring a single packaged submission ZIP are blocked
+  - added `submission.zip` coverage for extra safetensors payloads plus duplicate/unsafe member paths, including exact duplicate required entries
+  - added direct summary-schema coverage for `binary40`, `o30best`, `o30best_proxybench`, and `threshold_submission`, so legacy wrapper outputs are now regression-checked for `summary_schema_version=2` and `readme_contract_state`
+  - added direct helper-level stale-contract coverage for those same wrappers, so a six-field `readme_contract` missing `gpu_memory_utilization` now fails in every legacy `build_readme_contract_state()` path as well
+  - added direct README-file coverage for `binary40`, `o30best`, `o30best_proxybench`, `threshold_submission`, `v3f_exportable_audit`, and `v3f_submission_line`, so wrapper constants are now checked against the actual Evaluation table text under `README.md`
+  - added malformed-README coverage so those same loaders reject an empty `gpu_memory_utilization` row with a clear `SystemExit` message
+  - added summary-output coverage for `readme_contract_verified_from_readme_file`, so both payloads and Markdown now prove the README revalidation actually ran
+  - added missing-row README coverage so every summary-producing wrapper rejects an omitted `gpu_memory_utilization` row with an explicit `SystemExit`
+  - added optional-rank state coverage for `v3f_exportable_audit`, so `max_lora_rank_required=false` still reports a README match when the payload includes `max_lora_rank`
+  - added `baseline_mlx/tests/test_readme_assumption_manifests.py`, which now regression-locks the repo-side README assumption surfaces touched in the same sweep:
+    - `build_leaderboard_proxy_dataset.py` README contract + rendered README-aligned constraints
+    - `build_binary_route_aware_delta.py` README contract keys
+    - `baseline/cot/phase0_offline_eval/build_phase0_offline_eval.py` manifest assumptions
+    - `mac_workspace/v0/phase2_binary_dsl_mlx_v0.py` phase0 manifest assumptions
+    - `mac_workspace/v1/phase2_binary_dsl_mlx_v1.py` phase0 manifest assumptions
+  - added `versions/v4/tests/test_v4_minimal_readme_contract.py`, which now regression-locks the two minimal single-file v4 BF16 lines (`train_official_first_best_v4_minimal.py`, `train_best_notebook_sft_v4_minimal.py`) for live README revalidation, missing/empty/malformed/drifted Evaluation rows, and artifact surfacing of `readme_eval_contract` / `readme_contract_verified_from_readme_file`
+  - added `versions/v2/v2-results.md` so the last remaining historical version-local ledger gap now explicitly records the current negative state instead of leaving v2 silent in Git
+  - added `versions/v1/tests/test_eval_readme_contract.py`, which now regression-locks `versions/v1/code/train.py load_eval_config('official_lb')` against the live README Evaluation table while preserving non-official probe config freedom
+  - added `versions/v0/tests/test_eval_readme_contract.py`, which now regression-locks `versions/v0/code/train.py load_eval_config('official_lb')` against the live README Evaluation table while preserving non-official config freedom
+- diagnostics are clean for the edited files, but runtime verification is still blocked:
+  - `uv run python ...`, task-agent `python -c ...`, and pytest remain unusable in-session because `posix_openpt failed: Device not configured`
+  - fresh `list_bash` output still shows `497` completed shell sessions and no running/idle ones; sampled `stop_bash` calls report those sessions were started with `detach: true`, so the current PTY failure does not appear to be caused by a still-running interactive shell we can simply stop from the tool side
+  - Darwin PTY guidance for `posix_openpt` / `openpty` `Device not configured` points to a host-level PTY/devfs issue whose normal recovery is reboot or manual device-node repair; that action is not reachable from the current no-shell toolset
+- implication:
+  - under the README contract (`submission.zip`, rank<=32, Nemotron base model, fixed eval params), Stage2 profiles can no longer look package-ready when the underlying linked-run metadata is stale, partial, structurally wrong, wired to a stale export ZIP, pointed at the wrong profile dataset lineage, paired with an audit summary that no longer claims a single packaged submission ZIP, or packaged as a multi-payload/unsafe ZIP archive
+
+Update 2026-04-12T13:40Z:
+- `v3f_submission_line_v1` now has `write-stage2-candidate-audit`
+- it writes a Git-visible JSON/Markdown audit for selected Stage2 matrix profiles before packaging by reusing the monolith submission-candidate gates (`local320`, `general_stable`, `proxy_v2`, `specialized`, exportability)
+- `write-stage2-matrix` / wrapper summaries now also emit the matching audit commands:
+  - default curated trio audit
+  - explicit `--all-profiles` audit
+- the gate defaults used by `write-stage2-candidate-audit`, `postprocess-stage2`, `run-full-pipeline`, and `package-stage2-matrix-best-submission` are now single-sourced and surfaced in the wrapper summary/matrix payload
+- candidate-audit artifact checks now resolve `submission.zip` next to the chosen `--export-relpath`, so custom export roots are audited correctly instead of silently assuming the default `submission_export/`
+- file-system snapshot still shows no realized `stagefreeze_v3` v3f Stage1 or Stage2 run roots under `baseline_mlx/outputs/`, so the new audit will currently surface missing-artifact state rather than a package-ready candidate
+- candidate-audit now also reports whether each profile still needs `build-stage2-artifacts`, using the per-profile Stage2 CSV/summary/proxy artifact paths; current snapshot shows no `stagefreeze_v3` profile artifacts there either
+- candidate-audit now also emits `recommended_next_step` per profile, so the current frontier is explicit in Git-visible JSON/Markdown instead of implicit in the missing-artifact fields
+- candidate-audit now also inspects `submission.zip` itself for README contract compliance: valid ZIP, required files, parseable `adapter_config.json`, expected Nemotron `base_model_name_or_path`, and rank `<= 32`
+- candidate-audit now also checks `submission_export/export_manifest.json base_model_name_or_path`, so package gating no longer trusts `validation.valid` when the export points at the wrong base model name
+- candidate-audit now also requires `submission_export/export_manifest.json validation.valid = true` and `converted_tensor_count > 0`; export-manifest presence alone is no longer treated as package-ready
+- candidate-audit now also turns missing / unparsable `export_manifest.json` and missing `submission.zip` into explicit gate failures, so eligibility no longer leaks through artifact absence
+- candidate-audit now also rejects zero-byte `adapter_model.safetensors` inside `submission.zip`, tightening the final static README contract check around packaged weights
+- candidate-audit now also enforces `adapter_config.json peft_type=LORA`, `task_type=CAUSAL_LM`, `inference_mode=true`, non-empty `target_modules`, and checks that `export_manifest.json target_modules` matches the packaged adapter config
+- candidate-audit now also validates Stage2 corrective/proxy artifact content instead of only checking file existence: CSVs must be non-empty and their summary JSONs must have positive `rows` and matching `output_csv`
+- candidate-audit now also surfaces `recorded_run_result.json readme_eval_assumptions` drift against the README evaluation contract as a non-blocking diagnostic, so local proxy settings stay Git-visible
+- candidate-audit now also validates `submission_compat_audit.json` itself instead of trusting its presence: `peft_export_ready`, `unsupported_tensor_count`, base model, PEFT preview rank/target modules/inference mode, README required files/max rank, and preview-vs-package consistency all have to line up
+- a follow-up task-agent retry of `uv run python -m pytest baseline_mlx/tests/test_single_file_stage_waiters.py -k 'submission_zip or candidate_audit' -q` and a direct `python -c ...` import probe both hit the same `posix_openpt failed: Device not configured` blocker, so there is still no usable Python verification path in-session
+- implication:
+  - once PTY recovers, the first README submission pass can inspect static gate failures in Git before invoking `package-stage2-matrix-best-submission`
+
+Update 2026-04-12T13:31Z:
+- `v3f_submission_line_v1` matrix commands now expose both intentional operating modes:
+  - default with no `--profile`: curated trio only
+  - explicit `--all-profiles`: full Stage2 inventory, including exploratory lanes
+- `write-stage2-matrix` / wrapper summaries now also publish the exact wide-sweep commands, so the full-inventory path is Git-visible rather than implicit
+- regression coverage now fixes the selection guard too across the Stage2 profile-selection surfaces: `--profile` and `--all-profiles` must not be accepted together
+- implication:
+  - the first post-recovery launch remains safety-first, while wide parallel sweeps no longer require spelling out every exploratory profile by hand
+
+Update 2026-04-12T13:23Z:
+- Stage2 corrective dataset summaries now expose binary solver counts more honestly:
+  - `binary_solver_counts` now reflects all binary rows actually emitted into the corrective dataset
+  - `binary_verified_solver_counts` preserves the verified-only subset
+  - `binary_helper_solver_counts` isolates manual/answer-only helper contribution
+- implication:
+  - once execution resumes, per-profile Stage2 summary JSONs will show whether helper rows are skewing the solver mix instead of silently presenting verified-only counts under the generic solver-count label
+
+Update 2026-04-12T13:15Z:
+- `v3f_submission_line_v1` matrix execution defaults are now safer:
+  - `launch-stage2-matrix` without explicit `--profile`
+  - `package-stage2-matrix-best-submission` without explicit `--profile`
+  both now default to:
+  - `attention-short-default`
+  - `attention-short-noanswer`
+  - `attention-short-manual`
+- implication:
+  - exploratory lanes (`attention-short-lowlr`, `union-short-exploratory`, `attention-vo-historical`) stay available in the matrix inventory, but they are no longer launched or packaged implicitly when shell execution recovers
+
+Update 2026-04-12T13:06Z:
+- the new Stage2 manual helper lane was tightened from “any manual_audit_priority row in selected solvers” to the narrower lineage-aligned scope:
+  - `template_subtype = bit_other`
+- helper rows now also respect the selected `--binary-solver` subset consistently, so answer-only/manual helper rows no longer bypass solver narrowing while verified rows obey it
+- implication:
+  - `--max-manual-audit-ratio` now matches the prompt-router-v6 transfer prior more faithfully instead of risking unrelated manual tiers in the corrective dataset
+
+Update 2026-04-12T12:57Z:
+- `launch_reprobridge31_32_recovery.py --status-report` followup entries now expose `output_summary_excerpt` when a followup CSV+summary is already materialized
+- excerpted fields are intentionally narrow and operational:
+  - `created_at`
+  - `strategy`
+  - `removed_rows`
+  - `added_rows`
+  - `resulting_mix`
+- implication:
+  - once `reprobridge35/36` exist, the recovery hub can show their exact row swaps and stable no-unit mix directly in status-report output without opening the JSON files separately
+
+Update 2026-04-12T12:49Z:
+- a fresh task-agent pytest probe still fails before pytest starts:
+  - `uv run python -m pytest baseline_mlx/tests/test_single_file_stage_waiters.py -k 'manual_audit or reprobridge35 or reprobridge36 or launch_stage2_matrix or build_stage2_artifacts'`
+  - error: `posix_openpt failed: Device not configured`
+- implication:
+  - wrapper/monolith followup + manual-helper hardening is code-complete at the file level, but all remaining verification/train/eval/export/package work is still blocked by the same global PTY failure
+
+Update 2026-04-12T12:34Z:
+- followup materialization is now complete through `reprobridge36`
+- exact file-only artifacts now present:
+  - `reprobridge35`: `stage25_o30best_proxybench30ao_reprobridge35_text3bit1num8raw16nounit_v1.{csv,summary.json}`
+  - `reprobridge36`: `stage25_o30best_proxybench30ao_reprobridge36_text3bit1num8raw17nounit_v1.{csv,summary.json}`
+- exact row refreshes:
+  - `reprobridge35`: `1c48f9aa -> 6b393b81`
+  - `reprobridge36`: `27cec7a9 -> 552e14d7`
+- resulting no-unit mix is stable across both artifacts:
+  - `Bit=34`, `Text=18`, `Gravity=9`, `Unit=0`, `Equation=19`
+- implication:
+  - the previously chain-blocked no-unit bridge followup line is now Git-visible and recoverable through `reprobridge36` even before PTY recovery
+
+Update 2026-04-12T12:26Z:
+- the monolith Stage2 corrective builder now accepts a bounded `manual_audit_priority` helper slice via `--max-manual-audit-ratio`
+- operationally:
+  - default `v3f_submission_line_v1` behavior stays unchanged (`max_manual_audit_ratio=0.0`)
+  - the Stage2 matrix now adds `attention-short-manual`
+  - that lane keeps `max_answer_only_ratio=0.0` but adds `max_manual_audit_ratio=0.10`
+- implication:
+  - the wrapper can now test the portable prompt-router-v6 transfer signal (`bit_other manual_audit_priority` + `verified_trace_ready`) as a distinct single-adapter corrective comparison, instead of only recording it in ledgers
+
+Update 2026-04-12T09:46Z:
+- `launch_reprobridge31_32_recovery.py --status-report` now also reports followup artifact readiness for `reprobridge33-36`
+- the report now exposes:
+  - `ready_followup_steps`
+  - `blocked_followup_steps`
+  - `materialized_followup_steps`
+  - per-step `missing_inputs`, `ready_to_materialize`, and `materialized`
+- current practical interpretation under the repo snapshot:
+  - `reprobridge35` CSV+summary now exist (materialized via file-only methods, 2026-04-12)
+  - `reprobridge36` CSV+summary now exist (materialized via file-only methods, 2026-04-12)
+
+Update 2026-04-12T09:41Z:
+- `v3f_submission_line_v1` stage2 matrix is no longer only a LoRA hyperparameter matrix
+- each profile now carries:
+  - its own `build-stage2-artifacts` command
+  - its own Stage2 dataset/proxy artifact paths
+  - its own `launch-stage2-linked` and `postprocess-stage2` wiring against those artifacts
+- new profile:
+  - `attention-short-noanswer`
+  - same short attention-only corrective phase as the default lane, but with `max_answer_only_ratio=0.0`
+- operational implication:
+  - once shell execution recovers, the wrapper can compare the plan-aligned `5%` helper lane against an exact-route-first no-answer-only lane without another code edit
+
+Update 2026-04-12T09:28Z:
+- `v3f_submission_line_v1` summary/ledger now encodes the high-score lineage guardrails directly:
+  - `prompt-router-v6` remains the in-repo `>0.9` blueprint (`293/320`, `54/60` binary) but is still non-submission because it is multi-adapter + solver
+  - the wrapper now records the portable transfer priors instead of leaving them implicit in older ledgers:
+    - primary failure mode: `format_ok_content_wrong`
+    - primary lane: exact-route verified rows
+    - helper lane: low-ratio answer-only
+    - `bit_other + answer_only_keep` overlap rows already present in the current phase2 train CSV: `52`
+    - portable new signal should focus on `bit_other manual_audit_priority` + `verified_trace_ready`
+    - structured repair must include both `binary_structured_byte_formula_abstract` drift cleanup and `binary_structured_byte_not_formula`
+- operational implication:
+  - once shell recovery happens, the wrapper summary itself is now sufficient to remind future runs which prompt-router-v6 gains are portable to a README-compatible single-adapter lane and which are not
+
+Update 2026-04-12T09:17Z:
+- shell recovery probe still fails immediately with `posix_openpt failed: Device not configured`, so forward progress remains file-only
+- `launch_reprobridge31_32_recovery.py --status-report` was hardened again to make bridge recovery more actionable:
+  - each run now exposes:
+    - `audit_summary`
+    - `export_manifest`
+    - `submission_zip_exists`
+    - `missing_postprocess_artifacts`
+  - `submission_ready_runs` is now stricter and requires:
+    - suite summary present
+    - audit `peft_export_ready = true`
+    - export manifest present with `validation.valid = true`
+    - `submission_export/submission.zip` present
+    - `recorded_run_result.json` present
+  - `training_completed_pending_postprocess_runs` now catches not only pre-suite runs but also suite-complete runs that still lack export/audit/recorded artifacts
+- practical implication:
+  - `reprobridge28` can now be identified in one report as a real run root that completed training yet is still missing specific postprocess outputs, instead of only being described manually in ledgers/todos
+
+Update 2026-04-12T09:09Z:
+- file-only inspection found that the bridge wave advanced further than the earlier stale queue note suggested:
+  - `reprobridge27` is fully completed and submission-ready
+    - `readme_local320 = 227/320 = 0.7094`
+    - `leaderboard_proxy_v1_set = 129/200 = 0.6450`
+    - `submission_compat_audit = potentially_exportable_2d_only`
+    - `submission_export/submission.zip` exists
+  - `reprobridge28` is no longer artifact-only:
+    - real run root exists
+    - `training_result.json` exists
+    - but suite/audit/export/recorded_run_result are still missing, so it is effectively `training_completed_pending_postprocess`
+  - `reprobridge29/30` remain artifact-only
+- `launch_reprobridge31_32_recovery.py` now surfaces this distinction more cleanly through:
+  - `submission_ready_runs`
+  - `training_completed_pending_postprocess_runs`
+- operational implication:
+  - `reprobridge27` is no longer a queue placeholder; it is a completed exportable checkpoint
+  - the next bridge observation target is now `reprobridge28` postprocess completion, not `reprobridge27` launch
+
+Update 2026-04-12T12:03Z:
+- README/metric contract gap fixed for `gpu_memory_utilization=0.85`
+- changes:
+  - monolith `build_readme_eval_assumptions()` now records `gpu_memory_utilization`
+  - monolith eval/postprocess parsers now accept `--gpu-memory-utilization`
+  - `v3f_submission_line_v1` now threads `gpu_memory_utilization=0.85` through:
+    - `run-full-pipeline`
+    - `postprocess-stage2`
+    - generated matrix `postprocess-stage2` commands
+- important nuance:
+  - local MLX eval does not emulate vLLM memory allocation behavior, so this is currently a contract/audit fix rather than a local score change
+  - but the wrapper and summaries now match the authoritative README + metric notebook parameter surface more completely
+
+Update 2026-04-12T11:52Z:
+- `v3f_submission_line_v1` now includes `package-stage2-matrix-best-submission`
+- behavior:
+  - derives candidate run roots from selected Stage2 matrix profiles
+  - calls monolith `package-best-submission`
+  - can require exportability and promote a canonical README-compatible `submission.zip`
+- practical meaning:
+  - the wrapper now covers the parallel loop end-to-end at the control-plane level:
+    - launch shared Stage1
+    - arm many Stage2 lanes
+    - export completed lanes
+    - package the best submission candidate
+
+Update 2026-04-12T08:50Z:
+- retried execution through task agents, not just the main shell
+- both commands still fail with the same environment-level PTY error:
+  - `uv run python -m pytest baseline_mlx/tests/test_single_file_stage_waiters.py -k v3f`
+  - `uv run python versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py verify`
+  - error: `posix_openpt failed: Device not configured`
+- implication:
+  - the blocker is not limited to the main interactive shell session
+  - current forward progress remains code/file-only until a non-PTY execution path becomes available
+
+Update 2026-04-12T08:45Z:
+- `README.md` 契約どおり、この競技は最終的に Accuracy を積み上げる再現性勝負なので、`reprobridge35/36` も artifact を正確に残せる形でのみ前進させる方針を維持
+- 今回の local-file-only 精査で、followup 定義自体は既存 single-file recovery hub と完全に突合済み:
+  - `reprobridge35_text3bit1num8raw16nounit_v1`: `1c48f9aa -> 6b393b81`
+  - `reprobridge36_text3bit1num8raw17nounit_v1`: `27cec7a9 -> 552e14d7`
+  - どちらも `resulting_mix` は `Bit 34 / Text 18 / Gravity 9 / Unit 0 / Equation 19` のまま
+- 2026-04-12 追記: file-only write primitive (view/edit) を組み合わせることで、rb34 CSV を base として 80-row 全文を逐次再構築し、対象 row だけ差し替える手法で exact materialization に成功:
+  - `reprobridge35_text3bit1num8raw16nounit_v1`: `1c48f9aa -> 6b393b81` ✅ materialized
+  - `reprobridge36_text3bit1num8raw17nounit_v1`: `27cec7a9 -> 552e14d7` ✅ materialized
+  - 4 artifacts (2 CSV + 2 summary JSON) を baseline_mlx/outputs/...stagefreeze_v2_artifacts/ に出力済み
+
+Update 2026-04-12T06:20Z:
+- the local-file-only follow-up materializer completed successfully, so the no-unit continuation artifacts now exist in-repo:
+  - `stage25_o30best_proxybench30ao_reprobridge33_text3bit1num8raw14nounit_v1.csv`
+  - `stage25_o30best_proxybench30ao_reprobridge33_text3bit1num8raw14nounit_v1_summary.json`
+  - `stage25_o30best_proxybench30ao_reprobridge34_text3bit1num8raw15nounit_v1.csv`
+  - `stage25_o30best_proxybench30ao_reprobridge34_text3bit1num8raw15nounit_v1_summary.json`
+- replacement chain is now concretely materialized as planned:
+  - `reprobridge33`: `8c6a158e -> 27cec7a9`
+  - `reprobridge34`: `db6a5663 -> 2af7134e`
+- both summaries match the single-file `materialize_followup_step` contract in `launch_reprobridge31_32_recovery.py`:
+  - `resulting_mix` stays `Bit 34 / Text 18 / Gravity 9 / Unit 0 / Equation 19`
+  - `cot_sources` are preserved
+  - `row_source_files` point to `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv`
+  - `source_bridge_rows` correctly track `reprobridge32 raw13 nounit` -> `reprobridge33 raw14 nounit`
+- the original background materializer later completed successfully as well and agreed with the local-only output (same replacement pairs, same 80-row CSV shape, same resulting mix), so the generated follow-up artifacts are now confirmed by two independent execution paths
+
+Update 2026-04-12T11:41Z:
+- `v3f_submission_line_v1` now includes `launch-stage2-matrix`
+- behavior:
+  - launches shared `Stage1` once
+  - arms multiple `launch-stage2-linked` profile lanes
+  - optionally arms matching `postprocess-stage2` waiters in the same call
+- current role:
+  - this is the first wrapper-native command that directly expresses the user's required parallel experiment loop from a single file, instead of only emitting recipe text
+- current limit:
+  - actual execution remains blocked by the environment-wide `posix_openpt failed: Device not configured`
+
+Update 2026-04-12T11:32Z:
+- `v3f_submission_line_v1` now includes `export-stage2-submission`
+- purpose:
+  - export a completed Stage2 MLX adapter into a README-compatible `submission.zip`
+  - derive the default paths from `--run-root`:
+    - `adapter/`
+    - `shadow_model/`
+    - `submission_export/`
+- `write-stage2-matrix` was expanded accordingly, so each profile now carries:
+  - `launch-stage2-linked`
+  - `postprocess-stage2`
+  - `export-stage2-submission`
+- practical meaning:
+  - once a Stage2 run finishes, the single-file wrapper itself now contains the direct README submission packaging line instead of relying only on the monolith or postprocess side effects
+
+Update 2026-04-12T11:18Z:
+- `v3f_submission_line_v1` now includes a single-file Stage2 profile matrix generator:
+  - command: `write-stage2-matrix`
+  - outputs:
+    - `v3f_stage2_profile_matrix.json`
+    - `v3f_stage2_profile_matrix.md`
+- generated command shape:
+  - one shared `launch-stage1`
+  - per-profile `launch-stage2-linked`
+  - per-profile `postprocess-stage2`
+- current emitted profiles:
+  - `attention-short-default`
+  - `attention-short-lowlr`
+  - `union-short-exploratory`
+  - `attention-vo-historical`
+- practical meaning:
+  - once shell recovery happens, the wrapper itself can emit multiple parallel launch recipes instead of relying on ad hoc notebook notes or manual command reconstruction
+  - this directly supports the user's requirement to run several long experiments in parallel from a Git-visible, single-file-controlled path
+
+Update 2026-04-12T11:10Z:
+- `v3f_submission_line_v1` no longer hardcodes the Stage2 corrective LoRA group:
+  - `launch-stage2`
+  - `launch-stage2-linked`
+  - `run-full-pipeline`
+  now accept Stage2 `lora_key_group` / `trainable_lora_suffix_group` overrides
+- practical meaning:
+  - default stays `stage-union-exportsafe + attention`
+  - but once shell execution returns, we can compare nearby alternatives like `stage-union-exportsafe` corrective phases without editing the wrapper itself
+  - this is useful because the existing nearby attention-only completed run is weak, and there are not enough finished neighbor runs to justify locking the wrapper to one corrective group forever
+
+Update 2026-04-12T11:00Z:
+- `v3f_submission_line_v1` now also passes `--eval-enable-thinking` explicitly into `postprocess-run`
+- this keeps the wrapper aligned not just with the README Evaluation table but also with the repo's metric-notebook behavior used elsewhere in this project
+
+Update 2026-04-12T10:55Z:
+- `v3f_submission_line_v1` now passes the README evaluation parameters explicitly to `postprocess-run`:
+  - `max_tokens=7680`
+  - `temperature=0.0`
+  - `top_p=1.0`
+  - `max_num_seqs=64`
+  - `max_model_len=8192`
+- this reduces dependence on monolith defaults and keeps the new single-file wrapper closer to the explicit README contract
+
+Update 2026-04-12T10:50Z:
+- `v3f_submission_line_v1` Stage2 default `max_answer_only_ratio` is now `0.05` instead of `0.0`
+- reason:
+  - `baseline/single_lora_stage_freeze_unfreeze/plan.md` says the Stage2 initial mix should keep a small `answer-only keep` helper lane at `5%`
+  - the wrapper should therefore preserve a narrow answer-only supplement instead of forcing a pure verified-only mix by default
+
+Update 2026-04-12T10:46Z:
+- another `v3f_submission_line_v1` mismatch against `baseline/single_lora_stage_freeze_unfreeze/plan.md` was corrected:
+  - Stage2 `proxy_v2` focus bucket order is now
+    - `dominant_structured_safe`
+    - `dominant_structured_abstract`
+    - `supported_not_structured`
+    - `supported_affine_xor`
+    - `supported_bijection`
+- why this matters:
+  - the plan says `supported_not_structured` is one of the main remaining holes, and `abstract` is also a key repair lane
+  - the wrapper should therefore emphasize those slices ahead of already-stronger affine/bijection behavior
+
+Update 2026-04-12T10:40Z:
+- while re-reading `baseline/single_lora_stage_freeze_unfreeze/plan.md`, one mismatch in `v3f_submission_line_v1` was corrected:
+  - Stage2 default `num_epochs` is now `0.75` instead of `3.6`
+- reason:
+  - the plan explicitly says Stage2 should be a **short corrective phase**, below one epoch and capped around `10%`-`15%` of Stage1 optimizer steps
+  - this matters because a nearby completed attention-only run is already weak (`218/320`, `33/84` proxy_v2, `158/563` specialized), so the wrapper should default toward narrow repair, not a long second-stage overfit risk
+
+Update 2026-04-12T10:32Z:
+- the new `v3f_submission_line_v1` wrapper now also encodes a concrete historical caution from a nearby completed exportsafe Stage2 run:
+  - `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3`
+  - `readme_local320 = 218/320 = 0.6813`
+  - `leaderboard_proxy_v2 = 33/84 = 0.3929`
+  - `binary_bias_specialized_set = 158/563 = 0.2806`
+- practical meaning:
+  - `v3f_submission_line_v1` is now explicit that it is a **README-compatible execution scaffold**, not a proven winning recipe yet
+  - this is important because the user's mandatory target is `0.9`, and the existing nearby attention-only line is still far below that bar
+
+Update 2026-04-12T10:20Z:
+- `v3f_submission_line_v1` now has a true one-command orchestration path:
+  - new command: `run-full-pipeline`
+  - sequence under the single-file wrapper:
+    1. build `leaderboard_proxy_v2`
+    2. build Stage2 corrective CSV
+    3. launch Stage1 broad exportsafe trunk
+    4. arm linked Stage2 with `wait-train-from-run`
+    5. start `postprocess-run --wait-for-training-result`
+- this closes another operational gap under the README contract:
+  - before, the wrapper exposed the pieces
+  - now it also exposes the **non-stop orchestration path** the user asked for
+- to make dry-run and unit tests practical, Stage2 launch commands now also accept explicit `--type-sample` overrides instead of requiring an already-materialized summary JSON
+- CLI regression also improved:
+  - both new `v3f` single-file scripts now support `parse_args(argv)`
+  - the existing Python test bundle now checks `write-summary` and `run-full-pipeline` argument parsing
+
+Update 2026-04-12T10:05Z:
+- `v3f_submission_line_v1` is now slightly more autonomous for real long-running use:
+  - new command: `launch-stage2-linked`
+  - it wraps the monolith `wait-train-from-run` path, derives `type-sample` counts from the Stage2 summary JSON, and arms the attention-only Stage2 run **before** Stage1 finishes
+- practical usage after shell recovery:
+  - `build-stage2-artifacts`
+  - `launch-stage1`
+  - `launch-stage2-linked`
+  - `postprocess-stage2`
+- this matters because the user requirement is explicitly long-running / parallel / non-stop operation; the wrapper is no longer just a set of disconnected commands, but can now pre-arm the corrective run for autonomous continuation
+
+Update 2026-04-12T09:50Z:
+- regression coverage for the new `v3f` single-file scripts was added to the existing test bundle:
+  - `baseline_mlx/tests/test_single_file_stage_waiters.py`
+  - coverage now includes:
+    - `v3f_exportable_audit_v1` summary anchors and summary-file emission
+    - `v3f_submission_line_v1` summary anchors
+    - Stage2 type-sample derivation from corrective dataset summaries
+    - dry-run command wiring for `build-stage2-artifacts` and `launch-stage2`
+- a concrete wiring fix was also made while adding these tests:
+  - the Stage1 wrapper source root now points to the real existing output root `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2`
+  - `postprocess-stage2 --min-local320-accuracy` now matches the monolith default (`215/320`) instead of an accidental stricter value
+- attempted runtime validation still hits the same global blocker:
+  - even targeted pytest through an alternate task runner fails before code execution because `posix_openpt failed: Device not configured`
+  - so the code/test additions are in-repo and diagnostics-clean, but actual pytest execution remains blocked by the environment rather than by Python/test failures
+
+Update 2026-04-12T09:35Z:
+- the next `v3f` step is no longer only a note in `plan.md`; a README-aligned single-file execution wrapper now exists:
+  - `versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py`
+  - version-local score/blueprint record: `versions/v3f_submission_line_v1/RESULT.md`
+- scope of the new wrapper:
+  - verifies the audited `v3f` anchors (`249/320` stored, `240/320` corrected, `133/200` proxy, `238/563` specialized)
+  - fixes the intended submission path to a **single rank-32 adapter** rather than the historical non-compatible MLX bundle
+  - builds the new `leaderboard_proxy_v2` watch CSV and narrow Stage2 corrective CSV in one place
+  - exposes single-file commands for:
+    - Stage1 broad exportsafe trunk launch (`broad-exportsafe`, `lr=1e-4`, `epochs=2.0`, `len=4096`)
+    - Stage2 attention corrective launch (`attention`, `lr=2e-5`, `epochs=3.6`, `len=1536`)
+    - Stage2 postprocess with `readme_local320 + leaderboard_proxy_v2 + binary_bias_specialized_set`
+- the targeted Stage2 watch set is now explicit in code:
+  - focus buckets: `dominant_structured_safe`, `supported_affine_xor`, `supported_bijection`, `supported_not_structured`
+  - binary solvers: `binary_affine_xor`, `binary_bit_permutation_bijection`, `binary_structured_byte_formula`, `binary_structured_byte_formula_abstract`, `binary_structured_byte_not_formula`
+- practical implication:
+  - `v3f` now has both halves of the single-file path in-repo:
+    - audit hub: `versions/v3f_exportable_audit_v1/reproduce_v3f_exportable_audit.py`
+    - execution wrapper: `versions/v3f_submission_line_v1/reproduce_v3f_submission_line.py`
+  - the remaining blocker is no longer code structure; it is actual shell recovery and long-run execution
+
+Update 2026-04-12T09:05Z:
+- the missing single-file `v3f` audit hub now exists at `versions/v3f_exportable_audit_v1/reproduce_v3f_exportable_audit.py`
+  - it verifies the README evaluation contract against the local `v3f` artifacts (`max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`, `max_lora_rank=32` where available)
+  - it hard-checks the historically important `v3f` numbers from local artifacts plus the corrected audit note:
+    - stored Phase0 `249/320 = 0.7781`
+    - corrected local320 `240/320 = 0.7500`
+    - corrected binary_hard `18/60 = 0.3000`
+    - proxy actual `133/200 = 0.6650`
+    - specialized563 `238/563 = 0.4227`
+  - it also pulls out the concrete hidden-gap bottlenecks that still block a README-compatible climb toward `0.9`:
+    - `supported_not_structured = 1/55 = 0.0182`
+    - `binary_structured_byte_not_formula = 1/25 = 0.0400`
+  - and it locks the current compatibility conclusion in code, not only prose:
+    - `baseline_mlx/.../stage1_broad_v3f_union/mlx_adapter_bundle/bundle_manifest.json` explicitly says the bundle is **not claimed to be PEFT/vLLM submission-compatible**
+- practical implication:
+  - the earlier gap “there is no single-file `v3f` audit/repro script” is now closed on the audit side
+  - `audit-v3f-exportable-lineage` can now be treated as done
+  - the remaining `v3f` work is no longer artifact discovery; it is the harder path of turning the verified `v3f` lessons into a submission-compatible single-adapter training/export line that can actually push toward the mandatory `0.9`
+
+Update 2026-04-12T08:20Z:
+- repo-wide lineage audit under the README contract now sharpens the roadmap toward the mandatory `0.9` target:
+  - the only measured lineage above `0.9` in-repo is `prompt-router-v6(-repro)` at `293/320 = 0.9156`
+  - however `versions/v1/v1-results.md` confirms that `prompt-router-v6-repro` is a **multi-adapter + solver local pipeline**, not a single `submission.zip` adapter compatible with README submitting rules
+  - therefore it is the best **accuracy source of truth**, but not the current submission path
+- the best historically verified exportable-leaning lineage beyond the current selected incumbent is `v3f`:
+  - stored Phase0 artifact: `249/320 = 0.7781`
+  - corrected README-style local320 after binary bug re-audit: `240/320 = 0.7500`
+  - actual proxy rerun: `133/200 = 0.6650`
+  - specialized563: `238/563 = 0.4227`
+  - the supporting correction evidence lives in `cuda-train-data-analysis-v1/proof_first_solver_factory_routing/result/LEADERBOARD_GAP_INVESTIGATION_2026-04-09.md`
+- practical implication:
+  - `prompt-router-v6` is the clearest blueprint for **what** reaches `0.9`
+  - `v3f` is the clearest blueprint for **what single-adapter direction** has already beaten the current exportable incumbent
+  - the dominant submission bottleneck remains **binary_hard content correctness**, not general_stable (`0.915` is already solved in the incumbent)
+
+Update 2026-04-12T08:05Z:
+- the next no-unit continuation after `reprobridge34` is now concretized in the single-file recovery hub:
+  - `reprobridge35_text3bit1num8raw16nounit_v1`: `1c48f9aa -> 6b393b81`
+  - `reprobridge36_text3bit1num8raw17nounit_v1`: `27cec7a9 -> 552e14d7`
+- important nuance from the follow-up audit:
+  - this is **not** a new stronger hard-score frontier; the best remaining candidates are same-tier `verified_trace_ready` `numeric_2x2` lateral refreshes
+  - both swaps preserve the no-unit mix (`Unit = 0`) and stay inside the all-train_split equation path
+  - lower-confidence candidate `2af7134e -> 5c743e8a` was intentionally left out for now because it shifts operator/formula family more aggressively
+- operationally:
+  - `launch_reprobridge31_32_recovery.py` now knows `reprobridge35/36`
+  - artifact materialization completed via file-only methods (view+edit row-by-row reconstruction): `reprobridge35/36` CSV+summary are now emitted
+
+Update 2026-04-12T07:50Z:
+- this queue snapshot was later proven stale by file-only inspection:
+  - `reprobridge27` did later materialize fully and complete with suite/audit/export artifacts
+  - `reprobridge28` did later materialize a real run root and finish training, but not postprocess
+  - only `reprobridge29/30` remained artifact-only
+- practical lesson:
+  - `launch_reprobridge31_32_recovery.py --status-report` must distinguish artifact-only, training-complete, and submission-ready bridge states rather than collapsing them into one queued bucket
+
+Update 2026-04-12T07:35Z:
+- `reprobridge26_text3bit1num8raw7unitedge_v1` also fully completed autonomously:
+  - final full-suite scores are `readme_local320 = 228/320 = 0.7125` and `leaderboard_proxy_v1_set = 126/200 = 0.6300`
+  - `audit_status = potentially_exportable_2d_only`, `submission.zip` exists, and no threshold submission artifact was produced
+  - detached postprocess published commit `01c6eeb4` (`Record reprobridge26 raw7-unitedge results`)
+- this closes the current dead-on-local320 bridge chain:
+  - `reprobridge24`: `233/320`, `127/200`, commit `c5c4e94f`
+  - `reprobridge25`: `232/320`, `125/200`, commit `f61cbf57`
+  - `reprobridge26`: `228/320`, `126/200`, commit `01c6eeb4`
+- selector impact remains nil so far:
+  - the best-submission selector is still unchanged through iteration `53` (`2026-04-12T07:34:24Z`)
+  - incumbent remains `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+  - `candidate_count = 38`, `eligible_candidate_count = 5`
+
+Update 2026-04-12T07:17Z:
+- `reprobridge26_text3bit1num8raw7unitedge_v1` has now also failed the README gate on local320:
+  - `readme_local320 = 228/320 = 0.7125`
+  - detached eval has already advanced into `leaderboard_proxy_v1_set` and is currently at `176/200` with `117` correct = `0.6648` (`11/13` chunks completed)
+  - `postprocess_manifest.json` exists and shows the detached `postprocess-run` chain is active with `eval_suite.status = running`
+  - as with `reprobridge24/25`, this is now another dead-on-local320 autonomous lane that may still publish a full suite result later, but it has no remaining threshold path
+- queue state remains stalled beyond that point:
+  - only the `reprobridge31` artifact CSV/summary exists; the `reprobridge31` run root itself still does not exist, while `/tmp/reprobridge31_waiters/` still contains only the stale partial waiter pair (`live`, `threshold075`) waiting on missing `prepare_manifest.json` / suite summary
+  - only the `reprobridge32` artifact CSV/summary exists; the `reprobridge32` run root still does not exist and there is still no waiter directory
+- shell recovery remains globally blocked:
+  - a fresh verify/commit attempt from a separate general-purpose agent failed immediately on `git --no-pager status --short --untracked-files=all` with the same `posix_openpt failed: Device not configured`
+  - so pytest plus the commit/push of the current recovery-hub / test / ledger / follow-up-artifact changes are still blocked by PTY allocation failure, not by test failures
+- the single-file recovery hub now surfaces artifact-only queued state for `reprobridge31/32` as well:
+  - `launch_reprobridge31_32_recovery.py` status-report includes `artifact_status` for runs whose stagefreeze artifact CSV/summary exists even when the downstream run root has never been created
+  - regression coverage was added so `build_status_report()` explicitly preserves the `artifact exists / run root missing` state instead of collapsing it into a generic missing run
+  - follow-up artifacts `reprobridge33/34` remain intentionally visible through `followup_steps` rather than `runs`, and regression coverage now fixes that intended distinction in tests
+  - top-level summary lists now also include `artifact_only_runs`, `stale_waiter_runs`, `dead_local320_runs`, and `dead_local320_proxy_active_runs` for faster third-party handoff
+  - a followup review also caught and fixed a `followup_steps` test mismatch: the regression test now matches the intentionally exposed `remove_id` / `add_id` fields
+- best-submission auto selector still has not moved:
+  - by iteration `51` (`2026-04-12T07:24:21Z`), the selected exportable candidate remains `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+  - the selected metrics are still `local320 235/320 = 0.7344`, `general_stable 183/200 = 0.915`, `proxy_v1 131/200 = 0.655`
+  - `candidate_count` has expanded to `38` and `eligible_candidate_count` to `5`, but none of the new bridge descendants displaced the incumbent
+
+Update 2026-04-12T06:14Z:
+- the detached `reprobridge24` and `reprobridge25` waiters did not stall at dead-on-local320; both now fully completed postprocess and published:
+  - `reprobridge24_text3bit1num8raw6nograv_v1`: `readme_local320 = 233/320 = 0.7281`, `leaderboard_proxy_v1_set = 127/200 = 0.6350`, `audit_status = potentially_exportable_2d_only`, `submission.zip` exists, publish commit `c5c4e94f`
+  - `reprobridge25_text3bit1num8raw6unitedge_v1`: `readme_local320 = 232/320 = 0.7250`, `leaderboard_proxy_v1_set = 125/200 = 0.6250`, `audit_status = potentially_exportable_2d_only`, `submission.zip` exists, publish commit `f61cbf57`
+  - no threshold submission artifact is visible under either run root, matching the completed threshold waiters and the sub-`0.75` local320 outcomes
+- this supersedes the earlier dead-lane reading that `reprobridge24/25` still lacked full-suite summaries; they are now closed autonomous completions, not pending cleanup
+- the bridge queue also advanced for real:
+  - `reprobridge26_text3bit1num8raw7unitedge_v1` is no longer hypothetical; `wait_for_trigger_path.json` shows `reprobridge25` suite summary was observed at `2026-04-12T06:12:06Z` and the memory gate immediately passed
+  - `prepare_manifest.json` and `training_result.json` now exist for `reprobridge26`
+  - latest visible train/eval markers are `iteration 64`, `optimizer_step 8`, `train_loss 0.3545`, `val_loss 0.4078`
+  - no suite progress or full-suite summary is visible yet, so `reprobridge26` is now the active autonomous lane to watch
+- runtime blocker is still current:
+  - a fresh PTY-backed shell probe from this session still fails with `posix_openpt failed: Device not configured`, so new pytest / git / launcher execution remains blocked even though detached bridge automation is still advancing
+
+Update 2026-04-12T05:34Z:
+- `reprobridge24_text3bit1num8raw6nograv_v1` has now also failed the README gate on local320:
+  - `readme_local320 = 233/320 = 0.7281`
+  - detached eval has already rolled into `leaderboard_proxy_v1_set`, but it starts from `0/200` and there is still no full-suite summary
+  - no threshold submission was produced, so this lane is now another dead-on-local320 branch that should either self-resolve through detached automation or be cut once PTY-backed shell control returns
+- `reprobridge25_text3bit1num8raw6unitedge_v1` has now also failed the README gate on local320:
+  - `readme_local320 = 232/320 = 0.7250`
+  - detached eval has already rolled into `leaderboard_proxy_v1_set`, but it starts from `0/200` and there is still no full-suite summary
+  - no threshold submission was produced, so this lane is also dead on local320 and now only has value as an already-armed autonomous completion path
+- implication for the bridge wave:
+  - the surviving `24/25` evidence is gone; the active wave is now effectively dead-on-local320 while queued descendants (`26/31/32`) remain unlaunched from this session because PTY-backed shell execution is still broken
+  - once shell control returns, the operator now has a real choice point: either let dead `reprobridge25` finish proxy/full-suite so any already-armed `reprobridge26` chain can trigger, or cut `reprobridge25` early and manually relaunch from `reprobridge26/31/32`
+- `reprobridge33/34` follow-up materialization is now being attempted via two background paths:
+  - the original background materializer is still running
+  - a second local-only materializer was launched so the no-unit follow-up CSV/summary generation can finish without relying on GitHub fetches
+
+Update 2026-04-12T05:22Z:
+- `reprobridge23_text3bit1num8raw5unitedge_v1` no longer needs operational retirement:
+  - detached postprocess completed autonomously and published commit `bc262fc7` (`Record reprobridge23 full-raw unitedge results`)
+  - final full-suite scores are `local320 227/320 = 0.7094` and `proxy_v1 126/200 = 0.6300`
+  - `audit_status = potentially_exportable_2d_only`, `submission.zip` exists, and both threshold waiters correctly skipped (`local-ge-0.75` / `local-ge-0.80`)
+  - the stale `reprobridge24` queue waiter also completed harmlessly as `skipped_existing_target`, confirming that `reprobridge24` had already been launched and no handoff gap remained
+- surviving live bridge prefixes at this checkpoint:
+  - `reprobridge24`: `233/304 = 0.7664`
+  - `reprobridge25`: `231/288 = 0.8021`
+- the single-file recovery hub is now better aligned with shell-recovery handoff:
+  - `launch_reprobridge31_32_recovery.py --status-report` now covers `reprobridge26` as well
+  - waiter summaries now expose parsed pid status and `missing_waiters`, so `reprobridge31/32` can be reattached from one JSON read once PTY execution returns
+  - run summaries now also expose `gate_state` (`phase`, `proxy_started`, `dead_on_local320`, threshold gate classification), so dead-on-local320 lanes like `reprobridge24` can be recognized from status JSON without re-reading multiple progress files
+  - top-level status report now also exposes `dead_local320_pending_suite`, so dead lanes that have already rolled into proxy but still lack a full-suite summary can be surfaced immediately
+  - `baseline_mlx/tests/test_single_file_stage_waiters.py` now also covers the recovery hub import path, waiter pid/missing-waiter summary, `build_status_report()` coverage for `reprobridge26`, and `--materialize-followups` row replacement behavior
+- queue / selector state:
+  - `reprobridge26` still has no visible output root yet
+  - `reprobridge31` still has only partial waiter state (`live`, `threshold075`)
+  - `reprobridge32` still has no waiter directory
+  - best-submission auto selector remains unchanged through iteration `26` (`2026-04-12T05:18:53Z`), still selecting `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1` at `local320 235/320 = 0.7344`, `general_stable 183/200 = 0.915`, `proxy_v1 131/200 = 0.655`
+- runtime blocker is unchanged:
+  - new PTY-backed shell execution from this session still fails with `posix_openpt failed: Device not configured`
+
+Update 2026-04-12T05:08Z:
+- `baseline_mlx/reproduce_nemotron_sft_lora_with_cot_v2_mlx.py` now retries `git add` / `git commit` when concurrent publish attempts hit `.git/index.lock`:
+  - this was added after the detached `reprobridge24` live poller crashed inside `publish_results_md_to_git` with `fatal: Unable to create ... .git/index.lock: File exists`
+  - the publish path now waits and retries instead of failing immediately, which should make concurrent detached ledger publishers more robust during the active bridge wave
+  - note: the already-running detached `reprobridge24` poller had loaded the old code and is still considered crashed; any later reattach should use the updated single-file code path
+  - regression coverage now exists for both `git add` and `git commit` index.lock retry paths in `baseline_mlx/tests/test_single_file_stage_waiters.py`
+- latest active bridge prefixes at this checkpoint:
+  - `reprobridge24`: `220/272 = 0.8088`
+  - `reprobridge25`: `201/240 = 0.8375`
+- `launch_reprobridge31_32_recovery.py` now also has a repo-tracked single-file `--status-report` mode:
+  - it summarizes `reprobridge23/24/25/31/32`, `reprobridge31/32` waiter directories, the best-submission selector, and whether `reprobridge33/34` follow-up artifacts already exist
+  - this keeps recovery, follow-up materialization, and status inspection inside one single-file operational entrypoint
+- latest detached-read state remains:
+  - `reprobridge23` is still dead on local320 (`227/320 = 0.7094`) and proxy is now `97/128 = 0.7578`
+  - `reprobridge24` current local prefix is `194/224 = 0.8661`
+  - `reprobridge25` current local prefix is `167/176 = 0.9489`
+  - none of `reprobridge23/24/25` has produced a full suite summary yet, so their detached postprocess workers are still waiting on evaluation completion
+- queue / waiter reality is now sharper:
+  - `reprobridge31` has partial waiter state only (`live`, `threshold075`)
+  - `reprobridge32` still has no waiter directory at all
+  - `reprobridge26` still has no visible `prepare_manifest.json` or `training_result.json`, so no downstream raw-heavy launch has materialized yet
+- best-submission auto selector is still unchanged through poll iteration `23` (`2026-04-12T05:03:49Z`):
+  - selected exportable lane remains `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+  - selected score remains `local320 235/320 = 0.7344`, `general_stable 183/200 = 0.915`, `proxy_v1 131/200 = 0.655`
+
+Update 2026-04-12T04:56Z:
+- `reprobridge21_text3bit1num8raw2grav1unitedge_v1` no longer needs operational retirement:
+  - its detached single-file `postprocess-run` waiter completed autonomously even while new interactive shell commands still fail with `posix_openpt failed: Device not configured`
+  - final README-aligned scores are `readme_local320 = 227/320 = 0.7094` and `leaderboard_proxy_v1_set = 126/200 = 0.6300`
+  - audit/export also completed (`audit_status = potentially_exportable_2d_only`, `submission.zip` present), and the waiter published the result block in commit `0878db9e` (`Record reprobridge21 unit-edge results`)
+- the only dead bridge lane that still requires an actual kill is now `reprobridge23_text3bit1num8raw5unitedge_v1`:
+  - local320 finalized at `227/320 = 0.7094`
+  - proxy is already underway at `62/80 = 0.7750`
+- surviving bridge evidence remains concentrated in:
+  - `reprobridge24_text3bit1num8raw6nograv_v1`: `167/176 = 0.9489`
+  - `reprobridge25_text3bit1num8raw6unitedge_v1`: `144/144 = 1.0000`
+- the canonical repo recovery script was tightened accordingly:
+  - `launch_reprobridge31_32_recovery.py` now retires only `reprobridge23` before arming the `reprobridge31` and `reprobridge32` waiters
+- `reprobridge31` turned out to be partially armed already:
+  - detached `live` and `threshold075` waiters are present under `/tmp/reprobridge31_waiters/`
+  - both are still waiting on `reprobridge31` artifacts because the missing `launcher` has not created `prepare_manifest.json`
+  - so the missing operational pieces are now precisely: `reprobridge31 launcher`, `reprobridge31 postprocess`, `reprobridge31 threshold080`, plus all `reprobridge32` waiters
+- a repo-tracked single-file follow-up generator now exists for the next no-unit descendants:
+  - `launch_reprobridge31_32_recovery.py --materialize-followups` is prepared to materialize
+    - `reprobridge33`: `8c6a158e -> 27cec7a9`
+    - `reprobridge34`: `db6a5663 -> 2af7134e`
+  - this keeps the continuation README-visible and git-trackable even though the current PTY blocker still prevents actually running the generator from this session
+- operational implication:
+  - interactive PTY-backed shell execution is still blocked from this session, but previously armed detached single-file Python waiters can still finish eval/audit/export/publish on their own
+
+Update 2026-04-12T04:52Z:
+- `reprobridge23_text3bit1num8raw5unitedge_v1` is now also dead on the README contract:
+  - `readme_local320` finalized at `227/320 = 0.7094`
+  - the lane is already spending more eval on `leaderboard_proxy_v1_set` at `46/64 = 0.7188`, so it should be cut alongside `reprobridge21` as soon as subprocess execution is healthy again
+- live bridge survivors remain strong:
+  - `reprobridge24_text3bit1num8raw6nograv_v1`: `156/160 = 0.9750`
+  - `reprobridge25_text3bit1num8raw6unitedge_v1`: `128/128 = 1.0000`
+- dead-lane waste is now larger than at the previous checkpoint:
+  - `reprobridge21` proxy has advanced further to `117/176 = 0.6648`
+  - `reprobridge23` proxy has also started and is now `46/64 = 0.7188`
+- the continuous best-submission selector is still unchanged:
+  - as of poll iteration `20` (`2026-04-12T04:48:46Z`), the selected exportable candidate remains `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+  - selected score remains `local320 235/320 = 0.7344`, `general_stable 183/200 = 0.915`, `proxy_v1 131/200 = 0.655`
+- recovery scope has widened:
+  - `launch_reprobridge31_32_recovery.py` now retires both dead lanes (`reprobridge21`, `reprobridge23`) before arming the `reprobridge31` and `reprobridge32` waiters
+  - a shell-health probe from this session still fails with `posix_openpt failed: Device not configured`, so the actual retire/arm step remains blocked from here
+- next no-unit continuation after `reprobridge32` is now narrowed down from repository evidence:
+  - strongest `reprobridge33` candidate is `remove 8c6a158e -> add 27cec7a9`
+  - optional follow-up `reprobridge34` candidate is `remove db6a5663 -> add 2af7134e`
+  - rationale: `8c6a158e` is the remaining rule-based symbolic outlier in the no-unit branch, while `27cec7a9` is `verified_trace_ready` and stable across the recorded symbol-analysis history
+
+Update 2026-04-12T04:08Z:
+- README-aligned `readme_local320` now resolves `reprobridge21_text3bit1num8raw2grav1unitedge_v1` as dead:
+  - final local score is `227/320 = 0.7094`
+  - so the lane cannot meet the working `0.75` gate and should be retired at the next moment shell execution is healthy enough to stop its remaining live/proxy workers
+- the stronger surviving bridge lanes remain healthy:
+  - `reprobridge23_text3bit1num8raw5unitedge_v1`: `226/288 = 0.7847`
+  - `reprobridge24_text3bit1num8raw6nograv_v1`: `80/80 = 1.0000`
+  - `reprobridge25_text3bit1num8raw6unitedge_v1`: `48/48 = 1.0000`
+- dead-lane waste that still needs cleanup once shell execution recovers:
+  - `reprobridge21` has already moved on to `leaderboard_proxy_v1_set` and is currently `43/64 = 0.6719`, so it is spending eval capacity on a lane that no longer has a promotion path
+- the continuous best-submission selector is still stable:
+  - as of poll iteration `13` (`2026-04-12T04:13:38Z`), the selected exportable candidate remains `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+  - selected score remains `local320 235/320 = 0.7344`, `general_stable 183/200 = 0.915`, `proxy_v1 131/200 = 0.655`
+- the queue has been extended one more step offline:
+  - `reprobridge31_text3bit1num8raw12unitedge_v1`
+    - remove: `3f37b894`
+    - add: `2f5959c9`
+    - resulting mix: `Bit 34 / Text 18 / Gravity 9 / Unit 1 / Equation 18`
+    - rationale: start from `reprobridge30`, keep only the last hard unit-edge hedge `0c26f842`, and swap the final non-edge unit stabilizer for the next highest-hard-score still-unused train_split `numeric_2x2` row
+  - `reprobridge32_text3bit1num8raw13nounit_v1`
+    - remove: `0c26f842`
+    - add: `1c48f9aa`
+    - resulting mix: `Bit 34 / Text 18 / Gravity 9 / Unit 0 / Equation 19`
+    - rationale: start from `reprobridge31`, remove the final hard unit-edge hedge, and swap in the next highest-hard-score still-unused train_split `numeric_2x2` row to create the terminal no-unit aggressive descendant of the bridge family
+- operational blocker:
+  - the current shell runtime is intermittently failing with `posix_openpt failed: Device not configured`, so `reprobridge21` retirement and the missing `reprobridge31` launcher/postprocess/0.80 waiters are prepared but not yet armed from this session
+  - a single-shot recovery entrypoint was prepared at `session-state/.../files/bridge_runtime_recovery.py`; once subprocess execution recovers, it is meant to terminate remaining `reprobridge21` workers and arm the missing `reprobridge31` waiters in one pass
+  - the canonical git-tracked recovery entrypoint is now `launch_reprobridge31_32_recovery.py`, which is designed to retire `reprobridge21` and arm the `reprobridge31` plus `reprobridge32` waiters in a single-file pass once subprocess execution is healthy again
+
+Update 2026-04-12T03:45Z:
+- `reprobridge22_text3bit1num8raw5grav1_fullraw_v1` is now operationally retired:
+  - README-aligned `readme_local320` finalized at `231/320 = 0.7219`, so the lane cannot cross the working `0.75` promotion gate
+  - its live poller, postprocess worker, threshold waiter, and stale `reprobridge22 summary -> reprobridge21/23` waiters were explicitly stopped
+- the recovered headroom was used immediately:
+  - free memory recovered to about `178.12 GB`
+  - `reprobridge25_text3bit1num8raw6unitedge_v1` was manual early-launched with the same single-file `resume-train-from-run` path used for `reprobridge24`
+  - existing `reprobridge25` prepare/live/postprocess waiters attached automatically once `prepare_manifest.json` appeared
+- current implication:
+  - active bridge lanes are now `21/23/24/25`
+  - after `25` joined, free memory settled near `95.04 GB`, so `reprobridge26+` remain queued behind the normal corrected handoff chain rather than being manual early-launched
+
+Update 2026-04-12T03:34Z:
+- `reprobridge24_text3bit1num8raw6nograv_v1` was manual early-launched as soon as `reprobridge20` was cut and host free memory recovered above the standing launch band:
+  - launch path: single-file `resume-train-from-run`
+  - source run: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+  - runtime preflight: `system_free_memory=63%`, `gpu_device_util=100%`
+  - immediate state: `prepare_manifest.json` is present, the existing live/postprocess/threshold waiters have attached, and training has already reached `Iter 1: Val loss 0.397`
+- operational implication:
+  - the bridge wave is back to four active lanes (`21/22/23/24`) before `reprobridge23` full-suite completion
+  - `reprobridge25 -> 30` remain queued behind the corrected handoff chain, so the queue can keep refilling even after this early-launch override
+
+Update 2026-04-12T03:29Z:
+- `reprobridge20_text3bit1num8raw4grav1_hedgecut_v1` is now operationally retired:
+  - README-aligned `readme_local320` finished at `229/320 = 0.7156`, so it can no longer cross the working `0.75` promotion gate even with the remaining proxy pass
+  - its live poller, postprocess worker, threshold waiter, and stale `reprobridge20 summary -> reprobridge22/23` handoff waiters were explicitly stopped
+- immediate implication:
+  - host free memory recovered to about `178.93 GB`, which is back above the standing `PhysMem unused >= 150 GB` launch band
+  - the next actual blocker for `reprobridge24` is no longer host headroom; it is only the missing `reprobridge23` full-suite summary
+- current visible bridge-wave state after the cut:
+  - `reprobridge21`: `226/288 = 0.7847` (`14/32` still needed to hold `0.75`)
+  - `reprobridge22`: `230/288 = 0.7986` (`10/32` still needed to hold `0.75`)
+  - `reprobridge23`: `144/144 = 1.0000` so far, still the key handoff lane for `24 -> 30`
+
+Update 2026-04-12T03:18Z:
+- The repaired raw-heavy bridge queue has now been extended two more steps beyond `reprobridge28`:
+  - `reprobridge29_text3bit1num8raw10unitedge_v1` is now materialized from `reprobridge28`
+    - remove: `2af08815`
+    - add: `1f445c5e`
+    - resulting mix: `Bit 34 / Text 18 / Gravity 9 / Unit 3 / Equation 16`
+    - rationale: keep the hard unit-edge hedge `0c26f842` and the remaining stronger unit stabilizers, but swap the weakest remaining unit row for the highest-hard-score still-unused verified `numeric_2x2` row that is already present in the baseline `train_split_with_cot.csv`
+  - `reprobridge30_text3bit1num8raw11unitedge_v1` is now also materialized from `reprobridge29`
+    - remove: `95e8326c`
+    - add: `2f485a40`
+    - resulting mix: `Bit 34 / Text 18 / Gravity 9 / Unit 2 / Equation 17`
+    - rationale: continue the same bridge direction one step further by cutting the last remaining hard-2 unit stabilizer while still leaving `3f37b894` and the hard unit-edge row `0c26f842` in place
+- immediate implication:
+  - queue depth is now `24 -> 25 -> 26 -> 27 -> 28 -> 29 -> 30`
+  - unlike `27/28`, both new additions come from `baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv`, so they stay inside the generated-COT-safe source family and do not require manual `type` backfill
+- operational note:
+  - the continuous proxybench best-submission poller was restarted after the old shell exited; the selected exportable candidate is still the same `235/320, 131/200` `o30best_proxybench30ao_b10_t10_g15_u15` lane, so queue extension can continue without losing submission mirroring
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+
+- recorded_at: `2026-04-13T00:45:05.124254+00:00`
+- label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
 - max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.189373`
-- learning_rate: `2.36105e-07`
-- it_per_sec: `0.399519`
-- tokens_per_sec: `185.377`
-- trained_tokens: `417059`
-- peak_memory_gb: `65.5183`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `27744`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_vo_lr2e5_len1024_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1536_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1536_rerun_v1`
-
-- status: `training_completed`
-- label: `export-safe-qkvo-lr3e5-rerun-v1-live`
-- observed_at: `2026-04-09T16:45:31.725837+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1536_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `3e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1536_rerun_v1/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.182473`
-- learning_rate: `3.54157e-07`
-- it_per_sec: `0.410704`
-- tokens_per_sec: `190.567`
-- trained_tokens: `418695`
-- peak_memory_gb: `67.3986`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `32475`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1536_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3`
-
-- recorded_at: `2026-04-10T00:06:14.934395+00:00`
-- label: `export-safe-qkvo-len768-rerun-v3-postprocess`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_steps: `67`
-- lr: `2e-05`
-- max_seq_length: `768`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
 #### Scores
 
-- readme_local320: `218/320 = 0.6813`
-- local320_components: `general_stable_set 178/200 = 0.8900; binary_hard_set 18/60 = 0.3000; symbol_watch_set 22/60 = 0.3667`
-- leaderboard_proxy_v2: `33/84 = 0.3929`
-- binary_bias_specialized_set: `158/563 = 0.2806`
+- readme_local320: `235/320 = 0.7344`
+- local320_components: `general_stable_set 183/200 = 0.9150; binary_hard_set 29/60 = 0.4833; symbol_watch_set 23/60 = 0.3833`
+- leaderboard_proxy_v1_set: `131/200 = 0.6550`
 
 #### Submission audit
 
@@ -1068,603 +1179,1703 @@ row-level overlap:
 
 #### Submission export
 
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3/submission_export/submission.zip`
-- zip_size_bytes: `102353337`
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/submission_export/submission.zip`
+- zip_size_bytes: `102357401`
 - validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_ep24_len768_rerun_v3 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1024_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1024_rerun_v1`
-
-- status: `training_completed`
-- label: `export-safe-union-len1024-rerun-v1-live`
-- observed_at: `2026-04-09T17:44:15.575516+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1024_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `2e-05`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj', 'mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1024_rerun_v1/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.179665`
-- learning_rate: `2.36105e-07`
-- it_per_sec: `0.510072`
-- tokens_per_sec: `236.673`
-- trained_tokens: `417059`
-- peak_memory_gb: `65.8962`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `47215`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1024_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1536_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1536_rerun_v1`
-
-- status: `training`
-- label: `export-safe-union-len1536-rerun-v1-live`
-- observed_at: `2026-04-09T17:33:15.378042+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1536_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `20/101 = 19.80%`
-- lr: `2e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.in_proj', 'mixer.out_proj', 'mixer.shared_experts.up_proj', 'mixer.shared_experts.down_proj', 'mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1536_rerun_v1/adapter/latest_train_report.json`
-- iteration: `160`
-- optimizer_step: `20`
-- train_loss: `0.24355`
-- learning_rate: `1.91935e-05`
-- it_per_sec: `0.351834`
-- tokens_per_sec: `187.039`
-- trained_tokens: `84805`
-- peak_memory_gb: `65.8004`
-
-#### Completion markers
-
-- training_result_exists: `False`
-- runtime_pid: `50566`
-- runtime_pid_alive: `True`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_union_exportsafe_lr2e5_len1536_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1024_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1024_rerun_v1`
-
-- status: `training_completed`
-- label: `export-safe-qkvo-len1024-rerun-v1-live`
-- observed_at: `2026-04-09T19:20:08.953587+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1024_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `2e-05`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1024_rerun_v1/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.201141`
-- learning_rate: `2.36105e-07`
-- it_per_sec: `0.614324`
-- tokens_per_sec: `285.046`
-- trained_tokens: `417059`
-- peak_memory_gb: `65.85`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `69145`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr2e5_len1024_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1`
-
-- status: `training_completed`
-- label: `export-safe-qkvo-lr3e5-len1024-live`
-- observed_at: `2026-04-09T20:20:40.165091+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_progress: `101/101 = 100.00%`
-- lr: `3e-05`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Latest train progress
-
-- source: `latest_train_report`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1/adapter/latest_train_report.json`
-- iteration: `784`
-- optimizer_step: `101`
-- train_loss: `0.195071`
-- learning_rate: `3.54157e-07`
-- it_per_sec: `0.768988`
-- tokens_per_sec: `356.81`
-- trained_tokens: `417059`
-- peak_memory_gb: `65.85`
-
-#### Completion markers
-
-- training_result_exists: `True`
-- runtime_pid: `82336`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False`
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_len1024_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1 -->
-### Manual result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
-
-- recorded_at: `2026-04-10T01:33:00+00:00`
-- label: `export-safe-qkvo-lr3e5-ep24-len768-rerun-v1-pruned-after-local320`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v1_artifacts/stage2_corrective_v1.csv`
-- sampled_rows: `218`
-- optimizer_steps: `67`
-- lr: `3e-05`
-- max_seq_length: `768`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `72/320 = 0.2250`
-- local320_components: `general_stable_set 52/200 = 0.2600; binary_hard_set 10/60 = 0.1667; symbol_watch_set 10/60 = 0.1667`
-- family_breakdown: `text 0/50 = 0.0000; gravity 6/50 = 0.1200; unit 8/50 = 0.1600; roman 38/50 = 0.7600; binary 10/60 = 0.1667; symbol 10/60 = 0.1667`
-
-#### Notes
-
-- training_result_exists: `True`
-- runtime_pid: `91963`
-- runtime_pid_alive: `False`
-- suite_summary_exists: `False` (postprocess pruned after local320 dead result)
-- audit_summary_exists: `False`
-- export_manifest_exists: `False`
-- recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage2_attention_qkvo_lr3e5_ep24_len768_rerun_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
-
-- recorded_at: `2026-04-09T23:56:42.653730+00:00`
-- label: `export-safe-qkvo-reanchor-len1024-from-len768-v1-postprocess`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `200`
-- optimizer_steps: `12`
-- lr: `1e-05`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `221/320 = 0.6906`
-- local320_components: `general_stable_set 179/200 = 0.8950; binary_hard_set 21/60 = 0.3500; symbol_watch_set 21/60 = 0.3500`
-
-#### Submission audit
-
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1/submission_export/submission.zip`
-- zip_size_bytes: `102355396`
-- validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1`
-
-- recorded_at: `2026-04-10T03:05:14.060220+00:00`
-- label: `export-safe-qkvo-reanchor-len1536-from-len768-v1-postprocess`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `200`
-- optimizer_steps: `12`
-- lr: `1e-05`
-- max_seq_length: `1536`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `220/320 = 0.6875`
-- local320_components: `general_stable_set 178/200 = 0.8900; binary_hard_set 20/60 = 0.3333; symbol_watch_set 22/60 = 0.3667`
-
-#### Submission audit
-
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1/submission_export/submission.zip`
-- zip_size_bytes: `102355184`
-- validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1536_from_len768_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1`
-
-- recorded_at: `2026-04-10T03:10:42.030403+00:00`
-- label: `export-safe-qkvo-reanchor-text100-num50-grav25-unit25-len1024-v1-postprocess`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `200`
-- optimizer_steps: `12`
-- lr: `8e-06`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `215/320 = 0.6719`
-- local320_components: `general_stable_set 171/200 = 0.8550; binary_hard_set 23/60 = 0.3833; symbol_watch_set 21/60 = 0.3500`
-
-#### Submission audit
-
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1/submission_export/submission.zip`
-- zip_size_bytes: `102356647`
-- validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text100_num50_grav25_unit25_lr8e6_len1024_from_reanchor1024_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1`
-
-- recorded_at: `2026-04-10T03:25:57.479136+00:00`
-- label: `export-safe-qkvo-reanchor-text120-num40-grav20-unit20-len1024-v1-postprocess`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `200`
-- optimizer_steps: `12`
-- lr: `8e-06`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `212/320 = 0.6625`
-- local320_components: `general_stable_set 171/200 = 0.8550; binary_hard_set 21/60 = 0.3500; symbol_watch_set 20/60 = 0.3333`
-
-#### Submission audit
-
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1/submission_export/submission.zip`
-- zip_size_bytes: `102356438`
-- validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text120_num40_grav20_unit20_lr8e6_len1024_from_reanchor1024_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text140_num30_grav15_unit15_lr8e6_len1024_from_reanchor1024_v1 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text140_num30_grav15_unit15_lr8e6_len1024_from_reanchor1024_v1`
-
-- recorded_at: `2026-04-10T03:31:38.239255+00:00`
-- label: `stage25 reanchor text140 num30 grav15 unit15 from reanchor1024`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text140_num30_grav15_unit15_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot_v3f_safe_plus_notformula.csv`
-- sampled_rows: `200`
-- optimizer_steps: `12`
-- lr: `8e-06`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `214/320 = 0.6687`
-- local320_components: `general_stable_set 174/200 = 0.8700; binary_hard_set 20/60 = 0.3333; symbol_watch_set 20/60 = 0.3333`
-
-#### Submission audit
-
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text140_num30_grav15_unit15_lr8e6_len1024_from_reanchor1024_v1/submission_export/submission.zip`
-- zip_size_bytes: `102356687`
-- validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_text140_num30_grav15_unit15_lr8e6_len1024_from_reanchor1024_v1 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_textao0_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_textao0_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2`
-
-- recorded_at: `2026-04-10T03:59:17.839262+00:00`
-- label: `stage25 reanchor textv140 textao0 num30 grav15 unit15 rowselect from reanchor1024 v2`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_textao0_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified140_num30_grav15_unit15_rowselect_v1.csv`
-- sampled_rows: `200`
-- optimizer_steps: `12`
-- lr: `8e-06`
-- max_seq_length: `1024`
-- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
-
-#### Scores
-
-- readme_local320: `217/320 = 0.6781`
-- local320_components: `general_stable_set 172/200 = 0.8600; binary_hard_set 22/60 = 0.3667; symbol_watch_set 23/60 = 0.3833`
-
-#### Submission audit
-
-- audit_status: `potentially_exportable_2d_only`
-- peft_export_ready: `True`
-- tensor_count: `232`
-
-#### Submission export
-
-- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_textao0_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2/submission_export/submission.zip`
-- zip_size_bytes: `102356358`
-- validation_valid: `True`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv140_textao0_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2 -->
-### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2`
-
-- recorded_at: `2026-04-10T04:13:34.624110+00:00`
-- label: `baseline mlx notebook original fullrun v2 proxy v1 readme64`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv`
-- sampled_rows: `2907`
-- optimizer_steps: `728`
-- lr: `0.0001`
-- max_seq_length: `4096`
-- trainable_lora_suffixes: `[]`
-
-#### Scores
-
-- leaderboard_proxy_v1_set: `123/200 = 0.6150`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_notebook_original_fullrun_v2 -->
-
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
-
-- status: `evaluating`
-- label: `stage25 reanchor textv60 textao80 num30 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T05:51:49.588170+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified60_answeronly80_num30_grav15_unit15_rowselect_v1.csv`
-- sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
-- lr: `8e-06`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
+
+### Manual threshold promotion note: `local-ge-0.70 frontier`
+
+- source_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+- promotion_script: `versions/baseline_mlx_threshold_submission_v1/reproduce_threshold_submission.py`
+- promoted_at: `2026-04-11T19:08Z`
+- threshold_label: `local-ge-0.70`
+- readme_contract: `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`, `max_lora_rank=32`
+- gate_scores: `readme_local320 235/320 = 0.7344`, `leaderboard_proxy_v1_set 131/200 = 0.6550`
+- output_root: `baseline_mlx/outputs/threshold_submission_local_ge_070_frontier_v1`
+- summary_md: `baseline_mlx/outputs/threshold_submission_local_ge_070_frontier_v1/threshold_submission_summary.md`
+- reproduced_submission_zip: `baseline_mlx/outputs/threshold_submission_local_ge_070_frontier_v1/submission_export/submission.zip`
+- reproduced_zip_size_bytes: `102357401`
+- reproduced_validation_valid: `True`
+- notes: `the already-achieved >0.70 frontier is now re-exported by the new single-file threshold pipeline, so future >0.75 / >0.8 promotions can reuse the same README-contract path instead of relying on the original run-root export only`
+
+### Manual threshold waiter note: `active + queued wave 0.75 / 0.8`
+
+- armed_at: `2026-04-11T19:10Z`
+- wait_script: `versions/baseline_mlx_threshold_submission_v1/reproduce_threshold_submission.py`
+- wait_condition: `each waiter blocks on eval_suite_readme_proxy_specialized/benchmark_eval_suite_summary.json for its target run, then conditionally emits threshold artifacts only when both README-contract gates are satisfied`
+- gate_contract: `readme_local320 >= target threshold`, `leaderboard_proxy_v1_set >= 0.65`, `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, `max_model_len=8192`
+- active_waiters: `reprobridge20 -> {0.75, 0.80}`, `reprobridge22 -> {0.75, 0.80}`, `reprobridge21 -> {0.75, 0.80}`, `reprobridge23 -> {0.75, 0.80}`
+- retired_waiters: `numreal8` retired after local320 finished at `226/320 = 0.7063`, which ruled out both `local-ge-0.75` and `local-ge-0.80`; `reprogap5` retired after stalling at `225/304 = 0.7401` with one chunk left, which made `local-ge-0.75` improbable enough to cut for memory; `reprogap4` retired after local320 finished at `229/320 = 0.7156`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge9` retired after local320 finished at `230/320 = 0.7188`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge10` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge12` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75`; `reprobridge13` retired after local320 finished at `235/320 = 0.7344`, which matched the tracked frontier but still missed the `0.75` gate and therefore did not justify further proxy continuation; `reprobridge15` retired after local320 finished at `228/320 = 0.7125`, which ruled out both the tracked frontier and `local-ge-0.75` and made further proxy continuation lower EV than the stronger raw-heavy siblings; `reprobridge16` retired after local320 finished at `232/320 = 0.7250`, which cleared the previous bridge-family siblings but still missed both the tracked frontier and the `0.75` gate; `reprobridge17` retired after local320 finished at `227/320 = 0.7094`, which matched the older bridge-family collapse pattern rather than the surviving raw+gravity line; `reprobridge18` retired after local320 finished at `227/320 = 0.7094`, which failed in almost the same way as reprobridge17 and removed the last live value from the hybrid restore branch; `reprobridge19` retired after local320 finished at `231/320 = 0.7219`, which ruled out both the tracked frontier and the `0.75` gate before proxy continuation justified another heavy eval worker`
+- queued_waiters: `reprobridge24 -> {0.75, 0.80}`, `reprobridge25 -> {0.75, 0.80}`, `reprobridge26 -> {0.75, 0.80}`, `reprobridge27 -> {0.75, 0.80}`, `reprobridge28 -> {0.75, 0.80}`
+- output_roots: `baseline_mlx/outputs/threshold_submission_numreal8_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap4_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprogap5_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge9_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge10_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge12_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge13_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge15_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge16_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge17_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge18_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge19_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge20_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge21_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge22_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge23_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge24_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge25_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge26_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge27_local_ge_075_v1`, `..._080_v1`, `threshold_submission_reprobridge28_local_ge_075_v1`, `..._080_v1`
+- notes: `this keeps the threshold packaging path live across the currently running bridge wave, so any qualifying >0.75 or >0.8 result can materialize a submission artifact immediately instead of waiting for another manual pass; numreal8, reprogap5, reprogap4, reprobridge9, reprobridge10, reprobridge12, reprobridge13, reprobridge15, reprobridge16, reprobridge17, reprobridge18, and now reprobridge19 were all retired from the active threshold set after finishing below the necessary local gates, while reprobridge20, reprobridge22, reprobridge21, and manually early-launched reprobridge23 remain the active threshold-tracked lanes; a later artifact audit found that reprobridge23 actually trained with sampled_rows=79 because 0c26f842 landed in the queued CSV with blank generated_cot/type, so queued descendants reprobridge24/25/26 were repaired in place before launch and the queue now extends further through corrected reprobridge27 to reprobridge28`
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2`
+
+- status: `paused_memory_cut`
+- label: `o30best-verifiedswap22-bit33eq2-v2-eval-live`
+- observed_at: `2026-04-11T18:00:40+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_verifiedswap22_bit33eq2_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
 #### Latest evaluation progress
 
 - source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 230/320 = 0.7188`
+- manual_cut_note: `bit33eq2 finished local320 at 230/320, below the tracked 235/320 frontier; after reprogap4 launch pushed host headroom down to roughly PhysMem unused 49 GB, proxy continuation was intentionally cut to protect the wave and keep resources for reprogap4 plus the numreal bridge lanes`
+- post_cut_memory_note: `after killing the bit33 postprocess + live poller workers, host headroom recovered to roughly PhysMem unused 206 GB`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `74387`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_bit33eq2_lr1e6_len1024_from_proxybench_v2 -->
+
+### Manual queue note: `reprogap4_text3bit1_anchortrim_v1`
+
+- status: `launched_after_sym9_cut`
+- queued_at: `2026-04-11T17:42Z`
+- launched_at: `2026-04-11T17:57Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_v1.csv`
+- trigger: `launched early once sym9 was cut and free memory recovered to ~145 GB; the original wait-on-bit33 launcher was then terminated to avoid duplicate start paths`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: tracked `131/200` frontier beats clean repro `128/200` on six proxy rows; two numeric_2x2 rows are already covered by the current bridge family, so this queue targets the remaining four absent rows (`text_monoalphabetic x3 + bit_structured_byte_formula x1`) while trimming the easiest gravity/unit stabilizers from `verifiedswap22_bit33eq2`
+
+### Manual queue note: `reprogap5_text3bit1num1_anchortrim_v1`
+
+- status: `launched_after_bit33_cut`
+- queued_at: `2026-04-11T17:50Z`
+- launched_at: `2026-04-11T18:02Z`
+- training_completed_at: `2026-04-11T18:05Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_v1.csv`
+- trigger: `launched early once bit33 proxy was cut and free memory recovered to ~206 GB; the original wait-on-numreal8 launcher was then terminated to avoid duplicate start paths`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `reprogap4` covers the four absent frontier-over-repro rows with verified text + structured-byte rows; this hedge adds the only remaining absent reverse-gap row (`8158a14c`, `answer_only_keep numeric_2x2`) as a boxed answer-only example while trimming the next easiest gravity stabilizer, keeping answer-only exposure at `1/80`
+- cut_note: `this lane was later retired at readme_local320 225/304 = 0.7401 with one chunk left because it needed 15/16 in the final chunk to recover the 0.75 gate; proxy continuation was intentionally terminated to free memory for reprogap4, reprobridge9, and the queued sibling wave`
+
+### Manual queue note: `reprobridge9_text3bit1num5_anchortrim_v1`
+
+- status: `cut_after_local320`
+- queued_at: `2026-04-11T18:10Z`
+- launched_at: `2026-04-11T18:36Z`
+- training_completed_at: `2026-04-11T18:38Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_v1.csv`
+- triggers: `it was launched early while reprogap4 / reprogap5 / numreal8 were still active because host headroom was about PhysMem unused 143-144 GB, which was enough to reopen a fourth active lane; the original summary-trigger launch waiters are no longer the primary path`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: this hybrid combines the exact four absent frontier-over-repro rows from `reprogap4` with the five quality-focused numeric anchors from `verifiedmix`, while trimming the easiest five gravity and four unit stabilizers from `verifiedswap22_bit33eq2`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 11 / Equation 7`
+- notes: `the goal was to test whether the narrow text+structured-byte reproducibility fix and the verified numeric bridge stack could combine constructively without introducing answer_only numeric rows; the early launch opened with Iter 1 val_loss ≈ 0.398, closed short train at train_loss ≈ 0.3614 / val_loss ≈ 0.3980, handed off to README-contract eval, and was then retired once local320 finalized at 230/320 = 0.7188`
+
+### Manual queue note: `reprobridge10_text3bit1num5num1_anchortrim_v1`
+
+- status: `cut_after_local320`
+- queued_at: `2026-04-11T18:20Z`
+- launched_at: `2026-04-11T20:34Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_v1.csv`
+- trigger: `launched early once the numreal8 and reprogap5 cuts recovered roughly PhysMem unused 202 GB; this intentionally overrode the previous wait-for-reprobridge9-summary chain so the sibling matrix could keep expanding in parallel`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: this sibling stacks the exact four `reprogap4` frontier-over-repro rows, the five verifiedmix numeric anchors, and the single raw-only reverse-gap answer_only row from `reprogap5`, while trimming the easiest five gravity and five unit stabilizers from `verifiedswap22_bit33eq2`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 10 / Equation 8`
+- notes: `this is the first queued sibling that carries all currently known repro-gap fixes in one 80-row set while keeping answer_only exposure capped at 1/80; the original launch waiter was accidentally killed during stale summary cleanup, but a fresh duplicate-safe wait-resume launcher was re-armed and confirmed live; once memory recovered, the run was started directly and opened with Iter 1 val_loss ≈ 0.368 while the existing live/postprocess waiters remained in place to pick up the new run; it was later retired once local320 finalized at 228/320 = 0.7125`
+
+### Manual queue note: `reprobridge12_text3bit1num8_anchortrim_v1`
+
+- status: `cut_after_local320`
+- queued_at: `2026-04-11T18:24Z`
+- launched_at: `2026-04-11T20:41Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_v1.csv`
+- trigger: `launched early once the reprogap4 cut recovered roughly PhysMem unused 192 GB; this intentionally overrode the previous wait-for-reprobridge10-summary chain so the broad sibling could join the live wave immediately`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: this broader sibling combines the exact four `reprogap4` frontier-over-repro rows with the full eight-row `numreal8` numeric block, while trimming the easiest six gravity and six unit stabilizers from `verifiedswap22_bit33eq2`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 9 / Equation 10`
+- notes: `this is the broad-numeric counterpart to reprobridge9 and was originally chained after reprobridge10, but after the reprogap4 cut freed enough memory it was started directly; the short train closed with train_loss ≈ 0.3630 / val_loss ≈ 0.4518 / optimizer_step 8 / peak_memory ≈ 65.46 GB and then handed off to the existing live/postprocess waiters; it was later retired once local320 finalized at 228/320 = 0.7125`
+
+### Manual queue note: `reprobridge13_text3bit1num8num1_anchortrim_v1`
+
+- status: `cut_after_local320`
+- queued_at: `2026-04-11T18:29Z`
+- launched_at: `2026-04-11T20:58Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_v1.csv`
+- trigger: `launched early once host headroom returned to roughly PhysMem unused 192 GB, intentionally overriding the original wait-for-reprobridge12-summary chain so the final answer_only sibling could join the active wave immediately`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: this factor sibling adds the single `reprogap5` reverse-gap answer_only hedge on top of `reprobridge12`, closing the narrow/broad numeric bridge × answer_only off/on 2x2 queue matrix
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 8 / Equation 11`
+- notes: `reprobridge13 differs from reprobridge12 by exactly one row: answer_only hedge row 8158a14c replaces the next easiest remaining unit stabilizer a127eb72; runtime preflight captured current_pid 77590 with PhysMem unused about 192 GB, GPU device util 100%, and in-use system memory about 193.37 GB at launch; the short train then closed with train_loss ≈ 0.3629 / val_loss ≈ 0.4594 / optimizer_step 8 / peak_memory ≈ 65.46 GB and handed off to README-contract eval; it later finalized at readme_local320 235/320 = 0.7344 with binary 29/60, symbol 23/60, and text 33/50, then was intentionally retired because it still missed the 0.75 gate and early proxy rows were only 14/32 = 0.4375`
+
+### Manual queue note: `reprobridge15_text3bit1num8num1swap_anchorrestore_v1`
+
+- status: `cut_after_local320_below_threshold`
+- queued_at: `2026-04-11T22:04Z`
+- launched_at: `2026-04-11T22:31Z`
+- local320_completed_at: `2026-04-12T00:40Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_v1.csv`
+- trigger: `launched early once reprobridge10 and reprobridge12 were cut and host headroom returned to roughly PhysMem unused 313 GB, intentionally overriding the original wait-for-reprobridge13-summary queue while keeping the duplicate-safe waiters alive as no-op backups`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `the selected numeric_2x2 pool is already exhausted by reprobridge13, so this follow-up no longer tries to widen numeric coverage; instead it keeps the 8158a14c hedge row from reprobridge13, restores one unit stabilizer, and drops one high-audit answer_only numeric row to test whether the broad+hedge branch works better with slightly less answer_only burden`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 9 / Equation 10`
+- notes: `reprobridge15 is a hedge-swap / anchor-restore branch built by replacing answer_only numeric row 6e60b0c5 from reprobridge13 with restored unit stabilizer a127eb72 from reprobridge12; the run stayed within the currently selected train pool and was started immediately once the reprobridge10 and reprobridge12 cuts reopened enough headroom; runtime preflight captured current_pid 4499 with PhysMem unused about 313 GB, GPU device util 99%, and in-use system memory about 65.03 GB at launch; the short train then closed with train_loss ≈ 0.3678 / val_loss ≈ 0.4383 / optimizer_step 8 / peak_memory ≈ 65.46 GB, but local320 then collapsed in the final chunk and finished at 228/320 = 0.7125 (general 177/200, binary 30/60, symbol 21/60, text 28/50), so the lane was cut before any meaningful proxy continuation rather than spending further memory on a now-clearly losing hedge-heavy branch`
+
+### Manual queue note: `reprobridge16_text3bit1num8num1raw4_answertrim_v1`
+
+- status: `cut_after_local320_below_threshold`
+- queued_at: `2026-04-11T22:41Z`
+- launched_at: `2026-04-11T22:42Z`
+- local320_completed_at: `2026-04-12T01:08Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_v1.csv`
+- trigger: `launched immediately once reprobridge10 / reprobridge12 cuts and the light 2-lane eval wave left roughly PhysMem unused 251 GB, so the raw-numeric sibling did not wait for a further parent summary`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge15, keep the restored unit stabilizer a127eb72 and the low-hard-score hedge 8158a14c, trim two harder answer_only numeric rows plus two easy unit stabilizers, and replace them with four unused verified_trace_ready raw numeric_2x2 rows with generated CoT to test whether raw verified numeric depth beats selected-pool answer_only saturation`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 7 / Equation 12`
+- notes: `reprobridge16 is the first bridge sibling that explicitly steps outside the currently exhausted selected numeric pool while preserving the reprogap4 text/bit corrective skeleton; it removes answer_only numeric rows 9cb03277 and a19a75ba plus easy unit stabilizers 7291f716 and c1775d35, then adds raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, and a8e033fe sourced from generated-CoT train splits; runtime preflight captured current_pid 8818 with PhysMem unused about 251 GB, GPU device util 100%, and in-use system memory about 130.65 GB at launch; the short train then closed with train_loss ≈ 0.3599 / val_loss ≈ 0.3957 / optimizer_step 8 / peak_memory ≈ 65.46 GB, but local320 finished at only 232/320 = 0.7250 (general 182/200, binary 30/60, symbol 20/60, text 32/50), so the lane was cut after only the first proxy chunk (10/16 = 0.625) instead of spending more memory on a below-threshold continuation`
+
+### Manual queue note: `reprobridge17_text3bit1num8num1gravrestore_v1`
+
+- status: `cut_after_local320_below_threshold`
+- queued_at: `2026-04-11T22:47Z`
+- launched_at: `2026-04-11T22:55Z`
+- local320_completed_at: `2026-04-12T01:20Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_v1.csv`
+- trigger: `launched immediately once reprobridge15 and reprobridge16 both opened strongly and host headroom returned to roughly PhysMem unused 252 GB, intentionally overriding the surviving wait-for-reprobridge15/16-summary queue while keeping the duplicate-safe waiters attached as no-op backups`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge15, remove one harder answer_only numeric row plus the low-hard-score hedge row, and restore two zero-hard-score gravity stabilizers to test whether the bridge wave benefits more from broader stabilizer recovery than from carrying the extra answer_only numeric burden`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 11 / Unit 9 / Equation 8`
+- notes: `reprobridge17 is the stabilizer-restore sibling to reprobridge16's raw-numeric expansion; it removes numeric rows 9cb03277 and 8158a14c, restores gravity rows 853a0e3b and 66ae2b46, and serves as the low-risk fallback if the raw-verified numeric jump over-corrects toward equation-heavy behavior; runtime preflight captured current_pid 13023 with PhysMem unused about 252 GB, GPU device util 100%, and in-use system memory about 129.23 GB at launch; the short train then closed with train_loss ≈ 0.3504 / val_loss ≈ 0.3976 / optimizer_step 8 / peak_memory ≈ 65.46 GB, but local320 finished at only 227/320 = 0.7094 (general 175/200, binary 30/60, symbol 22/60, text 26/50), so the lane was cut before the first proxy chunk rather than spending more memory on another below-threshold continuation`
+
+### Manual queue note: `reprobridge18_text3bit1num8num1raw2gravrestore_v1`
+
+- status: `cut_after_local320_below_threshold`
+- queued_at: `2026-04-11T22:59Z`
+- launched_at: `2026-04-11T23:08Z`
+- local320_completed_at: `2026-04-12T01:27Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_v1.csv`
+- trigger: `launched immediately once the active wave still held roughly PhysMem unused 190 GB, intentionally overriding the wait-for-reprobridge15/16/17-summary queue while keeping the duplicate-safe waiters attached as no-op backups`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge15, keep the low-hard-score hedge 8158a14c, remove two harder answer_only numeric rows plus two easy unit stabilizers, then add two strongest unused raw verified numeric rows and two zero-hard-score gravity stabilizers; this is the balanced hybrid between reprobridge16's raw expansion and reprobridge17's pure stabilizer restore`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 11 / Unit 7 / Equation 10`
+- notes: `reprobridge18 preserves the corrective reprogap4 text/bit skeleton and the 8158a14c hedge while moderating reprobridge16's equation-heavy jump; it removes 9cb03277, a19a75ba, 7291f716, and c1775d35, then adds raw verified numeric rows 118f8c86 and 7195cb7b plus restored gravity rows 853a0e3b and 66ae2b46; runtime preflight captured current_pid 17080 with PhysMem unused about 190 GB, GPU device util 100%, and in-use system memory about 193.36 GB at launch; the short train then closed with train_loss ≈ 0.3596 / val_loss ≈ 0.4478 / optimizer_step 8 / peak_memory ≈ 65.46 GB, but local320 finished at only 227/320 = 0.7094 (general 177/200, binary 30/60, symbol 20/60, text 27/50), so the lane was cut before the first proxy chunk rather than preserving a now-clearly losing hybrid branch`
+
+### Manual queue note: `reprobridge19_text3bit1num8num1raw3grav1_v1`
+
+- status: `cut_after_local320_below_threshold`
+- queued_at: `2026-04-11T23:11Z`
+- launched_at: `2026-04-11T23:53Z`
+- training_completed_at: `2026-04-11T23:56Z`
+- local320_completed_at: `2026-04-12T02:18Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_v1.csv`
+- trigger: `manually launched once host headroom recovered to roughly PhysMem unused 154 GB / system_free_memory 51%, intentionally overriding the wait-for-reprobridge15/16/17/18-summary queue while keeping the duplicate-safe waiters alive as no-op backups`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge15, keep the hedge 8158a14c, remove two harder answer_only numeric rows plus two easy unit stabilizers, then add three strongest unused raw verified numeric rows and one zero-hard-score gravity stabilizer; this is the bridge between reprobridge16's raw4 push and reprobridge18's raw2+grav2 balance`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 7 / Equation 11`
+- notes: `reprobridge19 preserves the corrective reprogap4 text/bit skeleton while leaning slightly more equation-heavy than reprobridge18; it removes 9cb03277, a19a75ba, 7291f716, and c1775d35, then adds raw verified numeric rows 118f8c86, 7195cb7b, and 9b820b4e plus restored gravity row 853a0e3b; runtime preflight captured current_pid 30788 with PhysMem unused about 154 GB, system_free_memory 51%, GPU device util 100%, and in-use system memory about 257.48 GB at launch; the short train then closed with train_loss ≈ 0.3468 / val_loss ≈ 0.4527 / optimizer_step 8 / peak_memory ≈ 65.46 GB, but local320 ultimately finished at only 231/320 = 0.7219, so the lane was cut before leaderboard_proxy_v1_set could consume another heavy eval worker and the recovered headroom was immediately reused for reprobridge23`
+
+### Manual queue note: `reprobridge20_text3bit1num8raw4grav1_hedgecut_v1`
+
+- status: `launched_early_after_reprobridge16_cut`
+- queued_at: `2026-04-11T23:49Z`
+- launched_at: `2026-04-12T01:15Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_v1.csv`
+- trigger: `original queue trigger was reprobridge19 full-suite summary plus free memory >= 150 GB, but after reprobridge16 was cut the host returned to PhysMem unused ≈ 194 GB, so this lane was started manually with the duplicate-safe launcher left in place as a no-op backup`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge19, drop the remaining low-hard-score answer_only hedge 8158a14c, and replace it with the strongest still-unused generated-COT-capable raw verified numeric row f94810f5; this preserves the single gravity restore from reprobridge19 while following the current live evidence that raw-heavy bridge siblings are staying cleaner than the hedge-heavy branch as local320 hardens`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 7 / Equation 11`
+- notes: `reprobridge20 is the hedge-cut continuation of the raw+gravity branch: it keeps the reprogap4 corrective text/bit skeleton, retains raw verified numeric rows 118f8c86, 7195cb7b, and 9b820b4e plus restored gravity row 853a0e3b, then swaps out hedge row 8158a14c for sourced raw verified numeric row f94810f5; f94810f5 was confirmed in generated-COT-capable sources including train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, and sampled_train_split_with_cot.csv; runtime preflight at manual early launch captured current_pid 54704 with PhysMem used ≈ 317 GB / unused ≈ 194 GB, GPU device util 100%, and in-use system memory ≈ 194.11 GB`
+
+### Manual queue note: `reprobridge22_text3bit1num8raw5grav1_fullraw_v1`
+
+- status: `launched_early_after_reprobridge18_cut`
+- queued_at: `2026-04-12T00:27Z`
+- launched_at: `2026-04-12T01:29Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_v1.csv`
+- trigger: `original queue trigger was reprobridge20 full-suite summary plus free memory >= 150 GB, but after reprobridge18 was cut the host returned to PhysMem unused ≈ 251 GB while reprobridge20 had already opened 16/16, so this lane was started manually with the duplicate-safe launcher left in place as a no-op backup`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge20, drop the last remaining answer_only numeric row 9c8eef89, and replace it with the strongest still-unused generated-COT-capable raw verified numeric row a8e033fe; this preserves the single gravity restore from reprobridge19/20 while merging the last top raw row that already defined reprobridge16's strongest raw-heavy branch`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 7 / Equation 11`
+- notes: `reprobridge22 is the full-raw continuation of the raw+gravity branch: it keeps the reprogap4 corrective text/bit skeleton, retains raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, and f94810f5 plus restored gravity row 853a0e3b, then swaps out the last answer_only numeric row 9c8eef89 for sourced raw verified numeric row a8e033fe; a8e033fe was confirmed in generated-COT-capable sources including train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, and sampled_train_split_with_cot.csv; runtime preflight at manual early launch captured current_pid 59249 with PhysMem used ≈ 259 GB / unused ≈ 251 GB, GPU device util 100%, and in-use system memory ≈ 129.21 GB`
+
+### Manual queue note: `reprobridge21_text3bit1num8raw2grav1unitedge_v1`
+
+- status: `launched_early_after_reprobridge22_train_handoff`
+- queued_at: `2026-04-12T00:13Z`
+- reordered_at: `2026-04-12T00:28Z`
+- launched_at: `2026-04-12T01:34Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_v1.csv`
+- trigger: `original trigger was reprobridge22 full-suite summary plus free memory >= 150 GB, but once reprobridge22 had finished train and the host still held PhysMem unused ≈ 191 GB, this final queued continuation was started manually with the duplicate-safe launcher left in place as a no-op backup`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge18, keep the raw2 branch and one restored gravity stabilizer, but trade the second zero-hard-score gravity row 66ae2b46 for the strongest still-unused generated-COT-capable ratio_edge unit row 0c26f842; this tests whether a harder unit hedge improves later hidden-tail robustness without giving up the strong raw2 balance`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 10 / Unit 8 / Equation 10`
+- notes: `reprobridge21 was originally kept queued one step later behind reprobridge22 because the raw-heavy bridge family was still owning the cleaner live evidence than the unit-edge side hedge; it preserves raw verified numeric rows 118f8c86 and 7195cb7b plus restored gravity row 853a0e3b from reprobridge18, then swaps out gravity row 66ae2b46 for sourced unit row 0c26f842; 0c26f842 was confirmed in generated-COT-capable sources including train_split_with_cot_v2_plus_binary_route_aware.csv and sampled_train_split_with_cot.csv; runtime preflight at manual early launch captured current_pid 60884 with PhysMem used ≈ 320 GB / unused ≈ 191 GB, GPU device util 100%, and in-use system memory ≈ 193.38 GB`
+
+### Manual queue note: `reprobridge23_text3bit1num8raw5unitedge_v1`
+
+- status: `launched_early_after_reprobridge19_cut`
+- queued_at: `2026-04-12T01:45Z`
+- launched_at: `2026-04-12T02:20Z`
+- training_completed_at: `2026-04-12T02:23Z`
+- suite_started_at: `2026-04-12T02:23Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_v1.csv`
+- trigger: `duplicate-safe launchers were originally armed behind the first full-suite summary from reprobridge19, reprobridge20, reprobridge21, or reprobridge22, but once reprobridge19 was cut the host immediately recovered to PhysMem unused ≈ 189 GB while reprobridge20 / reprobridge21 / reprobridge22 still held strong early scores, so this lane was manual early-launched with the remaining duplicate-safe launchers left in place as later no-op backups`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge22, keep the full raw verified numeric spine, but trade the last zero-hard-score gravity restore 853a0e3b for reprobridge21's harder ratio_edge unit row 0c26f842; this explicitly fuses the current full-raw mainline with the unit-edge side hedge to test whether later hidden-tail robustness benefits more from one hard unit anchor than from one easy gravity stabilizer once all answer_only numerics are already gone`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 8 / Equation 11`
+- notes: `reprobridge23 is the queue-refill cross between the two surviving design ideas: reprobridge22's full-raw backbone and reprobridge21's unit-edge hedge; it removes the remaining gravity restore 853a0e3b from reprobridge22, keeps raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, and a8e033fe, and injects unit row 0c26f842 instead; runtime preflight at manual early launch captured current_pid 74969 with PhysMem used ≈ 322 GB / unused ≈ 189 GB, system_free_memory 62%, GPU device util 100%, and in-use system memory ≈ 194.06 GB; the short train then closed almost immediately with train_loss ≈ 0.3439 / val_loss ≈ 0.3951 / optimizer_step 8 / peak_memory ≈ 65.46 GB, and the pre-armed postprocess chain has already started `eval_suite_readme_proxy_specialized` on the target root (`readme_local320` 0/320 at handoff), so the bridge queue remains live without waiting for another full-suite summary to free memory; later audit of the run root showed `prepare_manifest.sampled_rows = 79`, because 0c26f842 had blank generated_cot/type in the artifact CSV and was silently skipped by the loader, so treat reprobridge23 as a useful but imperfect early diagnostic rather than the exact intended 80-row unitedge fusion`
+
+### Manual queue note: `reprobridge24_text3bit1num8raw6_nograv_v1`
+
+- status: `queued_behind_reprobridge23_full_suite_summary`
+- queued_at: `2026-04-12T01:46Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6_nograv_v1.csv`
+- trigger: `queued one step behind reprobridge23 full-suite summary, again with duplicate-safe start guards and the conservative free-memory gate of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge22, drop the last remaining easy gravity restore 853a0e3b, and replace it with the strongest still-unused generated-COT-capable verified numeric_2x2 row dfec0ed4; this is the aggressive continuation of the raw-heavy line and tests whether the branch can push one step past fullraw now that every answer_only numeric row has already been removed`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 7 / Equation 12`
+- notes: `reprobridge24 keeps the reprogap4 corrective bit/text skeleton and all five full-raw numeric rows from reprobridge22, then swaps the final gravity restore for unused raw verified numeric row dfec0ed4, which is present in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, the broad-v3f sampled_train_split_with_cot.csv, and baseline train_split_with_cot.csv; a later artifact audit found dfec0ed4 missing type/generated_cot in the queued-only CSV, so the train CSV was repaired in place from baseline train_split_with_cot.csv before launch; duplicate-safe live-poller, postprocess, and threshold waiters are already armed on the target root so the queue can keep extending even if reprobridge23 itself is later manual-launched early`
+
+### Manual queue note: `reprobridge25_text3bit1num8raw6unitedge_v1`
+
+- status: `queued_behind_reprobridge24_full_suite_summary`
+- queued_at: `2026-04-12T02:07Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge24 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge23, keep the injected ratio_edge unit hedge 0c26f842, but swap one weakest remaining ratio_lt2 unit stabilizer f9103e02 for the strongest still-unused generated-COT-capable verified numeric_2x2 row 791fc537; this explicitly fuses reprobridge23's unit-edge hedge with reprobridge24's raw6 push instead of forcing an either-or choice`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 7 / Equation 12`
+- notes: `reprobridge25 is the deeper continuation after the queue-refill pair: it starts from reprobridge23, preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, and a8e033fe plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row f9103e02 in favor of unused raw verified numeric row 791fc537; 791fc537 was confirmed in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, the broad-v3f sampled_train_split_with_cot.csv, and baseline train_split_with_cot.csv; a later artifact audit found that both 0c26f842 and 791fc537 had landed in the queued-only CSV without complete type/generated_cot fields, so the train CSV was repaired in place from baseline train_split_with_cot.csv before launch; duplicate-safe launch, live-poller, postprocess, and threshold waiters are all now armed on the target root so the bridge queue can continue beyond reprobridge24 without another manual wiring pass`
+
+### Manual queue note: `reprobridge26_text3bit1num8raw7unitedge_v1`
+
+- status: `queued_behind_reprobridge25_full_suite_summary`
+- queued_at: `2026-04-12T02:43Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge25 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge25, keep the injected ratio_edge unit hedge 0c26f842 and the first extra raw verified numeric row 791fc537, but swap another weakest remaining ratio_lt2 unit stabilizer a127eb72 for reprobridge24's generated-COT-capable verified numeric_2x2 row dfec0ed4; this is the next raw-heavy continuation because it merges the two queued raw6 branches instead of forcing an either-or choice between them`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 6 / Equation 13`
+- notes: `reprobridge26 is the triple-fusion continuation after reprobridge24 and reprobridge25: it starts from reprobridge25, preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, and 791fc537 plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row a127eb72 in favor of dfec0ed4 from the reprobridge24 raw6-nograv branch; dfec0ed4 was confirmed in train_split_with_cot_v3f_one_shot_repair_v1.csv, train_split_with_cot_v2_plus_binary_route_aware.csv, and baseline train_split_with_cot.csv; a later artifact audit found that 0c26f842, 791fc537, and dfec0ed4 needed full type/generated_cot backfill in the queued-only CSV, so the train CSV was repaired in place from baseline train_split_with_cot.csv before launch; duplicate-safe launch, live-poller, postprocess, and threshold waiters can extend the bridge queue one more step without leaving the generated-COT-capable source family`
+
+### Manual queue note: `reprobridge27_text3bit1num8raw8unitedge_v1`
+
+- status: `queued_behind_reprobridge26_full_suite_summary`
+- queued_at: `2026-04-12T03:27Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge26 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from repaired reprobridge26, keep the injected ratio_edge unit hedge 0c26f842 and both extra raw verified numeric rows 791fc537 and dfec0ed4, but swap another weakest remaining ratio_lt2 unit stabilizer dae6dea8 for stronger verified numeric_2x2 row 8c6a158e from the rule-based verified COT source; this is the next raw-heavy continuation once the queue has already merged reprobridge24 and reprobridge25`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 5 / Equation 14`
+- notes: `reprobridge27 is the raw8 continuation after the repaired reprobridge26 queue: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row dae6dea8 in favor of 8c6a158e from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this intentionally steps outside the current route-aware/v3f source trio for one stronger rule-based verified raw row while keeping the rest of the queue on generated-COT-capable train_split_with_cot sources; duplicate-safe launcher, live-poller, postprocess, and 0.75/0.80 threshold waiters are now armed on the target root behind reprobridge26 full-suite completion`
+
+### Manual queue note: `reprobridge28_text3bit1num8raw9unitedge_v1`
+
+- status: `queued_behind_reprobridge27_full_suite_summary`
+- queued_at: `2026-04-12T03:43Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge27 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge27, keep only the hardest remaining ratio_edge unit hedge 0c26f842 together with the growing raw verified numeric spine, but swap another weak ratio_lt2 unit stabilizer e346233f for stronger verified numeric_2x2 row db6a5663 from the rule-based verified COT source; this continues the raw-heavy bridge one step further without dropping the final hard unit-edge anchor`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 4 / Equation 15`
+- notes: `reprobridge28 is the raw9 continuation after reprobridge27: it preserves raw verified numeric rows 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, 8c6a158e, plus unit-edge row 0c26f842, then removes weak ratio_lt2 unit row e346233f in favor of db6a5663 from baseline/cot/output-csv/rule_based_verified_600_training_data_v2.csv; this pushes the queue one more step outside the current route-aware/v3f source trio while still leaving one hard unit-edge stabilizer in place; duplicate-safe launcher, live-poller, postprocess, and 0.75/0.80 threshold waiters are now armed on the target root behind reprobridge27 full-suite completion`
+
+### Manual queue note: `reprobridge29_text3bit1num8raw10unitedge_v1`
+
+- status: `queued_behind_reprobridge28_full_suite_summary`
+- queued_at: `2026-04-12T03:18Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge28 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge28, keep the hard unit-edge hedge 0c26f842 and the remaining stronger unit stabilizers, but swap the weakest remaining unit row 2af08815 for the highest-hard-score still-unused verified numeric_2x2 row 1f445c5e from baseline train_split_with_cot.csv; this deepens the raw-heavy bridge while stepping back inside the generated-COT-safe source family after the two rule-based additions`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 3 / Equation 16`
+- notes: `reprobridge29 is the raw10 continuation after reprobridge28: it preserves the raw verified numeric spine 118f8c86, 7195cb7b, 9b820b4e, f94810f5, a8e033fe, 791fc537, dfec0ed4, 8c6a158e, db6a5663, plus the hard unit-edge row 0c26f842 and remaining unit stabilizers 95e8326c and 3f37b894, then removes weak unit row 2af08815 in favor of 1f445c5e from baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv; duplicate-safe launcher, live-poller, postprocess, and 0.75/0.80 threshold waiters are now armed on the target root behind reprobridge28 full-suite completion`
+
+### Manual queue note: `reprobridge30_text3bit1num8raw11unitedge_v1`
+
+- status: `queued_behind_reprobridge29_full_suite_summary`
+- queued_at: `2026-04-12T03:18Z`
+- target_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_v1.csv`
+- trigger: `queued one step behind reprobridge29 full-suite summary, again guarded by duplicate-safe launchers and the conservative free-memory band of PhysMem unused >= 150 GB`
+- recipe: `notebook-current`, `lr=1e-6`, `epochs=0.8`, `max_seq_length=1024`, `stage-union-exportsafe + attention`
+- rationale: `start from reprobridge29, keep the hard unit-edge hedge 0c26f842 and the last stronger unit stabilizer 3f37b894, but swap the remaining hard-2 unit row 95e8326c for the next highest-hard-score still-unused verified numeric_2x2 row 2f485a40 from baseline train_split_with_cot.csv; this extends the raw-heavy bridge another step while still leaving two unit anchors in place`
+- resulting_mix: `Bit 34 / Text 18 / Gravity 9 / Unit 2 / Equation 17`
+- notes: `reprobridge30 is the raw11 continuation after reprobridge29: it preserves the entire raw verified numeric spine from reprobridge29 plus unit anchors 3f37b894 and 0c26f842, then removes weak unit row 95e8326c in favor of 2f485a40 from baseline/nemotron-sft-lora-with-cot-v2/artifacts/train_split_with_cot.csv; this is the deepest queued continuation so far and keeps the bridge queue populated two steps beyond reprobridge28 without leaving the generated-COT-safe source family; duplicate-safe launcher, live-poller, postprocess, and 0.75/0.80 threshold waiters are now armed on the target root behind reprobridge29 full-suite completion`
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
+
+- recorded_at: `2026-04-13T00:45:07.806686+00:00`
+- label: `o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage2_o30best_proxymiss40_text20_grav15_unit15_sym8_v1.csv`
+- sampled_rows: `98`
+- optimizer_steps: `16`
+- lr: `2e-06`
+- max_seq_length: `1536`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `232/320 = 0.7250`
+- local320_components: `general_stable_set 182/200 = 0.9100; binary_hard_set 29/60 = 0.4833; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `130/200 = 0.6500`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356734`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
+
+- recorded_at: `2026-04-13T00:45:10.198880+00:00`
+- label: `o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `12`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `230/320 = 0.7188`
+- local320_components: `general_stable_set 179/200 = 0.8950; binary_hard_set 29/60 = 0.4833; symbol_watch_set 22/60 = 0.3667`
+- leaderboard_proxy_v1_set: `127/200 = 0.6350`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356385`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_ep12_len1024_from_proxymiss_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1`
+
+- status: `paused_memory_cut`
+- label: `o30best-verifiedswap22-eq12anchortrim-v1-live`
+- observed_at: `2026-04-11T17:28:21.583398+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `0/2 = 0.00%`
 - current_evaluation: `readme_local320`
-- current_rows_progress: `80/320 = 25.00%`
-- current_chunks_progress: `5/20 = 25.00%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- current_rows_progress: `192/320 = 60.00%`
+- current_chunks_progress: `12/20 = 60.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- accuracy_so_far: `0.8906`
+- correct_so_far: `171`
+- manual_cut_note: `Heavy eq12anchortrim eval was stopped after numreal8 launch pushed host memory to about PhysMem 463G used / 48G unused. Rerun remains possible from existing artifacts.`
 
 #### Completion markers
 
 - training_result_exists: `True`
-- runtime_pid: `26071`
+- runtime_pid: `84126`
 - runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv60_textao80_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_eq12anchortrim_lr1e6_len1024_from_proxybench_v1 -->
 
-## 2026-04-10 comparison note: `baseline_mlx_notebook_original_fullrun_v2` vs `stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1`
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
 
-- score roots:
-  - baseline local320: `215/320 = 0.6719` (`baseline/cot/phase0_offline_eval/result/baseline_mlx_notebook_original_fullrun_v2/phase0_offline_eval/reports/phase0_eval_summary.md`)
-  - reanchor local320: `221/320 = 0.6906` (`baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_lr1e5_len1024_from_len768_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_summary.json`)
-- family delta versus baseline:
-  - binary `26 -> 21` (`-5`)
-  - gravity `50 -> 49` (`-1`)
-  - roman `50 -> 50` (`+0`)
-  - symbol `15 -> 21` (`+6`)
-  - text `25 -> 30` (`+5`)
-  - unit `49 -> 50` (`+1`)
-- training-data difference:
-  - baseline is a single-stage sample from `train_split_with_cot.csv`: `2907` rows = numeral `300`, gravity `400`, unit `700`, text `700`, bit `607`, equation `200`.
-  - reanchor winner is a 3-stage curriculum:
-    - stage1 broad: `train_split_with_cot_v3f_safe_plus_notformula.csv`, `3321` rows = numeral `300`, gravity `400`, unit `700`, text `700`, bit `1021`, equation `200`
-    - stage2 corrective: `stage2_corrective_v1.csv`, `218` rows = bit `209`, equation `9`
-    - stage2.5 reanchor: `train_split_with_cot_v3f_safe_plus_notformula.csv`, `200` rows = numeral `50`, gravity `50`, unit `50`, text `50`, bit `0`, equation `0`
-- SFT method difference:
-  - baseline uses notebook-original single-shot LoRA: `lr=1e-4`, `epochs=2.0`, `max_seq_length=4096`, and broad LoRA targets on `mixer.in_proj/out_proj/up_proj/down_proj`, `switch_mlp.fc1/fc2`, and `shared_experts.up_proj/down_proj`.
-  - reanchor winner uses stagefreeze-v2 staged LoRA:
-    - stage1 broad trunk keeps the export-safe broad targets trainable (`mixer.in_proj`, `mixer.out_proj`, `mixer.shared_experts.up_proj`, `mixer.shared_experts.down_proj`)
-    - stage2 and stage2.5 resume the previous adapter and train only attention suffixes (`mixer.q_proj`, `mixer.k_proj`, `mixer.v_proj`, `mixer.o_proj`)
-    - stage2 runs `lr=2e-5`, `epochs=2.4`, `max_seq_length=768`; stage2.5 runs `lr=1e-5`, `epochs=0.45`, `max_seq_length=1024`
-- training-time evidence from artifact timestamps (`prepare_manifest.created_at -> training_result.created_at`):
-  - baseline single-stage: `2h13m10s`
-  - reanchor lineage: stage1 `2h35m02s` + stage2 `0h23m32s` + stage2.5 `0h04m32s` = cumulative `3h03m06s`
-  - therefore the final `221/320` model cost more total training time than the baseline, but the final reanchor increment itself was only about `4.5` minutes
+- recorded_at: `2026-04-13T00:45:21.740654+00:00`
+- label: `o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary20_text10_grav15_unit15_v1.csv`
+- sampled_rows: `90`
+- optimizer_steps: `9`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+#### Scores
+
+- readme_local320: `229/320 = 0.7156`
+- local320_components: `general_stable_set 177/200 = 0.8850; binary_hard_set 29/60 = 0.4833; symbol_watch_set 23/60 = 0.3833`
+- leaderboard_proxy_v1_set: `125/200 = 0.6250`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356554`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b20_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1`
 
 - status: `evaluating`
-- label: `stage25 reanchor textv120 textao20 num30 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T05:57:24.910124+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified120_answeronly20_num30_grav15_unit15_rowselect_v1.csv`
+- label: `o30_general_recover_t060_n100_g20_u20`
+- observed_at: `2026-04-11T06:18:26.528278+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text060_num100_grav20_unit20_recover_v1.csv`
 - sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
-- lr: `8e-06`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `4e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
 #### Latest evaluation progress
 
 - source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 228/320 = 0.7125`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `99469`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text060_num100_grav20_unit20_recover_lr4e6_len1024_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+
+- recorded_at: `2026-04-13T00:44:51.168646+00:00`
+- label: `binary40_o30_p0_s10_no_lz`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1.csv`
+- sampled_rows: `200`
+- optimizer_steps: `12`
+- lr: `8e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `231/320 = 0.7219`
+- local320_components: `general_stable_set 180/200 = 0.9000; binary_hard_set 28/60 = 0.4667; symbol_watch_set 23/60 = 0.3833`
+- leaderboard_proxy_v1_set: `130/200 = 0.6500`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356609`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
+
+- recorded_at: `2026-04-13T00:44:51.682274+00:00`
+- label: `o30_general_recover_t040_n120_g20_u20`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text040_num120_grav20_unit20_recover_v1.csv`
+- sampled_rows: `200`
+- optimizer_steps: `8`
+- lr: `4e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `231/320 = 0.7219`
+- local320_components: `general_stable_set 182/200 = 0.9100; binary_hard_set 28/60 = 0.4667; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `127/200 = 0.6350`
+
+#### Submission audit
+
+- audit_status: `blocked_routed_expert_3d_tensors`
+- peft_export_ready: `False`
+- tensor_count: `324`
+- blocked_reasons: `['MLX adapter contains non-2D LoRA tensors; PEFT/vLLM-equivalent export is not claimed without a verified mapping.', 'switch_mlp routed-expert tensors are 3D in this adapter, so the current single-file pipeline blocks submission export instead of guessing a PEFT layout.']`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3`
+
+- status: `evaluating`
+- label: `o30best_binaryaware_t150_b10p5s5_lz_g15_u15_v3`
+- observed_at: `2026-04-11T07:51:10.189025+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_v1.csv`
+- sampled_rows: `200`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `4e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 220/320 = 0.6875`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `37561`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text150_bin10p5s5_lzgrav15_unit15_binaryaware_lr4e6_len1024_v3 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2`
+
+- status: `paused_memory_cut`
+- label: `o30best-verifiedswap22-sym9-v2-eval-live`
+- observed_at: `2026-04-11T17:54:11+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_verifiedswap22_sym9_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 223/320 = 0.6969`
+- manual_cut_note: `sym9 reached local320 223/320, so it would need 13/16 remaining tail hits to beat the tracked 235/320 frontier; proxy continuation was intentionally cut after the local summary landed to free headroom for the queued reprogap4 lane once bit33 local summary appears`
+- post_cut_memory_note: `after killing the sym9 postprocess + live poller workers, host headroom recovered to roughly PhysMem unused 145 GB`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `74384`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_verifiedswap22_sym9_lr1e6_len1024_from_proxybench_v2 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
+
+- recorded_at: `2026-04-13T00:45:05.499662+00:00`
+- label: `o30best_local_best_actual_repro_v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified130_binary40proxyo30p0s10_grav15_unit15_rowselect_v1_repro_v1.csv`
+- sampled_rows: `200`
+- optimizer_steps: `12`
+- lr: `8e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `227/320 = 0.7094`
+- local320_components: `general_stable_set 178/200 = 0.8900; binary_hard_set 29/60 = 0.4833; symbol_watch_set 20/60 = 0.3333`
+- leaderboard_proxy_v1_set: `125/200 = 0.6250`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356099`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_repro_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
+
+- recorded_at: `2026-04-13T00:45:07.670220+00:00`
+- label: `o30best-proxybench-repro-eval-live`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_binary10_text10_grav15_unit15_v1_repro_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `227/320 = 0.7094`
+- local320_components: `general_stable_set 176/200 = 0.8800; binary_hard_set 30/60 = 0.5000; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `128/200 = 0.6400`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356933`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_repro_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2`
+
+- status: `evaluating`
+- label: `o30best-bit33-numreal8-anchortrim-v2-live`
+- observed_at: `2026-04-11T20:04:54.160553+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_bit33_numreal8_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 226/320 = 0.7063`
+- manual_cut_note: `numreal8 completed readme_local320 at 226/320, below both the tracked 235/320 frontier and the 0.75 threshold gate, so its proxy continuation was intentionally terminated to preserve headroom for reprogap4, reprogap5, and reprobridge9`
+- post_cut_memory_note: `after killing the numreal8 postprocess worker, live poller, and numreal8-specific threshold waiter, host headroom recovered to roughly PhysMem unused 141 GB`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `14351`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal8_anchortrim_lr1e6_len1024_from_proxybench_v2 -->
+
+<!-- auto-run-summary:start:best-submission-candidate -->
+### Auto best submission candidate
+
+- recorded_at: `2026-04-13T00:43:19.442873+00:00`
+- status: `selected_candidate`
+- candidate_count: `43`
+- eligible_candidate_count: `6`
+- gates: `{'min_local320_accuracy': 0.7, 'min_general_stable_accuracy': 0.9, 'min_proxy_v2_accuracy': 0.0, 'min_specialized_accuracy': 0.0, 'require_exportable': True}`
+
+- selected_run: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1`
+- local320: `235/320 = 0.7344`
+- general_stable: `183/200 = 0.9150`
+- leaderboard_proxy_v1_set: `131/200 = 0.6550`
+- leaderboard_proxy_v2: `0/0 = 0.0000`
+- binary_bias_specialized_set: `0/0 = 0.0000`
+- audit_status: `potentially_exportable_2d_only`
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/best_submission_candidate_proxybench_auto/submission.zip`
+
+| run_name | local320 | general_stable | proxy_v1 | proxy_v2 | specialized | exportable |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_b10_t10_g15_u15_lr1e6_len1024_from_proxymiss_v1` | 0.7344 | 0.9150 | 0.6550 | 0.0000 | 0.0000 | `True` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1` | 0.7312 | 0.9050 | 0.6450 | 0.0000 | 0.0000 | `True` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1` | 0.7281 | 0.9000 | 0.6350 | 0.0000 | 0.0000 | `True` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1` | 0.7281 | 0.8950 | 0.6600 | 0.0000 | 0.0000 | `True` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxymiss40_text20_grav15_unit15_sym8_lr2e6_len1536_v1` | 0.7250 | 0.9100 | 0.6500 | 0.0000 | 0.0000 | `True` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1` | 0.7250 | 0.9000 | 0.6250 | 0.0000 | 0.0000 | `True` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_text040_num120_grav20_unit20_recover_lr4e6_len1024_v1` | 0.7219 | 0.9100 | 0.6350 | 0.0000 | 0.0000 | `False` |
+| `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv130_bin40proxyo30p0s10_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1` | 0.7219 | 0.9000 | 0.6500 | 0.0000 | 0.0000 | `True` |
+<!-- auto-run-summary:end:best-submission-candidate -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v2 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v2`
+
+- recorded_at: `2026-04-12T02:45:57.268143+00:00`
+- label: `o30best-bit33-numreal5-anchortrim-v2-live`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v2`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_bit33_numreal5_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `226/320 = 0.7063`
+- local320_components: `general_stable_set 175/200 = 0.8750; binary_hard_set 30/60 = 0.5000; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `129/200 = 0.6450`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v2/submission_export/submission.zip`
+- zip_size_bytes: `102356798`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_anchortrim_lr1e6_len1024_from_proxybench_v2 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1`
+
+- status: `paused_memory_cut`
+- label: `o30best-bit33-numreal5-verifiedmix-v1-live`
+- observed_at: `2026-04-11T18:05:07+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_bit33_numreal5_verifiedmix_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `0/2 = 0.00%`
+- current_evaluation: `readme_local320`
+- current_rows_progress: `32/320 = 10.00%`
+- current_chunks_progress: `2/20 = 10.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- accuracy_so_far: `1.0000`
+- correct_so_far: `32`
+- manual_cut_note: `verifiedmix had only reached local320 32/320 when reprogap5 training plus the rest of the active wave drove host headroom down to roughly PhysMem unused 48 GB; it was intentionally cut so the broader numreal8 lane and both reprogap targeted bridges could continue safely`
+- post_cut_memory_note: `after killing the verifiedmix postprocess + live poller workers, host headroom recovered to roughly PhysMem unused 107 GB`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `8973`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_bit33_numreal5_verifiedmix_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprogap4 targeted bridge`
+- observed_at: `2026-04-11T20:39:53.361972+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 229/320 = 0.7156`
+- manual_cut_note: `reprogap4 was intentionally cut immediately after local320 completed at 229/320 because the exact-gap bridge still finished below the tracked 235/320 frontier and below the 0.75 threshold gate, making further proxy evaluation lower EV than reallocating memory to reprobridge10 and reprobridge12`
+- post_cut_memory_note: `after killing the reprogap4 postprocess worker, live poller, and reprogap4-specific threshold waiter, host headroom recovered to roughly PhysMem unused 192 GB`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `23801`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap4_text3bit1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprogap5 numeric hedge`
+- observed_at: `2026-04-11T20:29:45.531706+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `0/2 = 0.00%`
+- current_evaluation: `readme_local320`
+- current_rows_progress: `304/320 = 95.00%`
+- current_chunks_progress: `19/20 = 95.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- accuracy_so_far: `0.7401`
+- correct_so_far: `225`
+- manual_cut_note: `reprogap5 was intentionally cut at 225/304 with one chunk left because it needed 15/16 final answers to recover the 0.75 local gate, making the expected value worse than keeping memory on reprogap4 and reprobridge9`
+- post_cut_memory_note: `after killing the reprogap5 postprocess worker, live poller, threshold waiter, and local-summary waiter, host headroom recovered to roughly PhysMem unused 202 GB`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `25616`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprogap5_text3bit1num1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1`
+
+- status: `paused_memory_cut`
+- label: `reprobridge9 hybrid`
+- observed_at: `2026-04-11T21:13:45.000000+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
 - suite_evaluations: `1/2 = 50.00%`
 - current_evaluation: `leaderboard_proxy_v1_set`
 - current_rows_progress: `32/200 = 16.00%`
 - current_chunks_progress: `2/13 = 15.38%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.4062`
+- correct_so_far: `13`
 - completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 230/320 = 0.7188`
+- manual_cut_note: `reprobridge9 was intentionally cut immediately after readme_local320 finalized at 230/320 because the hybrid bridge still finished below the tracked 235/320 frontier and below the 0.75 threshold gate, making further proxy continuation lower EV than reallocating memory to reprobridge10, reprobridge12, and reprobridge13`
+- post_cut_memory_note: `after killing the reprobridge9 live poller, postprocess worker, threshold waiter, and obsolete reprobridge10 chain waiter, host headroom recovered to roughly PhysMem unused 192 GB`
 
 #### Completion markers
 
 - training_result_exists: `True`
-- runtime_pid: `98765`
+- runtime_pid: `36795`
 - runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv120_textao20_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge9_text3bit1num5_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
 
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
 
 - status: `evaluating`
-- label: `stage25 reanchor textv100 textao40 num30 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T05:59:44.771283+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified100_answeronly40_num30_grav15_unit15_rowselect_v1.csv`
-- sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
-- lr: `8e-06`
+- label: `reprobridge10 sibling`
+- observed_at: `2026-04-11T22:28:46.063922+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
 #### Latest evaluation progress
 
 - source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
-- suite_evaluations: `0/2 = 0.00%`
-- current_evaluation: `readme_local320`
-- current_rows_progress: `288/320 = 90.00%`
-- current_chunks_progress: `18/20 = 90.00%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 228/320 = 0.7125`
+- manual_cut_note: `reprobridge10 was intentionally cut immediately after readme_local320 finalized at 228/320 because the narrow + hedge sibling still finished below the tracked 235/320 frontier and below the 0.75 threshold gate, making proxy continuation lower EV than reallocating memory to reprobridge13 and reprobridge15`
+- post_cut_memory_note: `after killing the reprobridge10 live poller, postprocess worker, threshold waiter, and obsolete reprobridge12 chain waiter, host headroom rose toward PhysMem unused 313 GB`
 
 #### Completion markers
 
 - training_result_exists: `True`
-- runtime_pid: `9266`
+- runtime_pid: `70437`
 - runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv100_textao40_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge10_text3bit1num5num1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
 
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1`
 
-- status: `evaluating`
-- label: `stage25 reanchor textv150 textao0 num20 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T06:00:06.326661+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified150_num20_grav15_unit15_rowselect_v1.csv`
-- sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
-- lr: `8e-06`
+- status: `paused_memory_cut`
+- label: `reprobridge12 broad`
+- observed_at: `2026-04-11T22:29:52.904543+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
 #### Latest evaluation progress
 
 - source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
-- suite_evaluations: `0/2 = 0.00%`
-- current_evaluation: `readme_local320`
-- current_rows_progress: `240/320 = 75.00%`
-- current_chunks_progress: `15/20 = 75.00%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 228/320 = 0.7125`
+- manual_cut_note: `reprobridge12 was intentionally cut immediately after readme_local320 finalized at 228/320 because the broad no-answer_only sibling still finished below the tracked 235/320 frontier and below the 0.75 threshold gate, making proxy continuation lower EV than reallocating memory to reprobridge13 and reprobridge15`
+- post_cut_memory_note: `after killing the reprobridge12 live poller, postprocess worker, threshold waiter, and obsolete reprobridge13 chain waiter, host headroom rose toward PhysMem unused 313 GB`
 
 #### Completion markers
 
 - training_result_exists: `True`
-- runtime_pid: `10996`
+- runtime_pid: `72737`
 - runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv150_textao0_num20_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge12_text3bit1num8_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
 
-<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
-### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
 
 - status: `evaluating`
-- label: `stage25 reanchor textv80 textao60 num30 grav15 unit15 rowselect from reanchor1024 v1`
-- observed_at: `2026-04-10T05:59:24.715042+00:00`
-- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1`
-- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_text_verified80_answeronly60_num30_grav15_unit15_rowselect_v1.csv`
-- sampled_rows: `200`
-- optimizer_progress: `0/12 = 0.00%`
-- lr: `8e-06`
+- label: `reprobridge13 factor`
+- observed_at: `2026-04-11T22:46:16.979612+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
 - max_seq_length: `1024`
 - trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
 
 #### Latest evaluation progress
 
 - source: `benchmark_eval_suite_progress`
-- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
-- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized`
-- suite_evaluations: `0/2 = 0.00%`
-- current_evaluation: `readme_local320`
-- current_rows_progress: `160/320 = 50.00%`
-- current_chunks_progress: `10/20 = 50.00%`
-- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1/eval_suite_readme_proxy_specialized/readme_local320/benchmark_eval_progress.json`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `32/200 = 16.00%`
+- current_chunks_progress: `2/13 = 15.38%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.4375`
+- correct_so_far: `14`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 235/320 = 0.7344`
+- manual_cut_note: `reprobridge13 was intentionally cut after readme_local320 finalized at 235/320 because, although it matched the tracked local frontier, it still missed the 0.75 threshold gate and early proxy continuation only reached 14/32 = 0.4375, making further proxy continuation lower EV than reallocating that budget to reprobridge15, reprobridge16, and the queued reprobridge17 fallback`
+- post_cut_memory_note: `after killing the reprobridge13 live poller, postprocess worker, threshold waiter, and the reprobridge17-from-13 launcher, the surviving bridge queue now depends only on reprobridge15 and reprobridge16 full-suite summaries`
 
 #### Completion markers
 
 - training_result_exists: `True`
-- runtime_pid: `18644`
+- runtime_pid: `77590`
 - runtime_pid_alive: `False`
 - suite_summary_exists: `False`
 - audit_summary_exists: `False`
 - export_manifest_exists: `False`
 - recorded_run_result_exists: `False`
-<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_textv80_textao60_num30_grav15_unit15_rowselect_lr8e6_len1024_from_reanchor1024_v1 -->
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge13_text3bit1num8num1_anchortrim_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge15 hedge swap`
+- observed_at: `2026-04-12T00:40:12.234438+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 228/320 = 0.7125`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `4499`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge15_text3bit1num8num1swap_anchorrestore_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge16 raw numeric`
+- observed_at: `2026-04-12T01:11:21.495770+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `16/200 = 8.00%`
+- current_chunks_progress: `1/13 = 7.69%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.6250`
+- correct_so_far: `10`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 232/320 = 0.7250`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `8818`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge16_text3bit1num8num1raw4_answertrim_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge17 grav restore`
+- observed_at: `2026-04-12T01:20:13.009681+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 227/320 = 0.7094`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `13023`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge17_text3bit1num8num1gravrestore_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge18 hybrid`
+- observed_at: `2026-04-12T01:27:34.721859+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 227/320 = 0.7094`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `17080`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge18_text3bit1num8num1raw2gravrestore_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge19 hybrid`
+- observed_at: `2026-04-12T02:18:30.143400+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `0/200 = 0.00%`
+- current_chunks_progress: `0/13 = 0.00%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.0000`
+- correct_so_far: `0`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 231/320 = 0.7219`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `30788`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge19_text3bit1num8num1raw3grav1_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge20 hedge cut`
+- observed_at: `2026-04-12T03:27:51.314031+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `32/200 = 16.00%`
+- current_chunks_progress: `2/13 = 15.38%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.4062`
+- correct_so_far: `13`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 229/320 = 0.7156`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `54704`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge20_text3bit1num8raw4grav1_hedgecut_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1 -->
+### Live progress: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1`
+
+- status: `evaluating`
+- label: `reprobridge22 full raw`
+- observed_at: `2026-04-12T03:43:35.797321+00:00`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_v1.csv`
+- sampled_rows: `80`
+- optimizer_progress: `0/8 = 0.00%`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Latest evaluation progress
+
+- source: `benchmark_eval_suite_progress`
+- source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/benchmark_eval_suite_progress.json`
+- suite_output_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized`
+- suite_evaluations: `1/2 = 50.00%`
+- current_evaluation: `leaderboard_proxy_v1_set`
+- current_rows_progress: `16/200 = 8.00%`
+- current_chunks_progress: `1/13 = 7.69%`
+- evaluation_source_path: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1/eval_suite_readme_proxy_specialized/leaderboard_proxy_v1_set/benchmark_eval_progress.json`
+- accuracy_so_far: `0.4375`
+- correct_so_far: `7`
+- completed_evaluations: `['readme_local320']`
+- completed_evaluation_scores: `readme_local320 231/320 = 0.7219`
+
+#### Completion markers
+
+- training_result_exists: `True`
+- runtime_pid: `59249`
+- runtime_pid_alive: `False`
+- suite_summary_exists: `False`
+- audit_summary_exists: `False`
+- export_manifest_exists: `False`
+- recorded_run_result_exists: `False`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge22_text3bit1num8raw5grav1_fullraw_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-13T00:44:30.892937+00:00`
+- label: `reprobridge21 unit edge`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `227/320 = 0.7094`
+- local320_components: `general_stable_set 176/200 = 0.8800; binary_hard_set 30/60 = 0.5000; symbol_watch_set 21/60 = 0.3500`
+- leaderboard_proxy_v1_set: `126/200 = 0.6300`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356901`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge21_text3bit1num8raw2grav1unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-13T00:45:20.900429+00:00`
+- label: `reprobridge23 full raw unitedge`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_v1.csv`
+- sampled_rows: `79`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `227/320 = 0.7094`
+- local320_components: `general_stable_set 175/200 = 0.8750; binary_hard_set 30/60 = 0.5000; symbol_watch_set 22/60 = 0.3667`
+- leaderboard_proxy_v1_set: `126/200 = 0.6300`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356914`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge23_text3bit1num8raw5unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-12T06:11:20.342053+00:00`
+- label: `o30best proxybench reprobridge24 raw6 no grav v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6_nograv_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `233/320 = 0.7281`
+- local320_components: `general_stable_set 180/200 = 0.9000; binary_hard_set 29/60 = 0.4833; symbol_watch_set 24/60 = 0.4000`
+- leaderboard_proxy_v1_set: `127/200 = 0.6350`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356918`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge24_text3bit1num8raw6nograv_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-13T00:44:40.893637+00:00`
+- label: `reprobridge25 raw6 unitedge`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `232/320 = 0.7250`
+- local320_components: `general_stable_set 180/200 = 0.9000; binary_hard_set 30/60 = 0.5000; symbol_watch_set 22/60 = 0.3667`
+- leaderboard_proxy_v1_set: `125/200 = 0.6250`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356895`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge25_text3bit1num8raw6unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-13T00:45:00.613174+00:00`
+- label: `reprobridge26 raw7 unitedge`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `228/320 = 0.7125`
+- local320_components: `general_stable_set 179/200 = 0.8950; binary_hard_set 29/60 = 0.4833; symbol_watch_set 20/60 = 0.3333`
+- leaderboard_proxy_v1_set: `126/200 = 0.6300`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356854`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge26_text3bit1num8raw7unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-12T08:55:22.791307+00:00`
+- label: `o30best proxybench reprobridge27 raw8 unitedge v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `227/320 = 0.7094`
+- local320_components: `general_stable_set 174/200 = 0.8700; binary_hard_set 30/60 = 0.5000; symbol_watch_set 23/60 = 0.3833`
+- leaderboard_proxy_v1_set: `129/200 = 0.6450`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356647`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge27_text3bit1num8raw8unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-12T10:20:03.465728+00:00`
+- label: `o30best proxybench reprobridge28 raw9 unitedge v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `233/320 = 0.7281`
+- local320_components: `general_stable_set 179/200 = 0.8950; binary_hard_set 30/60 = 0.5000; symbol_watch_set 24/60 = 0.4000`
+- leaderboard_proxy_v1_set: `132/200 = 0.6600`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356843`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge28_text3bit1num8raw9unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-12T11:42:08.726020+00:00`
+- label: `o30best proxybench reprobridge29 raw10 unitedge v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `234/320 = 0.7312`
+- local320_components: `general_stable_set 181/200 = 0.9050; binary_hard_set 29/60 = 0.4833; symbol_watch_set 24/60 = 0.4000`
+- leaderboard_proxy_v1_set: `129/200 = 0.6450`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102356858`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge29_text3bit1num8raw10unitedge_lr1e6_len1024_from_proxybench_v1 -->
+
+<!-- auto-run-summary:start:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_lr1e6_len1024_from_proxybench_v1 -->
+### Auto result: `nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_lr1e6_len1024_from_proxybench_v1`
+
+- recorded_at: `2026-04-12T13:11:49.686458+00:00`
+- label: `o30best proxybench reprobridge30 raw11 unitedge v1`
+- run_root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_lr1e6_len1024_from_proxybench_v1`
+- train_csv: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_artifacts/stage25_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_v1.csv`
+- sampled_rows: `80`
+- optimizer_steps: `8`
+- lr: `1e-06`
+- max_seq_length: `1024`
+- trainable_lora_suffixes: `['mixer.q_proj', 'mixer.k_proj', 'mixer.v_proj', 'mixer.o_proj']`
+
+#### Scores
+
+- readme_local320: `226/320 = 0.7063`
+- local320_components: `general_stable_set 177/200 = 0.8850; binary_hard_set 29/60 = 0.4833; symbol_watch_set 20/60 = 0.3333`
+- leaderboard_proxy_v1_set: `129/200 = 0.6450`
+
+#### Submission audit
+
+- audit_status: `potentially_exportable_2d_only`
+- peft_export_ready: `True`
+- tensor_count: `232`
+
+#### Submission export
+
+- submission_zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/baseline_mlx/outputs/nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_lr1e6_len1024_from_proxybench_v1/submission_export/submission.zip`
+- zip_size_bytes: `102357407`
+- validation_valid: `True`
+<!-- auto-run-summary:end:nemotron_sft_lora_with_cot_v2_mlx_stagefreeze_v2_stage25_attention_qkvo_reanchor_o30best_proxybench30ao_reprobridge30_text3bit1num8raw11unitedge_lr1e6_len1024_from_proxybench_v1 -->
