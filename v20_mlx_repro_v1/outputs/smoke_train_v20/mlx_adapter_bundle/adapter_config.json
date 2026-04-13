@@ -1,0 +1,60 @@
+{
+    "adapter_path": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/outputs/smoke_train_v20/adapter",
+    "batch_size": 16,
+    "data": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14",
+    "enable_thinking": true,
+    "fine_tune_type": "lora",
+    "grad_accumulation_steps": 1,
+    "grad_checkpoint": true,
+    "iters": 1,
+    "learning_rate": 0.0002,
+    "lora_parameters": {
+        "rank": 32,
+        "dropout": 0.0,
+        "scale": 32.0,
+        "keys": [
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "in_proj",
+            "out_proj",
+            "switch_mlp.fc1",
+            "switch_mlp.fc2",
+            "shared_experts.up_proj",
+            "shared_experts.down_proj",
+            "lm_head"
+        ]
+    },
+    "lr_schedule": {
+        "name": "v20_step_linear_decay",
+        "arguments": [
+            0.0002,
+            1
+        ]
+    },
+    "mask_prompt": true,
+    "max_seq_length": 8192,
+    "model": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/outputs/smoke_train_v20/shadow_model",
+    "num_layers": -1,
+    "optimizer": "adam",
+    "optimizer_config": {
+        "adam": {},
+        "adamw": {},
+        "muon": {},
+        "sgd": {},
+        "adafactor": {}
+    },
+    "resume_adapter_file": null,
+    "save_every": 1,
+    "seed": 123,
+    "steps_per_eval": 1,
+    "steps_per_report": 1,
+    "train": true,
+    "v20_effective_batch_size": 32,
+    "v20_micro_batch_size": 16,
+    "v20_optimizer_steps": 1,
+    "v20_schedule_formula": "learning_rate * (1 - step / total_steps)",
+    "v20_snapshot_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14",
+    "val_batches": -1
+}

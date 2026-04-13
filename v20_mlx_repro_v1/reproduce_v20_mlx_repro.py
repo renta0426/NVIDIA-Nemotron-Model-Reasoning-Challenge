@@ -605,6 +605,7 @@ def build_training_manifest(args: argparse.Namespace, step_plan: Sequence[StepPl
             "assumptions": {
                 "lora_alpha_is_rank": True,
                 "tinker_dropout_not_exposed_assumed_zero": float(args.lora_dropout) == 0.0,
+                "fixed_train_padding": bool(args.fixed_train_padding),
             },
         },
         "evaluation": {
@@ -709,6 +710,7 @@ def build_microbatch_arrays(
     *,
     micro_batch_size: int,
     max_seq_length: int,
+    fixed_train_padding: bool,
 ) -> tuple[mx.array, mx.array]:
     loaded: list[tuple[list[int], int, int]] = []
     max_length = 0
@@ -718,7 +720,10 @@ def build_microbatch_arrays(
         max_length = max(max_length, truncated_length)
         loaded.append((tokens, min(example.prompt_length, truncated_length), truncated_length))
 
-    padded_length = min(max_seq_length, 1 + PAD_TO * ((max_length + PAD_TO - 1) // PAD_TO))
+    if fixed_train_padding:
+        padded_length = int(max_seq_length)
+    else:
+        padded_length = min(max_seq_length, 1 + PAD_TO * ((max_length + PAD_TO - 1) // PAD_TO))
     if padded_length <= 0:
         raise ValueError("Encountered empty microbatch")
 
@@ -775,7 +780,8 @@ def create_adapter_config_payload(
         "v20_effective_batch_size": int(args.batch_size),
         "v20_micro_batch_size": int(args.micro_batch_size),
         "v20_optimizer_steps": int(total_steps),
-        "v20_schedule_formula": "learning_rate * (1 - step / total_steps)",
+            "v20_schedule_formula": "learning_rate * (1 - step / total_steps)",
+        "v20_fixed_train_padding": bool(args.fixed_train_padding),
     }
 
 
@@ -1060,6 +1066,7 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
                 micro_examples,
                 micro_batch_size=int(args.micro_batch_size),
                 max_seq_length=int(args.max_seq_length),
+                fixed_train_padding=bool(args.fixed_train_padding),
             )
             loss_value, token_count, grad_accum = micro_step(
                 batch_array,
@@ -1393,6 +1400,12 @@ def parse_args() -> argparse.Namespace:
         target.add_argument("--micro-batch-size", type=int, default=16)
         target.add_argument("--learning-rate", type=float, default=2e-4)
         target.add_argument("--max-seq-length", type=int, default=8192)
+        target.add_argument(
+            "--fixed-train-padding",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Pad every train microbatch to max_seq_length to avoid MLX compile-shape cache growth.",
+        )
         target.add_argument("--lora-rank", type=int, default=32)
         target.add_argument("--lora-alpha", type=float, default=32.0)
         target.add_argument("--lora-dropout", type=float, default=0.0)
