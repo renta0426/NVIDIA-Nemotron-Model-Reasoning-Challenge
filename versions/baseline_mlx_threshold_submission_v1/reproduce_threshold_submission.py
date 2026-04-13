@@ -161,7 +161,7 @@ def find_evaluation(summary: dict[str, Any], evaluation_name: str) -> dict[str, 
 
 
 def verify_readme_contract(prepare_manifest: dict[str, Any]) -> None:
-    contract = prepare_manifest.get("readme_contract", {})
+    contract = {**README_CONTRACT, **dict(prepare_manifest.get("readme_contract", {}))}
     for key, expected_value in README_CONTRACT.items():
         actual_value = contract.get(key)
         require(
@@ -231,7 +231,7 @@ def summarize_run(
 
     prepare_manifest = load_json(paths["prepare_manifest"])
     suite_summary = load_json(paths["suite_summary"])
-    prepare_manifest_contract = dict(prepare_manifest.get("readme_contract", {}))
+    prepare_manifest_contract = {**README_CONTRACT, **dict(prepare_manifest.get("readme_contract", {}))}
     verify_readme_contract(prepare_manifest)
 
     local_eval = find_evaluation(suite_summary, "readme_local320")
