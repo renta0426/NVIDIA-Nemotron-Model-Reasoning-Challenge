@@ -22,15 +22,15 @@
 
 | selection_tier | rows | share |
 | --- | ---: | ---: |
-| `verified_trace_ready` | 6,486 | 68.3% |
-| `answer_only_keep` | 2,826 | 29.7% |
-| `manual_audit_priority` | 164 | 1.7% |
+| `verified_trace_ready` | 6,711 | 70.6% |
+| `answer_only_keep` | 2,652 | 27.9% |
+| `manual_audit_priority` | 113 | 1.2% |
 | `exclude_suspect` | 24 | 0.3% |
 
 ### この数字の意味
 
-- 安全側の学習コア: `6,486 + 2,826 = 9,312` 行（`98.0%`）
-- 未解決 / 要注意: `164 + 24 = 188` 行（`2.0%`）
+- 安全側の学習コア: `6,711 + 2,652 = 9,363` 行（`98.6%`）
+- 未解決 / 要注意: `113 + 24 = 137` 行（`1.4%`）
 - 結論: **かなり良い状態まで到達し、manual はごく薄い残差になった**
 
 ### selection tier の実務的な意味
@@ -60,14 +60,15 @@
 | `gravity_constant` | 1,597 | 1,597 | 0 | 0 | 0 | 実質完了 |
 | `unit_conversion` | 1,594 | 1,594 | 0 | 0 | 0 | 実質完了 |
 | `text_decryption` | 1,576 | 605 | 971 | 0 | 0 | 未解決分は clean な answer-only に昇格 |
-| `bit_manipulation` | 1,602 | 1,004 | 445 | 138 | 15 | prompt-local consensus は answer-only として回収 |
+| `bit_manipulation` | 1,602 | 1,229 | 271 | 87 | 15 | strict audit 後は overall unique exact / manual exact / boolean4 のみ verified |
 | `symbol_equation` | 1,555 | 110 | 1,410 | 26 | 9 | manual を大幅圧縮し、残差は numeric tail 中心 |
 
 ### 解釈
 
 - `roman` / `gravity` / `unit` は、curation の観点ではほぼ完成です。
 - `text` は accuracy 向けの教師としてかなり良い状態ですが、`971` 行は **answer-only** であり、完全な reasoning trace 教師ではありません。
-- 最大の改善は最終盤の `symbol_equation` で、`numeric_2x2` の reverse-mode consensus / manual exact / small-set / wrapper-only に加え、current/reverse 両経路へ `max(x,y) % min(x,y)` family、reverse `x_minus_y` の unique-negative tail、prompt-local `%` reverse abs-diff suffix family、prompt-backed `>` / `<` exact branch rowsを追加し、さらに **README.md の boxed final-answer Accuracy** 前提で non-suspect な glyph 残差 `470` 行と numeric same-op-zero 残差 `136` 行を `answer_only_keep` へ再配置したことで、manual は `1,289 -> 26` まで圧縮できました。`bit_manipulation` は trace-safe core を `1,004 verified` に保ちつつ、prompt-local consensus を `answer_only` として追加回収し、manual を `138` 行まで圧縮できています。
+- `bit_manipulation` は初回の広い exact disambiguation では `95.01% verified` まで伸びましたが、strict audit で library-local unique / dominant exact が広すぎると判明したため、overall unique exact のみ verified に残しました。監査後の最終値は `1,229 verified / 271 answer_only / 87 manual / 15 exclude` (`76.72% verified`) です。
+- `symbol_equation` も最終盤で大きく改善し、`numeric_2x2` の reverse-mode consensus / manual exact / small-set / wrapper-only に加え、current/reverse 両経路へ `max(x,y) % min(x,y)` family、reverse `x_minus_y` の unique-negative tail、prompt-local `%` reverse abs-diff suffix family、prompt-backed `>` / `<` exact branch rowsを追加し、さらに **README.md の boxed final-answer Accuracy** 前提で non-suspect な glyph 残差 `470` 行と numeric same-op-zero 残差 `136` 行を `answer_only_keep` へ再配置したことで、manual は `1,289 -> 26` まで圧縮できています。
 
 ### Kaggle 側 family 名との対応
 
@@ -154,27 +155,23 @@ binary では、既存の単純規則だけでなく次の rule family を追加
 結果:
 
 - 以前の solved 参照値: `306`
-- ルール拡張後の binary 回収総量: `1,449` (`verified 1,004 + answer_only 445`)
-- trace-safe 再監査後も維持した verified binary core: `1,004`
-- 改善幅: `+698` verified / `+1,143` curated total
-- semantic-dedup 後の structured byte formula library から、`71` 個の repeated zero-error family を確定した
-- その conservative support rule により、manual binary `189` 行を新規 `verified_trace_ready` に昇格した
-- さらに abstract family pass（`support>=12`, `distinct exact>=6`, `0 error`）で singleton structured rows `29` 行を追加 `verified_trace_ready` に昇格した
-- さらに same-pred multi-formula で safe abstract family に anchor を持つ `2` 行を `answer_only_keep` に昇格した
-- さらに conservative hybrid consensus で `20` 行を `answer_only_keep` に昇格した
-- さらに thin zero-error abstract family を `answer_only_keep` として `11` 行追加回収した
-- さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family を `answer_only_keep` として `2` 行追加回収した
-- さらに second-pass not-structured formula と prompt-exact manual reread で binary の残差を大きく圧縮した
-- ただし学習用途では、self-including support や ID 固定 prompt-exact singleton に依存する row を `verified_trace_ready` に残し続けるべきではない
-- そのため leave-one-out 再監査を残したうえで、再監査後の残差だけに prompt-local exact consensus を段階適用したが、trace 教師へは上げず `answer_only_keep` に留めた
-- current structured/not-structured same-pred exact で `305` 行を `answer_only_keep` として追加回収した
-- extended binary family（`support>=3`, `error=0`）で `10` 行を `answer_only_keep` として追加回収した
-- nested binary family（exact `support>=3` または abstract family `support>=4`, `distinct>=2`, `error=0`）で `127` 行を `answer_only_keep` として追加回収した
-- current binary は `1,004 verified / 445 answer_only / 138 manual / 15 exclude`
+- 現在の binary 最終集計: `1,229 verified / 271 answer_only / 87 manual / 15 exclude`
+- verified coverage: `1229 / 1602 = 76.72%`
+- curated total（`verified + answer_only`）: `1,500`
+- 既存の solver-native trace-safe core `1,004` 行はそのまま維持した
+- committed baseline 比の純増は `+225 verified`（`answer_only -> verified: 174`, `manual -> verified: 51`）
+- `binary_four_bit_boolean` を teacher dispatch に接続し、純増 `9` 行（`answer_only 7 + manual 2`）を `verified_trace_ready` に昇格した
+- prompt-backed manual exact reread を後段で再適用し、純増 `62` 行（`answer_only 60 + manual 2`）を `verified_trace_ready` に戻した
+- strict audit 後の exact disambiguation は、4 exact libraries 全体で 1 つの `(formula, prediction)` に収束した `154` 行だけを `verified_trace_ready` に残した
+- その audited exact 昇格は純増 `154` 行（`answer_only 107 + manual 47`）で、decision rule は `overall_unique_exact_formula` のみ
+- source library は `stage2 142 / structured 9 / not_structured 3`
+- 初回の広い exact disambiguation `447` 行のうち、`293` 行は broader exact ambiguity が残ったため `verified` から戻した
+- 結果として answer-only は `445 -> 271`、manual は `138 -> 87` まで縮小した
+- 残る manual `87` 行は `bit_other 86 + bit_permutation_inversion 1` で、high no-candidate / no audited unique exact family の hold queue である
 
 ### 4.2 text の改善
 
-今回もっとも大きかったのは text の整理です。
+text では、未解決行の整理が大きく進みました。
 
 - 未解決 text は **壊れた cipher** ではありませんでした
 - 主因は、query に必要な暗号文字が examples に 1〜6 文字足りないことでした
@@ -288,6 +285,9 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_structured_byte_support3_answer_only_candidates_v1.csv` | `support=3 / distinct=3 / error=0` の narrow structured-byte family から `answer_only_keep` に昇格した binary 2 行の台帳 |
 | `artifacts/binary_structured_byte_manual_exact_verified_v1.csv` | direct prompt reread で `verified_trace_ready` に確定した structured-byte residual 5 行の台帳 |
 | `artifacts/binary_structured_byte_manual_exact_excludes_v1.csv` | direct prompt reread で `exclude_suspect` に確定した structured-byte residual 1 行の台帳 |
+| `artifacts/binary_four_bit_boolean_verified_v1.csv` | `binary_four_bit_boolean` で gold を再現した current verified 38 行の台帳（baseline 比の純増は 9 行） |
+| `artifacts/binary_manual_exact_reverified_v1.csv` | prompt-backed manual exact reread を後段で再適用し、`verified_trace_ready` に戻した 62 行の台帳 |
+| `artifacts/binary_exact_disambiguation_verified_v1.csv` | strict audit 後に、4 exact libraries 全体で 1 つの `(formula, prediction)` に収束した `overall_unique_exact_formula` 154 行の台帳 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 117 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_minus_direct_plain_support_v1.csv` | prompt-exact な direct `-` plain subfamily の support 台帳 |
@@ -410,6 +410,8 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 | `reports/57_symbol_colon_manual_exact_answer_only.md` | `:` residual を直接読み、symbol manual 2 行を `answer_only_keep` に確定した根拠 |
 | `reports/58_symbol_prefix_always_abs_tail.md` | `"` / `[` tail を直接読み、symbol manual 2 行を `answer_only_keep` に確定し、multi-example gold-hit tail の枯渇を確認した根拠 |
 | `reports/59_symbol_single_example_tail_hold.md` | single-example gold-hit tail 8 行を全件再読し、safe promotion / exclude ともに 0 で hold に据えた根拠 |
+| `reports/60_binary_exact_disambiguation_and_boolean4_recovery.md` | initial recovery を strict audit で削り込み、binary verified の audited final を `1229 / 1602` に確定した根拠 |
+| `reports/61_binary_promotion_audit.md` | corrected output を fresh rerun で再生成し、key artifact の SHA256 一致まで確認した再現性 / 妥当性監査 |
 
 ## 8. 最短の読み順
 
@@ -426,18 +428,13 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.venv/lib/python3.12/site-packages \
 
 ### 9.1 binary がまだ重い
 
-- `bit_manipulation` は `138 manual + 15 exclude` まで圧縮できた
-- 2-bit / 3-bit / affine XOR / byte transform に加えて、current structured/not-structured same-pred exact、extended binary family、nested binary family を段階適用した
-- binary curated total は `1,449`、そのうち trace 教師コアは `1,004` に保ったまま answer-only を厚くできた
-- leave-one-out 再監査は維持したまま、その後段で `305 + 10 + 127` 行を prompt-local consensus から `answer_only_keep` として追加回収した
-- 残差の中心は、なお high no-candidate で prompt-local exact family が立たないケースである
-- affine mismatch の疑わしい低ギャップ行は引き続き除外側へ寄せ、unsafe な verified 水増しは避けた
-- answer-only は `445` 行まで増え、binary は trace-safe core と answer supervision を分離した curated family になった
-- さらに thin zero-error abstract family から `11 answer_only` を追加回収できた
-- さらに `support=3 / distinct=3 / error=0` の narrow structured-byte family から `2 answer_only` を追加回収できた
-- さらに direct prompt reread により structured-byte residual `5` 行を `verified`、`1` 行を `exclude_suspect` に確定できた
-- structured byte formula の残差は現在 `1 manual + 5 exclude` まで縮んだ
-- round2 の top binary cluster（`34` 行, `7 examples / 1 no-candidate / 0 multi-candidate`）も再読したが、affine / boolean / byte family のどれも unique ではなく、consensus mismatch も無いので safe promotion / safe exclusion の両方ができない
+- `bit_manipulation` の audited final は `1,229 verified / 271 answer_only / 87 manual / 15 exclude` で、verified は `76.72%`
+- 実際に残した verified 拡張は `four-bit boolean`, `late manual exact`, `overall_unique_exact_formula` の 3 段だけ
+- 純増 `+225 verified` の内訳は `+9`, `+62`, `+154`
+- strict audit により、初回の broader exact disambiguation `447` 行のうち `293` 行は `verified` から外した
+- answer-only は `271` 行、manual は `87` 行で、manual の大半は `bit_other`
+- exclude `15` 行は既存 suspect のままで、unsafe な verified 水増しは行っていない
+- strict audit 後も 4 exact libraries 全体で 1 つの exact rule に収束する row だけを verified へ残し、broader exact ambiguity を持つ tail は answer-only / manual へ戻した
 - second-largest binary cluster（`29` 行, `8 examples / 1 no-candidate / 0 multi-candidate`）も同様に no unique solver / no consensus mismatch で、safe promotion / safe exclusion の両方ができない
 - third-largest binary cluster（`17` 行, `9 examples / 1 no-candidate / 0 multi-candidate`）も follow-up したが、shift-like / inversion-like fragments が row ごとに別方向へ散っており、やはり no unique solver / no safe exclusion のままだった
 - 残る binary の小 cluster も representative rows を再読したが、今度は `bit_multi_candidate_positions >= 1` や `bit_no_candidate_positions = 0` でも複数候補競合が残るタイプが中心で、top3 よりさらに曖昧だった

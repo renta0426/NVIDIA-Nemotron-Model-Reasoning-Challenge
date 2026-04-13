@@ -5,7 +5,7 @@
 | audit_focus | family | rows |
 | --- | --- | --- |
 | symbol_numeric_same_op | symbol_equation | 26 |
-| binary_low_gap | bit_manipulation | 6 |
+| binary_low_gap | bit_manipulation | 5 |
 
 ## Top rows in pass1 pack
 
@@ -15,7 +15,6 @@
 | binary_low_gap | 6adef1ef | bit_manipulation | bit_other | 3.0 | 11111101 | 11110101 |
 | binary_low_gap | a63f9c85 | bit_manipulation | bit_permutation_inversion | 3.0 | 11111111 | 10011101 |
 | binary_low_gap | b45003a6 | bit_manipulation | bit_other | 3.0 | 00110110 | 10110101 |
-| binary_low_gap | cf5b4ab4 | bit_manipulation | bit_other | 3.0 | 11101100 | 11011001 |
 | binary_low_gap | e5bb9b26 | bit_manipulation | bit_other | 3.0 | 11110001 | 11000111 |
 | symbol_numeric_same_op | 34c563c5 | symbol_equation | numeric_2x2 | 5.0 | 04` | 45`41 |
 | symbol_numeric_same_op | 45076dc9 | symbol_equation | numeric_2x2 | 5.0 | 6 | 56}17 |

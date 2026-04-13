@@ -4,26 +4,26 @@
 
 | template_subtype | bit_simple_family | bit_independent_unique | bit_bijection_unique | bit_boolean2_unique | bit_boolean3_unique | bit_boolean4_unique | bit_affine_unique | bit_byte_transform_unique | bit_hybrid_consensus_ready | selection_tier | analysis_notes | teacher_solver_candidate | rows |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_structured_byte_exact | binary_structured_byte_formula | 410 |
-| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 193 |
-| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_structured_byte_abstract_exact | binary_structured_byte_formula_abstract | 126 |
-| bit_other | unknown | False | False | False | False | False | False | False | False | manual_audit_priority | bit_audit_needed |  | 119 |
-| bit_other | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_exact | binary_affine_xor | 112 |
-| bit_other | unknown | False | False | False | False | False | False | False | False | answer_only_keep | bit_prompt_local_nested_support3_or_abstract_answer_only |  | 106 |
-| bit_other | unknown | False | False | False | False | False | False | False | False | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 61 |
-| bit_other | unknown | False | False | True | False | False | True | False | False | verified_trace_ready | bit_exact | binary_two_bit_boolean | 59 |
-| bit_other | unknown | False | False | True | False | False | False | False | False | verified_trace_ready | bit_exact | binary_two_bit_boolean | 52 |
-| bit_structured_byte_formula | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_structured_byte_exact | binary_structured_byte_formula | 36 |
-| bit_structured_byte_formula | unknown | False | False | False | False | False | True | False | False | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 27 |
-| bit_structured_byte_formula | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_structured_byte_abstract_exact | binary_structured_byte_formula_abstract | 26 |
-| bit_permutation_inversion | unknown | True | True | False | False | False | False | False | False | verified_trace_ready | bit_exact | binary_bit_permutation_bijection | 25 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_structured_byte_exact | binary_structured_byte_formula | 395 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 134 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_structured_byte_abstract_exact | binary_structured_byte_formula_abstract | 119 |
+| bit_prompt_local_exact_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_prompt_local_stage2_unique_exact_overall | binary_prompt_local_stage2_unique_exact | 113 |
+| bit_other | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_exact | binary_affine_xor | 107 |
+| bit_other | unknown | False | False | False | False | False | False | False | False | manual_audit_priority | bit_audit_needed |  | 80 |
+| bit_other | unknown | False | False | False | False | False | False | False | False | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 56 |
+| bit_other | unknown | False | False | True | False | False | False | False | False | verified_trace_ready | bit_exact | binary_two_bit_boolean | 48 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_not_structured_manual_prompt_exact | binary_structured_byte_not_formula_manual | 47 |
+| bit_other | unknown | False | False | True | False | False | True | False | False | verified_trace_ready | bit_exact | binary_two_bit_boolean | 42 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_structured_byte_exact | binary_structured_byte_formula | 35 |
+| bit_other | unknown | False | False | False | False | True | False | False | False | verified_trace_ready | bit_exact | binary_four_bit_boolean | 30 |
+| bit_other | unknown | False | False | False | False | False | False | False | False | answer_only_keep | bit_prompt_local_nested_support3_or_abstract_answer_only |  | 28 |
+| bit_prompt_local_exact_formula | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_prompt_local_stage2_unique_exact_overall | binary_prompt_local_stage2_unique_exact | 28 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | True | False | False | verified_trace_ready | bit_structured_byte_abstract_exact | binary_structured_byte_formula_abstract | 25 |
 | bit_structured_byte_formula | unknown | False | False | False | False | False | False | False | False | verified_trace_ready | bit_not_structured_byte_exact | binary_structured_byte_not_formula | 23 |
-| bit_other | unknown | False | False | False | False | False | True | False | False | manual_audit_priority | bit_audit_needed |  | 18 |
-| bit_other | unknown | False | False | False | False | False | True | False | False | answer_only_keep | bit_prompt_local_nested_support3_or_abstract_answer_only |  | 16 |
+| bit_permutation_inversion | unknown | True | True | False | False | False | False | False | False | verified_trace_ready | bit_exact | binary_bit_permutation_bijection | 22 |
+| bit_other | unknown | False | False | True | False | True | True | False | False | verified_trace_ready | bit_exact | binary_two_bit_boolean | 17 |
 | bit_other | unknown | False | False | False | False | False | True | False | True | verified_trace_ready | bit_exact | binary_affine_xor | 16 |
-| bit_other | unknown | False | False | False | False | False | False | False | True | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 14 |
-| bit_permutation_inversion | unknown | True | True | False | False | False | True | False | False | verified_trace_ready | bit_exact | binary_bit_permutation_bijection | 11 |
-| bit_other | unknown | False | False | False | True | False | False | False | False | verified_trace_ready | bit_exact | binary_three_bit_boolean | 9 |
+| bit_structured_byte_formula | unknown | False | False | False | False | False | True | False | False | answer_only_keep | bit_prompt_local_current_consensus_answer_only |  | 15 |
 
 ## Text
 

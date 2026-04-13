@@ -250,6 +250,13 @@ def invert_bit(bit: str) -> str:
     return "1" if bit == "0" else "0"
 
 
+def normalize_bit_answer_text(answer: Any) -> str:
+    text = str(answer).strip()
+    if text and set(text) <= {"0", "1"} and len(text) < 8:
+        return text.zfill(8)
+    return text
+
+
 def rotate_left_byte(value: int, shift: int) -> int:
     shift %= 8
     return (((value & 0xFF) << shift) & 0xFF) | ((value & 0xFF) >> (8 - shift))
@@ -1558,6 +1565,27 @@ def split_formula_arguments(text: str) -> list[str]:
     return arguments
 
 
+BIT_FORMULA_SOURCE_PATTERN = re.compile(
+    r"^(x|reverse|nibble_swap|zero|ones|const_[01]{8}|const_not_[01]{8}|(rol|ror|shl|shr)\d+)$"
+)
+
+
+@lru_cache(maxsize=None)
+def bit_formula_text_complexity(text: str) -> int:
+    formula_text = str(text).strip()
+    if not formula_text:
+        return 0
+    if BIT_FORMULA_SOURCE_PATTERN.fullmatch(formula_text):
+        return 1
+    if formula_text.startswith("not(") and formula_text.endswith(")"):
+        return 1 + bit_formula_text_complexity(formula_text[4:-1])
+    if "(" not in formula_text or not formula_text.endswith(")"):
+        return 1000
+    _operation, remainder = formula_text.split("(", 1)
+    arguments = split_formula_arguments(remainder[:-1])
+    return 1 + sum(bit_formula_text_complexity(argument) for argument in arguments)
+
+
 def abstract_bit_structured_source_name(name: str) -> str:
     if re.fullmatch(r"rol\d+", str(name)):
         return "rol"
@@ -1984,7 +2012,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     bijection_answer = next(iter(bijection_answers)) if len(bijection_answers) == 1 else ""
     boolean2_answer, boolean2_value_counts, boolean2_support_counts = infer_bit_two_bit_boolean_answer(examples, query_bits)
     boolean3_answer, boolean3_value_counts, boolean3_support_counts = infer_bit_three_bit_boolean_answer(examples, query_bits)
-    boolean4_answer, boolean4_value_counts, boolean4_support_counts = None, [], []
+    boolean4_answer, boolean4_value_counts, boolean4_support_counts = infer_bit_four_bit_boolean_answer(examples, query_bits)
     affine_answer, affine_free_var_counts = infer_bit_affine_xor_answer(examples, query_bits)
     byte_transform_answer, byte_transform_names = infer_bit_byte_transform_answer(examples, query_bits)
     structured_formula_matches = infer_bit_structured_byte_formula_matches(examples, query_bits)
@@ -2003,7 +2031,15 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
     not_structured_formula_predictions_text = "|".join(not_structured_formula_predictions)
     hybrid_answer, hybrid_info = infer_bit_hybrid_consensus_answer(examples, candidate_sets, query_bits)
     strict_prediction = bijection_answer or (independent_answer or "")
-    fallback_prediction = strict_prediction or (boolean2_answer or "") or (boolean3_answer or "") or (hybrid_answer or "") or (affine_answer or "") or (byte_transform_answer or "")
+    fallback_prediction = (
+        strict_prediction
+        or (boolean2_answer or "")
+        or (boolean3_answer or "")
+        or (boolean4_answer or "")
+        or (hybrid_answer or "")
+        or (affine_answer or "")
+        or (byte_transform_answer or "")
+    )
     no_candidate_positions = sum(1 for candidates in candidate_sets if not candidates)
     multi_candidate_positions = sum(1 for candidates in candidate_sets if len(candidates) > 1)
     reasons: list[str] = []
@@ -2021,17 +2057,45 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         reasons.append("bit_boolean3_ambiguous")
     elif not strict_prediction and not boolean2_answer and boolean3_answer != str(answer):
         reasons.append("bit_boolean3_answer_mismatch")
+    if boolean4_answer is None:
+        reasons.append("bit_boolean4_ambiguous")
+    elif (
+        not strict_prediction
+        and not boolean2_answer
+        and not boolean3_answer
+        and boolean4_answer != str(answer)
+    ):
+        reasons.append("bit_boolean4_answer_mismatch")
     if affine_answer is None:
         reasons.append("bit_affine_ambiguous")
-    elif not strict_prediction and not boolean2_answer and not boolean3_answer and affine_answer != str(answer):
+    elif (
+        not strict_prediction
+        and not boolean2_answer
+        and not boolean3_answer
+        and not boolean4_answer
+        and affine_answer != str(answer)
+    ):
         reasons.append("bit_affine_answer_mismatch")
     if byte_transform_answer is None:
         reasons.append("bit_byte_transform_ambiguous")
-    elif not strict_prediction and not boolean2_answer and not boolean3_answer and not affine_answer and byte_transform_answer != str(answer):
+    elif (
+        not strict_prediction
+        and not boolean2_answer
+        and not boolean3_answer
+        and not boolean4_answer
+        and not affine_answer
+        and byte_transform_answer != str(answer)
+    ):
         reasons.append("bit_byte_transform_mismatch")
     if hybrid_answer is None:
         reasons.append("bit_hybrid_consensus_ambiguous")
-    elif not strict_prediction and not boolean2_answer and not boolean3_answer and hybrid_answer != str(answer):
+    elif (
+        not strict_prediction
+        and not boolean2_answer
+        and not boolean3_answer
+        and not boolean4_answer
+        and hybrid_answer != str(answer)
+    ):
         reasons.append("bit_hybrid_consensus_mismatch")
     if strict_prediction and strict_prediction != str(answer):
         reasons.append("bit_answer_mismatch")
@@ -2046,6 +2110,8 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         teacher_solver = "binary_two_bit_boolean"
     elif boolean3_answer and boolean3_answer == str(answer):
         teacher_solver = "binary_three_bit_boolean"
+    elif boolean4_answer and boolean4_answer == str(answer):
+        teacher_solver = "binary_four_bit_boolean"
     elif affine_answer and affine_answer == str(answer):
         teacher_solver = "binary_affine_xor"
     elif byte_transform_answer and byte_transform_answer == str(answer):
@@ -2062,6 +2128,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         and not strict_prediction
         and not boolean2_answer
         and not boolean3_answer
+        and not boolean4_answer
         and affine_answer
         and not byte_transform_answer
         and affine_answer != str(answer)
@@ -2080,6 +2147,8 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         best_prediction = boolean2_answer or ""
     elif teacher_solver == "binary_three_bit_boolean":
         best_prediction = boolean3_answer or ""
+    elif teacher_solver == "binary_four_bit_boolean":
+        best_prediction = boolean4_answer or ""
     elif teacher_solver == "binary_affine_xor":
         best_prediction = affine_answer or ""
     elif teacher_solver == "binary_byte_transform":
@@ -2144,7 +2213,7 @@ def analyze_bit_row(v1: Any, parsed: Any, answer: str) -> dict[str, Any]:
         "bit_bijection_solution_count": int(len(bijection_answers)),
         "bit_boolean2_unique": bool(boolean2_answer is not None),
         "bit_boolean3_unique": bool(boolean3_answer is not None),
-        "bit_boolean4_unique": False,
+        "bit_boolean4_unique": bool(boolean4_answer is not None),
         "bit_affine_unique": bool(affine_answer is not None),
         "bit_byte_transform_unique": bool(byte_transform_answer is not None),
         "bit_no_candidate_positions": int(no_candidate_positions),
@@ -3510,6 +3579,36 @@ BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS: dict[str, dict[str, str]] = {
 }
 
 
+BIT_LATE_MANUAL_EXACT_PROMOTION_SPECS: dict[str, dict[str, str]] = {
+    **{
+        row_id: {
+            "library": "structured",
+            "formula_name": spec["formula_name"],
+            "decision_note": spec["decision_note"],
+        }
+        for row_id, spec in BIT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS.items()
+    },
+    **{
+        row_id: {
+            "library": "not_structured",
+            "formula_name": spec["formula_name"],
+            "decision_note": spec["decision_note"],
+        }
+        for row_id, spec in BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS.items()
+    },
+    "5791e7c4": {
+        "library": "structured",
+        "formula_name": "majority(nibble_swap,shl6,shr6)",
+        "decision_note": "late_manual_prompt_exact_verified",
+    },
+    "ea10e59c": {
+        "library": "structured",
+        "formula_name": "majority(rol1,shl5,shr1)",
+        "decision_note": "late_manual_prompt_exact_verified",
+    },
+}
+
+
 def apply_bit_not_structured_manual_prompt_curation(analysis_df: pd.DataFrame) -> pd.DataFrame:
     analysis_df = analysis_df.copy()
     if not BIT_NOT_STRUCTURED_MANUAL_EXACT_PROMOTION_SPECS:
@@ -3549,6 +3648,421 @@ def apply_bit_not_structured_manual_prompt_curation(analysis_df: pd.DataFrame) -
     analysis_df.loc[promote_mask, "analysis_notes"] = "bit_not_structured_manual_prompt_exact"
     analysis_df.loc[promote_mask, "suspect_label"] = False
     return analysis_df
+
+
+def apply_bit_late_manual_exact_promotions(
+    analysis_df: pd.DataFrame,
+    v1: Any,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "previous_selection_tier",
+        "query_raw",
+        "answer",
+        "library_name",
+        "formula_name",
+        "predicted_answer",
+        "decision_note",
+    ]
+    if not BIT_LATE_MANUAL_EXACT_PROMOTION_SPECS:
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    infer_map = {
+        "structured": infer_bit_structured_byte_formula_matches,
+        "not_structured": infer_bit_structured_byte_not_formula_matches,
+    }
+    solver_map = {
+        "structured": "binary_structured_byte_formula_manual",
+        "not_structured": "binary_structured_byte_not_formula_manual",
+    }
+    analysis_note_map = {
+        "structured": "bit_structured_manual_prompt_exact",
+        "not_structured": "bit_not_structured_manual_prompt_exact",
+    }
+
+    target_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & analysis_df["selection_tier"].isin(["answer_only_keep", "manual_audit_priority"])
+        & analysis_df["id"].astype(str).isin(set(BIT_LATE_MANUAL_EXACT_PROMOTION_SPECS))
+    )
+    if not target_mask.any():
+        return analysis_df, pd.DataFrame(columns=candidate_columns)
+
+    candidate_rows: list[dict[str, Any]] = []
+    promote_rows: dict[str, dict[str, str]] = {}
+    for row in analysis_df.loc[target_mask, ["id", "selection_tier", "prompt", "query_raw", "answer"]].to_dict(orient="records"):
+        row_id = str(row["id"])
+        spec = BIT_LATE_MANUAL_EXACT_PROMOTION_SPECS.get(row_id)
+        if spec is None:
+            continue
+        library_name = str(spec["library"])
+        infer_matches = infer_map.get(library_name)
+        if infer_matches is None:
+            continue
+        parsed = v1.parse_prompt(str(row["prompt"]), str(row["answer"]))
+        examples = extract_examples(parsed)
+        query_bits = str(parsed.bit_query_binary or "")
+        if len(query_bits) != 8 or not examples:
+            continue
+        formula_map = {formula_name: predicted_answer for formula_name, predicted_answer in infer_matches(examples, query_bits)}
+        predicted_answer = str(formula_map.get(str(spec["formula_name"]), ""))
+        normalized_answer = normalize_bit_answer_text(row["answer"])
+        if predicted_answer != normalized_answer:
+            continue
+        promote_rows[row_id] = {
+            "library_name": library_name,
+            "formula_name": str(spec["formula_name"]),
+            "predicted_answer": predicted_answer,
+        }
+        candidate_rows.append(
+            {
+                "id": row_id,
+                "previous_selection_tier": str(row["selection_tier"]),
+                "query_raw": str(row["query_raw"]),
+                "answer": normalized_answer,
+                "library_name": library_name,
+                "formula_name": str(spec["formula_name"]),
+                "predicted_answer": predicted_answer,
+                "decision_note": str(spec["decision_note"]),
+            }
+        )
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not promote_rows:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(promote_rows))
+    analysis_df.loc[promote_mask, "template_subtype"] = "bit_structured_byte_formula"
+    analysis_df.loc[promote_mask, "teacher_solver_candidate"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(
+            lambda row_id: solver_map[promote_rows[row_id]["library_name"]]
+        )
+    )
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: promote_rows[row_id]["predicted_answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[promote_mask, "answer_only_ready"] = False
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(
+            lambda row_id: analysis_note_map[promote_rows[row_id]["library_name"]]
+        )
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(["library_name", "formula_name", "id"], ascending=[True, True, True]).reset_index(
+        drop=True
+    )
+    return analysis_df, candidate_df
+
+
+def apply_bit_exact_disambiguation_promotions(
+    analysis_df: pd.DataFrame,
+    v1: Any,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    candidate_columns = [
+        "id",
+        "previous_selection_tier",
+        "query_raw",
+        "answer",
+        "decision_rule",
+        "source_library",
+        "chosen_formula_name",
+        "chosen_formula_support",
+        "chosen_formula_error_rows",
+        "chosen_formula_complexity",
+        "runner_up_support",
+        "matched_formula_count",
+        "prediction_count",
+        "zero_error_gold_formula_count",
+        "gold_formula_supports",
+    ]
+    empty_df = pd.DataFrame(columns=candidate_columns)
+    candidate_mask = (
+        (analysis_df["family"] == "bit_manipulation")
+        & analysis_df["selection_tier"].isin(["answer_only_keep", "manual_audit_priority"])
+    )
+    if not candidate_mask.any():
+        return analysis_df, empty_df
+
+    library_specs = (
+        {
+            "name": "structured",
+            "infer": infer_bit_structured_byte_formula_matches,
+            "priority": 0,
+            "template_subtype": "bit_structured_byte_formula",
+            "teacher_unique": "binary_structured_byte_formula_unique_exact",
+            "teacher_dominant": "binary_structured_byte_formula_dominant_exact",
+            "analysis_unique": "bit_structured_unique_exact",
+            "analysis_dominant": "bit_structured_dominant_exact",
+        },
+        {
+            "name": "not_structured",
+            "infer": infer_bit_structured_byte_not_formula_matches,
+            "priority": 1,
+            "template_subtype": "bit_structured_byte_formula",
+            "teacher_unique": "binary_structured_byte_not_formula_unique_exact",
+            "teacher_dominant": "binary_structured_byte_not_formula_dominant_exact",
+            "analysis_unique": "bit_not_structured_unique_exact",
+            "analysis_dominant": "bit_not_structured_dominant_exact",
+        },
+        {
+            "name": "stage1",
+            "infer": infer_bit_prompt_local_stage1_formula_matches,
+            "priority": 2,
+            "template_subtype": "bit_prompt_local_exact_formula",
+            "teacher_unique": "binary_prompt_local_stage1_unique_exact",
+            "teacher_dominant": "binary_prompt_local_stage1_dominant_exact",
+            "analysis_unique": "bit_prompt_local_stage1_unique_exact",
+            "analysis_dominant": "bit_prompt_local_stage1_dominant_exact",
+        },
+        {
+            "name": "stage2",
+            "infer": infer_bit_prompt_local_stage2_formula_matches,
+            "priority": 3,
+            "template_subtype": "bit_prompt_local_exact_formula",
+            "teacher_unique": "binary_prompt_local_stage2_unique_exact",
+            "teacher_dominant": "binary_prompt_local_stage2_dominant_exact",
+            "analysis_unique": "bit_prompt_local_stage2_unique_exact",
+            "analysis_dominant": "bit_prompt_local_stage2_dominant_exact",
+        },
+    )
+
+    bit_rows = analysis_df.loc[
+        analysis_df["family"] == "bit_manipulation",
+        ["id", "selection_tier", "prompt", "query_raw", "answer"],
+    ].to_dict(orient="records")
+    support_maps: dict[str, dict[str, tuple[int, int]]] = {spec["name"]: {} for spec in library_specs}
+    row_cache: dict[str, dict[str, Any]] = {}
+    for row in bit_rows:
+        parsed = v1.parse_prompt(str(row["prompt"]), str(row["answer"]))
+        examples = extract_examples(parsed)
+        query_bits = str(parsed.bit_query_binary or "")
+        if len(query_bits) != 8 or not examples:
+            continue
+        normalized_answer = normalize_bit_answer_text(row["answer"])
+        matches_by_library: dict[str, list[tuple[str, str]]] = {}
+        for spec in library_specs:
+            matches = spec["infer"](examples, query_bits)
+            matches_by_library[spec["name"]] = matches
+            library_support_map = support_maps[spec["name"]]
+            for formula_name, predicted_answer in matches:
+                support_rows, gold_rows = library_support_map.get(formula_name, (0, 0))
+                library_support_map[formula_name] = (
+                    support_rows + 1,
+                    gold_rows + int(predicted_answer == normalized_answer),
+                )
+        row_cache[str(row["id"])] = {
+            "selection_tier": str(row["selection_tier"]),
+            "query_raw": str(row["query_raw"]),
+            "answer": normalized_answer,
+            "matches_by_library": matches_by_library,
+        }
+
+    def collect_overall_formula_predictions(
+        matches_by_library: dict[str, list[tuple[str, str]]]
+    ) -> set[tuple[str, str]]:
+        overall_pairs: set[tuple[str, str]] = set()
+        for matches in matches_by_library.values():
+            for formula_name, predicted_answer in matches:
+                overall_pairs.add((str(formula_name), normalize_bit_answer_text(predicted_answer)))
+        return overall_pairs
+
+    def choose_unique_candidate(
+        row_id: str,
+        answer_text: str,
+        matches_by_library: dict[str, list[tuple[str, str]]],
+    ) -> dict[str, Any] | None:
+        overall_pairs = collect_overall_formula_predictions(matches_by_library)
+        if len(overall_pairs) != 1:
+            return None
+        overall_formula_name, overall_prediction = next(iter(overall_pairs))
+        if overall_prediction != answer_text:
+            return None
+        unique_candidates: list[dict[str, Any]] = []
+        for spec in library_specs:
+            matches = matches_by_library.get(spec["name"], [])
+            if len(matches) != 1:
+                continue
+            formula_name, predicted_answer = matches[0]
+            if (
+                normalize_bit_answer_text(predicted_answer) != overall_prediction
+                or str(formula_name) != overall_formula_name
+            ):
+                continue
+            support_rows, gold_rows = support_maps[spec["name"]].get(formula_name, (0, 0))
+            unique_candidates.append(
+                {
+                    "id": row_id,
+                    "decision_rule": "overall_unique_exact_formula",
+                    "source_library": spec["name"],
+                    "teacher_solver_candidate": spec["teacher_unique"],
+                    "analysis_note": f"{spec['analysis_unique']}_overall",
+                    "template_subtype": spec["template_subtype"],
+                    "chosen_formula_name": formula_name,
+                    "chosen_formula_support": int(support_rows),
+                    "chosen_formula_error_rows": int(support_rows - gold_rows),
+                    "chosen_formula_complexity": int(bit_formula_text_complexity(formula_name)),
+                    "runner_up_support": 0,
+                    "matched_formula_count": 1,
+                    "prediction_count": 1,
+                    "zero_error_gold_formula_count": int(gold_rows == support_rows),
+                    "gold_formula_supports": f"{formula_name}@{int(support_rows)}",
+                    "priority": int(spec["priority"]),
+                }
+            )
+        if not unique_candidates:
+            return None
+        unique_candidates.sort(
+            key=lambda item: (
+                item["priority"],
+                item["chosen_formula_complexity"],
+                -item["chosen_formula_support"],
+                item["chosen_formula_error_rows"],
+                item["chosen_formula_name"],
+            )
+        )
+        return unique_candidates[0]
+
+    def choose_dominant_candidate(
+        row_id: str,
+        answer_text: str,
+        matches_by_library: dict[str, list[tuple[str, str]]],
+    ) -> dict[str, Any] | None:
+        dominant_candidates: list[dict[str, Any]] = []
+        for spec in library_specs:
+            matches = matches_by_library.get(spec["name"], [])
+            if not matches:
+                continue
+            prediction_count = len({predicted_answer for _, predicted_answer in matches})
+            gold_formulas: list[dict[str, Any]] = []
+            for formula_name, predicted_answer in matches:
+                support_rows, gold_rows = support_maps[spec["name"]].get(formula_name, (0, 0))
+                error_rows = int(support_rows - gold_rows)
+                if predicted_answer != answer_text or error_rows != 0:
+                    continue
+                gold_formulas.append(
+                    {
+                        "formula_name": formula_name,
+                        "support_rows": int(support_rows),
+                        "complexity": int(bit_formula_text_complexity(formula_name)),
+                    }
+                )
+            if not gold_formulas:
+                continue
+            gold_formulas.sort(key=lambda item: (-item["support_rows"], item["complexity"], item["formula_name"]))
+            best_support = int(gold_formulas[0]["support_rows"])
+            top_formulas = [item for item in gold_formulas if int(item["support_rows"]) == best_support]
+            second_support = max((int(item["support_rows"]) for item in gold_formulas[1:]), default=0)
+            if len(top_formulas) != 1 or best_support < 2 or best_support <= second_support:
+                continue
+            dominant_formula = top_formulas[0]
+            dominant_candidates.append(
+                {
+                    "id": row_id,
+                    "decision_rule": "dominant_zero_error_formula",
+                    "source_library": spec["name"],
+                    "teacher_solver_candidate": spec["teacher_dominant"],
+                    "analysis_note": spec["analysis_dominant"],
+                    "template_subtype": spec["template_subtype"],
+                    "chosen_formula_name": str(dominant_formula["formula_name"]),
+                    "chosen_formula_support": best_support,
+                    "chosen_formula_error_rows": 0,
+                    "chosen_formula_complexity": int(dominant_formula["complexity"]),
+                    "runner_up_support": int(second_support),
+                    "matched_formula_count": int(len(matches)),
+                    "prediction_count": int(prediction_count),
+                    "zero_error_gold_formula_count": int(len(gold_formulas)),
+                    "gold_formula_supports": "|".join(
+                        f"{item['formula_name']}@{item['support_rows']}" for item in gold_formulas[:12]
+                    ),
+                    "priority": int(spec["priority"]),
+                }
+            )
+        if not dominant_candidates:
+            return None
+        dominant_candidates.sort(
+            key=lambda item: (
+                -item["chosen_formula_support"],
+                item["priority"],
+                item["chosen_formula_complexity"],
+                item["chosen_formula_name"],
+            )
+        )
+        return dominant_candidates[0]
+
+    chosen_promotions: dict[str, dict[str, Any]] = {}
+    candidate_rows: list[dict[str, Any]] = []
+    for row_id, info in row_cache.items():
+        if info["selection_tier"] not in {"answer_only_keep", "manual_audit_priority"}:
+            continue
+        chosen_candidate = choose_unique_candidate(row_id, info["answer"], info["matches_by_library"])
+        if chosen_candidate is None:
+            continue
+        chosen_promotions[row_id] = {
+            **chosen_candidate,
+            "answer": info["answer"],
+        }
+        candidate_rows.append(
+            {
+                "id": row_id,
+                "previous_selection_tier": info["selection_tier"],
+                "query_raw": info["query_raw"],
+                "answer": info["answer"],
+                "decision_rule": chosen_candidate["decision_rule"],
+                "source_library": chosen_candidate["source_library"],
+                "chosen_formula_name": chosen_candidate["chosen_formula_name"],
+                "chosen_formula_support": chosen_candidate["chosen_formula_support"],
+                "chosen_formula_error_rows": chosen_candidate["chosen_formula_error_rows"],
+                "chosen_formula_complexity": chosen_candidate["chosen_formula_complexity"],
+                "runner_up_support": chosen_candidate["runner_up_support"],
+                "matched_formula_count": chosen_candidate["matched_formula_count"],
+                "prediction_count": chosen_candidate["prediction_count"],
+                "zero_error_gold_formula_count": chosen_candidate["zero_error_gold_formula_count"],
+                "gold_formula_supports": chosen_candidate["gold_formula_supports"],
+            }
+        )
+
+    candidate_df = pd.DataFrame(candidate_rows, columns=candidate_columns)
+    if not chosen_promotions:
+        return analysis_df, candidate_df
+
+    promote_mask = analysis_df["id"].astype(str).isin(set(chosen_promotions))
+    analysis_df.loc[promote_mask, "template_subtype"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: chosen_promotions[row_id]["template_subtype"])
+    )
+    analysis_df.loc[promote_mask, "teacher_solver_candidate"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(
+            lambda row_id: chosen_promotions[row_id]["teacher_solver_candidate"]
+        )
+    )
+    analysis_df.loc[promote_mask, "auto_solver_predicted_answer"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: chosen_promotions[row_id]["answer"])
+    )
+    analysis_df.loc[promote_mask, "auto_solver_match"] = True
+    analysis_df.loc[promote_mask, "verified_trace_ready"] = True
+    analysis_df.loc[promote_mask, "answer_only_ready"] = False
+    analysis_df.loc[promote_mask, "example_consistency_ok"] = True
+    analysis_df.loc[promote_mask, "selection_tier"] = "verified_trace_ready"
+    analysis_df.loc[promote_mask, "audit_priority_score"] = 0.0
+    analysis_df.loc[promote_mask, "audit_reasons"] = ""
+    analysis_df.loc[promote_mask, "analysis_notes"] = (
+        analysis_df.loc[promote_mask, "id"].astype(str).map(lambda row_id: chosen_promotions[row_id]["analysis_note"])
+    )
+    analysis_df.loc[promote_mask, "suspect_label"] = False
+
+    candidate_df = candidate_df.sort_values(
+        ["decision_rule", "source_library", "chosen_formula_support", "chosen_formula_complexity", "id"],
+        ascending=[True, True, False, True, True],
+    ).reset_index(drop=True)
+    return analysis_df, candidate_df
 
 
 def int_cell(value: Any) -> int:
@@ -7489,6 +8003,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df = apply_bit_not_structured_low_support_answer_only_promotions(analysis_df)
     analysis_df = apply_bit_not_structured_manual_prompt_curation(analysis_df)
     analysis_df = apply_bit_trace_training_safety_reaudit(analysis_df)
+    analysis_df, bit_late_manual_exact_df = apply_bit_late_manual_exact_promotions(analysis_df, v1)
     (
         analysis_df,
         bit_prompt_local_current_candidate_df,
@@ -7498,6 +8013,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         bit_prompt_local_stage2_candidate_df,
         bit_prompt_local_stage2_abstract_support_df,
     ) = apply_bit_prompt_local_consensus_promotions(analysis_df, v1)
+    analysis_df, bit_exact_disambiguation_candidate_df = apply_bit_exact_disambiguation_promotions(analysis_df, v1)
     analysis_df, symbol_operator_spec_support_df, symbol_operator_spec_candidate_df = apply_symbol_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_reverse_support_df, symbol_reverse_candidate_df = apply_symbol_reverse_operator_consensus_promotions(analysis_df)
     analysis_df, symbol_minus_prefix_support_df, symbol_minus_prefix_candidate_df = apply_symbol_minus_prefix_subfamily_promotions(analysis_df)
@@ -7607,6 +8123,14 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
             & (analysis_df["bit_hybrid_consensus_ready"])
         ]
         .sort_values(["selection_tier", "bit_hybrid_consensus_varset", "bit_hybrid_consensus_match_count", "id"], ascending=[True, True, False, True])
+        .reset_index(drop=True)
+    )
+    binary_boolean4_df = (
+        analysis_df.loc[
+            (analysis_df["family"] == "bit_manipulation")
+            & (analysis_df["teacher_solver_candidate"] == "binary_four_bit_boolean")
+        ]
+        .sort_values(["selection_tier", "num_examples", "id"], ascending=[True, False, True])
         .reset_index(drop=True)
     )
     binary_structured_formula_df = (
@@ -7723,6 +8247,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(binary_affine_exclude_df, artifacts_dir / "binary_affine_low_gap_exclude_v1.csv")
     write_dataframe(binary_affine_manual_df, artifacts_dir / "binary_affine_mismatch_candidates_v1.csv")
     write_dataframe(binary_hybrid_consensus_df, artifacts_dir / "binary_hybrid_consensus_candidates_v1.csv")
+    write_dataframe(binary_boolean4_df, artifacts_dir / "binary_four_bit_boolean_verified_v1.csv")
     write_dataframe(binary_structured_formula_df, artifacts_dir / "binary_structured_byte_formula_candidates_v1.csv")
     write_dataframe(structured_low_support_candidate_df, artifacts_dir / "binary_structured_byte_low_support_answer_only_candidates_v1.csv")
     write_dataframe(structured_support3_candidate_df, artifacts_dir / "binary_structured_byte_support3_answer_only_candidates_v1.csv")
@@ -7736,6 +8261,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(bit_prompt_local_stage2_support_df, artifacts_dir / "binary_prompt_local_nested_support_v1.csv")
     write_dataframe(bit_prompt_local_stage2_abstract_support_df, artifacts_dir / "binary_prompt_local_nested_abstract_support_v1.csv")
     write_dataframe(bit_prompt_local_stage2_candidate_df, artifacts_dir / "binary_prompt_local_nested_candidates_v1.csv")
+    write_dataframe(bit_late_manual_exact_df, artifacts_dir / "binary_manual_exact_reverified_v1.csv")
+    write_dataframe(bit_exact_disambiguation_candidate_df, artifacts_dir / "binary_exact_disambiguation_verified_v1.csv")
     write_dataframe(symbol_operator_spec_support_df, artifacts_dir / "symbol_operator_specific_formula_support_v1.csv")
     write_dataframe(symbol_operator_spec_candidate_df, artifacts_dir / "symbol_operator_specific_formula_candidates_v1.csv")
     write_dataframe(symbol_reverse_support_df, artifacts_dir / "symbol_reverse_operator_formula_support_v1.csv")

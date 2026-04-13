@@ -44,3 +44,4 @@
 _none remain after the training-label promotion pass._
 
 Interpretation: even the best glyph candidates remain underdetermined as latent-rule teachers. They are still valid final-answer supervision, so the current pass keeps them as answer-only labels while withholding trace-ready status.
+

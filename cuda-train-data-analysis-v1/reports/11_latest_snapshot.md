@@ -1,16 +1,16 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-04-01T22:51:50.038888+00:00`
-- verified_trace_ready: `6486`
-- answer_only_keep: `2826`
-- manual_audit_priority: `164`
+- generated_at_utc: `2026-04-11T23:32:49.189542+00:00`
+- verified_trace_ready: `6711`
+- answer_only_keep: `2652`
+- manual_audit_priority: `113`
 - exclude_suspect: `24`
 
 ## Family summary
 
 | family | rows | parse_ok_rate | verified_trace_ready | answer_only_keep | manual_audit_priority | exclude_suspect | suspect_labels | avg_hard_score |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bit_manipulation | 1602 | 1.0 | 1004 | 445 | 138 | 15 | 15 | 4.2166 |
+| bit_manipulation | 1602 | 1.0 | 1229 | 271 | 87 | 15 | 15 | 4.2166 |
 | gravity_constant | 1597 | 1.0 | 1597 | 0 | 0 | 0 | 0 | 1.0751 |
 | roman_numeral | 1576 | 1.0 | 1576 | 0 | 0 | 0 | 0 | 1.1783 |
 | symbol_equation | 1555 | 1.0 | 110 | 1410 | 26 | 9 | 9 | 3.1775 |
@@ -22,7 +22,7 @@
 | audit_focus | family | rows |
 | --- | --- | --- |
 | symbol_numeric_same_op | symbol_equation | 26 |
-| binary_low_gap | bit_manipulation | 6 |
+| binary_low_gap | bit_manipulation | 5 |
 
 ## Key changes in this snapshot
 
@@ -34,3 +34,4 @@
 - `symbol_equation/numeric_2x2`: remaining non-suspect rows with `same_operator_example_count = 0` now move to `answer_only_keep` as raw final-answer supervision (`136` rows), because README evaluation is final-answer accuracy and there is no same-op evidence to justify trace promotion anyway.
 - `symbol_equation/numeric_2x2`: `1` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`1` same-op conflicts, `0` format ambiguities).
 - `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield no unique latent rule for the residual glyph slice. With no concrete suspect signal, the remaining glyph rows now stay only as answer-only training labels (`470` rows), not as trace-ready teachers.
+

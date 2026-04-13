@@ -36,21 +36,28 @@ It summarizes:
 
 ## 4. Definitions used in this note
 
-### 4.1 Strong slice
+### 4.1 Current verified slice vs synthesis-stable seed
 
-For `bit_manipulation`, this note uses:
-
-- `selection_tier == verified_trace_ready`
-
-That is the current trace-safe binary core described in the final summary.
-
-Current count:
+The current final ledger for `bit_manipulation` is:
 
 - total `bit_manipulation`: `1602`
-- strong slice: `1004`
-- answer-only: `445`
-- manual: `138`
-- exclude: `15`
+- `verified_trace_ready`: `1229`
+- `answer_only_keep`: `271`
+- `manual_audit_priority`: `87`
+- `exclude_suspect`: `15`
+
+For the rest of this note, the working set is narrower than the full `1229` verified rows.
+
+This note focuses on the **solver-native synthesis-stable seed** used for large-scale synthetic generation:
+
+- rows already grouped by reusable solver keys
+- rows whose exact transform family is already consolidated into mass-synthesis buckets
+- excluding the later row-local prompt-exact additions (`bit_prompt_local_exact_formula`, `binary_four_bit_boolean`) until they are regrouped into reusable synthesis keys
+
+Current synthesis-stable seed size:
+
+- solver-native synthesis seed: `1004`
+- exact-trace-safe subset inside that seed: `817`
 
 ### 4.2 Analysis strict key vs synthesis key
 
@@ -68,11 +75,11 @@ For actual synthetic generation, use a **synthesis key**:
 - do **not** mix multiple exact formulas/signatures inside one generated puzzle
 - for `binary_structured_byte_formula_abstract`, the synthesis key must be the row's **exact formula**, not the abstract family name alone
 
-## 5. Reproducible strong-group counts
+## 5. Reproducible synthesis-seed counts
 
 ### 5.1 Group counts
 
-Current strong-group breakdown:
+Current synthesis-seed breakdown:
 
 | strong group | analysis strict key | patterns | rows |
 | --- | --- | ---: | ---: |
@@ -142,7 +149,7 @@ print(f"TOTAL\tpatterns={total_patterns}\trows={total_rows}")
 PY
 ```
 
-Expected totals:
+Expected totals for the synthesis-stable seed:
 
 - `patterns=395`
 - `rows=1004`
@@ -865,16 +872,17 @@ Before adding synthetic rows to training, verify:
 
 ## 14. Bottom line
 
-For large-scale binary problem-answer-CoT generation, the best current reusable base is:
+For large-scale binary problem-answer-CoT generation, the current verified ledger now has `1229` rows, but the best current reusable synthesis base is:
 
-- `1004` strong rows for answer-level supervision
+- `1004` solver-native synthesis-seed rows for answer-level supervision
 - `817` exact-trace-safe rows for **LoRA-only procedural CoT supervision**
-- `395` strict patterns in the broader strong slice
+- `395` strict patterns inside the synthesis-seed subset
 - all `817` rows can be turned into executable, code-verifiable program traces
 
 Operationally:
 
 - use the `817` rows as the direct seed for problem-answer-CoT generation
+- use the broader `1229` verified rows for answer supervision / row-local exact training audits, but do **not** assume every new prompt-local exact row has already been consolidated into a reusable synthesis key
 - do **not** use the remaining `187` strong-but-trace-ambiguous rows as-is for exact CoT
 - if those `187` rows are needed later, regenerate them from fixed exact rules first
 

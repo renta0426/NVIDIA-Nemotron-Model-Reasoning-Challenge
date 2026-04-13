@@ -8,12 +8,12 @@
 | verified_trace_ready | unit_conversion | 1594 |
 | verified_trace_ready | roman_numeral | 1576 |
 | answer_only_keep | symbol_equation | 1410 |
-| verified_trace_ready | bit_manipulation | 1004 |
+| verified_trace_ready | bit_manipulation | 1229 |
 | answer_only_keep | text_decryption | 971 |
 | verified_trace_ready | text_decryption | 605 |
-| answer_only_keep | bit_manipulation | 445 |
-| manual_audit_priority | bit_manipulation | 138 |
+| answer_only_keep | bit_manipulation | 271 |
 | verified_trace_ready | symbol_equation | 110 |
+| manual_audit_priority | bit_manipulation | 87 |
 | manual_audit_priority | symbol_equation | 26 |
 | exclude_suspect | bit_manipulation | 15 |
 | exclude_suspect | symbol_equation | 9 |
