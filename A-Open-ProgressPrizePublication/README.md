@@ -4,14 +4,14 @@ I would like to thank the competition hosts and Kaggle for organizing this compe
 You might have made some predictions that I have asked for. These are the answers.
 
 The score I was aiming for - 0.877
-How many tokens are used to train - 27,850,703 tokens for the winning solution, 598,958,637 in total
+How many tokens are used to train - 27,850,703 tokens[https://nemotron.huikang.dev/metrics.html?logpath=04-08-16-14] for the winning solution, 598,958,637 in total
 How much money I have spent - $212.48 in Tinker credits, approximately $60 in Modal credits, $10 for Kaggle / Colab subscription.
 What do you think is the secret - bit manipulation, you only need SFT, deterministic chain-of-thought design, use of min logprob as objective, use of Tinker for training
 Quick links
 Original notebook
 Validation notebook
 Training metrics and logs for winning submission
-Github containing the relevant code
+Github containing the relevant code : A-Open-ProgressPrizePublication/nemotron/README.md
 What was I betting on
 This is what I am betting on
 
@@ -19,7 +19,7 @@ Nemotron can act as a simple computer after LoRA training.
 These are the assumptions in my bet
 
 I can craft the chain-of-thought better than my competitors. I think this turned out to be true. The main differentiator was the bit manipulation problem where I managed to figure out a chain of thought that has solved many more problems.
-I can finetune LoRA correctly and efficiently. I think I got this almost correct. KhoA managed to get perfect scores on numeral, gravity and unit_conversion whereas my winning model still sometimes fails in these categories.
+I can finetune LoRA correctly and efficiently. I think I got this almost correct. KhoA managed to get perfect scores[baseline/nemotron-unsloth-sft-training/nemotron-unsloth-sft-training-3-30-2.ipynb] on numeral, gravity and unit_conversion whereas my winning model still sometimes fails in these categories.
 What am I betting against
 
 Reinforcement learning. I already have the optimal policy for solvable problems. I already know the best next token for the LLM to make (assuming they have been making all the correct moves). The only job of the LLM is to follow the policy.
