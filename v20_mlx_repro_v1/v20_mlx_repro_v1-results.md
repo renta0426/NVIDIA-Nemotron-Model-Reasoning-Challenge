@@ -65,55 +65,50 @@
 | numeral | 1 | 1 | 1.000000 |
 | unit_conversion | 0 | 1 | 0.000000 |
 
+## Validation notebook pivot
+
+- User-directed change: the 9500-row full `eval-aopen` path was stopped because it was too heavy for quick comparison, and the evaluation target was switched to `A-Open-ProgressPrizePublication/adapter-validation-notebook.ipynb`.
+- Notebook contract now reproduced in the monolith:
+  - dataset: `data/train.csv.head(950)`
+  - prompt rendering: tokenizer chat template with `enable_thinking=True`
+  - prompt content: **no boxed-answer suffix is appended**
+  - scoring artifacts: `validation.csv`, `results.csv`, `mistakes/*.csv`
+  - extra notebook signal: `minlogprob` per row is recorded
+- The single-file script now includes:
+  - `eval-adapter-validation`
+  - `merge-adapter-validation`
+  - `postprocess-run --postprocess-eval-kind adapter-validation`
+- Smoke validation on `v20_mlx_repro_v1/outputs/smoke_train_v20_fixedpad` succeeded for the first `2` rows, producing notebook-style `validation.csv` / `results.csv` with `minlogprob`.
+
 ## Current live run
 
 - run_root: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad`
-- status: `training complete; A-Open eval running`
+- status: `training complete; adapter-validation notebook reproduction running`
 - latest_observed_step: `245/245`
 - latest_train_loss: `0.16977385855533642`
 - trained_tokens: `26576637`
 - total_elapsed_seconds: `27014.2653`
 - peak_memory_gb: `307.9588`
-- note: switched the exact-snapshot full run from dynamic per-microbatch padding to fixed train padding after host RAM climbed toward the 512 GB ceiling; batch membership/order, LR schedule, LoRA targets, and snapshot inputs remain unchanged
+- live eval target: `adapter-validation-notebook.ipynb` first `950` rows
+- live eval config:
+  - `--eval-enable-thinking`
+  - `--validation-sample-size 950`
+  - `--eval-shards 4`
+  - `--max-num-seqs 1`
+  - `--prompt-chunk-size 1`
+  - `--prefill-batch-size 1`
+  - `--completion-batch-size 1`
+- note: an earlier `4 prompts/chunk` attempt made shard progress invisible for too long, so the live run was restarted at `1 row/chunk` to get checkpoint-visible forward progress without changing the notebook scoring contract.
 
 ## Eval robustness update
 
-- Full `eval-aopen` now checkpoints chunk-level progress into `aopen_eval/benchmark_eval_records_checkpoint.csv`.
-- If the 9500-row evaluation is interrupted, rerunning the same command resumes from the recorded row count instead of restarting from zero.
-- If `benchmark_eval_summary.json` already exists with `benchmark_eval_progress.json.status == complete`, the script returns that summary immediately instead of recomputing.
-- `postprocess-run` can now rebuild the tracked `v20_mlx_repro_v1-results.{md,json}` files from an existing run's `training_result.json` and `benchmark_eval_summary.json`.
-- The script now also supports sharded eval via `--eval-shards`, `--eval-shard-index`, and `merge-aopen-eval`, while keeping the implementation in this single file.
-
-## Eval execution log
-
-- The first full-eval resume attempt stayed at the existing root checkpoint `16/9500` while running a single high-concurrency chunk (`max_num_seqs=64`, `prompt_chunk_size=64`), so wall-clock throughput was judged too poor to keep.
-- A first shard-parallel retry with **6 shard workers** at `max_num_seqs=16`, `prompt_chunk_size=16`, `prefill=16`, `completion=16` also produced `0/6` shard summaries after roughly 44 minutes, so the bottleneck was no longer just batch size.
-- Inspecting the MLX chat template showed:
-  - `--eval-enable-thinking` leaves the assistant prompt open at `<think>`
-  - `--no-eval-enable-thinking` closes it as `<think></think>` before generation starts
-- That made `--no-eval-enable-thinking` the most likely explanation for the long local generations, so a direct benchmark was run before changing the full eval again.
-- Probe result on the first `4` training rows with `--no-eval-enable-thinking --max-num-seqs 4 --prompt-chunk-size 4`:
-  - accuracy: `1/4 = 0.25`
-  - `boxed_found: 4/4`
-  - output char length: `min=15`, `median=16`, `max=15359`
-- Probe result on the first `16` training rows with the same no-thinking settings:
-  - no-thinking accuracy: `5/16 = 0.3125`
-  - previous thinking accuracy on the same 16 rows: `2/16 = 0.125`
-  - `boxed_found: 16/16`
-  - output char length: `min=11`, `median=15`, `max=15359`
-- Important correction: the competition metric notebook (`nvidia-nemotron-metric.ipynb`) applies the tokenizer chat template with `enable_thinking=True`, so the no-thinking run is **not** the canonical reproduction target.
-- Therefore the no-thinking shard run is retained only as a **local diagnostic experiment** and was archived to:
-  - `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards_nothinking_experiment_20260414-090605/`
-- The current live evaluation has been reset to the **canonical metric-aligned configuration**:
-  - `--eval-enable-thinking`
-  - `--eval-shards 6`
-  - `--max-num-seqs 4`
-  - `--prompt-chunk-size 4`
-  - `--prefill-batch-size 4`
-  - `--completion-batch-size 4`
-- Active canonical shard outputs now live under `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards/`.
-- The waiter process now polls for `6/6` canonical shard summaries, then runs `merge-aopen-eval -> postprocess-run -> git commit/push`.
-- Immediate canonical status after the restart: all 6 shards launched cleanly and resumed from `0`, with full evaluation size still `9500` rows split as `1584 / 1584 / 1583 / 1583 / 1583 / 1583`.
+- Full `eval-aopen` already had checkpoint/resume, shard merge, and `postprocess-run` support.
+- The new notebook-validation path now has the same operational features:
+  - shard-local checkpoint CSVs
+  - resumable `validation_progress.json`
+  - shard merge into root `adapter_validation/`
+  - tracked results refresh through `postprocess-run`
+- This keeps the implementation in the same single Python file while making long `enable_thinking=True` validation runs restartable.
 
 ## Assumptions not explicit in the public v20 config
 
@@ -123,4 +118,4 @@
 
 ## Next recorded milestone
 
-Wait for the 6 shard-local A-Open eval runs to finish, merge them into the root `aopen_eval/` summary, refresh `v20_mlx_repro_v1-results.{md,json}`, and replace this progress log with the measured end-to-end result.
+Wait for the 4 shard-local notebook validation runs to finish, merge them into the root `adapter_validation/` summary, refresh `v20_mlx_repro_v1-results.{md,json}`, and replace this progress log with the measured 950-row result.

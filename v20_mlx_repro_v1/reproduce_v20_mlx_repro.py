@@ -26,7 +26,8 @@ import numpy as np
 import pandas as pd
 from mlx.nn.utils import average_gradients
 from mlx.utils import tree_flatten, tree_map
-from mlx_lm import batch_generate, generate, load as mlx_load
+from mlx_lm import batch_generate, generate, load as mlx_load, stream_generate
+from mlx_lm.generate import BatchGenerator
 from mlx_lm.sample_utils import make_sampler
 from mlx_lm.tuner.utils import linear_to_lora_layers, print_trainable_parameters
 from mlx_lm.utils import save_config
@@ -36,12 +37,14 @@ WORK_ROOT = Path(__file__).resolve().parent
 README_PATH = REPO_ROOT / "README.md"
 AOPEN_ROOT = REPO_ROOT / "A-Open-ProgressPrizePublication"
 AOPEN_NEMOTRON_ROOT = AOPEN_ROOT / "nemotron"
+ADAPTER_VALIDATION_NOTEBOOK_PATH = AOPEN_ROOT / "adapter-validation-notebook.ipynb"
 SNAPSHOT_ROOT = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "04-08-16-14"
 SNAPSHOT_CONFIG_PATH = SNAPSHOT_ROOT / "config.json"
 SNAPSHOT_INDEX_PATH = SNAPSHOT_ROOT / "logprobs" / "index.jsonl"
 SNAPSHOT_TOKENS_ROOT = SNAPSHOT_ROOT / "tokens"
 TRAIN_CSV_PATH = REPO_ROOT / "data" / "train.csv"
 PROBLEMS_INDEX_PATH = AOPEN_NEMOTRON_ROOT / "problems.jsonl"
+ADAPTER_VALIDATION_SAMPLE_SIZE = 950
 
 DEFAULT_MODEL_ROOT = Path(
     "/Users/mac-studio/.cache/huggingface/hub/models--mlx-community--NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16"
@@ -83,6 +86,16 @@ EVAL_RECORD_COLUMNS = (
     "has_boxed",
     "boxed_count",
 )
+VALIDATION_RECORD_COLUMNS = (
+    "id",
+    "prompt",
+    "answer",
+    "output",
+    "category",
+    "predicted",
+    "correct",
+    "minlogprob",
+)
 
 V20_TARGETS = {
     "overall_accuracy": 8340 / 9500,
@@ -99,6 +112,23 @@ V20_TARGETS = {
         "equation_numeric_guess": {"correct": 22, "total": 136},
         "cryptarithm_deduce": {"correct": 47, "total": 659},
         "cryptarithm_guess": {"correct": 11, "total": 164},
+    },
+}
+
+ADAPTER_VALIDATION_NOTEBOOK_TARGET = {
+    "overall_accuracy": 837 / 950,
+    "overall_correct": 837,
+    "overall_total": 950,
+    "categories": {
+        "bit_manipulation": {"correct": 149, "total": 169},
+        "cipher": {"correct": 158, "total": 162},
+        "cryptarithm_deduce": {"correct": 6, "total": 71},
+        "cryptarithm_guess": {"correct": 3, "total": 14},
+        "equation_numeric_deduce": {"correct": 42, "total": 48},
+        "equation_numeric_guess": {"correct": 0, "total": 7},
+        "gravity": {"correct": 159, "total": 159},
+        "numeral": {"correct": 149, "total": 149},
+        "unit_conversion": {"correct": 171, "total": 171},
     },
 }
 
@@ -284,11 +314,13 @@ def normalize_tokenizer_for_hf_parity(tokenizer: Any) -> None:
             pass
 
 
-def build_user_message(prompt: str) -> str:
+def build_user_message(prompt: str, *, include_boxed_instruction: bool = True) -> str:
     prompt_text = str(prompt).strip()
     if not prompt_text:
         raise ValueError("Prompt must not be empty.")
-    return f"{prompt_text}\n{BOXED_INSTRUCTION}"
+    if include_boxed_instruction:
+        return f"{prompt_text}\n{BOXED_INSTRUCTION}"
+    return prompt_text
 
 
 def apply_chat_template_safe(
@@ -325,13 +357,22 @@ def build_eval_prompts(
     prompt_series: Sequence[str],
     *,
     enable_thinking: bool,
+    include_boxed_instruction: bool = True,
 ) -> list[str]:
     prompts: list[str] = []
     for prompt_text in prompt_series:
         prompts.append(
             apply_chat_template_safe(
                 tokenizer,
-                [{"role": "user", "content": build_user_message(str(prompt_text))}],
+                [
+                    {
+                        "role": "user",
+                        "content": build_user_message(
+                            str(prompt_text),
+                            include_boxed_instruction=include_boxed_instruction,
+                        ),
+                    }
+                ],
                 add_generation_prompt=True,
                 enable_thinking=enable_thinking,
             )
@@ -429,6 +470,109 @@ def verify_answer(gold: str, predicted: str) -> bool:
         )
     except Exception:
         return predicted_text.lower() == gold_text.lower()
+
+
+def detect_validation_category(prompt: str) -> str:
+    if "secret bit manipulation rule transforms 8-bit binary numbers" in prompt:
+        return "bit_manipulation"
+    if "secret encryption rules are used on text" in prompt:
+        return "cipher"
+    if "secret set of transformation rules is applied to equations" in prompt:
+        after_header = prompt.split("Below are a few examples:\n", 1)[1]
+        examples_text, rest = after_header.split("\nNow, determine the result for: ", 1)
+        question_text = rest.strip()
+        if any(char.isdigit() for char in examples_text):
+            question_match = re.fullmatch(r"(\d+)(\D)(\d+)", question_text)
+            if question_match and re.search(
+                r"\d" + re.escape(question_match.group(2)) + r"\d",
+                examples_text,
+            ):
+                return "equation_numeric_deduce"
+            return "equation_numeric_guess"
+        if len(question_text) == 5:
+            question_operator = question_text[2]
+            for example_line in examples_text.strip().splitlines():
+                input_text = example_line.split(" = ")[0].strip()
+                if len(input_text) == 5 and input_text[2] == question_operator:
+                    return "cryptarithm_deduce"
+        return "cryptarithm_guess"
+    if "gravitational constant has been secretly changed" in prompt:
+        return "gravity"
+    if "converted into a different numeral system" in prompt:
+        return "numeral"
+    if "secret unit conversion is applied to measurements" in prompt:
+        return "unit_conversion"
+    raise ValueError(f"Unknown validation category for prompt: {prompt[:120]!r}")
+
+
+def _sampled_token_logprob(logprobs: Any, token_id: int) -> float:
+    token_logprob = logprobs[int(token_id)]
+    return float(token_logprob.item())
+
+
+def generate_single_with_min_logprob(
+    model: Any,
+    tokenizer: Any,
+    prompt_tokens: Sequence[int],
+    *,
+    max_tokens: int,
+    sampler: Any,
+) -> tuple[str, float | None]:
+    text_segments: list[str] = []
+    min_logprob: float | None = None
+    for response in stream_generate(
+        model,
+        tokenizer,
+        prompt=list(prompt_tokens),
+        max_tokens=max_tokens,
+        sampler=sampler,
+    ):
+        if response.text:
+            text_segments.append(str(response.text))
+        if response.finish_reason == "stop":
+            continue
+        sampled_logprob = _sampled_token_logprob(response.logprobs, int(response.token))
+        min_logprob = sampled_logprob if min_logprob is None else min(min_logprob, sampled_logprob)
+    return "".join(text_segments), min_logprob
+
+
+def batch_generate_with_min_logprobs(
+    model: Any,
+    tokenizer: Any,
+    prompt_tokens: Sequence[Sequence[int]],
+    *,
+    max_tokens: int,
+    sampler: Any,
+    prefill_batch_size: int,
+    completion_batch_size: int,
+) -> tuple[list[str], list[float | None]]:
+    generator = BatchGenerator(
+        model,
+        stop_tokens=getattr(tokenizer, "eos_token_ids", None),
+        sampler=sampler,
+        prefill_batch_size=max(1, int(prefill_batch_size)),
+        completion_batch_size=max(1, int(completion_batch_size)),
+    )
+    uids = generator.insert([list(tokens) for tokens in prompt_tokens], max_tokens=max_tokens)
+    generated_tokens: dict[int, list[int]] = {uid: [] for uid in uids}
+    min_logprobs: dict[int, float | None] = {uid: None for uid in uids}
+    try:
+        while responses := generator.next():
+            for response in responses:
+                if response.finish_reason == "stop":
+                    continue
+                token_id = int(response.token)
+                generated_tokens[response.uid].append(token_id)
+                sampled_logprob = _sampled_token_logprob(response.logprobs, token_id)
+                previous = min_logprobs[response.uid]
+                min_logprobs[response.uid] = (
+                    sampled_logprob if previous is None else min(previous, sampled_logprob)
+                )
+    finally:
+        generator.close()
+    texts = [tokenizer.decode(generated_tokens[uid]) for uid in uids]
+    minima = [min_logprobs[uid] for uid in uids]
+    return texts, minima
 
 
 def read_snapshot_token_file(token_path: Path) -> tuple[list[int], list[int]]:
@@ -938,6 +1082,178 @@ def resolve_eval_root(run_root: Path, *, shard_count: int, shard_index: int) -> 
     return base_eval_root / "shards" / f"shard_{shard_index:02d}_of_{shard_count:02d}"
 
 
+def resolve_adapter_validation_root(run_root: Path, *, shard_count: int, shard_index: int) -> Path:
+    base_validation_root = run_root / "adapter_validation"
+    if shard_count <= 1:
+        return base_validation_root
+    return base_validation_root / "shards" / f"shard_{shard_index:02d}_of_{shard_count:02d}"
+
+
+def load_validation_records_csv(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    frame = pd.read_csv(
+        path,
+        keep_default_na=False,
+        converters={
+            "correct": lambda value: str(value).strip().lower() in {"true", "1", "1.0"},
+        },
+    )
+    records = frame.to_dict(orient="records")
+    for record in records:
+        record["id"] = str(record.get("id", ""))
+        record["prompt"] = str(record.get("prompt", ""))
+        record["answer"] = str(record.get("answer", ""))
+        record["output"] = str(record.get("output", ""))
+        record["category"] = str(record.get("category", ""))
+        record["predicted"] = str(record.get("predicted", ""))
+        record["correct"] = bool(record.get("correct", False))
+        minlogprob_value = str(record.get("minlogprob", "")).strip()
+        record["minlogprob"] = None if not minlogprob_value else float(minlogprob_value)
+    return records
+
+
+def append_validation_checkpoint_records(checkpoint_path: Path, records: Sequence[dict[str, Any]]) -> None:
+    if not records:
+        return
+    ensure_dir(checkpoint_path.parent)
+    pd.DataFrame.from_records(records, columns=VALIDATION_RECORD_COLUMNS).to_csv(
+        checkpoint_path,
+        mode="a",
+        header=not checkpoint_path.exists(),
+        index=False,
+    )
+
+
+def build_validation_results_table(validation_frame: pd.DataFrame) -> pd.DataFrame:
+    stats = validation_frame.groupby("category")["correct"].agg(correct="sum", total="count").sort_index()
+    if stats.empty:
+        totals = pd.DataFrame(
+            {
+                "correct": [0],
+                "total": [0],
+                "weightage": ["100.0%"],
+                "percentage": ["0.0%"],
+                "contribution": ["0.0%"],
+            },
+            index=["TOTAL"],
+        )
+        return totals
+    stats["correct"] = stats["correct"].astype("int")
+    grand_total = int(stats["total"].sum())
+    stats["weightage"] = (stats["total"] / grand_total * 100).map("{:.1f}%".format)
+    stats["percentage"] = (stats["correct"] / stats["total"] * 100).map("{:.1f}%".format)
+    stats["contribution"] = (stats["correct"] / grand_total * 100).map("{:.1f}%".format)
+    overall_pct = stats["correct"].sum() / grand_total * 100
+    totals = pd.DataFrame(
+        {
+            "correct": [int(stats["correct"].sum())],
+            "total": [grand_total],
+            "weightage": ["100.0%"],
+            "percentage": [f"{overall_pct:.1f}%"],
+            "contribution": [f"{overall_pct:.1f}%"],
+        },
+        index=["TOTAL"],
+    )
+    return pd.concat([stats, totals])
+
+
+def summarize_validation_results(results_frame: pd.DataFrame) -> dict[str, Any]:
+    category_rows: list[dict[str, Any]] = []
+    for category, row in results_frame.drop(index="TOTAL", errors="ignore").iterrows():
+        correct = int(row["correct"])
+        total = int(row["total"])
+        category_rows.append(
+            {
+                "category": str(category),
+                "correct": correct,
+                "total": total,
+                "accuracy": round(correct / total, 6) if total else 0.0,
+                "weightage": str(row["weightage"]),
+                "percentage": str(row["percentage"]),
+                "contribution": str(row["contribution"]),
+            }
+        )
+    total_correct = int(results_frame.loc["TOTAL", "correct"]) if "TOTAL" in results_frame.index else 0
+    total_count = int(results_frame.loc["TOTAL", "total"]) if "TOTAL" in results_frame.index else 0
+    return {
+        "overall": {
+            "correct": total_correct,
+            "total": total_count,
+            "accuracy": round(total_correct / total_count, 6) if total_count else 0.0,
+        },
+        "categories": category_rows,
+    }
+
+
+def render_validation_markdown_summary(evaluation_name: str, payload: dict[str, Any]) -> str:
+    overall = payload["overall"]
+    lines = [f"# {evaluation_name}", ""]
+    lines.append(f"- notebook_reference: `{payload['notebook_reference']}`")
+    lines.append(f"- benchmark_csv: `{payload['benchmark_csv']}`")
+    lines.append(f"- model_root: `{payload['model_root']}`")
+    lines.append(f"- adapter_dir: `{payload['adapter_dir']}`")
+    lines.append(f"- overall_accuracy: `{overall['accuracy']}` ({overall['correct']}/{overall['total']})")
+    notebook_reference_score = payload.get("notebook_reference_score")
+    if isinstance(notebook_reference_score, dict) and notebook_reference_score:
+        lines.append(
+            "- notebook_reference_accuracy: "
+            f"`{notebook_reference_score['overall_accuracy']}` "
+            f"({notebook_reference_score['overall_correct']}/{notebook_reference_score['overall_total']})"
+        )
+        lines.append(
+            f"- delta_vs_notebook_reference: "
+            f"`{round(float(overall['accuracy']) - float(notebook_reference_score['overall_accuracy']), 6)}`"
+        )
+    evaluation_settings = payload.get("evaluation_settings")
+    if isinstance(evaluation_settings, dict) and evaluation_settings:
+        lines.append(f"- max_tokens: `{evaluation_settings.get('max_tokens', '')}`")
+        lines.append(f"- max_num_seqs: `{evaluation_settings.get('max_num_seqs', '')}`")
+        lines.append(f"- prompt_chunk_size: `{evaluation_settings.get('prompt_chunk_size', '')}`")
+        lines.append(f"- prefill_batch_size: `{evaluation_settings.get('prefill_batch_size', '')}`")
+        lines.append(f"- completion_batch_size: `{evaluation_settings.get('completion_batch_size', '')}`")
+        lines.append(f"- eval_enable_thinking: `{evaluation_settings.get('eval_enable_thinking', '')}`")
+    prompt_policy = payload.get("prompt_policy")
+    if isinstance(prompt_policy, dict) and prompt_policy:
+        lines.append(f"- append_boxed_instruction: `{prompt_policy.get('append_boxed_instruction', '')}`")
+    lines.append("")
+    lines.append("| category | correct | total | accuracy | weightage | percentage | contribution |")
+    lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+    for row in payload["categories"]:
+        lines.append(
+            f"| {row['category']} | {row['correct']} | {row['total']} | {float(row['accuracy']):.6f} | "
+            f"{row['weightage']} | {row['percentage']} | {row['contribution']} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_validation_outputs(
+    *,
+    output_root: Path,
+    evaluation_name: str,
+    validation_frame: pd.DataFrame,
+    results_frame: pd.DataFrame,
+    payload: dict[str, Any],
+) -> None:
+    ensure_dir(output_root)
+    validation_frame.to_csv(output_root / "validation.csv", index=False)
+    results_frame.to_csv(output_root / "results.csv")
+    mistakes_root = output_root / "mistakes"
+    if mistakes_root.exists():
+        shutil.rmtree(mistakes_root)
+    mistakes_root.mkdir(parents=True, exist_ok=True)
+    if not validation_frame.empty:
+        for category in validation_frame["category"].unique():
+            category_mistakes = validation_frame[
+                (validation_frame["category"] == category) & (~validation_frame["correct"])
+            ]
+            if not category_mistakes.empty:
+                category_mistakes.to_csv(mistakes_root / f"{category}.csv", index=False)
+    write_json(output_root / "validation_summary.json", payload)
+    write_text(output_root / "validation_summary.md", render_validation_markdown_summary(evaluation_name, payload))
+
+
 def build_scored_rows(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     scored_rows: list[dict[str, Any]] = []
     for row in records:
@@ -1427,6 +1743,7 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
     )
     payload = {
         "created_at": utc_now(),
+        "evaluation_kind": "aopen_eval",
         "evaluation_name": evaluation_name,
         "benchmark_csv": str(TRAIN_CSV_PATH.resolve()),
         "model_root": str(model_root),
@@ -1461,6 +1778,238 @@ def run_eval_aopen(args: argparse.Namespace) -> dict[str, Any]:
         {
             "created_at": utc_now(),
             "status": "complete",
+            "rows_total": total_prompts,
+            "rows_completed": total_prompts,
+            "rows_total_global": total_benchmark_rows,
+            "row_start": row_start,
+            "row_end": row_end,
+            "eval_shards": eval_shards,
+            "eval_shard_index": eval_shard_index,
+        },
+    )
+    return payload
+
+
+def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    training_result_path = run_root / "training_result.json"
+    if not training_result_path.exists():
+        raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
+    training_result = load_json(training_result_path)
+    model_root = Path(training_result["shadow_model_dir"]).resolve()
+    adapter_dir = Path(training_result["adapter_dir"]).resolve()
+    eval_shards = max(1, int(args.eval_shards))
+    eval_shard_index = int(args.eval_shard_index)
+    if eval_shards == 1 and eval_shard_index != 0:
+        raise ValueError("--eval-shard-index must be 0 when --eval-shards=1")
+    validation_root = resolve_adapter_validation_root(run_root, shard_count=eval_shards, shard_index=eval_shard_index)
+    progress_path = validation_root / "validation_progress.json"
+    summary_path = validation_root / "validation_summary.json"
+    checkpoint_path = validation_root / "validation_records_checkpoint.csv"
+    ensure_dir(validation_root)
+    if summary_path.exists() and progress_path.exists():
+        progress_payload = load_json(progress_path)
+        if progress_payload.get("status") == "complete":
+            return load_json(summary_path)
+
+    model, tokenizer = load_model_for_eval(model_root, adapter_dir, lazy_load=bool(args.lazy_load))
+    benchmark_rows = load_training_rows()[: int(args.validation_sample_size)]
+    if int(args.eval_limit) > 0:
+        benchmark_rows = benchmark_rows[: int(args.eval_limit)]
+    total_benchmark_rows = len(benchmark_rows)
+    row_start, row_end = compute_eval_slice(total_benchmark_rows, eval_shards, eval_shard_index)
+    benchmark_rows = benchmark_rows[row_start:row_end]
+    prompts = build_eval_prompts(
+        tokenizer,
+        [row["prompt"] for row in benchmark_rows],
+        enable_thinking=bool(args.eval_enable_thinking),
+        include_boxed_instruction=False,
+    )
+    prompt_tokens = [encode_prompt(tokenizer, prompt) for prompt in prompts]
+
+    sampler = make_sampler(
+        temp=float(args.temperature),
+        top_p=float(args.top_p) if 0.0 < float(args.top_p) < 1.0 else 0.0,
+    )
+
+    max_num_seqs = max(1, int(args.max_num_seqs))
+    chunk_size = min(max_num_seqs, max(1, int(args.prompt_chunk_size)))
+    prefill_batch_size = min(max_num_seqs, max(1, int(args.prefill_batch_size)))
+    completion_batch_size = min(max_num_seqs, max(1, int(args.completion_batch_size)))
+    force_single_generate = bool(args.force_single_generate)
+
+    total_prompts = len(prompt_tokens)
+    records = load_validation_records_csv(checkpoint_path)
+    if len(records) > total_prompts:
+        raise RuntimeError(
+            f"Validation checkpoint has more rows than the benchmark: {len(records)} > {total_prompts}. "
+            f"Remove {checkpoint_path} and rerun."
+        )
+    if records:
+        if eval_shards > 1:
+            print(
+                f"Resuming adapter validation shard {eval_shard_index + 1}/{eval_shards} from "
+                f"{len(records)}/{total_prompts} (rows {row_start}:{row_end})"
+            )
+        else:
+            print(f"Resuming adapter validation from {len(records)}/{total_prompts}")
+
+    for chunk_start in range(len(records), total_prompts, chunk_size):
+        chunk_prompt_tokens = prompt_tokens[chunk_start : chunk_start + chunk_size]
+        chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompt_tokens)]
+        if force_single_generate:
+            chunk_outputs = []
+            chunk_minlogprobs = []
+            for prompt_tokens_single in chunk_prompt_tokens:
+                raw_output, min_logprob = generate_single_with_min_logprob(
+                    model,
+                    tokenizer,
+                    prompt_tokens_single,
+                    max_tokens=int(args.max_tokens),
+                    sampler=sampler,
+                )
+                chunk_outputs.append(raw_output)
+                chunk_minlogprobs.append(min_logprob)
+        else:
+            try:
+                chunk_outputs, chunk_minlogprobs = batch_generate_with_min_logprobs(
+                    model,
+                    tokenizer,
+                    chunk_prompt_tokens,
+                    max_tokens=int(args.max_tokens),
+                    sampler=sampler,
+                    prefill_batch_size=min(prefill_batch_size, len(chunk_prompt_tokens)),
+                    completion_batch_size=min(completion_batch_size, len(chunk_prompt_tokens)),
+                )
+            except (AttributeError, RuntimeError):
+                chunk_outputs = []
+                chunk_minlogprobs = []
+                for prompt_tokens_single in chunk_prompt_tokens:
+                    raw_output, min_logprob = generate_single_with_min_logprob(
+                        model,
+                        tokenizer,
+                        prompt_tokens_single,
+                        max_tokens=int(args.max_tokens),
+                        sampler=sampler,
+                    )
+                    chunk_outputs.append(raw_output)
+                    chunk_minlogprobs.append(min_logprob)
+
+        chunk_records: list[dict[str, Any]] = []
+        for row, raw_output, min_logprob in zip(chunk_rows, chunk_outputs, chunk_minlogprobs):
+            prediction = extract_final_answer(str(raw_output))
+            category = detect_validation_category(str(row["prompt"]))
+            correct = verify_answer(str(row["answer"]), prediction)
+            chunk_records.append(
+                {
+                    "id": str(row["id"]),
+                    "prompt": str(row["prompt"]),
+                    "answer": str(row["answer"]),
+                    "output": str(raw_output),
+                    "category": category,
+                    "predicted": prediction,
+                    "correct": bool(correct),
+                    "minlogprob": min_logprob,
+                }
+            )
+        append_validation_checkpoint_records(checkpoint_path, chunk_records)
+        records.extend(chunk_records)
+
+        rows_completed = len(records)
+        progress_payload = {
+            "created_at": utc_now(),
+            "status": "running",
+            "evaluation_kind": "adapter_validation",
+            "rows_total": total_prompts,
+            "rows_completed": rows_completed,
+            "rows_total_global": total_benchmark_rows,
+            "row_start": row_start,
+            "row_end": row_end,
+            "validation_sample_size": int(args.validation_sample_size),
+            "chunk_size": chunk_size,
+            "max_tokens": int(args.max_tokens),
+            "temperature": float(args.temperature),
+            "top_p": float(args.top_p),
+            "max_num_seqs": int(args.max_num_seqs),
+            "eval_shards": eval_shards,
+            "eval_shard_index": eval_shard_index,
+            "checkpoint_path": str(checkpoint_path.resolve()),
+        }
+        write_json(progress_path, progress_payload)
+        if eval_shards > 1:
+            print(
+                f"Adapter validation shard progress {eval_shard_index + 1}/{eval_shards}: "
+                f"{rows_completed}/{total_prompts} (rows {row_start}:{row_end})"
+            )
+        else:
+            print(f"Adapter validation progress: {rows_completed}/{total_prompts}")
+
+    validation_frame = pd.DataFrame.from_records(records, columns=VALIDATION_RECORD_COLUMNS)
+    results_frame = build_validation_results_table(validation_frame)
+    summary = summarize_validation_results(results_frame)
+    evaluation_name = (
+        f"adapter_validation_head_{total_benchmark_rows}"
+        if eval_shards <= 1
+        else f"adapter_validation_head_{total_benchmark_rows}_shard_{eval_shard_index:02d}_of_{eval_shards:02d}"
+    )
+    evaluation_settings = build_eval_settings_payload(
+        args,
+        eval_shards=eval_shards,
+        eval_shard_index=eval_shard_index,
+        chunk_size=chunk_size,
+        prefill_batch_size=prefill_batch_size,
+        completion_batch_size=completion_batch_size,
+    )
+    notebook_reference_score = (
+        ADAPTER_VALIDATION_NOTEBOOK_TARGET
+        if eval_shards <= 1 and row_start == 0 and row_end == total_benchmark_rows and total_benchmark_rows == ADAPTER_VALIDATION_SAMPLE_SIZE
+        else None
+    )
+    payload = {
+        "created_at": utc_now(),
+        "evaluation_kind": "adapter_validation",
+        "evaluation_name": evaluation_name,
+        "benchmark_csv": str(TRAIN_CSV_PATH.resolve()),
+        "notebook_reference": relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
+        "model_root": str(model_root),
+        "adapter_dir": str(adapter_dir),
+        "readme_contract": README_EVAL_CONTRACT,
+        "source_documents": [
+            relative_to_repo(README_PATH),
+            relative_to_repo(AOPEN_ROOT / "README.md"),
+            relative_to_repo(AOPEN_ROOT / "データ戦略を理解する.md"),
+            relative_to_repo(AOPEN_ROOT / "学習SFTパイプライン.md"),
+            relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
+        ],
+        "validation_sample_size": int(args.validation_sample_size),
+        "rows_total_global": total_benchmark_rows,
+        "row_start": row_start,
+        "row_end": row_end,
+        "eval_shards": eval_shards,
+        "eval_shard_index": eval_shard_index,
+        "evaluation_settings": evaluation_settings,
+        "prompt_policy": {
+            "append_boxed_instruction": False,
+            "enable_thinking": bool(args.eval_enable_thinking),
+        },
+        "notebook_reference_score": notebook_reference_score,
+        **summary,
+    }
+    write_validation_outputs(
+        output_root=validation_root,
+        evaluation_name=evaluation_name,
+        validation_frame=validation_frame,
+        results_frame=results_frame,
+        payload=payload,
+    )
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
+    write_json(
+        progress_path,
+        {
+            "created_at": utc_now(),
+            "status": "complete",
+            "evaluation_kind": "adapter_validation",
             "rows_total": total_prompts,
             "rows_completed": total_prompts,
             "rows_total_global": total_benchmark_rows,
@@ -1546,6 +2095,7 @@ def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
     )
     payload = {
         "created_at": utc_now(),
+        "evaluation_kind": "aopen_eval",
         "evaluation_name": "aopen_train_csv_full",
         "benchmark_csv": str(TRAIN_CSV_PATH.resolve()),
         "model_root": str(model_root),
@@ -1599,10 +2149,159 @@ def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
     return payload
 
 
+def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    training_result_path = run_root / "training_result.json"
+    if not training_result_path.exists():
+        raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
+    training_result = load_json(training_result_path)
+    model_root = Path(training_result["shadow_model_dir"]).resolve()
+    adapter_dir = Path(training_result["adapter_dir"]).resolve()
+    base_validation_root = run_root / "adapter_validation"
+    shard_root = base_validation_root / "shards"
+    if not shard_root.exists():
+        raise FileNotFoundError(f"Missing adapter validation shard directory at {shard_root}")
+
+    shard_entries: list[tuple[Path, dict[str, Any]]] = []
+    for summary_path in sorted(shard_root.glob("*/validation_summary.json")):
+        shard_entries.append((summary_path.parent, load_json(summary_path)))
+    if not shard_entries:
+        raise FileNotFoundError(f"No shard validation_summary.json files found under {shard_root}")
+
+    shard_entries.sort(key=lambda entry: (int(entry[1].get("row_start", 0)), entry[0].name))
+    expected_shards = int(shard_entries[0][1].get("eval_shards", len(shard_entries)))
+    if expected_shards <= 1:
+        raise RuntimeError("Adapter validation merge requires eval_shards > 1 in shard summaries.")
+    if len(shard_entries) != expected_shards:
+        raise RuntimeError(f"Expected {expected_shards} shard summaries, found {len(shard_entries)} under {shard_root}")
+
+    total_rows_global = int(shard_entries[0][1].get("rows_total_global", 0))
+    next_row_start = 0
+    records: list[dict[str, Any]] = []
+    for expected_index, (shard_dir, payload) in enumerate(shard_entries):
+        shard_index = int(payload.get("eval_shard_index", -1))
+        row_start = int(payload.get("row_start", -1))
+        row_end = int(payload.get("row_end", -1))
+        shard_total = int(payload.get("overall", {}).get("total", -1))
+        shard_rows_total_global = int(payload.get("rows_total_global", total_rows_global))
+        if shard_index != expected_index:
+            raise RuntimeError(f"Expected shard index {expected_index}, found {shard_index} in {shard_dir}")
+        if shard_rows_total_global != total_rows_global:
+            raise RuntimeError(
+                f"Global row count mismatch for {shard_dir}: {shard_rows_total_global} != {total_rows_global}"
+            )
+        if row_start != next_row_start:
+            raise RuntimeError(f"Shard coverage gap or overlap before {shard_dir}: expected {next_row_start}, found {row_start}")
+        if row_end < row_start:
+            raise RuntimeError(f"Invalid shard row range in {shard_dir}: {row_start}:{row_end}")
+        shard_records = load_validation_records_csv(shard_dir / "validation.csv")
+        if len(shard_records) != shard_total or len(shard_records) != (row_end - row_start):
+            raise RuntimeError(
+                f"Shard row mismatch in {shard_dir}: validation_rows={len(shard_records)} summary_total={shard_total} "
+                f"row_span={row_end - row_start}"
+            )
+        records.extend(shard_records)
+        next_row_start = row_end
+
+    if next_row_start != total_rows_global:
+        raise RuntimeError(f"Shard coverage incomplete: merged {next_row_start} rows, expected {total_rows_global}")
+
+    validation_frame = pd.DataFrame.from_records(records, columns=VALIDATION_RECORD_COLUMNS)
+    results_frame = build_validation_results_table(validation_frame)
+    summary = summarize_validation_results(results_frame)
+    max_num_seqs = max(1, int(args.max_num_seqs))
+    chunk_size = min(max_num_seqs, max(1, int(args.prompt_chunk_size)))
+    prefill_batch_size = min(max_num_seqs, max(1, int(args.prefill_batch_size)))
+    completion_batch_size = min(max_num_seqs, max(1, int(args.completion_batch_size)))
+    evaluation_settings = build_eval_settings_payload(
+        args,
+        eval_shards=expected_shards,
+        eval_shard_index=-1,
+        chunk_size=chunk_size,
+        prefill_batch_size=prefill_batch_size,
+        completion_batch_size=completion_batch_size,
+    )
+    payload = {
+        "created_at": utc_now(),
+        "evaluation_kind": "adapter_validation",
+        "evaluation_name": f"adapter_validation_head_{total_rows_global}",
+        "benchmark_csv": str(TRAIN_CSV_PATH.resolve()),
+        "notebook_reference": relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
+        "model_root": str(model_root),
+        "adapter_dir": str(adapter_dir),
+        "readme_contract": README_EVAL_CONTRACT,
+        "source_documents": [
+            relative_to_repo(README_PATH),
+            relative_to_repo(AOPEN_ROOT / "README.md"),
+            relative_to_repo(AOPEN_ROOT / "データ戦略を理解する.md"),
+            relative_to_repo(AOPEN_ROOT / "学習SFTパイプライン.md"),
+            relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
+        ],
+        "validation_sample_size": int(args.validation_sample_size),
+        "rows_total_global": total_rows_global,
+        "row_start": 0,
+        "row_end": total_rows_global,
+        "eval_shards": expected_shards,
+        "eval_shard_index": -1,
+        "evaluation_settings": evaluation_settings,
+        "aggregation": {
+            "mode": "sharded",
+            "shard_root": str(shard_root.resolve()),
+            "num_shards": expected_shards,
+        },
+        "prompt_policy": {
+            "append_boxed_instruction": False,
+            "enable_thinking": bool(args.eval_enable_thinking),
+        },
+        "notebook_reference_score": (
+            ADAPTER_VALIDATION_NOTEBOOK_TARGET if total_rows_global == ADAPTER_VALIDATION_SAMPLE_SIZE else None
+        ),
+        **summary,
+    }
+    write_validation_outputs(
+        output_root=base_validation_root,
+        evaluation_name=f"adapter_validation_head_{total_rows_global}",
+        validation_frame=validation_frame,
+        results_frame=results_frame,
+        payload=payload,
+    )
+    write_json(
+        base_validation_root / "validation_progress.json",
+        {
+            "created_at": utc_now(),
+            "status": "complete",
+            "evaluation_kind": "adapter_validation",
+            "rows_total": total_rows_global,
+            "rows_completed": total_rows_global,
+            "rows_total_global": total_rows_global,
+            "row_start": 0,
+            "row_end": total_rows_global,
+            "eval_shards": expected_shards,
+            "eval_shard_index": -1,
+            "aggregation": "sharded",
+        },
+    )
+    root_checkpoint_path = base_validation_root / "validation_records_checkpoint.csv"
+    if root_checkpoint_path.exists():
+        root_checkpoint_path.unlink()
+    return payload
+
+
 def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, Any]) -> str:
     overall = eval_result["overall"]
+    evaluation_kind = str(eval_result.get("evaluation_kind", "aopen_eval"))
+    evaluation_name = str(eval_result.get("evaluation_name", ""))
     evaluation_settings = eval_result.get("evaluation_settings")
     aggregation = eval_result.get("aggregation")
+    prompt_policy = eval_result.get("prompt_policy")
+    source_documents = list(eval_result.get("source_documents") or [])
+    if not source_documents:
+        source_documents = [
+            relative_to_repo(README_PATH),
+            relative_to_repo(AOPEN_ROOT / "README.md"),
+            relative_to_repo(AOPEN_ROOT / "データ戦略を理解する.md"),
+            relative_to_repo(AOPEN_ROOT / "学習SFTパイプライン.md"),
+        ]
     lines = [
         "# v20_mlx_repro_v1 results",
         "",
@@ -1613,9 +2312,6 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
         "## Source contract",
         "",
         f"- Top-level README: `{relative_to_repo(README_PATH)}`",
-        f"- A-Open README: `{relative_to_repo(AOPEN_ROOT / 'README.md')}`",
-        f"- Data strategy: `{relative_to_repo(AOPEN_ROOT / 'データ戦略を理解する.md')}`",
-        f"- SFT pipeline: `{relative_to_repo(AOPEN_ROOT / '学習SFTパイプライン.md')}`",
         f"- V20 snapshot: `{relative_to_repo(SNAPSHOT_ROOT)}`",
         "",
         "## Run summary",
@@ -1632,13 +2328,43 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
         f"- last_train_loss: `{run_result['latest_train_report']['train_loss']}`",
         f"- last_lr: `{run_result['latest_train_report']['lr']}`",
         "",
-        "## A-Open eval result",
+        "## Evaluation result",
         "",
+        f"- evaluation_kind: `{evaluation_kind}`",
+        f"- evaluation_name: `{evaluation_name}`",
         f"- overall_accuracy: `{overall['accuracy']}` ({overall['correct']}/{overall['total']})",
-        f"- v20_target_training_set_accuracy: `{V20_TARGETS['overall_accuracy']}` ({V20_TARGETS['overall_correct']}/{V20_TARGETS['overall_total']})",
-        f"- delta_vs_v20_target: `{round(float(overall['accuracy']) - float(V20_TARGETS['overall_accuracy']), 6)}`",
         "",
     ]
+    for source_document in source_documents:
+        lines.append(f"- source_document: `{source_document}`")
+    lines.append("")
+    if evaluation_kind == "adapter_validation":
+        notebook_reference = str(
+            eval_result.get("notebook_reference", relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH))
+        )
+        notebook_reference_score = eval_result.get("notebook_reference_score")
+        lines.append(f"- notebook_reference: `{notebook_reference}`")
+        lines.append(f"- validation_sample_size: `{eval_result.get('validation_sample_size', '')}`")
+        if isinstance(notebook_reference_score, dict) and notebook_reference_score:
+            lines.append(
+                "- notebook_reference_accuracy: "
+                f"`{notebook_reference_score['overall_accuracy']}` "
+                f"({notebook_reference_score['overall_correct']}/{notebook_reference_score['overall_total']})"
+            )
+            lines.append(
+                f"- delta_vs_notebook_reference: "
+                f"`{round(float(overall['accuracy']) - float(notebook_reference_score['overall_accuracy']), 6)}`"
+            )
+        lines.append("")
+    else:
+        lines.append(
+            f"- v20_target_training_set_accuracy: `{V20_TARGETS['overall_accuracy']}` "
+            f"({V20_TARGETS['overall_correct']}/{V20_TARGETS['overall_total']})"
+        )
+        lines.append(
+            f"- delta_vs_v20_target: `{round(float(overall['accuracy']) - float(V20_TARGETS['overall_accuracy']), 6)}`"
+        )
+        lines.append("")
     if isinstance(evaluation_settings, dict) and evaluation_settings:
         lines.extend(
             [
@@ -1654,6 +2380,16 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
                 "",
             ]
         )
+    if isinstance(prompt_policy, dict) and prompt_policy:
+        lines.extend(
+            [
+                "## Prompt policy",
+                "",
+                f"- append_boxed_instruction: `{prompt_policy.get('append_boxed_instruction', '')}`",
+                f"- enable_thinking: `{prompt_policy.get('enable_thinking', '')}`",
+                "",
+            ]
+        )
     if isinstance(aggregation, dict) and aggregation:
         lines.extend(
             [
@@ -1665,19 +2401,48 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
                 "",
             ]
         )
-    lines.extend(
-        [
-        "| category | reproduced_correct | reproduced_total | reproduced_accuracy | v20_correct | v20_total | v20_accuracy |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-        ]
-    )
     eval_by_category = {row["category"]: row for row in eval_result["categories"]}
-    for category, target in V20_TARGETS["categories"].items():
-        row = eval_by_category.get(category, {"correct": 0, "total": 0, "accuracy": 0.0})
-        target_accuracy = target["correct"] / target["total"] if target["total"] else 0.0
-        lines.append(
-            f"| {category} | {row['correct']} | {row['total']} | {float(row['accuracy']):.6f} | {target['correct']} | {target['total']} | {target_accuracy:.6f} |"
+    if evaluation_kind == "adapter_validation":
+        reference = eval_result.get("notebook_reference_score")
+        if isinstance(reference, dict) and reference.get("categories"):
+            lines.extend(
+                [
+                    "| category | reproduced_correct | reproduced_total | reproduced_accuracy | notebook_correct | notebook_total | notebook_accuracy |",
+                    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for category, target in reference["categories"].items():
+                row = eval_by_category.get(category, {"correct": 0, "total": 0, "accuracy": 0.0})
+                target_accuracy = target["correct"] / target["total"] if target["total"] else 0.0
+                lines.append(
+                    f"| {category} | {row['correct']} | {row['total']} | {float(row['accuracy']):.6f} | "
+                    f"{target['correct']} | {target['total']} | {target_accuracy:.6f} |"
+                )
+        else:
+            lines.extend(
+                [
+                    "| category | correct | total | accuracy | weightage | percentage | contribution |",
+                    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for row in eval_result["categories"]:
+                lines.append(
+                    f"| {row['category']} | {row['correct']} | {row['total']} | {float(row['accuracy']):.6f} | "
+                    f"{row.get('weightage', '')} | {row.get('percentage', '')} | {row.get('contribution', '')} |"
+                )
+    else:
+        lines.extend(
+            [
+                "| category | reproduced_correct | reproduced_total | reproduced_accuracy | v20_correct | v20_total | v20_accuracy |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
         )
+        for category, target in V20_TARGETS["categories"].items():
+            row = eval_by_category.get(category, {"correct": 0, "total": 0, "accuracy": 0.0})
+            target_accuracy = target["correct"] / target["total"] if target["total"] else 0.0
+            lines.append(
+                f"| {category} | {row['correct']} | {row['total']} | {float(row['accuracy']):.6f} | {target['correct']} | {target['total']} | {target_accuracy:.6f} |"
+            )
     lines.extend(
         [
             "",
@@ -1719,15 +2484,39 @@ def run_full(args: argparse.Namespace) -> dict[str, Any]:
 def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
     run_root = Path(args.output_root).resolve() / args.run_name
     training_result_path = run_root / "training_result.json"
-    eval_summary_path = run_root / "aopen_eval" / "benchmark_eval_summary.json"
     if not training_result_path.exists():
         raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
-    if not eval_summary_path.exists():
-        shard_root = run_root / "aopen_eval" / "shards"
-        if shard_root.exists():
-            run_merge_aopen_eval(args)
-        if not eval_summary_path.exists():
-            raise FileNotFoundError(f"Missing benchmark_eval_summary.json at {eval_summary_path}")
+    postprocess_eval_kind = str(args.postprocess_eval_kind)
+    if postprocess_eval_kind not in {"auto", "aopen", "adapter-validation"}:
+        raise ValueError(f"Unsupported --postprocess-eval-kind: {postprocess_eval_kind}")
+
+    eval_summary_path: Path | None = None
+    if postprocess_eval_kind in {"auto", "adapter-validation"}:
+        validation_summary_path = run_root / "adapter_validation" / "validation_summary.json"
+        if not validation_summary_path.exists():
+            validation_shard_root = run_root / "adapter_validation" / "shards"
+            if validation_shard_root.exists():
+                run_merge_adapter_validation(args)
+        if validation_summary_path.exists():
+            eval_summary_path = validation_summary_path
+        elif postprocess_eval_kind == "adapter-validation":
+            raise FileNotFoundError(f"Missing validation_summary.json at {validation_summary_path}")
+
+    if eval_summary_path is None and postprocess_eval_kind in {"auto", "aopen"}:
+        aopen_summary_path = run_root / "aopen_eval" / "benchmark_eval_summary.json"
+        if not aopen_summary_path.exists():
+            shard_root = run_root / "aopen_eval" / "shards"
+            if shard_root.exists():
+                run_merge_aopen_eval(args)
+        if aopen_summary_path.exists():
+            eval_summary_path = aopen_summary_path
+        elif postprocess_eval_kind == "aopen":
+            raise FileNotFoundError(f"Missing benchmark_eval_summary.json at {aopen_summary_path}")
+
+    if eval_summary_path is None:
+        raise FileNotFoundError(
+            f"No completed evaluation summary found under {run_root / 'adapter_validation'} or {run_root / 'aopen_eval'}"
+        )
     run_result = load_json(training_result_path)
     eval_result = load_json(eval_summary_path)
     update_results_files(args, run_result, eval_result)
@@ -1802,6 +2591,7 @@ def parse_args() -> argparse.Namespace:
         target.add_argument("--prefill-batch-size", type=int, default=8)
         target.add_argument("--completion-batch-size", type=int, default=8)
         target.add_argument("--eval-limit", type=int, default=0)
+        target.add_argument("--validation-sample-size", type=int, default=ADAPTER_VALIDATION_SAMPLE_SIZE)
         target.add_argument("--eval-shards", type=int, default=1)
         target.add_argument("--eval-shard-index", type=int, default=0)
         target.add_argument(
@@ -1815,6 +2605,11 @@ def parse_args() -> argparse.Namespace:
             default=True,
         )
         target.add_argument("--force-single-generate", action="store_true")
+        target.add_argument(
+            "--postprocess-eval-kind",
+            choices=("auto", "aopen", "adapter-validation"),
+            default="auto",
+        )
 
     prepare = subparsers.add_parser("prepare", help="Prepare the v20 snapshot contract, shadow model, and run manifest.")
     add_shared_args(prepare)
@@ -1828,6 +2623,13 @@ def parse_args() -> argparse.Namespace:
     add_shared_args(eval_aopen)
     eval_aopen.set_defaults(func=run_eval_aopen)
 
+    eval_adapter_validation = subparsers.add_parser(
+        "eval-adapter-validation",
+        help="Run adapter-validation-notebook.ipynb-style validation on train.csv.head(validation_sample_size) using the trained adapter.",
+    )
+    add_shared_args(eval_adapter_validation)
+    eval_adapter_validation.set_defaults(func=run_eval_adapter_validation)
+
     merge_eval = subparsers.add_parser(
         "merge-aopen-eval",
         help="Merge shard-local A-Open eval outputs into run_root/aopen_eval/ and update the root summary.",
@@ -1835,13 +2637,20 @@ def parse_args() -> argparse.Namespace:
     add_shared_args(merge_eval)
     merge_eval.set_defaults(func=run_merge_aopen_eval)
 
+    merge_adapter_validation = subparsers.add_parser(
+        "merge-adapter-validation",
+        help="Merge shard-local adapter validation outputs into run_root/adapter_validation/ and update the root summary.",
+    )
+    add_shared_args(merge_adapter_validation)
+    merge_adapter_validation.set_defaults(func=run_merge_adapter_validation)
+
     full = subparsers.add_parser("full-run", help="Prepare, train, evaluate, and update the tracked results files.")
     add_shared_args(full)
     full.set_defaults(func=run_full)
 
     postprocess = subparsers.add_parser(
         "postprocess-run",
-        help="Update tracked results files from an existing run's training_result.json and benchmark_eval_summary.json.",
+        help="Update tracked results files from an existing run's completed evaluation summary.",
     )
     add_shared_args(postprocess)
     postprocess.set_defaults(func=run_postprocess_existing)
