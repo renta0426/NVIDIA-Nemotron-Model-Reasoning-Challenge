@@ -124,6 +124,21 @@
 
 - Result: `seq4` was clearly best on the same workload, so the live 950-row run was relaunched from the existing shard checkpoints with `4x4` batching instead of `1x1`.
 
+### Token throughput on the same 4-row benchmark
+
+- README evaluation contract reference: `max_tokens=7680`, `max_model_len=8192`, `temperature=0.0`, `top_p=1.0`, `max_num_seqs=64`.
+- Benchmark prompt policy matched the notebook reproduction path: `enable_thinking=True` and **no boxed-answer suffix**.
+- The first 4 validation rows used for this benchmark had `824` prompt tokens in total after chat templating.
+- All 4 generations hit the `max_tokens=7680` cap, so each run generated exactly `30,720` output tokens total.
+
+| config | elapsed_seconds | prompt_tokens_total | output_tokens_total | output_tok_per_sec | total_tok_per_sec | avg_output_tok_per_row |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| seq1 | 800 | 824 | 30720 | 38.40 | 39.43 | 7680 |
+| seq2 | 785 | 824 | 30720 | 39.13 | 40.18 | 7680 |
+| seq4 | 659 | 824 | 30720 | 46.62 | 47.87 | 7680 |
+
+- Interpretation: under the current non-quantized MLX setup, the best measured single-process notebook-style benchmark here is about **46.6 output tok/s** aggregate at `4x4`, or about **11.65 output tok/s per row** when 4 requests are batched together.
+
 ## Eval robustness update
 
 - Full `eval-aopen` already had checkpoint/resume, shard merge, and `postprocess-run` support.
