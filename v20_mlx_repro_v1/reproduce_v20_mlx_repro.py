@@ -1131,40 +1131,78 @@ def resolve_adapter_validation_root(run_root: Path, *, shard_count: int, shard_i
 def load_validation_records_csv(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    frame = pd.read_csv(
-        path,
-        keep_default_na=False,
-        converters={
-            "correct": lambda value: str(value).strip().lower() in {"true", "1", "1.0"},
-        },
-    )
-    records = frame.to_dict(orient="records")
-    for fallback_index, record in enumerate(records):
-        row_index_value = record.get("row_index_within_shard", "")
+
+    def normalize_record(raw_record: dict[str, str], fallback_index: int) -> dict[str, Any]:
+        row_index_value = raw_record.get("row_index_within_shard", "")
         row_index_text = str(row_index_value).strip()
-        record["row_index_within_shard"] = int(row_index_text) if row_index_text else fallback_index
-        record["id"] = str(record.get("id", ""))
-        record["prompt"] = str(record.get("prompt", ""))
-        record["answer"] = str(record.get("answer", ""))
-        record["output"] = str(record.get("output", ""))
-        record["category"] = str(record.get("category", ""))
-        record["predicted"] = str(record.get("predicted", ""))
-        record["correct"] = bool(record.get("correct", False))
-        minlogprob_value = str(record.get("minlogprob", "")).strip()
-        record["minlogprob"] = None if not minlogprob_value else float(minlogprob_value)
+        minlogprob_value = str(raw_record.get("minlogprob", "")).strip()
+        return {
+            "row_index_within_shard": int(row_index_text) if row_index_text else fallback_index,
+            "id": str(raw_record.get("id", "")),
+            "prompt": str(raw_record.get("prompt", "")),
+            "answer": str(raw_record.get("answer", "")),
+            "output": str(raw_record.get("output", "")),
+            "category": str(raw_record.get("category", "")),
+            "predicted": str(raw_record.get("predicted", "")),
+            "correct": str(raw_record.get("correct", "")).strip().lower() in {"true", "1", "1.0"},
+            "minlogprob": None if not minlogprob_value else float(minlogprob_value),
+        }
+
+    records: list[dict[str, Any]] = []
+    with path.open("r", newline="") as handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except StopIteration:
+            return []
+        for fallback_index, row in enumerate(reader):
+            if not row:
+                continue
+            if len(row) == len(VALIDATION_RECORD_COLUMNS):
+                field_names = VALIDATION_RECORD_COLUMNS
+            elif len(row) == len(VALIDATION_FINAL_COLUMNS):
+                field_names = VALIDATION_FINAL_COLUMNS
+            elif len(row) == len(header):
+                field_names = tuple(str(name) for name in header)
+            else:
+                raise RuntimeError(
+                    f"Unsupported validation CSV row width in {path}: header={len(header)} row={len(row)}"
+                )
+            raw_record = {field_name: value for field_name, value in zip(field_names, row)}
+            records.append(normalize_record(raw_record, fallback_index))
     return records
+
+
+def rewrite_validation_checkpoint_records(checkpoint_path: Path, records: Sequence[dict[str, Any]]) -> None:
+    ensure_dir(checkpoint_path.parent)
+    with checkpoint_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=VALIDATION_RECORD_COLUMNS)
+        writer.writeheader()
+        for record in sort_validation_records(records):
+            writer.writerow(
+                {
+                    column: "" if record.get(column) is None else record.get(column)
+                    for column in VALIDATION_RECORD_COLUMNS
+                }
+            )
 
 
 def append_validation_checkpoint_records(checkpoint_path: Path, records: Sequence[dict[str, Any]]) -> None:
     if not records:
         return
     ensure_dir(checkpoint_path.parent)
-    pd.DataFrame.from_records(records, columns=VALIDATION_RECORD_COLUMNS).to_csv(
-        checkpoint_path,
-        mode="a",
-        header=not checkpoint_path.exists(),
-        index=False,
-    )
+    write_header = not checkpoint_path.exists()
+    with checkpoint_path.open("a", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=VALIDATION_RECORD_COLUMNS)
+        if write_header:
+            writer.writeheader()
+        for record in records:
+            writer.writerow(
+                {
+                    column: "" if record.get(column) is None else record.get(column)
+                    for column in VALIDATION_RECORD_COLUMNS
+                }
+            )
 
 
 def sort_validation_records(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1905,6 +1943,8 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
                 f"Remove {checkpoint_path} and rerun."
             )
         records_by_index[row_index_within_shard] = record
+    if checkpoint_path.exists():
+        rewrite_validation_checkpoint_records(checkpoint_path, records_by_index.values())
     if records:
         if eval_shards > 1:
             print(

@@ -138,6 +138,27 @@
 | seq4 | 659 | 824 | 30720 | 46.62 | 47.87 | 7680 |
 
 - Interpretation: under the current non-quantized MLX setup, the best measured single-process notebook-style benchmark here is about **46.6 output tok/s** aggregate at `4x4`, or about **11.65 output tok/s per row** when 4 requests are batched together.
+- A later live-sample recount over the first `53` completed rows of the real 950-row run showed why wall-clock progress is still slow even after finer checkpointing:
+  - average output length: `6602.85` tokens
+  - median output length: `7680` tokens
+  - `45/53` rows had already hit the `7680` cap
+  - only `8/53` rows finished at `<= 2000` output tokens
+- So the bottleneck is not just MLX BF16 inference speed; the notebook-style `enable_thinking=True` generations themselves frequently expand all the way to the README contract cap.
+
+## Checkpoint schema repair during live eval
+
+- After the first row-index checkpoint relaunch, shard-local `validation_records_checkpoint.csv` files were found to have a **mixed schema**:
+  - legacy rows from the prefix-based checkpoint path still used the old 8-column header
+  - new per-row checkpoint appends wrote 9 columns with `row_index_within_shard`
+- This would have broken a later restart or any direct CSV parsing, so the monolith was hardened to:
+  - load validation CSVs with `csv.reader` instead of `pandas.read_csv`
+  - accept legacy 8-column rows, final `validation.csv` rows, and mixed 8/9-column checkpoint files
+  - rewrite shard checkpoint files to the normalized 9-column schema before appending new rows
+- The live 4-shard run was then stopped, repaired, and resumed successfully from:
+  - shard `0`: `11/238`
+  - shard `1`: `16/238`
+  - shard `2`: `13/237`
+  - shard `3`: `13/237`
 
 ## Eval robustness update
 
