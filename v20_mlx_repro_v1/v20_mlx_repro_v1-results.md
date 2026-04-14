@@ -101,16 +101,19 @@
   - previous thinking accuracy on the same 16 rows: `2/16 = 0.125`
   - `boxed_found: 16/16`
   - output char length: `min=11`, `median=15`, `max=15359`
-- The live evaluation is now pivoted again to **6 shard-parallel no-thinking workers**:
+- Important correction: the competition metric notebook (`nvidia-nemotron-metric.ipynb`) applies the tokenizer chat template with `enable_thinking=True`, so the no-thinking run is **not** the canonical reproduction target.
+- Therefore the no-thinking shard run is retained only as a **local diagnostic experiment** and was archived to:
+  - `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards_nothinking_experiment_20260414-090605/`
+- The current live evaluation has been reset to the **canonical metric-aligned configuration**:
+  - `--eval-enable-thinking`
   - `--eval-shards 6`
-  - `--no-eval-enable-thinking`
   - `--max-num-seqs 4`
   - `--prompt-chunk-size 4`
   - `--prefill-batch-size 4`
   - `--completion-batch-size 4`
-- Active shard outputs now live under `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards/`.
-- A dedicated waiter process is polling for `6/6` shard summaries, then runs `merge-aopen-eval -> postprocess-run -> git commit/push`.
-- Immediate live confirmation after the no-thinking relaunch: shard `5/6` reached `12/1583` rows quickly, showing that checkpoint progress is now moving again.
+- Active canonical shard outputs now live under `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/aopen_eval/shards/`.
+- The waiter process now polls for `6/6` canonical shard summaries, then runs `merge-aopen-eval -> postprocess-run -> git commit/push`.
+- Immediate canonical status after the restart: all 6 shards launched cleanly and resumed from `0`, with full evaluation size still `9500` rows split as `1584 / 1584 / 1583 / 1583 / 1583 / 1583`.
 
 ## Assumptions not explicit in the public v20 config
 
