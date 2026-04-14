@@ -86,7 +86,7 @@ EVAL_RECORD_COLUMNS = (
     "has_boxed",
     "boxed_count",
 )
-VALIDATION_RECORD_COLUMNS = (
+VALIDATION_FINAL_COLUMNS = (
     "id",
     "prompt",
     "answer",
@@ -96,6 +96,7 @@ VALIDATION_RECORD_COLUMNS = (
     "correct",
     "minlogprob",
 )
+VALIDATION_RECORD_COLUMNS = ("row_index_within_shard",) + VALIDATION_FINAL_COLUMNS
 
 V20_TARGETS = {
     "overall_accuracy": 8340 / 9500,
@@ -536,7 +537,7 @@ def generate_single_with_min_logprob(
     return "".join(text_segments), min_logprob
 
 
-def batch_generate_with_min_logprobs(
+def iter_batch_generate_with_min_logprobs(
     model: Any,
     tokenizer: Any,
     prompt_tokens: Sequence[Sequence[int]],
@@ -545,7 +546,7 @@ def batch_generate_with_min_logprobs(
     sampler: Any,
     prefill_batch_size: int,
     completion_batch_size: int,
-) -> tuple[list[str], list[float | None]]:
+) -> Iterator[tuple[int, str, float | None]]:
     generator = BatchGenerator(
         model,
         stop_tokens=getattr(tokenizer, "eos_token_ids", None),
@@ -554,6 +555,7 @@ def batch_generate_with_min_logprobs(
         completion_batch_size=max(1, int(completion_batch_size)),
     )
     uids = generator.insert([list(tokens) for tokens in prompt_tokens], max_tokens=max_tokens)
+    uid_to_index = {uid: index for index, uid in enumerate(uids)}
     generated_tokens: dict[int, list[int]] = {uid: [] for uid in uids}
     min_logprobs: dict[int, float | None] = {uid: None for uid in uids}
     try:
@@ -568,11 +570,48 @@ def batch_generate_with_min_logprobs(
                 min_logprobs[response.uid] = (
                     sampled_logprob if previous is None else min(previous, sampled_logprob)
                 )
+                if response.finish_reason is not None:
+                    yield (
+                        uid_to_index[response.uid],
+                        tokenizer.decode(generated_tokens[response.uid]),
+                        min_logprobs[response.uid],
+                    )
+                    continue
+            for response in responses:
+                if response.finish_reason == "stop":
+                    yield (
+                        uid_to_index[response.uid],
+                        tokenizer.decode(generated_tokens[response.uid]),
+                        min_logprobs[response.uid],
+                    )
     finally:
         generator.close()
-    texts = [tokenizer.decode(generated_tokens[uid]) for uid in uids]
-    minima = [min_logprobs[uid] for uid in uids]
-    return texts, minima
+
+
+def batch_generate_with_min_logprobs(
+    model: Any,
+    tokenizer: Any,
+    prompt_tokens: Sequence[Sequence[int]],
+    *,
+    max_tokens: int,
+    sampler: Any,
+    prefill_batch_size: int,
+    completion_batch_size: int,
+) -> tuple[list[str], list[float | None]]:
+    texts: list[str | None] = [None] * len(prompt_tokens)
+    minima: list[float | None] = [None] * len(prompt_tokens)
+    for index, text, min_logprob in iter_batch_generate_with_min_logprobs(
+        model,
+        tokenizer,
+        prompt_tokens,
+        max_tokens=max_tokens,
+        sampler=sampler,
+        prefill_batch_size=prefill_batch_size,
+        completion_batch_size=completion_batch_size,
+    ):
+        texts[index] = text
+        minima[index] = min_logprob
+    return [text or "" for text in texts], minima
 
 
 def read_snapshot_token_file(token_path: Path) -> tuple[list[int], list[int]]:
@@ -1100,7 +1139,10 @@ def load_validation_records_csv(path: Path) -> list[dict[str, Any]]:
         },
     )
     records = frame.to_dict(orient="records")
-    for record in records:
+    for fallback_index, record in enumerate(records):
+        row_index_value = record.get("row_index_within_shard", "")
+        row_index_text = str(row_index_value).strip()
+        record["row_index_within_shard"] = int(row_index_text) if row_index_text else fallback_index
         record["id"] = str(record.get("id", ""))
         record["prompt"] = str(record.get("prompt", ""))
         record["answer"] = str(record.get("answer", ""))
@@ -1123,6 +1165,15 @@ def append_validation_checkpoint_records(checkpoint_path: Path, records: Sequenc
         header=not checkpoint_path.exists(),
         index=False,
     )
+
+
+def sort_validation_records(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(records, key=lambda record: int(record["row_index_within_shard"]))
+
+
+def build_validation_output_frame(records: Sequence[dict[str, Any]]) -> pd.DataFrame:
+    ordered_records = sort_validation_records(records)
+    return pd.DataFrame.from_records(ordered_records, columns=VALIDATION_FINAL_COLUMNS)
 
 
 def build_validation_results_table(validation_frame: pd.DataFrame) -> pd.DataFrame:
@@ -1845,6 +1896,15 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             f"Validation checkpoint has more rows than the benchmark: {len(records)} > {total_prompts}. "
             f"Remove {checkpoint_path} and rerun."
         )
+    records_by_index: dict[int, dict[str, Any]] = {}
+    for record in records:
+        row_index_within_shard = int(record["row_index_within_shard"])
+        if row_index_within_shard in records_by_index:
+            raise RuntimeError(
+                f"Duplicate row_index_within_shard={row_index_within_shard} in {checkpoint_path}. "
+                f"Remove {checkpoint_path} and rerun."
+            )
+        records_by_index[row_index_within_shard] = record
     if records:
         if eval_shards > 1:
             print(
@@ -1853,69 +1913,36 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             )
         else:
             print(f"Resuming adapter validation from {len(records)}/{total_prompts}")
+    pending_items = [
+        (row_index_within_shard, benchmark_rows[row_index_within_shard], prompt_tokens[row_index_within_shard])
+        for row_index_within_shard in range(total_prompts)
+        if row_index_within_shard not in records_by_index
+    ]
 
-    for chunk_start in range(len(records), total_prompts, chunk_size):
-        chunk_prompt_tokens = prompt_tokens[chunk_start : chunk_start + chunk_size]
-        chunk_rows = benchmark_rows[chunk_start : chunk_start + len(chunk_prompt_tokens)]
-        if force_single_generate:
-            chunk_outputs = []
-            chunk_minlogprobs = []
-            for prompt_tokens_single in chunk_prompt_tokens:
-                raw_output, min_logprob = generate_single_with_min_logprob(
-                    model,
-                    tokenizer,
-                    prompt_tokens_single,
-                    max_tokens=int(args.max_tokens),
-                    sampler=sampler,
-                )
-                chunk_outputs.append(raw_output)
-                chunk_minlogprobs.append(min_logprob)
-        else:
-            try:
-                chunk_outputs, chunk_minlogprobs = batch_generate_with_min_logprobs(
-                    model,
-                    tokenizer,
-                    chunk_prompt_tokens,
-                    max_tokens=int(args.max_tokens),
-                    sampler=sampler,
-                    prefill_batch_size=min(prefill_batch_size, len(chunk_prompt_tokens)),
-                    completion_batch_size=min(completion_batch_size, len(chunk_prompt_tokens)),
-                )
-            except (AttributeError, RuntimeError):
-                chunk_outputs = []
-                chunk_minlogprobs = []
-                for prompt_tokens_single in chunk_prompt_tokens:
-                    raw_output, min_logprob = generate_single_with_min_logprob(
-                        model,
-                        tokenizer,
-                        prompt_tokens_single,
-                        max_tokens=int(args.max_tokens),
-                        sampler=sampler,
-                    )
-                    chunk_outputs.append(raw_output)
-                    chunk_minlogprobs.append(min_logprob)
+    def record_validation_completion(
+        row_index_within_shard: int,
+        row: dict[str, str],
+        raw_output: str,
+        min_logprob: float | None,
+    ) -> None:
+        prediction = extract_final_answer(str(raw_output))
+        category = detect_validation_category(str(row["prompt"]))
+        correct = verify_answer(str(row["answer"]), prediction)
+        record = {
+            "row_index_within_shard": int(row_index_within_shard),
+            "id": str(row["id"]),
+            "prompt": str(row["prompt"]),
+            "answer": str(row["answer"]),
+            "output": str(raw_output),
+            "category": category,
+            "predicted": prediction,
+            "correct": bool(correct),
+            "minlogprob": min_logprob,
+        }
+        append_validation_checkpoint_records(checkpoint_path, [record])
+        records_by_index[int(row_index_within_shard)] = record
 
-        chunk_records: list[dict[str, Any]] = []
-        for row, raw_output, min_logprob in zip(chunk_rows, chunk_outputs, chunk_minlogprobs):
-            prediction = extract_final_answer(str(raw_output))
-            category = detect_validation_category(str(row["prompt"]))
-            correct = verify_answer(str(row["answer"]), prediction)
-            chunk_records.append(
-                {
-                    "id": str(row["id"]),
-                    "prompt": str(row["prompt"]),
-                    "answer": str(row["answer"]),
-                    "output": str(raw_output),
-                    "category": category,
-                    "predicted": prediction,
-                    "correct": bool(correct),
-                    "minlogprob": min_logprob,
-                }
-            )
-        append_validation_checkpoint_records(checkpoint_path, chunk_records)
-        records.extend(chunk_records)
-
-        rows_completed = len(records)
+        rows_completed = len(records_by_index)
         progress_payload = {
             "created_at": utc_now(),
             "status": "running",
@@ -1944,7 +1971,51 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
         else:
             print(f"Adapter validation progress: {rows_completed}/{total_prompts}")
 
-    validation_frame = pd.DataFrame.from_records(records, columns=VALIDATION_RECORD_COLUMNS)
+    for chunk_start in range(0, len(pending_items), chunk_size):
+        chunk_items = pending_items[chunk_start : chunk_start + chunk_size]
+        chunk_indices = [item[0] for item in chunk_items]
+        chunk_rows = [item[1] for item in chunk_items]
+        chunk_prompt_tokens = [item[2] for item in chunk_items]
+        if force_single_generate:
+            for chunk_index, row, prompt_tokens_single in zip(chunk_indices, chunk_rows, chunk_prompt_tokens):
+                raw_output, min_logprob = generate_single_with_min_logprob(
+                    model,
+                    tokenizer,
+                    prompt_tokens_single,
+                    max_tokens=int(args.max_tokens),
+                    sampler=sampler,
+                )
+                record_validation_completion(chunk_index, row, raw_output, min_logprob)
+        else:
+            try:
+                for output_index, raw_output, min_logprob in iter_batch_generate_with_min_logprobs(
+                    model,
+                    tokenizer,
+                    chunk_prompt_tokens,
+                    max_tokens=int(args.max_tokens),
+                    sampler=sampler,
+                    prefill_batch_size=min(prefill_batch_size, len(chunk_prompt_tokens)),
+                    completion_batch_size=min(completion_batch_size, len(chunk_prompt_tokens)),
+                ):
+                    record_validation_completion(
+                        chunk_indices[output_index],
+                        chunk_rows[output_index],
+                        raw_output,
+                        min_logprob,
+                    )
+            except (AttributeError, RuntimeError):
+                for chunk_index, row, prompt_tokens_single in zip(chunk_indices, chunk_rows, chunk_prompt_tokens):
+                    raw_output, min_logprob = generate_single_with_min_logprob(
+                        model,
+                        tokenizer,
+                        prompt_tokens_single,
+                        max_tokens=int(args.max_tokens),
+                        sampler=sampler,
+                    )
+                    record_validation_completion(chunk_index, row, raw_output, min_logprob)
+
+    records = sort_validation_records(records_by_index.values())
+    validation_frame = build_validation_output_frame(records)
     results_frame = build_validation_results_table(validation_frame)
     summary = summarize_validation_results(results_frame)
     evaluation_name = (
@@ -2206,7 +2277,7 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     if next_row_start != total_rows_global:
         raise RuntimeError(f"Shard coverage incomplete: merged {next_row_start} rows, expected {total_rows_global}")
 
-    validation_frame = pd.DataFrame.from_records(records, columns=VALIDATION_RECORD_COLUMNS)
+    validation_frame = build_validation_output_frame(records)
     results_frame = build_validation_results_table(validation_frame)
     summary = summarize_validation_results(results_frame)
     max_num_seqs = max(1, int(args.max_num_seqs))

@@ -103,6 +103,10 @@
   - shard `1`: `5/238`
   - shard `2`: `2/237`
   - shard `3`: `1/237`
+- checkpoint behavior update:
+  - the first 4-shard relaunch still checkpointed only chunk-level contiguous prefixes, so long `enable_thinking=True` generations could hide progress until an entire 4-row chunk finished
+  - the monolith was then updated to persist `row_index_within_shard` in the shard checkpoint CSV and resume from the completed-index set instead of the prefix length
+  - the current live 4-shard run is therefore a **finer-checkpoint relaunch** on the same root, preserving old rows and allowing per-row progress inside each chunk
 - parallelism note:
   - an **8-shard** relaunch was attempted after the single-process throughput benchmark, but free pages collapsed into a near-OOM range immediately after startup, so it was aborted before any useful checkpoint was written
   - a **6-shard** relaunch restored memory headroom, but still did not finish the first `4-row` chunk on any shard after a long wait, so it was slower in practice than the already-proven 4-shard path
