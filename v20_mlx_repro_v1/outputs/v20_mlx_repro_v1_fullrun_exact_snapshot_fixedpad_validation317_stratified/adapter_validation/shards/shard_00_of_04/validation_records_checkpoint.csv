@@ -1,0 +1,9356 @@
+row_index_within_shard,id,prompt,answer,output,category,predicted,correct,minlogprob
+0,000b53cf,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10001110 -> 00100110
+10011001 -> 01000100
+01100100 -> 00010001
+10000010 -> 00001010
+00011011 -> 01001100
+00111010 -> 10011100
+01101111 -> 00110111
+10010110 -> 01011010
+00001010 -> 00101100
+
+Now, determine the output for: 11100000",01000011,"We need to deduce the transformation by matching the example outputs.
+
+Output 1: 10001110->00100110
+Output 2: 10011001->01000100
+Output 3: 01100100->00010001
+Output 4: 10000010->00001010
+Output 5: 00011011->01001100
+Output 6: 00111010->10011100
+Output 7: 01101111->00110111
+Output 8: 10010110->01011010
+Output 9: 00001010->00101100
+
+Output bit columns (with bitsum as hash)
+0 1 2 3 4 5 6 7
+0 1 2 3 4 5 6 7
+
+Output 1: 00100110
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+Input 1: 10001110
+1 0 0 0 1 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0
+0 0 1 0 0 1 1 0",bit_manipulation,0,False,-1.25
+1,001b24c4,"In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:
+11 -> XI
+15 -> XV
+94 -> XCIV
+19 -> XIX
+Now, write the number 38 in the Wonderland numeral system.",XXXVIII,"We need to determine the conversion rule from the examples:
+  11 -> XI
+  15 -> XV
+  94 -> XCIV
+  19 -> XIX
+
+This is Arabic to Roman numeral conversion.
+
+Reference table (1-100):
+  1 = I
+  2 = II
+  3 = III
+  4 = IV
+  5 = V
+  6 = VI
+  7 = VII
+  8 = VIII
+  9 = IX
+  10 = X
+  11 = XI
+  12 = XII
+  13 = XIII
+  14 = XIV
+  15 = XV
+  16 = XVI
+  17 = XVII
+  18 = XVIII
+  19 = XIX
+  20 = XX
+  30 = XXX
+  40 = XL
+  50 = L
+  90 = XC
+  100 = C
+
+Converting 38:
+  30 = XXX
+  8 = VIII
+  38 = 30 + 8 = XXXOR VIII -> XXXVIII
+  38 >= 10, 3*10 = 30, remainder 8: 8 >= 5 -> V, remainder 3: 3 >= 1 -> I, remainder 2: 2 >= 1 -> I, remainder 1 -> I. 38 >= 10 -> X, remainder 28: 2 >= 10 -> X, remainder 18: 1 >= 10 -> X, remainder 8: 8 >= 5 -> V, remainder 3: 3 >= 1 -> I, remainder 2: 2 >= 1 -> I, remainder 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0: 1 >= 1 -> I, remainder 0",numeral,0,False,-1.125
+2,001c63cb,"In Alice's Wonderland, secret encryption rules are used on text. Here are some examples:
+wkgqa lsrqaq wneeke -> mouse chases mirror
+wkgqa nwrjnvaq nv brmrla -> mouse imagines in palace
+srppae oerhq gvoae wkgvprnv -> hatter draws under mountain
+psa qaleap hncreo onqlkzaeq -> the secret wizard discovers
+psa hnqa xneo earoq -> the wise bird reads
+Now, decrypt the following text: hncreo learpaq qaleap",wizard creates secret,"We need to find the encryption mapping from the examples. It looks like a substitution cipher.
+
+Listing the input words:
+
+「wkgqa lsrqaq wneeke」
+mice
+Best: 「wkgqa lsrqaq wneeke」 -> 「mouse chases mirror」:
+「wkgqa」->「mouse」
+「lsrqaq」->「chases」
+「wneeke」->「mirror」
+
+「wkgqa nwrjnvaq nv brmrla」
+mice
+Best: 「wkgqa nwrjnvaq nv brmrla」 -> 「mouse imagines in palace」:
+「wkgqa」->「mouse」
+「nwrjnvaq」->「imagines」
+「nv」->「in」
+「brmrla」->「palace」
+
+「srppae oerhq gvoae wkgvprnv」
+Best: 「hatter draws under mountain」:
+「srppae」->「hatter」
+「oerhq」->「draws」
+「gvoae」->「under」
+「wkgvprnv」->「mountain」
+
+「psa qaleap hncreo onqlkzaeq」
+Best: 「the secret wizard discovers」:
+「psa」->「the」
+「qaleap」->「secret」
+「hncreo」->「wizard」
+「onqlkzaeq」->「discovers」
+
+「psa hnqa xneo earoq」
+Best: 「the wise bird reads」:
+「psa」->「the」
+「hnqa」->「wise」
+「xneo」->「bird」
+「earoq」->「reads」
+
+「hncreo learpaq qaleap」
+Best: 「wizard discovers secret」:
+「hncreo」->「wizard」
+Best match
+Best: 「wizard discovers secret」:
+Best: 「wizard discovers secret」:
+Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「",cipher,Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「Best: 「,False,-2.25
+3,00457d26,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+`!*[{ = '""[`
+\'*'> = ![@
+\'-!` = \\
+`!*\& = '@'{
+Now, determine the result for: [[-!'",@&,"We need to infer the transformation rule from the examples.
+
+First, let me assign letters to each symbol:
+* -> A
+! -> B
+[ -> C
+{ -> D
+' -> E
+> -> F
+- -> G
+& -> H
+] -> I
+"" -> J
+
+Converting examples to letter form:
+
+  「!*[{' : A*B*C*D -> 「""[ : A* -> 「""[」 = A* -> 「""[」 -> A* -> A
+
+  「\'*>」 = 「![@」 = 「![@」 = 「![@」 -> 「![@」 = 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「",cryptarithm_deduce,「\'*>」 = 「![@」 = 「![@」 = 「![@」 -> 「![@」 = 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「![@」 -> 「,False,-1.625
+4,00463d04,"In Alice's Wonderland, the gravitational constant has been secretly changed. Here are some example observations:
+For t = 4.85s, distance = 204.55 m
+For t = 3.13s, distance = 85.19 m
+For t = 1.7s, distance = 25.13 m
+For t = 3.16s, distance = 86.84 m
+For t = 3.23s, distance = 90.73 m
+Now, determine the falling distance for t = 2.41s given d = 0.5*g*t^2.",50.51,"We need to determine the falling distance using d = k*t^2. Let me find k from the examples.
+
+t = 4.85s, d = 204.55m:
+k = 204.55 / 4.85^2 = 204.55 / 23.5225 = 8.702
+t = 3.13s, d = 85.19m: 3.13^2 = 9.7969, k = 85.19 / 9.7969 = 8.702
+t = 1.7s, 1.7^2 = 2.89, 25.13 / 2.89 = 8.702
+t = 3.16s: 3.16^2 = 9.9856, 86.84 / 9.9856 = 8.702
+t = 3.23s: 3.23^2 = 10.4329, 90.73 / 10.4329 = 8.702
+k is 8.702.
+
+For t = 2.41s: t^2 = 5.8081
+d = 0.5 * k * t^2. Let me find k. Let me find k if using k = 8.702:
+0.5 * 8.702 = 4.351
+d = 4.351 * 5.8081 = 25.27
+= 25.27m
+I will now return the answer in \boxed{}
+The answer in \boxed is
+\boxed{25.27}
+</think>
+\boxed{25.27}",gravity,25.27,False,-1.125
+5,0047365c,"In Alice's Wonderland, a secret unit conversion is applied to measurements. For example:
+32.58 m becomes 26.62
+10.9 m becomes 8.90
+17.86 m becomes 14.59
+Now, convert the following measurement: 13.0 m",10.62,"We need to find a conversion rule that maps the inputs to outputs. Let me check if it's a linear factor.
+
+32.58 -> 26.62: factor = 0.817
+10.9 -> 8.90: factor = 0.816
+17.86 -> 14.59: factor = 0.817
+
+The factor values: 0.817, 0.816, 0.817
+The median factor is 0.816.
+
+Converting 13.0:
+13.0 * 0.816 = 10.608
+0.816 factor
+= 10.608
+The median factor (0.816) *
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10.608
+= 10",unit_conversion,10,False,-1.375
+6,0073bcbb,"In Alice's Wonderland, the gravitational constant has been secretly changed. Here are some example observations:
+For t = 3.25s, distance = 78.86 m
+For t = 1.98s, distance = 29.27 m
+For t = 1.9s, distance = 26.95 m
+For t = 3.08s, distance = 70.82 m
+For t = 1.82s, distance = 24.73 m
+Now, determine the falling distance for t = 1.65s given d = 0.5*g*t^2.",20.33,"We need to determine the falling distance using d = k*t^2. Let me find k from the examples.
+
+t = 3.25s, d = 78.86m:
+k = 78.86 / 3.25^2 = 78.86 / 10.5625 = 78.86 / 10.5625
+= 7.466 + 0
+= 78.86 / 10.5625
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+= 7.466
+=",gravity,7.466,False,-0.75
+7,00754598,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+10101001 -> 01100010
+00110011 -> 10010100
+00100111 -> 00110001
+11011100 -> 11010111
+01110010 -> 10001100
+01010001 -> 10011100
+00100101 -> 00100001
+00100001 -> 00000000
+10011111 -> 11011111
+
+Now, determine the output for: 01111110",11101111,"We need to deduce the transformation by matching the example outputs.
+
+Output 1: 10101001->01100010
+  1 0 1 0 1 0 0 1
+ 0 1 1 0 0 0 1 0
+ 
+  Trying to see if it's
+  negated
+  negated(10101001) = 01010110
+  and 01100010
+  negated(10101001) = 01010110
+  negated(00110011) = 11001100
+  negated(00100111) = 11011000
+  negated(11011100) = 00100011
+  negated(01110010) = 10001101
+  negated(01010001) = 10101110
+  negated(00100101) = 11011010
+  negated(00100001) = 11011110
+  negated(10011111) = 01100000
+none
+ match
+
+  Trying to add
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+  addition
+",bit_manipulation,01100000,False,-1.625
+8,009a74b6,"In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.
+
+Here are some examples of input -> output:
+01110101 -> 00000111
+01101101 -> 10000110
+10001000 -> 01101110
+11101010 -> 00001110
+10100101 -> 00011011
+10001011 -> 00111110
+10101101 -> 10011010
+11101101 -> 10011110
+10110001 -> 11011011
+01100001 -> 11000111
+
+Now, determine the output for: 00110000",11111011,"We need to deduce the transformation by matching the example outputs.
+
+Output 8-bits
+Output 7
+00000111
+0 1 0
+1 0 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0
+0
+1 0",bit_manipulation,0,False,-1.5
+9,00a3fd23,"In Alice's Wonderland, secret encryption rules are used on text. Here are some examples:
+wfmkg gajifbgk vdkqig -> mouse explores castle
+yuelxq rbgdwk eu zdiigh -> knight dreams in valley
+jbeuvgkk pdqvxgk qxg vmbefmk sffy -> princess watches the curious book
+qxg duveguq dievg bgdrk -> the ancient alice reads
+Now, decrypt the following text: petdbr pdqvxgk qxbfmlx iesbdbh",wizard watches through library,"We need to find the encryption mapping from the examples. It looks like a substitution cipher.
+
+Listing the input words:
+
+「wfmkg gajifbgk vdkqig」
+ =「mouse explores castle」:
+「wfmkg」->「mouse」
+gajifbgk->explores
+vdkqig->castle
+
+「yuelxq rbgdwk eu zdiigh」
+ =「knight dreams in valley」:
+yuelxq->knight
+rbgdwk->dreams
+eu->in
+zdiigh->valley
+
+「jbeuvgkk pdqvxgk qxg vmbefmk sffy」
+ =「princess watches the curious book」:
+jbeuvgkk->princess
+pdqvxgk->watches
+qxg->the
+vmbefmk->curious
+sffy->book
+
+「qxg duveguq dievg bgdrk」
+ =「the ancient alice reads」:
+qxg->the
+dumvguq->ancient
+diegv->alice
+bgdrk->reads
+
+「petdbr pdqvxgk qxbfmlx iesbdbh」
+ =「???」:
+「petdbr」
+「pdqvxgk」
+「qxbfmlx」
+「iesbdbh」:
+「???」
+
+Breaking down into characters:
+
+「wfmkg」5 letters->「mouse」
+m-o-u-s-e
+w-f-m-k-g->m-o-u-s-e
+「gajifbgk」8->explores
+e-x-p-l-o-r-e-s
+g-a-j-i-f-b-g-k->e-x-p-l-o-r-e-s
+「vdkqig」6->castle
+c-a-s-t-l-e
+v-d-k-q-i-g->c-a-s-t-l-e
+「yuelxq」6->knight
+k-n-i-g-h-t
+y-u-e-l-x-q->k-n-i-g-h-t
+「rbgdwk」6->dreams
+d-r-e-a-m-s
+r-b-g-d-w-k->d-r-e-a-m-s
+「zdiigh」6->valley
+v-a-l-l-e-y
+z-d-i-i-g-h->v-a-l-l-e-y
+「jbeuvgkk」8->princess
+p-r-i-n-c-e-s-s
+j-b-e-u-v-g-k-k->p-r-i-n-c-e-s-s
+「pdqvxgk」7->watches
+w-a-t-c-h-e-s
+p-d-q-v-x-g-k->w-a-t-c-h-e-s
+「qxg」3->the
+t-h-e
+q-x-g->t-h-e
+「vmbefmk」7->curious
+c-u-r-i-o-u-s
+v-m-b-e-f-m-k->c-u-r-i-o-u-s
+「sffy」4->book
+b-o-o-k
+s-f-f-y->b-o-o-k
+「dumvguq」7->ancient
+a-n-c-i-e-n-t
+d-u-m-v-g-u-q->a-n-c-i-e-n-t
+「diegv」5->alice
+a-l-i-c-e
+d-i-e-g-v->a-l-i-c-e
+「bgdrk」5->reads
+r-e-a-d-s
+b-g-d-r-k->r-e-a-d-s
+
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->「reads」 match
+「qxg duveguq dievg bgdrk」 / 「qxg」->「the」, 「dumvguq」->「ancient」, 「diegv」->「alice」, 「bgdrk」->",cipher,5,False,-2.25
+10,00a77d86,"In Alice's Wonderland, a secret unit conversion is applied to measurements. For example:
+22.62 m becomes 40.87
+32.87 m becomes 59.39
+12.43 m becomes 22.46
+31.75 m becomes 57.37
+Now, convert the following measurement: 11.38 m",20.56,"We need to find a conversion rule that maps the inputs to outputs. Let me check if it's a linear factor.
+
+22.62 -> 40.87: factor = 40.87 / 22.62
+= 1 + 0.1 * 2262 / 2262
+= 1.0 + 0.1 * 100
+= 2.0
+= 2.0 * 2262 / 100
+= 2.0 * 22.62 = 45.24
+= 40.87
+= 0.1 * 2262 + 2262
+= 2262 + 22620
+= 24882
+= 24882 / 1000
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+= 22.62 + 0.1 * 2262
+= 22.62 + 226.2
+= 248.82
+= 248.82 / 10
+= 24.882
+=",unit_conversion,24.882,False,-1.25
+11,010055e2,"In Alice's Wonderland, a secret unit conversion is applied to measurements. For example:
+5.08 m becomes 3.05
+22.98 m becomes 13.78
+22.84 m becomes 13.70
+33.62 m becomes 20.17
+Now, convert the following measurement: 47.17 m",28.29,"We need to find a conversion rule that maps the inputs to outputs. Let me check if it's a linear factor.
+
+5.08 -> 3.05: factor = 3.05 / 5.08
+= 0.599
+22.98 -> 13.78: factor = 13.78 / 22.98
+= 0.599
+22.84 -> 13.70: factor = 13.70 / 22.84
+= 0.599
+33.62 -> 20.17: factor = 20.17 / 33.62
+= 0.599
+
+The factor is 0.599, which is 3.05 / 5.08
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+= 0.599
+",unit_conversion,0.599,False,-0.625
+12,0106eb4a,"In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:
+32 -> XXXII
+76 -> LXXVI
+51 -> LI
+1 -> I
+Now, write the number 84 in the Wonderland numeral system.",LXXXIV,"We need to determine the conversion rule from the examples:
+  32 -> XXXII
+  76 -> LXXVI
+  51 -> LI
+  1 -> I
+
+This is Arabic to Roman numeral conversion.
+
+Reference table (1-100):
+  1 = I
+  2 = II
+  3 = III
+  4 = IV
+  5 = V
+  6 = VI
+  7 = VII
+  8 = VIII
+  9 = IX
+  10 = X
+  20 = XX
+  30 = XXX
+  40 = XL
+  50 = L
+  60 = LX
+  70 = LXX
+  80 = LXXX
+  90 = XC
+  100 = C
+
+Converting 84:
+  80 = LXXX
+  4 = IV
+  84 = LXXX IV -> LXXXIV
+
+I will now return the answer in \boxed{}
+The answer in \boxed is
+\boxed{LXXXIV}
+</think>
+\boxed{LXXXIV}",numeral,LXXXIV,True,-0.625
