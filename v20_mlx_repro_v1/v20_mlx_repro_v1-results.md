@@ -160,6 +160,36 @@
   - shard `2`: `13/237`
   - shard `3`: `13/237`
 
+## Pivot from 950 rows to a stratified 317-row subset
+
+- User-directed change: the exact notebook-style 950-row validation was projected to take too long on the current non-quantized MLX path, so the live target was changed from the full first `950` rows to a **category-proportional one-third subset** of that same notebook population.
+- The monolith now supports this with:
+  - `--validation-subset-size`
+  - `--validation-subset-mode stratified-category-proportional`
+- Selection policy:
+  - start from `train.csv.head(950)` exactly as the notebook does
+  - re-detect categories from prompt text with the notebook-compatible classifier
+  - allocate integer per-category subset counts by proportional largest-remainder rounding
+  - choose rows deterministically and evenly within each category bucket, then restore original global row order
+- The resulting `317`-row subset preserves the first-950 category mix as:
+
+| category | first_950 | stratified_317 |
+| --- | ---: | ---: |
+| bit_manipulation | 169 | 56 |
+| cipher | 162 | 54 |
+| cryptarithm_deduce | 71 | 24 |
+| cryptarithm_guess | 14 | 5 |
+| equation_numeric_deduce | 48 | 16 |
+| equation_numeric_guess | 7 | 2 |
+| gravity | 159 | 53 |
+| numeral | 149 | 50 |
+| unit_conversion | 171 | 57 |
+
+- Live run switched to:
+  - run root: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad_validation317_stratified/`
+  - eval shape: `6-shard / 4x4`
+  - notebook prompt policy unchanged: `enable_thinking=True`, no boxed suffix
+
 ## Eval robustness update
 
 - Full `eval-aopen` already had checkpoint/resume, shard merge, and `postprocess-run` support.

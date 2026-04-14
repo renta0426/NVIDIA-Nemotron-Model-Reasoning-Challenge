@@ -1097,6 +1097,123 @@ def load_training_rows() -> list[dict[str, str]]:
     return rows
 
 
+def allocate_proportional_counts(
+    category_counts: Sequence[tuple[str, int]],
+    *,
+    target_total: int,
+) -> dict[str, int]:
+    total = sum(int(count) for _, count in category_counts)
+    if target_total <= 0:
+        raise ValueError(f"target_total must be positive; got {target_total}")
+    if total <= 0:
+        raise ValueError("category_counts must contain at least one row")
+    if target_total > total:
+        raise ValueError(f"target_total={target_total} exceeds available rows={total}")
+
+    allocations: dict[str, int] = {}
+    remainders: list[tuple[float, int, int, str]] = []
+    assigned = 0
+    for order, (category, count_value) in enumerate(category_counts):
+        count = int(count_value)
+        exact = (count * target_total) / total
+        base = math.floor(exact)
+        allocations[str(category)] = base
+        assigned += base
+        remainders.append((exact - base, count, order, str(category)))
+    for _, _, _, category in sorted(remainders, key=lambda item: (-item[0], -item[1], item[2]))[
+        : target_total - assigned
+    ]:
+        allocations[category] += 1
+    return allocations
+
+
+def select_evenly_spaced_items[T](items: Sequence[T], target_count: int) -> list[T]:
+    if target_count <= 0:
+        return []
+    if target_count >= len(items):
+        return list(items)
+    if target_count == 1:
+        return [items[len(items) // 2]]
+
+    selected_positions: list[int] = []
+    total = len(items)
+    for bucket_index in range(target_count):
+        start = math.floor(bucket_index * total / target_count)
+        end = math.floor((bucket_index + 1) * total / target_count) - 1
+        if end < start:
+            end = start
+        position = (start + end) // 2
+        if selected_positions and position <= selected_positions[-1]:
+            position = selected_positions[-1] + 1
+        max_position = total - (target_count - bucket_index)
+        position = min(position, max_position)
+        selected_positions.append(position)
+    return [items[position] for position in selected_positions]
+
+
+def build_validation_sample_selection(
+    rows: Sequence[dict[str, str]],
+    *,
+    validation_sample_size: int,
+    validation_subset_size: int,
+    validation_subset_mode: str,
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    source_rows = list(rows[:validation_sample_size])
+    category_buckets: OrderedDict[str, list[tuple[int, dict[str, str]]]] = OrderedDict()
+    for source_index, row in enumerate(source_rows):
+        category = detect_validation_category(str(row["prompt"]))
+        category_buckets.setdefault(category, []).append((source_index, row))
+    source_counts = {category: len(bucket_rows) for category, bucket_rows in category_buckets.items()}
+
+    if validation_subset_size <= 0 or validation_subset_size >= len(source_rows):
+        selected_rows = source_rows
+        selected_counts = dict(source_counts)
+        selection_mode = "head"
+        selection_tag = f"head_{len(selected_rows)}"
+    elif validation_subset_mode == "stratified-category-proportional":
+        target_counts = allocate_proportional_counts(
+            [(category, len(bucket_rows)) for category, bucket_rows in category_buckets.items()],
+            target_total=validation_subset_size,
+        )
+        selected_indexed_rows: list[tuple[int, dict[str, str]]] = []
+        selected_counts = {}
+        for category, bucket_rows in category_buckets.items():
+            chosen = select_evenly_spaced_items(bucket_rows, target_counts.get(category, 0))
+            selected_indexed_rows.extend(chosen)
+            selected_counts[category] = len(chosen)
+        selected_indexed_rows.sort(key=lambda item: item[0])
+        selected_rows = [row for _, row in selected_indexed_rows]
+        selection_mode = "stratified-category-proportional"
+        selection_tag = f"stratified_category_{len(selected_rows)}_of_{len(source_rows)}"
+    else:
+        raise ValueError(f"Unsupported validation_subset_mode: {validation_subset_mode}")
+
+    return selected_rows, {
+        "mode": selection_mode,
+        "selection_tag": selection_tag,
+        "source_total": len(source_rows),
+        "selected_total": len(selected_rows),
+        "source_counts": source_counts,
+        "selected_counts": selected_counts,
+    }
+
+
+def build_adapter_validation_evaluation_name(
+    sample_selection: dict[str, Any],
+    *,
+    total_rows_global: int,
+    eval_shards: int,
+    eval_shard_index: int,
+) -> str:
+    selection_tag = str(sample_selection.get("selection_tag", f"head_{total_rows_global}"))
+    selected_total = int(sample_selection.get("selected_total", total_rows_global))
+    if total_rows_global != selected_total:
+        selection_tag = f"{selection_tag}_limit_{total_rows_global}"
+    if eval_shards <= 1:
+        return f"adapter_validation_{selection_tag}"
+    return f"adapter_validation_{selection_tag}_shard_{eval_shard_index:02d}_of_{eval_shards:02d}"
+
+
 def load_category_map() -> dict[str, str]:
     rows = load_jsonl(PROBLEMS_INDEX_PATH)
     return {str(row["id"]): str(row["category"]) for row in rows}
@@ -1372,7 +1489,7 @@ def build_eval_settings_payload(
     prefill_batch_size: int,
     completion_batch_size: int,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "max_tokens": int(args.max_tokens),
         "temperature": float(args.temperature),
         "top_p": float(args.top_p),
@@ -1386,6 +1503,13 @@ def build_eval_settings_payload(
         "eval_shards": int(eval_shards),
         "eval_shard_index": int(eval_shard_index),
     }
+    validation_subset_size = int(getattr(args, "validation_subset_size", 0))
+    if validation_subset_size > 0:
+        payload["validation_subset_size"] = validation_subset_size
+        payload["validation_subset_mode"] = str(
+            getattr(args, "validation_subset_mode", "stratified-category-proportional")
+        )
+    return payload
 
 
 def summarize_benchmark_scores(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -1902,7 +2026,12 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             return load_json(summary_path)
 
     model, tokenizer = load_model_for_eval(model_root, adapter_dir, lazy_load=bool(args.lazy_load))
-    benchmark_rows = load_training_rows()[: int(args.validation_sample_size)]
+    benchmark_rows, sample_selection = build_validation_sample_selection(
+        load_training_rows(),
+        validation_sample_size=int(args.validation_sample_size),
+        validation_subset_size=int(args.validation_subset_size),
+        validation_subset_mode=str(args.validation_subset_mode),
+    )
     if int(args.eval_limit) > 0:
         benchmark_rows = benchmark_rows[: int(args.eval_limit)]
     total_benchmark_rows = len(benchmark_rows)
@@ -2001,6 +2130,7 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             "eval_shards": eval_shards,
             "eval_shard_index": eval_shard_index,
             "checkpoint_path": str(checkpoint_path.resolve()),
+            "sample_selection": sample_selection,
         }
         write_json(progress_path, progress_payload)
         if eval_shards > 1:
@@ -2058,10 +2188,11 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     validation_frame = build_validation_output_frame(records)
     results_frame = build_validation_results_table(validation_frame)
     summary = summarize_validation_results(results_frame)
-    evaluation_name = (
-        f"adapter_validation_head_{total_benchmark_rows}"
-        if eval_shards <= 1
-        else f"adapter_validation_head_{total_benchmark_rows}_shard_{eval_shard_index:02d}_of_{eval_shards:02d}"
+    evaluation_name = build_adapter_validation_evaluation_name(
+        sample_selection,
+        total_rows_global=total_benchmark_rows,
+        eval_shards=eval_shards,
+        eval_shard_index=eval_shard_index,
     )
     evaluation_settings = build_eval_settings_payload(
         args,
@@ -2073,7 +2204,13 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     )
     notebook_reference_score = (
         ADAPTER_VALIDATION_NOTEBOOK_TARGET
-        if eval_shards <= 1 and row_start == 0 and row_end == total_benchmark_rows and total_benchmark_rows == ADAPTER_VALIDATION_SAMPLE_SIZE
+        if (
+            eval_shards <= 1
+            and row_start == 0
+            and row_end == total_benchmark_rows
+            and total_benchmark_rows == ADAPTER_VALIDATION_SAMPLE_SIZE
+            and str(sample_selection.get("mode", "")) == "head"
+        )
         else None
     )
     payload = {
@@ -2093,6 +2230,7 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
         ],
         "validation_sample_size": int(args.validation_sample_size),
+        "sample_selection": sample_selection,
         "rows_total_global": total_benchmark_rows,
         "row_start": row_start,
         "row_end": row_end,
@@ -2128,6 +2266,7 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             "row_end": row_end,
             "eval_shards": eval_shards,
             "eval_shard_index": eval_shard_index,
+            "sample_selection": sample_selection,
         },
     )
     return payload
@@ -2160,6 +2299,15 @@ def run_merge_aopen_eval(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"Expected {expected_shards} shard summaries, found {len(shard_entries)} under {shard_root}")
 
     total_rows_global = int(shard_entries[0][1].get("rows_total_global", 0))
+    sample_selection = shard_entries[0][1].get(
+        "sample_selection",
+        {
+            "mode": "head",
+            "selection_tag": f"head_{total_rows_global}",
+            "source_total": int(args.validation_sample_size),
+            "selected_total": total_rows_global,
+        },
+    )
     next_row_start = 0
     records: list[dict[str, Any]] = []
     for expected_index, (shard_dir, payload) in enumerate(shard_entries):
@@ -2301,6 +2449,8 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             raise RuntimeError(
                 f"Global row count mismatch for {shard_dir}: {shard_rows_total_global} != {total_rows_global}"
             )
+        if payload.get("sample_selection", sample_selection) != sample_selection:
+            raise RuntimeError(f"Sample selection mismatch in {shard_dir}")
         if row_start != next_row_start:
             raise RuntimeError(f"Shard coverage gap or overlap before {shard_dir}: expected {next_row_start}, found {row_start}")
         if row_end < row_start:
@@ -2311,6 +2461,8 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
                 f"Shard row mismatch in {shard_dir}: validation_rows={len(shard_records)} summary_total={shard_total} "
                 f"row_span={row_end - row_start}"
             )
+        for local_index, record in enumerate(shard_records):
+            record["row_index_within_shard"] = row_start + local_index
         records.extend(shard_records)
         next_row_start = row_end
 
@@ -2332,10 +2484,16 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
         prefill_batch_size=prefill_batch_size,
         completion_batch_size=completion_batch_size,
     )
+    evaluation_name = build_adapter_validation_evaluation_name(
+        sample_selection,
+        total_rows_global=total_rows_global,
+        eval_shards=1,
+        eval_shard_index=0,
+    )
     payload = {
         "created_at": utc_now(),
         "evaluation_kind": "adapter_validation",
-        "evaluation_name": f"adapter_validation_head_{total_rows_global}",
+        "evaluation_name": evaluation_name,
         "benchmark_csv": str(TRAIN_CSV_PATH.resolve()),
         "notebook_reference": relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
         "model_root": str(model_root),
@@ -2349,6 +2507,7 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH),
         ],
         "validation_sample_size": int(args.validation_sample_size),
+        "sample_selection": sample_selection,
         "rows_total_global": total_rows_global,
         "row_start": 0,
         "row_end": total_rows_global,
@@ -2365,13 +2524,15 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             "enable_thinking": bool(args.eval_enable_thinking),
         },
         "notebook_reference_score": (
-            ADAPTER_VALIDATION_NOTEBOOK_TARGET if total_rows_global == ADAPTER_VALIDATION_SAMPLE_SIZE else None
+            ADAPTER_VALIDATION_NOTEBOOK_TARGET
+            if total_rows_global == ADAPTER_VALIDATION_SAMPLE_SIZE and str(sample_selection.get("mode", "")) == "head"
+            else None
         ),
         **summary,
     }
     write_validation_outputs(
         output_root=base_validation_root,
-        evaluation_name=f"adapter_validation_head_{total_rows_global}",
+        evaluation_name=evaluation_name,
         validation_frame=validation_frame,
         results_frame=results_frame,
         payload=payload,
@@ -2390,6 +2551,7 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
             "eval_shards": expected_shards,
             "eval_shard_index": -1,
             "aggregation": "sharded",
+            "sample_selection": sample_selection,
         },
     )
     root_checkpoint_path = base_validation_root / "validation_records_checkpoint.csv"
@@ -2454,8 +2616,15 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
             eval_result.get("notebook_reference", relative_to_repo(ADAPTER_VALIDATION_NOTEBOOK_PATH))
         )
         notebook_reference_score = eval_result.get("notebook_reference_score")
+        sample_selection = eval_result.get("sample_selection", {})
         lines.append(f"- notebook_reference: `{notebook_reference}`")
         lines.append(f"- validation_sample_size: `{eval_result.get('validation_sample_size', '')}`")
+        if isinstance(sample_selection, dict) and sample_selection:
+            lines.append(f"- sample_selection_mode: `{sample_selection.get('mode', '')}`")
+            lines.append(f"- sample_selection_tag: `{sample_selection.get('selection_tag', '')}`")
+            lines.append(
+                f"- sample_selection_total: `{sample_selection.get('selected_total', '')}` / `{sample_selection.get('source_total', '')}`"
+            )
         if isinstance(notebook_reference_score, dict) and notebook_reference_score:
             lines.append(
                 "- notebook_reference_accuracy: "
@@ -2703,6 +2872,12 @@ def parse_args() -> argparse.Namespace:
         target.add_argument("--completion-batch-size", type=int, default=8)
         target.add_argument("--eval-limit", type=int, default=0)
         target.add_argument("--validation-sample-size", type=int, default=ADAPTER_VALIDATION_SAMPLE_SIZE)
+        target.add_argument("--validation-subset-size", type=int, default=0)
+        target.add_argument(
+            "--validation-subset-mode",
+            choices=("head", "stratified-category-proportional"),
+            default="head",
+        )
         target.add_argument("--eval-shards", type=int, default=1)
         target.add_argument("--eval-shard-index", type=int, default=0)
         target.add_argument(
