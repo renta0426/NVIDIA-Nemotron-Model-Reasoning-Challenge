@@ -187,8 +187,23 @@
 
 - Live run switched to:
   - run root: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad_validation317_stratified/`
-  - eval shape: `6-shard / 4x4`
+  - initial eval shape: `6-shard / 4x4`
   - notebook prompt policy unchanged: `enable_thinking=True`, no boxed suffix
+
+### 6-shard subset trial rollback
+
+- The first live 317-row attempt used `6-shard / 4x4` because RAM headroom was still available.
+- It was safe on memory, but not fast in practice:
+  - free memory stayed around tens of GB rather than collapsing to the previous near-OOM range
+  - after about 10 minutes only `3` rows had completed across all `6` shards
+  - worker CPU utilization was only about `10-15%` each, noticeably worse than the earlier 4-shard full-950 run
+- That subset root was therefore deleted and relaunched with **4-shard / 4x4** instead.
+
+### Current live subset run
+
+- live eval shape: `4-shard / 4x4`
+- observed early progress after relaunch: about `12/317` rows in the first ~20 minutes
+- this is still slow, but materially better than the failed 6-shard subset attempt and much better than continuing the full 950-row notebook reproduction on the same local MLX path
 
 ## Eval robustness update
 
