@@ -226,6 +226,31 @@
 - `2048` improved aggregate output throughput only modestly over `1024`, but nearly doubled wall-clock time with no score gain.
 - Conclusion: for this adapter and notebook-style prompt policy, **`max_tokens` reduction alone is not a viable fast path** if the goal is to stay meaningfully comparable to the README / notebook reproduction.
 
+## vMLX / vLLM-MLX engine smoke on a fused model
+
+- To answer the separate engine question from `appendix/mlx_faster.md`, the fullrun adapter was fused into a standalone MLX model with `mlx_lm.fuse`.
+- The fused artifact was about `58.8 GB`, and `vmlx doctor` recognized it as `NemotronHForCausalLM`, passing a 10-token smoke inference.
+- Important scope note:
+  - this is **not** the notebook-style challenge benchmark yet
+  - it is the engines' built-in single-prompt benchmark on the fused model
+  - so these numbers are useful for startup / TTFT comparison, not for score reproduction
+
+| engine | version | load_seconds | ttft_ms | generation_tok_per_sec | total_throughput_tok_per_sec | latency_seconds | peak_process_memory_gb |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| vMLX | 1.3.49 | 4.04 | 789.2 | 20.1 | 17.8 | 3.93 | 59.29 |
+| vLLM-MLX | 0.2.8 | 17.48 | 1460.2 | 20.1 | 15.3 | 4.59 | 59.66 |
+
+- Shared settings:
+  - `prompts=1`
+  - `max_tokens=64`
+  - `temperature=0.0`
+  - same fused BF16 Nemotron model on the same M3 Ultra host
+- Observed result:
+  - decode speed was effectively tied
+  - **vMLX had much lower model-load time and lower TTFT**
+  - memory footprint was roughly the same (~`59 GB`)
+- So for a pre-merged MLX model on this machine, vMLX currently looks like the better low-latency engine candidate, while a challenge-aligned API-level benchmark remains a separate next step.
+
 ## Eval robustness update
 
 - Full `eval-aopen` already had checkpoint/resume, shard merge, and `postprocess-run` support.

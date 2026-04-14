@@ -31,6 +31,23 @@
 - 既存の README 契約寄り 4-row benchmark (`max_tokens=7680`, 同じ `4x4`) では **46.62 output tok/s** が出ているが、これは別サンプルなので単純比較はしない。それでも今回の 8-row probe から、**短い `max_tokens` だけで速く・強くするのは難しい**ことは確認できた。
 - したがってローカル MLX で再現性を保つ本線は、引き続き README 契約どおり `max_tokens=7680` の notebook reproduction を優先する。
 
+### 2026-04-14: vMLX / vLLM-MLX の最小 engine probe
+
+- README の本番契約は **vLLM** 推論なので、エンジン差し替え候補として vMLX / vLLM-MLX も確認した。
+- ただし両方とも current adapter を直接読むのではなく、まず `mlx_lm.fuse` で **fullrun adapter を base model に統合した fused MLX model** を作る必要があった。
+- fused model は `31.6B / 58.8 GB` で、`vmlx doctor` は NemotronH として正常認識し、10-token smoke inference を PASS した。
+- ここでの bench は **エンジン同梱の built-in benchmark** であり、challenge prompt そのものではない。したがって TTFT / load overhead の比較には有効だが、精度比較には使わない。
+
+| engine | model_load | ttft | gen_tps | total_throughput | latency | peak_process_mem |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| vMLX 1.3.49 | 4.04s | 789.2ms | 20.1 tok/s | 17.8 tok/s | 3.93s | 59.29 GB |
+| vLLM-MLX 0.2.8 | 17.48s | 1460.2ms | 20.1 tok/s | 15.3 tok/s | 4.59s | 59.66 GB |
+
+- 条件は両方とも同じで、`prompts=1`, `max_tokens=64`, `temperature=0.0`, fused BF16 model を local path で読み込ませた。
+- この最小 probe では、**decode 速度はほぼ同じ**だった一方で、**model load と TTFT は vMLX が明確に軽い**。
+- つまり「LoRA を事前統合した単一 MLX model を作る」前提なら、Mac 上の最小 smoke では **vMLX のほうが立ち上がり系の遅延に強い**。
+- ただし challenge 本線に近い比較をするには、次段で same prompts / `enable_thinking=True` / same extraction rule の API-level benchmark を別途取る必要がある。
+
 ## 優先順位
 
 1. MLX ネイティブな推論エンジンを使う。
