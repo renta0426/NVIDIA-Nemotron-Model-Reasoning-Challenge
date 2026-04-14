@@ -94,11 +94,27 @@
   - `--eval-enable-thinking`
   - `--validation-sample-size 950`
   - `--eval-shards 4`
-  - `--max-num-seqs 1`
-  - `--prompt-chunk-size 1`
-  - `--prefill-batch-size 1`
-  - `--completion-batch-size 1`
-- note: an earlier `4 prompts/chunk` attempt made shard progress invisible for too long, so the live run was restarted at `1 row/chunk` to get checkpoint-visible forward progress without changing the notebook scoring contract.
+  - `--max-num-seqs 4`
+  - `--prompt-chunk-size 4`
+  - `--prefill-batch-size 4`
+  - `--completion-batch-size 4`
+- resume status at relaunch:
+  - shard `0`: `1/238`
+  - shard `1`: `1/238`
+  - shard `2`: `2/237`
+  - shard `3`: `1/237`
+
+## Throughput benchmark before final relaunch
+
+- To choose the local MLX evaluation settings for the 950-row notebook validation, the exact fullrun adapter was benchmarked on the same first `4` rows under three deterministic settings:
+
+| config | max_num_seqs | prompt_chunk_size | prefill | completion | elapsed_seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| seq1 | 1 | 1 | 1 | 1 | 800 |
+| seq2 | 2 | 2 | 2 | 2 | 785 |
+| seq4 | 4 | 4 | 4 | 4 | 659 |
+
+- Result: `seq4` was clearly best on the same workload, so the live 950-row run was relaunched from the existing shard checkpoints with `4x4` batching instead of `1x1`.
 
 ## Eval robustness update
 
