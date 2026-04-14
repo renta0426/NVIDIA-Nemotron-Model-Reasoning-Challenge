@@ -100,9 +100,13 @@
   - `--completion-batch-size 4`
 - resume status at relaunch:
   - shard `0`: `1/238`
-  - shard `1`: `1/238`
+  - shard `1`: `5/238`
   - shard `2`: `2/237`
   - shard `3`: `1/237`
+- parallelism note:
+  - an **8-shard** relaunch was attempted after the single-process throughput benchmark, but free pages collapsed into a near-OOM range immediately after startup, so it was aborted before any useful checkpoint was written
+  - a **6-shard** relaunch restored memory headroom, but still did not finish the first `4-row` chunk on any shard after a long wait, so it was slower in practice than the already-proven 4-shard path
+  - the live run therefore returned to **4-shard / 4x4**, which had already shown real checkpoint progress
 
 ## Throughput benchmark before final relaunch
 
