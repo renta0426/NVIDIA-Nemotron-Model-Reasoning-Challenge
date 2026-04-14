@@ -2435,6 +2435,15 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"Expected {expected_shards} shard summaries, found {len(shard_entries)} under {shard_root}")
 
     total_rows_global = int(shard_entries[0][1].get("rows_total_global", 0))
+    sample_selection = shard_entries[0][1].get(
+        "sample_selection",
+        {
+            "mode": "head",
+            "selection_tag": f"head_{total_rows_global}",
+            "source_total": int(args.validation_sample_size),
+            "selected_total": total_rows_global,
+        },
+    )
     next_row_start = 0
     records: list[dict[str, Any]] = []
     for expected_index, (shard_dir, payload) in enumerate(shard_entries):
