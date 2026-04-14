@@ -1,5 +1,8 @@
 このメモは、Mac 上で Nemotron-3-Nano-30B-A3B-BF16 系モデルを MLX で扱うときの高速化観点を、重複なく整理したものです。
 
+> Repository note: canonical challenge contract lives in `README.md`.
+> この appendix では、提出本番の README 契約 (`max_tokens=7680`, `max_model_len=8192`, `temperature=0.0`, `top_p=1.0`) を基準にしつつ、**ローカル MLX 再現での診断的な高速化実験**を記録します。
+
 ## 要点
 
 - BF16 のまま扱うなら、まずは MLX ネイティブな実行系を使う。
@@ -7,6 +10,26 @@
 - 同じ長い前置きや共通プロンプトは、プレフィックスキャッシュで再利用する。
 - メモリが厳しい場合は、同時実行数やコンテキスト長を先に削る。
 - macOS と MLX はできるだけ新しい安定版を使う。
+
+## このリポジトリの実測
+
+### 2026-04-14: `max_tokens` 短縮の最小ベンチ
+
+- 対象アダプタ: `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_exact_snapshot_fixedpad/adapter`
+- 生成条件: `enable_thinking=True`, boxed suffix なし, `max_num_seqs=4`, `prompt_chunk_size=4`, `prefill=4`, `completion=4`
+- ベンチ母集団: `train.csv.head(950)` から作った stratified 317 subset の先頭 `8` rows
+- 注意: これは **README 契約の `max_tokens=7680` を意図的に崩した診断実験**であり、本番互換設定ではない
+
+| max_tokens | elapsed_seconds | accuracy | prompt_tokens | output_tokens | output_tok/s | total_tok/s | rows_at_cap |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1024 | 708 | 0.125 (1/8) | 1097 | 7605 | 10.74 | 12.29 | 7/8 |
+| 2048 | 1193 | 0.125 (1/8) | 1097 | 14773 | 12.38 | 13.30 | 7/8 |
+
+- どちらも正解は同じ `1/8` で、唯一の正解行は `unit_conversion` だった。
+- `max_tokens` を半分以下に落としても、対象 8 行のうち `7/8` は新しい上限まで伸び切った。つまり「考えすぎ」が主因の行では、単純な cap 短縮だけでは cap hit 自体をほとんど減らせない。
+- 2048 は 1024 より token throughput が少し良くても、壁時計時間は `708s -> 1193s` に伸び、精度改善はなかった。
+- 既存の README 契約寄り 4-row benchmark (`max_tokens=7680`, 同じ `4x4`) では **46.62 output tok/s** が出ているが、これは別サンプルなので単純比較はしない。それでも今回の 8-row probe から、**短い `max_tokens` だけで速く・強くするのは難しい**ことは確認できた。
+- したがってローカル MLX で再現性を保つ本線は、引き続き README 契約どおり `max_tokens=7680` の notebook reproduction を優先する。
 
 ## 優先順位
 

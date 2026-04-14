@@ -203,7 +203,28 @@
 
 - live eval shape: `4-shard / 4x4`
 - observed early progress after relaunch: about `12/317` rows in the first ~20 minutes
+- later snapshot during the parallel fastbench probes: `113/317`
 - this is still slow, but materially better than the failed 6-shard subset attempt and much better than continuing the full 950-row notebook reproduction on the same local MLX path
+
+## Minimal faster-inference probes on the same adapter
+
+- Goal: test whether simply lowering `max_tokens` can make the local MLX notebook-style validation materially faster.
+- Important: these probes intentionally **violate the README evaluation contract** (`max_tokens=7680`), so they are diagnostic only and not a replacement for the canonical run.
+- Shared setup for both probes:
+  - same fullrun adapter as the live subset evaluation
+  - same prompt policy: `enable_thinking=True`, no boxed suffix
+  - same batching: `max_num_seqs=4`, `prompt_chunk_size=4`, `prefill=4`, `completion=4`
+  - same sample: first `8` rows of the stratified `317`-row subset drawn from `train.csv.head(950)`
+
+| probe | max_tokens | elapsed_seconds | accuracy | prompt_tokens_total | output_tokens_total | output_tok_per_sec | total_tok_per_sec | rows_at_cap |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fastbench_strat8_mt1024 | 1024 | 708 | 0.125 (1/8) | 1097 | 7605 | 10.74 | 12.29 | 7/8 |
+| fastbench_strat8_mt2048 | 2048 | 1193 | 0.125 (1/8) | 1097 | 14773 | 12.38 | 13.30 | 7/8 |
+
+- Both probes produced the same single correct row (`unit_conversion`) and missed the other `7`.
+- Lowering the cap did not stop the long-thought rows from saturating; `7/8` rows still ran all the way to the new cap at both `1024` and `2048`.
+- `2048` improved aggregate output throughput only modestly over `1024`, but nearly doubled wall-clock time with no score gain.
+- Conclusion: for this adapter and notebook-style prompt policy, **`max_tokens` reduction alone is not a viable fast path** if the goal is to stay meaningfully comparable to the README / notebook reproduction.
 
 ## Eval robustness update
 
