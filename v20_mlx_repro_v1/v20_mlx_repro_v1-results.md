@@ -109,3 +109,17 @@
   - `elapsed_seconds = 305.9085`
   - `peak_memory_gb = 214.8353`
 - The same corrected 888M-trainable setup OOMed at `micro_batch_size=16`, so the corrected full retrain was relaunched as `v20_mlx_repro_v1_fullrun_targetfix_mb1`.
+
+## 2026-04-15 corrected full retrain progress
+
+- source_document: `README.md`
+- source_document: `A-Open-ProgressPrizePublication/README.md`
+- run: `v20_mlx_repro_v1_fullrun_targetfix_mb1`
+- status: `training_in_progress`
+- latest_observed_step: `50 / 245`
+- latest_train_loss: `0.0026276590617166137`
+- latest_trained_tokens: `5485116`
+- latest_peak_memory_gb: `221.9409`
+- latest_step_elapsed_seconds: `303.7`
+- estimated_remaining_hours_from_step50: `16.8`
+- current fullrun adapter dir still has only report files (`latest_train_report.json`, `train_report.jsonl`) and no mid-run `adapters.safetensors`, so this launch remains vulnerable until final save.
