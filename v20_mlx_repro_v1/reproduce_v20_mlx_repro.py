@@ -739,18 +739,102 @@ def render_step_plan(step_plan: Sequence[StepPlan]) -> list[dict[str, Any]]:
 
 def default_lora_keys() -> list[str]:
     return [
-        "q_proj",
-        "k_proj",
-        "v_proj",
-        "o_proj",
-        "in_proj",
-        "out_proj",
-        "switch_mlp.fc1",
-        "switch_mlp.fc2",
-        "shared_experts.up_proj",
-        "shared_experts.down_proj",
+        "mixer.q_proj",
+        "mixer.k_proj",
+        "mixer.v_proj",
+        "mixer.o_proj",
+        "mixer.in_proj",
+        "mixer.out_proj",
+        "mixer.switch_mlp.fc1",
+        "mixer.switch_mlp.fc2",
+        "mixer.shared_experts.up_proj",
+        "mixer.shared_experts.down_proj",
         "lm_head",
     ]
+
+
+def _count_parameters(tree: Any) -> int:
+    total = 0
+    for _, value in tree_flatten(tree):
+        size = 1
+        for dim in value.shape:
+            size *= int(dim)
+        total += size
+    return total
+
+
+def summarize_lora_matches(model: Any) -> dict[str, Any]:
+    counts: Counter[str] = Counter()
+    base_shapes: dict[str, tuple[int, ...]] = {}
+    for key, value in tree_flatten(model.trainable_parameters()):
+        if not key.endswith(".lora_a"):
+            continue
+        base_key = key[: -len(".lora_a")]
+        base_shapes[base_key] = tuple(int(dim) for dim in value.shape)
+
+    def _label_and_units(base_key: str, shape: tuple[int, ...]) -> tuple[str, int]:
+        if base_key.endswith("mixer.switch_mlp.fc1"):
+            return "up_proj", int(shape[0]) if len(shape) >= 3 else 1
+        if base_key.endswith("mixer.switch_mlp.fc2"):
+            return "down_proj", int(shape[0]) if len(shape) >= 3 else 1
+        if base_key.endswith("mixer.shared_experts.up_proj"):
+            return "up_proj", 1
+        if base_key.endswith("mixer.shared_experts.down_proj"):
+            return "down_proj", 1
+        for label in ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "lm_head"):
+            if base_key.endswith(label):
+                return label, 1
+        return base_key.rsplit(".", 1)[-1], 1
+
+    for base_key, shape in sorted(base_shapes.items()):
+        label, units = _label_and_units(base_key, shape)
+        counts[label] += units
+
+    trainable_params = _count_parameters(model.trainable_parameters())
+    all_params = _count_parameters(model.parameters())
+    trainable_percent = 100.0 * trainable_params / all_params if all_params else 0.0
+    return {
+        "matched_target_modules": {
+            label: int(counts[label])
+            for label in ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "up_proj", "down_proj", "lm_head")
+            if counts.get(label)
+        },
+        "trainable_params": int(trainable_params),
+        "all_params": int(all_params),
+        "trainable_percent": float(trainable_percent),
+        "num_lora_tensors": int(len(base_shapes) * 2),
+        "num_lora_modules": int(len(base_shapes)),
+    }
+
+
+def print_lora_match_summary(summary: dict[str, Any]) -> None:
+    print("Matched target modules:")
+    matched = summary["matched_target_modules"]
+    for label in ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "up_proj", "down_proj", "lm_head"):
+        if label in matched:
+            print(f"  {label:<12} {matched[label]}")
+    print(
+        "trainable params: "
+        f"{summary['trainable_params']:,} || all params: {summary['all_params']:,} || "
+        f"trainable%: {summary['trainable_percent']:.4f}"
+    )
+
+
+def assert_lora_match_summary(summary: dict[str, Any]) -> None:
+    matched = summary["matched_target_modules"]
+    required = ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "up_proj", "down_proj", "lm_head")
+    missing = [label for label in required if int(matched.get(label, 0)) <= 0]
+    if missing:
+        raise RuntimeError(
+            "LoRA target resolution failed; missing matched target modules for "
+            + ", ".join(missing)
+            + "."
+        )
+    if int(summary["num_lora_modules"]) <= 1 or int(summary["trainable_params"]) < 100_000_000:
+        raise RuntimeError(
+            "LoRA target resolution looks implausibly small "
+            f"(modules={summary['num_lora_modules']}, trainable_params={summary['trainable_params']:,})."
+        )
 
 
 def build_training_manifest(args: argparse.Namespace, step_plan: Sequence[StepPlan], shadow_model_dir: Path) -> dict[str, Any]:
@@ -892,7 +976,7 @@ def default_loss(model: Any, batch: mx.array, lengths: mx.array) -> tuple[mx.arr
     targets = batch[:, 1:]
     logits = model(inputs)
     steps = mx.arange(1, targets.shape[1] + 1)
-    mask = mx.logical_and(steps >= lengths[:, 0:1], steps <= lengths[:, 1:])
+    mask = mx.logical_and(steps >= lengths[:, 0:1], steps < lengths[:, 1:])
     ce = nn.losses.cross_entropy(logits, targets) * mask
     ntoks = mask.sum()
     ce = ce.astype(mx.float32).sum() / ntoks
@@ -1650,6 +1734,9 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
             "keys": list(default_lora_keys()),
         },
     )
+    lora_match_summary = summarize_lora_matches(model)
+    print_lora_match_summary(lora_match_summary)
+    assert_lora_match_summary(lora_match_summary)
     if args.resume_adapter_file:
         resume_path = Path(args.resume_adapter_file).resolve()
         print(f"Loading fine-tuned weights from {resume_path}")
@@ -1664,6 +1751,7 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
     )
     ensure_dir(artifacts.adapter_dir)
     save_config(adapter_config, artifacts.adapter_dir / "adapter_config.json")
+    write_json(artifacts.run_root / "lora_match_summary.json", lora_match_summary)
 
     schedule = build_v20_lr_schedule(total_optimizer_steps, float(args.learning_rate))
     optimizer = optim.Adam(
@@ -1672,6 +1760,7 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
         eps=float(args.eps),
         bias_correction=bool(args.bias_correction),
     )
+    print("optimizer_kind: adam")
 
     if mx.metal.is_available():
         mx.set_wired_limit(mx.device_info()["max_recommended_working_set_size"])

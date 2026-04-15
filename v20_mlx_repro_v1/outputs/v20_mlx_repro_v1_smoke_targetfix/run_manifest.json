@@ -1,0 +1,78 @@
+{
+  "created_at": "2026-04-15T00:21:07.727021+00:00",
+  "repo_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge",
+  "work_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1",
+  "run_name": "v20_mlx_repro_v1_smoke_targetfix",
+  "run_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_smoke_targetfix",
+  "shadow_model_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_smoke_targetfix/shadow_model",
+  "snapshot_root": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14",
+  "readme_contract": {
+    "max_lora_rank": 32,
+    "max_tokens": 7680,
+    "top_p": 1.0,
+    "temperature": 0.0,
+    "max_num_seqs": 64,
+    "gpu_memory_utilization": 0.85,
+    "max_model_len": 8192
+  },
+  "training": {
+    "backend": "mlx",
+    "base_model_name_or_path": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+    "model_root": "/Users/mac-studio/.cache/huggingface/hub/models--mlx-community--NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16",
+    "shadow_model_dir": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_smoke_targetfix/shadow_model",
+    "optimizer": "adam",
+    "learning_rate": 0.0002,
+    "optimizer_steps": 245,
+    "microsteps": 490,
+    "effective_batch_size": 32,
+    "micro_batch_size": 16,
+    "max_seq_length": 8192,
+    "epochs": 1,
+    "lora_rank": 32,
+    "lora_alpha": 32.0,
+    "lora_dropout": 0.0,
+    "train_attn": true,
+    "train_mlp": true,
+    "train_unembed": true,
+    "lora_keys": [
+      "mixer.q_proj",
+      "mixer.k_proj",
+      "mixer.v_proj",
+      "mixer.o_proj",
+      "mixer.in_proj",
+      "mixer.out_proj",
+      "mixer.switch_mlp.fc1",
+      "mixer.switch_mlp.fc2",
+      "mixer.shared_experts.up_proj",
+      "mixer.shared_experts.down_proj",
+      "lm_head"
+    ],
+    "adam": {
+      "beta1": 0.9,
+      "beta2": 0.95,
+      "eps": 1e-08,
+      "weight_decay": 0.0,
+      "bias_correction": true
+    },
+    "lr_schedule": {
+      "name": "StepLinearDecayLRSchedule",
+      "formula": "learning_rate * (1 - step / total_steps)"
+    },
+    "assumptions": {
+      "lora_alpha_is_rank": true,
+      "tinker_dropout_not_exposed_assumed_zero": true,
+      "fixed_train_padding": true
+    }
+  },
+  "evaluation": {
+    "benchmark_csv": "/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/data/train.csv",
+    "max_tokens": 7680,
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_num_seqs": 16,
+    "max_model_len": 8192,
+    "enable_thinking": true,
+    "eval_shards": 1,
+    "eval_shard_index": 0
+  }
+}

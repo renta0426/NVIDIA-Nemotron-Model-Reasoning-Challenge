@@ -1,0 +1,373 @@
+4.5s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+4.5s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+4.5s 3 0.00s - to python to disable frozen modules.
+4.5s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+4.9s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+4.9s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+4.9s 7 0.00s - to python to disable frozen modules.
+4.9s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+5.8s 9 Running: /usr/bin/python3 -m pip install -q --no-index --find-links /kaggle/input/datasets/mayukh18/nemotron-packages/packages --find-links /kaggle/input/datasets/llkh0a/rtx-wheels/wheels bitsandbytes
+117.7s 10 Running: /usr/bin/python3 -m pip install -q /kaggle/input/datasets/mayukh18/nemotron-packages/causal_conv1d-1.6.1+cu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl
+141.2s 11 Running: /usr/bin/python3 -m pip install -q /kaggle/input/datasets/mayukh18/nemotron-packages/mamba_ssm-2.3.1+cu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl
+150.2s 12 Environment setup complete.
+202.0s 13 SNAPSHOT_BUNDLE_PATH: /kaggle/input/datasets/happymiik/train-sft/v20_corrective_corpus_v1_bundle.jsonl
+202.0s 14 SNAPSHOT_ROOT: None
+202.0s 15 NEMOTRON_ROOT: /kaggle/input/datasets/happymiik/train-sft
+202.0s 16 MODEL_PATH: /kaggle/input/models/metric/nemotron-3-nano-30b-a3b-bf16/transformers/default/1
+202.0s 17 RUN_ROOT: /kaggle/working/kaggle-v20-sft-repro-0414-104905
+202.0s 18 LOCAL_MICRO_BATCH_SIZE: 1
+202.0s 19 TARGET_MODULES: ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'in_proj', 'out_proj', 'up_proj', 'down_proj', 'lm_head']
+202.0s 20 USE_8BIT_OPTIMIZER: True
+202.0s 21 ENABLE_DIAGNOSTICS: False
+202.0s 22 MEMORY_LOG_EVERY: 1
+208.1s 23 Snapshot stats: {'num_examples': 9622, 'total_tokens': 39030839, 'total_masked_tokens': 1723641, 'total_unmasked_tokens': 37307198, 'total_steps': 301, 'max_seq_len': 7971}
+208.1s 24 Bundle manifest: {'bundle_format': 'nemotron_single_file_training_bundle_v1', 'version': 'v20_corrective_corpus_v1', 'bundle_path': 'A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v1_bundle.jsonl'}
+208.1s 25 Category counts:
+208.1s 26 bit_manipulation           3098
+208.1s 27 cipher                     1656
+208.1s 28 cryptarithm_deduce         835
+208.1s 29 cryptarithm_guess          202
+208.1s 30 equation_numeric_deduce    850
+208.1s 31 equation_numeric_guess     126
+208.1s 32 gravity                    1055
+208.1s 33 numeral                    730
+208.1s 34 unit_conversion            1070
+208.1s 35 First 3 batch sizes: [32, 32, 32]
+208.1s 36 Last batch size: 32
+237.6s 37 Matched target modules:
+237.6s 38 q_proj       6
+237.6s 39 k_proj       6
+237.6s 40 v_proj       6
+237.6s 41 o_proj       6
+237.6s 42 in_proj      23
+237.6s 43 out_proj     23
+237.6s 44 up_proj      2967
+237.6s 45 down_proj    2967
+237.6s 46 lm_head      1
+820.4s 47 trainable params: 888,154,112 || all params: 32,466,091,456 || trainable%: 2.7356
+820.4s 48 optimizer_kind: paged_adamw_8bit
+991.6s 49 epoch=0 step=000/301 lr=0.000200 n=32 loss_per_token=0.385202 elapsed=171.1s alloc=67.1GiB reserved=67.2GiB peak_alloc=81.6GiB peak_reserved=84.8GiB
+1109.1s 50 epoch=0 step=001/301 lr=0.000199 n=32 loss_per_token=0.442254 elapsed=117.4s alloc=67.1GiB reserved=67.4GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+1233.0s 51 epoch=0 step=002/301 lr=0.000199 n=32 loss_per_token=0.342865 elapsed=123.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+1355.0s 52 epoch=0 step=003/301 lr=0.000198 n=32 loss_per_token=0.275101 elapsed=122.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+1473.5s 53 epoch=0 step=004/301 lr=0.000197 n=32 loss_per_token=0.290843 elapsed=118.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+1591.6s 54 epoch=0 step=005/301 lr=0.000197 n=32 loss_per_token=0.242528 elapsed=118.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+1711.3s 55 epoch=0 step=006/301 lr=0.000196 n=32 loss_per_token=0.231658 elapsed=119.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+1829.5s 56 epoch=0 step=007/301 lr=0.000195 n=32 loss_per_token=0.202771 elapsed=118.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+1951.7s 57 epoch=0 step=008/301 lr=0.000195 n=32 loss_per_token=0.172923 elapsed=122.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+2071.5s 58 epoch=0 step=009/301 lr=0.000194 n=32 loss_per_token=0.163760 elapsed=119.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.4GiB peak_reserved=84.8GiB
+2194.5s 59 epoch=0 step=010/301 lr=0.000193 n=32 loss_per_token=0.159925 elapsed=123.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.7GiB peak_reserved=87.5GiB
+2316.5s 60 epoch=0 step=011/301 lr=0.000193 n=32 loss_per_token=0.123657 elapsed=122.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+2436.7s 61 epoch=0 step=012/301 lr=0.000192 n=32 loss_per_token=0.122365 elapsed=120.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+2553.4s 62 epoch=0 step=013/301 lr=0.000191 n=32 loss_per_token=0.087427 elapsed=116.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.2GiB peak_reserved=85.7GiB
+2677.9s 63 epoch=0 step=014/301 lr=0.000191 n=32 loss_per_token=0.103563 elapsed=124.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+2797.2s 64 epoch=0 step=015/301 lr=0.000190 n=32 loss_per_token=0.082476 elapsed=119.3s alloc=67.1GiB reserved=67.4GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+2918.0s 65 epoch=0 step=016/301 lr=0.000189 n=32 loss_per_token=0.071917 elapsed=120.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.1GiB
+3041.7s 66 epoch=0 step=017/301 lr=0.000189 n=32 loss_per_token=0.075247 elapsed=123.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+3160.3s 67 epoch=0 step=018/301 lr=0.000188 n=32 loss_per_token=0.050256 elapsed=118.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=82.5GiB peak_reserved=85.0GiB
+3279.1s 68 epoch=0 step=019/301 lr=0.000187 n=32 loss_per_token=0.045468 elapsed=118.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.3GiB peak_reserved=85.9GiB
+3396.2s 69 epoch=0 step=020/301 lr=0.000187 n=32 loss_per_token=0.038202 elapsed=117.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.6GiB peak_reserved=85.1GiB
+3518.0s 70 epoch=0 step=021/301 lr=0.000186 n=32 loss_per_token=0.035917 elapsed=121.7s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+3638.0s 71 epoch=0 step=022/301 lr=0.000185 n=32 loss_per_token=0.031016 elapsed=120.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+3756.6s 72 epoch=0 step=023/301 lr=0.000185 n=32 loss_per_token=0.029597 elapsed=118.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.6GiB peak_reserved=87.3GiB
+3876.3s 73 epoch=0 step=024/301 lr=0.000184 n=32 loss_per_token=0.022269 elapsed=119.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.1GiB
+3996.2s 74 epoch=0 step=025/301 lr=0.000183 n=32 loss_per_token=0.016502 elapsed=119.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.5GiB peak_reserved=86.1GiB
+4116.2s 75 epoch=0 step=026/301 lr=0.000183 n=32 loss_per_token=0.016975 elapsed=120.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+4237.8s 76 epoch=0 step=027/301 lr=0.000182 n=32 loss_per_token=0.015278 elapsed=121.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.5GiB
+4357.1s 77 epoch=0 step=028/301 lr=0.000181 n=32 loss_per_token=0.011613 elapsed=119.3s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+4478.0s 78 epoch=0 step=029/301 lr=0.000181 n=32 loss_per_token=0.009628 elapsed=120.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+4597.2s 79 epoch=0 step=030/301 lr=0.000180 n=32 loss_per_token=0.009007 elapsed=119.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.1GiB peak_reserved=85.7GiB
+4717.1s 80 epoch=0 step=031/301 lr=0.000179 n=32 loss_per_token=0.009641 elapsed=119.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+4841.6s 81 epoch=0 step=032/301 lr=0.000179 n=32 loss_per_token=0.009865 elapsed=124.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+4962.2s 82 epoch=0 step=033/301 lr=0.000178 n=32 loss_per_token=0.008310 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=82.8GiB peak_reserved=85.3GiB
+5081.4s 83 epoch=0 step=034/301 lr=0.000177 n=32 loss_per_token=0.005426 elapsed=119.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.5GiB peak_reserved=85.0GiB
+5203.1s 84 epoch=0 step=035/301 lr=0.000177 n=32 loss_per_token=0.008350 elapsed=121.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=85.0GiB peak_reserved=87.8GiB
+5321.8s 85 epoch=0 step=036/301 lr=0.000176 n=32 loss_per_token=0.006354 elapsed=118.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+5441.8s 86 epoch=0 step=037/301 lr=0.000175 n=32 loss_per_token=0.005342 elapsed=120.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+5563.8s 87 epoch=0 step=038/301 lr=0.000175 n=32 loss_per_token=0.005187 elapsed=122.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+5684.7s 88 epoch=0 step=039/301 lr=0.000174 n=32 loss_per_token=0.002716 elapsed=120.9s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+5808.0s 89 epoch=0 step=040/301 lr=0.000173 n=32 loss_per_token=0.005703 elapsed=123.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+5930.4s 90 epoch=0 step=041/301 lr=0.000173 n=32 loss_per_token=0.003766 elapsed=122.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=87.0GiB
+6051.1s 91 epoch=0 step=042/301 lr=0.000172 n=32 loss_per_token=0.003964 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.6GiB peak_reserved=87.3GiB
+6173.6s 92 epoch=0 step=043/301 lr=0.000171 n=32 loss_per_token=0.004872 elapsed=122.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+6294.7s 93 epoch=0 step=044/301 lr=0.000171 n=32 loss_per_token=0.003623 elapsed=121.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.6GiB peak_reserved=87.3GiB
+6414.9s 94 epoch=0 step=045/301 lr=0.000170 n=32 loss_per_token=0.003354 elapsed=120.2s alloc=67.1GiB reserved=67.7GiB peak_alloc=83.5GiB peak_reserved=86.2GiB
+6533.0s 95 epoch=0 step=046/301 lr=0.000169 n=32 loss_per_token=0.003576 elapsed=118.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.0GiB
+6654.2s 96 epoch=0 step=047/301 lr=0.000169 n=32 loss_per_token=0.001380 elapsed=121.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+6770.8s 97 epoch=0 step=048/301 lr=0.000168 n=32 loss_per_token=0.003144 elapsed=116.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+6890.8s 98 epoch=0 step=049/301 lr=0.000167 n=32 loss_per_token=0.004129 elapsed=120.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+7011.5s 99 epoch=0 step=050/301 lr=0.000167 n=32 loss_per_token=0.002252 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+7133.2s 100 epoch=0 step=051/301 lr=0.000166 n=32 loss_per_token=0.003014 elapsed=121.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+7252.3s 101 epoch=0 step=052/301 lr=0.000165 n=32 loss_per_token=0.002697 elapsed=119.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+7373.2s 102 epoch=0 step=053/301 lr=0.000165 n=32 loss_per_token=0.002034 elapsed=120.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.1GiB
+7494.3s 103 epoch=0 step=054/301 lr=0.000164 n=32 loss_per_token=0.001793 elapsed=121.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+7611.5s 104 epoch=0 step=055/301 lr=0.000163 n=32 loss_per_token=0.004186 elapsed=117.3s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+7734.0s 105 epoch=0 step=056/301 lr=0.000163 n=32 loss_per_token=0.003083 elapsed=122.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.4GiB
+7852.6s 106 epoch=0 step=057/301 lr=0.000162 n=32 loss_per_token=0.002049 elapsed=118.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.1GiB
+7973.9s 107 epoch=0 step=058/301 lr=0.000161 n=32 loss_per_token=0.001633 elapsed=121.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+8093.8s 108 epoch=0 step=059/301 lr=0.000161 n=32 loss_per_token=0.001553 elapsed=119.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+8213.1s 109 epoch=0 step=060/301 lr=0.000160 n=32 loss_per_token=0.001227 elapsed=119.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.5GiB peak_reserved=86.2GiB
+8332.0s 110 epoch=0 step=061/301 lr=0.000159 n=32 loss_per_token=0.001312 elapsed=118.9s alloc=67.1GiB reserved=67.4GiB peak_alloc=84.1GiB peak_reserved=86.6GiB
+8453.1s 111 epoch=0 step=062/301 lr=0.000159 n=32 loss_per_token=0.002265 elapsed=121.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+8574.3s 112 epoch=0 step=063/301 lr=0.000158 n=32 loss_per_token=0.001362 elapsed=121.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+8694.2s 113 epoch=0 step=064/301 lr=0.000157 n=32 loss_per_token=0.001564 elapsed=119.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+8813.3s 114 epoch=0 step=065/301 lr=0.000157 n=32 loss_per_token=0.001083 elapsed=119.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.1GiB peak_reserved=85.6GiB
+8931.4s 115 epoch=0 step=066/301 lr=0.000156 n=32 loss_per_token=0.001907 elapsed=118.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.2GiB
+9053.0s 116 epoch=0 step=067/301 lr=0.000155 n=32 loss_per_token=0.000906 elapsed=121.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+9173.1s 117 epoch=0 step=068/301 lr=0.000155 n=32 loss_per_token=0.001389 elapsed=120.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+9290.1s 118 epoch=0 step=069/301 lr=0.000154 n=32 loss_per_token=0.001175 elapsed=117.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.2GiB peak_reserved=85.7GiB
+9410.6s 119 epoch=0 step=070/301 lr=0.000153 n=32 loss_per_token=0.001888 elapsed=120.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.5GiB peak_reserved=87.2GiB
+9531.6s 120 epoch=0 step=071/301 lr=0.000153 n=32 loss_per_token=0.001040 elapsed=121.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+9651.8s 121 epoch=0 step=072/301 lr=0.000152 n=32 loss_per_token=0.001282 elapsed=120.1s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.3GiB peak_reserved=87.2GiB
+9771.3s 122 epoch=0 step=073/301 lr=0.000151 n=32 loss_per_token=0.001081 elapsed=119.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+9889.4s 123 epoch=0 step=074/301 lr=0.000151 n=32 loss_per_token=0.001683 elapsed=118.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+10010.3s 124 epoch=0 step=075/301 lr=0.000150 n=32 loss_per_token=0.001368 elapsed=120.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+10130.5s 125 epoch=0 step=076/301 lr=0.000150 n=32 loss_per_token=0.001931 elapsed=120.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+10253.1s 126 epoch=0 step=077/301 lr=0.000149 n=32 loss_per_token=0.001330 elapsed=122.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.1GiB peak_reserved=86.2GiB
+10376.1s 127 epoch=0 step=078/301 lr=0.000148 n=32 loss_per_token=0.001148 elapsed=123.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+10499.1s 128 epoch=0 step=079/301 lr=0.000148 n=32 loss_per_token=0.000862 elapsed=123.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+10618.0s 129 epoch=0 step=080/301 lr=0.000147 n=32 loss_per_token=0.000725 elapsed=118.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.2GiB
+10740.0s 130 epoch=0 step=081/301 lr=0.000146 n=32 loss_per_token=0.001228 elapsed=122.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.2GiB
+10863.0s 131 epoch=0 step=082/301 lr=0.000146 n=32 loss_per_token=0.001028 elapsed=122.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+10983.0s 132 epoch=0 step=083/301 lr=0.000145 n=32 loss_per_token=0.001035 elapsed=120.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+11102.4s 133 epoch=0 step=084/301 lr=0.000144 n=32 loss_per_token=0.000937 elapsed=119.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.7GiB peak_reserved=85.1GiB
+11220.8s 134 epoch=0 step=085/301 lr=0.000144 n=32 loss_per_token=0.000620 elapsed=118.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+11341.4s 135 epoch=0 step=086/301 lr=0.000143 n=32 loss_per_token=0.001071 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+11458.9s 136 epoch=0 step=087/301 lr=0.000142 n=32 loss_per_token=0.001017 elapsed=117.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+11581.6s 137 epoch=0 step=088/301 lr=0.000142 n=32 loss_per_token=0.000991 elapsed=122.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.5GiB
+11703.1s 138 epoch=0 step=089/301 lr=0.000141 n=32 loss_per_token=0.000853 elapsed=121.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.0GiB peak_reserved=86.4GiB
+11823.6s 139 epoch=0 step=090/301 lr=0.000140 n=32 loss_per_token=0.001293 elapsed=120.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.0GiB
+11944.5s 140 epoch=0 step=091/301 lr=0.000140 n=32 loss_per_token=0.000997 elapsed=120.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+12064.8s 141 epoch=0 step=092/301 lr=0.000139 n=32 loss_per_token=0.000816 elapsed=120.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+12186.2s 142 epoch=0 step=093/301 lr=0.000138 n=32 loss_per_token=0.000950 elapsed=121.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+12304.5s 143 epoch=0 step=094/301 lr=0.000138 n=32 loss_per_token=0.000577 elapsed=118.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+12423.8s 144 epoch=0 step=095/301 lr=0.000137 n=32 loss_per_token=0.001006 elapsed=119.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+12546.6s 145 epoch=0 step=096/301 lr=0.000136 n=32 loss_per_token=0.000689 elapsed=122.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+12666.0s 146 epoch=0 step=097/301 lr=0.000136 n=32 loss_per_token=0.000682 elapsed=119.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+12784.6s 147 epoch=0 step=098/301 lr=0.000135 n=32 loss_per_token=0.000673 elapsed=118.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.2GiB
+12902.0s 148 epoch=0 step=099/301 lr=0.000134 n=32 loss_per_token=0.000774 elapsed=117.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=82.9GiB peak_reserved=85.5GiB
+13021.3s 149 epoch=0 step=100/301 lr=0.000134 n=32 loss_per_token=0.000612 elapsed=119.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.3GiB peak_reserved=85.7GiB
+13143.0s 150 epoch=0 step=101/301 lr=0.000133 n=32 loss_per_token=0.000537 elapsed=121.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.4GiB
+13264.9s 151 epoch=0 step=102/301 lr=0.000132 n=32 loss_per_token=0.000364 elapsed=121.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+13388.2s 152 epoch=0 step=103/301 lr=0.000132 n=32 loss_per_token=0.000725 elapsed=123.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+13509.5s 153 epoch=0 step=104/301 lr=0.000131 n=32 loss_per_token=0.000904 elapsed=121.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.2GiB peak_reserved=85.8GiB
+13630.7s 154 epoch=0 step=105/301 lr=0.000130 n=32 loss_per_token=0.000728 elapsed=121.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.2GiB peak_reserved=85.6GiB
+13749.0s 155 epoch=0 step=106/301 lr=0.000130 n=32 loss_per_token=0.000421 elapsed=118.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.7GiB
+13868.3s 156 epoch=0 step=107/301 lr=0.000129 n=32 loss_per_token=0.000358 elapsed=119.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+13986.7s 157 epoch=0 step=108/301 lr=0.000128 n=32 loss_per_token=0.001253 elapsed=118.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.1GiB
+14109.3s 158 epoch=0 step=109/301 lr=0.000128 n=32 loss_per_token=0.000432 elapsed=122.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=87.0GiB
+14229.6s 159 epoch=0 step=110/301 lr=0.000127 n=32 loss_per_token=0.000846 elapsed=120.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+14351.6s 160 epoch=0 step=111/301 lr=0.000126 n=32 loss_per_token=0.000474 elapsed=122.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+14471.2s 161 epoch=0 step=112/301 lr=0.000126 n=32 loss_per_token=0.000788 elapsed=119.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+14591.9s 162 epoch=0 step=113/301 lr=0.000125 n=32 loss_per_token=0.001028 elapsed=120.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+14709.9s 163 epoch=0 step=114/301 lr=0.000124 n=32 loss_per_token=0.000843 elapsed=118.0s alloc=67.1GiB reserved=67.7GiB peak_alloc=83.5GiB peak_reserved=86.2GiB
+14830.0s 164 epoch=0 step=115/301 lr=0.000124 n=32 loss_per_token=0.000690 elapsed=120.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+14948.4s 165 epoch=0 step=116/301 lr=0.000123 n=32 loss_per_token=0.000965 elapsed=118.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+15070.1s 166 epoch=0 step=117/301 lr=0.000122 n=32 loss_per_token=0.000587 elapsed=121.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.1GiB
+15186.9s 167 epoch=0 step=118/301 lr=0.000122 n=32 loss_per_token=0.000521 elapsed=116.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+15306.2s 168 epoch=0 step=119/301 lr=0.000121 n=32 loss_per_token=0.001226 elapsed=119.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.2GiB
+15428.2s 169 epoch=0 step=120/301 lr=0.000120 n=32 loss_per_token=0.000754 elapsed=122.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.5GiB peak_reserved=86.1GiB
+15548.8s 170 epoch=0 step=121/301 lr=0.000120 n=32 loss_per_token=0.000441 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+15667.0s 171 epoch=0 step=122/301 lr=0.000119 n=32 loss_per_token=0.000534 elapsed=118.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+15790.9s 172 epoch=0 step=123/301 lr=0.000118 n=32 loss_per_token=0.000755 elapsed=123.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+15909.7s 173 epoch=0 step=124/301 lr=0.000118 n=32 loss_per_token=0.000624 elapsed=118.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+16029.4s 174 epoch=0 step=125/301 lr=0.000117 n=32 loss_per_token=0.000633 elapsed=119.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+16148.1s 175 epoch=0 step=126/301 lr=0.000116 n=32 loss_per_token=0.001051 elapsed=118.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+16269.4s 176 epoch=0 step=127/301 lr=0.000116 n=32 loss_per_token=0.000467 elapsed=121.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.2GiB peak_reserved=85.7GiB
+16388.4s 177 epoch=0 step=128/301 lr=0.000115 n=32 loss_per_token=0.000455 elapsed=119.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.3GiB peak_reserved=85.8GiB
+16512.6s 178 epoch=0 step=129/301 lr=0.000114 n=32 loss_per_token=0.000267 elapsed=124.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+16635.1s 179 epoch=0 step=130/301 lr=0.000114 n=32 loss_per_token=0.000634 elapsed=122.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+16752.7s 180 epoch=0 step=131/301 lr=0.000113 n=32 loss_per_token=0.000508 elapsed=117.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+16875.1s 181 epoch=0 step=132/301 lr=0.000112 n=32 loss_per_token=0.000828 elapsed=122.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.9GiB peak_reserved=85.4GiB
+16995.2s 182 epoch=0 step=133/301 lr=0.000112 n=32 loss_per_token=0.000522 elapsed=120.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+17115.7s 183 epoch=0 step=134/301 lr=0.000111 n=32 loss_per_token=0.000287 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.4GiB peak_reserved=87.1GiB
+17236.8s 184 epoch=0 step=135/301 lr=0.000110 n=32 loss_per_token=0.000593 elapsed=121.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+17355.2s 185 epoch=0 step=136/301 lr=0.000110 n=32 loss_per_token=0.000366 elapsed=118.4s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.5GiB peak_reserved=87.3GiB
+17474.2s 186 epoch=0 step=137/301 lr=0.000109 n=32 loss_per_token=0.000664 elapsed=119.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.2GiB
+17598.2s 187 epoch=0 step=138/301 lr=0.000108 n=32 loss_per_token=0.000436 elapsed=124.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+17722.8s 188 epoch=0 step=139/301 lr=0.000108 n=32 loss_per_token=0.000519 elapsed=124.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+17842.8s 189 epoch=0 step=140/301 lr=0.000107 n=32 loss_per_token=0.000489 elapsed=120.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+17963.9s 190 epoch=0 step=141/301 lr=0.000106 n=32 loss_per_token=0.000336 elapsed=121.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+18083.3s 191 epoch=0 step=142/301 lr=0.000106 n=32 loss_per_token=0.000405 elapsed=119.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.2GiB
+18200.1s 192 epoch=0 step=143/301 lr=0.000105 n=32 loss_per_token=0.000527 elapsed=116.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+18321.4s 193 epoch=0 step=144/301 lr=0.000104 n=32 loss_per_token=0.000383 elapsed=121.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+18438.2s 194 epoch=0 step=145/301 lr=0.000104 n=32 loss_per_token=0.000316 elapsed=116.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.3GiB
+18559.5s 195 epoch=0 step=146/301 lr=0.000103 n=32 loss_per_token=0.000417 elapsed=121.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.8GiB peak_reserved=86.4GiB
+18676.5s 196 epoch=0 step=147/301 lr=0.000102 n=32 loss_per_token=0.000691 elapsed=117.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.9GiB
+18796.8s 197 epoch=0 step=148/301 lr=0.000102 n=32 loss_per_token=0.000251 elapsed=120.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+18916.7s 198 epoch=0 step=149/301 lr=0.000101 n=32 loss_per_token=0.000444 elapsed=119.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+19038.6s 199 epoch=0 step=150/301 lr=0.000100 n=32 loss_per_token=0.000559 elapsed=121.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.7GiB
+19156.2s 200 epoch=0 step=151/301 lr=0.000100 n=32 loss_per_token=0.000243 elapsed=117.6s alloc=67.1GiB reserved=67.7GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+19276.9s 201 epoch=0 step=152/301 lr=0.000099 n=32 loss_per_token=0.000316 elapsed=120.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.4GiB
+19395.8s 202 epoch=0 step=153/301 lr=0.000098 n=32 loss_per_token=0.000472 elapsed=118.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+19517.1s 203 epoch=0 step=154/301 lr=0.000098 n=32 loss_per_token=0.000800 elapsed=121.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+19637.0s 204 epoch=0 step=155/301 lr=0.000097 n=32 loss_per_token=0.000453 elapsed=119.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+19760.2s 205 epoch=0 step=156/301 lr=0.000096 n=32 loss_per_token=0.000599 elapsed=123.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+19879.1s 206 epoch=0 step=157/301 lr=0.000096 n=32 loss_per_token=0.000409 elapsed=118.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+19997.4s 207 epoch=0 step=158/301 lr=0.000095 n=32 loss_per_token=0.000702 elapsed=118.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+20115.8s 208 epoch=0 step=159/301 lr=0.000094 n=32 loss_per_token=0.000509 elapsed=118.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.1GiB
+20237.6s 209 epoch=0 step=160/301 lr=0.000094 n=32 loss_per_token=0.000360 elapsed=121.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+20354.5s 210 epoch=0 step=161/301 lr=0.000093 n=32 loss_per_token=0.000322 elapsed=117.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+20475.0s 211 epoch=0 step=162/301 lr=0.000092 n=32 loss_per_token=0.000534 elapsed=120.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.4GiB
+20595.6s 212 epoch=0 step=163/301 lr=0.000092 n=32 loss_per_token=0.000455 elapsed=120.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.2GiB
+20717.2s 213 epoch=0 step=164/301 lr=0.000091 n=32 loss_per_token=0.000307 elapsed=121.6s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.3GiB peak_reserved=87.1GiB
+20838.5s 214 epoch=0 step=165/301 lr=0.000090 n=32 loss_per_token=0.000199 elapsed=121.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.2GiB
+20959.4s 215 epoch=0 step=166/301 lr=0.000090 n=32 loss_per_token=0.000571 elapsed=121.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+21080.5s 216 epoch=0 step=167/301 lr=0.000089 n=32 loss_per_token=0.000579 elapsed=121.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+21199.2s 217 epoch=0 step=168/301 lr=0.000088 n=32 loss_per_token=0.000454 elapsed=118.7s alloc=67.1GiB reserved=67.7GiB peak_alloc=82.8GiB peak_reserved=85.4GiB
+21318.6s 218 epoch=0 step=169/301 lr=0.000088 n=32 loss_per_token=0.000390 elapsed=119.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.3GiB
+21438.4s 219 epoch=0 step=170/301 lr=0.000087 n=32 loss_per_token=0.000232 elapsed=119.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+21559.5s 220 epoch=0 step=171/301 lr=0.000086 n=32 loss_per_token=0.000880 elapsed=121.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+21680.4s 221 epoch=0 step=172/301 lr=0.000086 n=32 loss_per_token=0.000245 elapsed=120.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+21800.8s 222 epoch=0 step=173/301 lr=0.000085 n=32 loss_per_token=0.000434 elapsed=120.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+21923.3s 223 epoch=0 step=174/301 lr=0.000084 n=32 loss_per_token=0.000357 elapsed=122.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+22043.6s 224 epoch=0 step=175/301 lr=0.000084 n=32 loss_per_token=0.000415 elapsed=120.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.5GiB peak_reserved=86.1GiB
+22162.2s 225 epoch=0 step=176/301 lr=0.000083 n=32 loss_per_token=0.000472 elapsed=118.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.0GiB
+22283.7s 226 epoch=0 step=177/301 lr=0.000082 n=32 loss_per_token=0.000569 elapsed=121.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+22406.5s 227 epoch=0 step=178/301 lr=0.000082 n=32 loss_per_token=0.000303 elapsed=122.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.0GiB
+22527.9s 228 epoch=0 step=179/301 lr=0.000081 n=32 loss_per_token=0.000476 elapsed=121.4s alloc=67.1GiB reserved=67.7GiB peak_alloc=83.9GiB peak_reserved=86.7GiB
+22649.6s 229 epoch=0 step=180/301 lr=0.000080 n=32 loss_per_token=0.000277 elapsed=121.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+22767.7s 230 epoch=0 step=181/301 lr=0.000080 n=32 loss_per_token=0.000190 elapsed=118.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+22887.7s 231 epoch=0 step=182/301 lr=0.000079 n=32 loss_per_token=0.000402 elapsed=120.1s alloc=67.1GiB reserved=67.7GiB peak_alloc=83.8GiB peak_reserved=86.6GiB
+23007.9s 232 epoch=0 step=183/301 lr=0.000078 n=32 loss_per_token=0.000344 elapsed=120.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.0GiB peak_reserved=85.4GiB
+23131.5s 233 epoch=0 step=184/301 lr=0.000078 n=32 loss_per_token=0.000241 elapsed=123.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+23256.5s 234 epoch=0 step=185/301 lr=0.000077 n=32 loss_per_token=0.000312 elapsed=125.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+23379.2s 235 epoch=0 step=186/301 lr=0.000076 n=32 loss_per_token=0.000180 elapsed=122.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+23498.8s 236 epoch=0 step=187/301 lr=0.000076 n=32 loss_per_token=0.000236 elapsed=119.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+23619.6s 237 epoch=0 step=188/301 lr=0.000075 n=32 loss_per_token=0.000260 elapsed=120.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+23741.6s 238 epoch=0 step=189/301 lr=0.000074 n=32 loss_per_token=0.000506 elapsed=122.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.5GiB peak_reserved=87.2GiB
+23863.6s 239 epoch=0 step=190/301 lr=0.000074 n=32 loss_per_token=0.000255 elapsed=122.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+23985.9s 240 epoch=0 step=191/301 lr=0.000073 n=32 loss_per_token=0.000614 elapsed=122.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+24103.4s 241 epoch=0 step=192/301 lr=0.000072 n=32 loss_per_token=0.000333 elapsed=117.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+24224.6s 242 epoch=0 step=193/301 lr=0.000072 n=32 loss_per_token=0.000557 elapsed=121.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+24343.8s 243 epoch=0 step=194/301 lr=0.000071 n=32 loss_per_token=0.000364 elapsed=119.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.3GiB peak_reserved=85.8GiB
+24465.4s 244 epoch=0 step=195/301 lr=0.000070 n=32 loss_per_token=0.000204 elapsed=121.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+24586.7s 245 epoch=0 step=196/301 lr=0.000070 n=32 loss_per_token=0.000368 elapsed=121.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=87.0GiB
+24709.8s 246 epoch=0 step=197/301 lr=0.000069 n=32 loss_per_token=0.000430 elapsed=123.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+24832.8s 247 epoch=0 step=198/301 lr=0.000068 n=32 loss_per_token=0.000211 elapsed=123.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.8GiB peak_reserved=87.5GiB
+24951.8s 248 epoch=0 step=199/301 lr=0.000068 n=32 loss_per_token=0.000341 elapsed=119.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+25072.1s 249 epoch=0 step=200/301 lr=0.000067 n=32 loss_per_token=0.000273 elapsed=120.3s alloc=67.1GiB reserved=67.7GiB peak_alloc=83.2GiB peak_reserved=85.9GiB
+25195.7s 250 epoch=0 step=201/301 lr=0.000066 n=32 loss_per_token=0.000306 elapsed=123.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.2GiB
+25315.7s 251 epoch=0 step=202/301 lr=0.000066 n=32 loss_per_token=0.000244 elapsed=120.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=82.9GiB peak_reserved=85.5GiB
+25436.6s 252 epoch=0 step=203/301 lr=0.000065 n=32 loss_per_token=0.000360 elapsed=120.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.4GiB peak_reserved=87.1GiB
+25556.4s 253 epoch=0 step=204/301 lr=0.000064 n=32 loss_per_token=0.000216 elapsed=119.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.1GiB
+25675.6s 254 epoch=0 step=205/301 lr=0.000064 n=32 loss_per_token=0.000227 elapsed=119.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+25794.7s 255 epoch=0 step=206/301 lr=0.000063 n=32 loss_per_token=0.000776 elapsed=119.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+25915.4s 256 epoch=0 step=207/301 lr=0.000062 n=32 loss_per_token=0.000206 elapsed=120.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.5GiB
+26035.1s 257 epoch=0 step=208/301 lr=0.000062 n=32 loss_per_token=0.000356 elapsed=119.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.4GiB peak_reserved=85.9GiB
+26154.9s 258 epoch=0 step=209/301 lr=0.000061 n=32 loss_per_token=0.000543 elapsed=119.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.4GiB peak_reserved=87.0GiB
+26276.9s 259 epoch=0 step=210/301 lr=0.000060 n=32 loss_per_token=0.000229 elapsed=122.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+26396.6s 260 epoch=0 step=211/301 lr=0.000060 n=32 loss_per_token=0.000281 elapsed=119.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+26518.2s 261 epoch=0 step=212/301 lr=0.000059 n=32 loss_per_token=0.000368 elapsed=121.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.5GiB peak_reserved=87.2GiB
+26635.9s 262 epoch=0 step=213/301 lr=0.000058 n=32 loss_per_token=0.000550 elapsed=117.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+26756.9s 263 epoch=0 step=214/301 lr=0.000058 n=32 loss_per_token=0.000211 elapsed=121.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+26872.9s 264 epoch=0 step=215/301 lr=0.000057 n=32 loss_per_token=0.000360 elapsed=116.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.2GiB peak_reserved=85.9GiB
+26991.7s 265 epoch=0 step=216/301 lr=0.000056 n=32 loss_per_token=0.000175 elapsed=118.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.3GiB peak_reserved=84.7GiB
+27111.7s 266 epoch=0 step=217/301 lr=0.000056 n=32 loss_per_token=0.000153 elapsed=120.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+27232.7s 267 epoch=0 step=218/301 lr=0.000055 n=32 loss_per_token=0.000373 elapsed=120.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.8GiB peak_reserved=87.5GiB
+27353.0s 268 epoch=0 step=219/301 lr=0.000054 n=32 loss_per_token=0.000589 elapsed=120.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.1GiB
+27475.1s 269 epoch=0 step=220/301 lr=0.000054 n=32 loss_per_token=0.000265 elapsed=122.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+27595.7s 270 epoch=0 step=221/301 lr=0.000053 n=32 loss_per_token=0.000365 elapsed=120.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+27716.8s 271 epoch=0 step=222/301 lr=0.000052 n=32 loss_per_token=0.000198 elapsed=121.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.5GiB
+27837.8s 272 epoch=0 step=223/301 lr=0.000052 n=32 loss_per_token=0.000141 elapsed=120.9s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+27959.2s 273 epoch=0 step=224/301 lr=0.000051 n=32 loss_per_token=0.000263 elapsed=121.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+28081.6s 274 epoch=0 step=225/301 lr=0.000050 n=32 loss_per_token=0.000205 elapsed=122.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+28203.6s 275 epoch=0 step=226/301 lr=0.000050 n=32 loss_per_token=0.000364 elapsed=122.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.6GiB peak_reserved=86.3GiB
+28322.8s 276 epoch=0 step=227/301 lr=0.000049 n=32 loss_per_token=0.000114 elapsed=119.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+28443.6s 277 epoch=0 step=228/301 lr=0.000049 n=32 loss_per_token=0.000132 elapsed=120.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=85.9GiB
+28561.9s 278 epoch=0 step=229/301 lr=0.000048 n=32 loss_per_token=0.000122 elapsed=118.3s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.6GiB peak_reserved=85.0GiB
+28681.7s 279 epoch=0 step=230/301 lr=0.000047 n=32 loss_per_token=0.000374 elapsed=119.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.4GiB
+28801.5s 280 epoch=0 step=231/301 lr=0.000047 n=32 loss_per_token=0.000205 elapsed=119.8s alloc=67.1GiB reserved=67.7GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+28920.1s 281 epoch=0 step=232/301 lr=0.000046 n=32 loss_per_token=0.000123 elapsed=118.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+29043.3s 282 epoch=0 step=233/301 lr=0.000045 n=32 loss_per_token=0.000408 elapsed=123.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.8GiB peak_reserved=86.5GiB
+29164.2s 283 epoch=0 step=234/301 lr=0.000045 n=32 loss_per_token=0.000246 elapsed=120.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.6GiB peak_reserved=86.2GiB
+29282.9s 284 epoch=0 step=235/301 lr=0.000044 n=32 loss_per_token=0.000101 elapsed=118.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.5GiB peak_reserved=86.7GiB
+29405.3s 285 epoch=0 step=236/301 lr=0.000043 n=32 loss_per_token=0.000202 elapsed=122.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+29526.6s 286 epoch=0 step=237/301 lr=0.000043 n=32 loss_per_token=0.000120 elapsed=121.3s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+29645.8s 287 epoch=0 step=238/301 lr=0.000042 n=32 loss_per_token=0.000346 elapsed=119.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.1GiB peak_reserved=85.7GiB
+29769.0s 288 epoch=0 step=239/301 lr=0.000041 n=32 loss_per_token=0.000097 elapsed=123.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+29891.0s 289 epoch=0 step=240/301 lr=0.000041 n=32 loss_per_token=0.000129 elapsed=122.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+30009.6s 290 epoch=0 step=241/301 lr=0.000040 n=32 loss_per_token=0.000156 elapsed=118.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.9GiB peak_reserved=85.4GiB
+30130.1s 291 epoch=0 step=242/301 lr=0.000039 n=32 loss_per_token=0.000230 elapsed=120.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+30248.5s 292 epoch=0 step=243/301 lr=0.000039 n=32 loss_per_token=0.000196 elapsed=118.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.3GiB peak_reserved=85.8GiB
+30330.2s 293 epoch=0 step=244/301 lr=0.000038 n=22 loss_per_token=0.000299 elapsed=81.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+30467.9s 294 epoch=0 step=245/301 lr=0.000037 n=32 loss_per_token=0.040848 elapsed=137.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.9GiB peak_reserved=87.5GiB
+30589.7s 295 epoch=0 step=246/301 lr=0.000037 n=32 loss_per_token=0.093226 elapsed=121.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.9GiB peak_reserved=86.6GiB
+30725.6s 296 epoch=0 step=247/301 lr=0.000036 n=32 loss_per_token=0.009625 elapsed=135.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+30862.6s 297 epoch=0 step=248/301 lr=0.000035 n=32 loss_per_token=0.000069 elapsed=137.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+30999.6s 298 epoch=0 step=249/301 lr=0.000035 n=32 loss_per_token=0.004260 elapsed=137.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+31136.2s 299 epoch=0 step=250/301 lr=0.000034 n=32 loss_per_token=0.000401 elapsed=136.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+31273.9s 300 epoch=0 step=251/301 lr=0.000033 n=32 loss_per_token=0.000108 elapsed=137.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+31411.5s 301 epoch=0 step=252/301 lr=0.000033 n=32 loss_per_token=0.000282 elapsed=137.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+31548.5s 302 epoch=0 step=253/301 lr=0.000032 n=32 loss_per_token=0.003628 elapsed=137.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+31686.4s 303 epoch=0 step=254/301 lr=0.000031 n=32 loss_per_token=0.006772 elapsed=137.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+31823.8s 304 epoch=0 step=255/301 lr=0.000031 n=32 loss_per_token=0.004348 elapsed=137.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+31961.4s 305 epoch=0 step=256/301 lr=0.000030 n=32 loss_per_token=0.009017 elapsed=137.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=85.0GiB peak_reserved=87.8GiB
+32099.5s 306 epoch=0 step=257/301 lr=0.000029 n=32 loss_per_token=0.006222 elapsed=138.1s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.4GiB peak_reserved=87.0GiB
+32237.0s 307 epoch=0 step=258/301 lr=0.000029 n=32 loss_per_token=0.003354 elapsed=137.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.8GiB peak_reserved=87.6GiB
+32374.0s 308 epoch=0 step=259/301 lr=0.000028 n=32 loss_per_token=0.007005 elapsed=137.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+32511.6s 309 epoch=0 step=260/301 lr=0.000027 n=32 loss_per_token=0.004812 elapsed=137.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=86.9GiB
+32649.4s 310 epoch=0 step=261/301 lr=0.000027 n=32 loss_per_token=0.002102 elapsed=137.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+32786.2s 311 epoch=0 step=262/301 lr=0.000026 n=32 loss_per_token=0.002918 elapsed=136.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.9GiB peak_reserved=86.5GiB
+32922.7s 312 epoch=0 step=263/301 lr=0.000025 n=32 loss_per_token=0.002687 elapsed=136.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+33058.2s 313 epoch=0 step=264/301 lr=0.000025 n=32 loss_per_token=0.000584 elapsed=135.5s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=86.0GiB
+33193.5s 314 epoch=0 step=265/301 lr=0.000024 n=32 loss_per_token=0.004063 elapsed=135.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+33329.9s 315 epoch=0 step=266/301 lr=0.000023 n=32 loss_per_token=0.001029 elapsed=136.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.2GiB peak_reserved=85.8GiB
+33465.6s 316 epoch=0 step=267/301 lr=0.000023 n=32 loss_per_token=0.001653 elapsed=135.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+33600.8s 317 epoch=0 step=268/301 lr=0.000022 n=32 loss_per_token=0.001418 elapsed=135.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=83.1GiB peak_reserved=85.6GiB
+33737.6s 318 epoch=0 step=269/301 lr=0.000021 n=32 loss_per_token=0.001948 elapsed=136.8s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.0GiB peak_reserved=86.7GiB
+33874.9s 319 epoch=0 step=270/301 lr=0.000021 n=32 loss_per_token=0.000282 elapsed=137.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+34011.9s 320 epoch=0 step=271/301 lr=0.000020 n=32 loss_per_token=0.000235 elapsed=137.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.2GiB peak_reserved=87.0GiB
+34148.9s 321 epoch=0 step=272/301 lr=0.000019 n=32 loss_per_token=0.000108 elapsed=137.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+34285.3s 322 epoch=0 step=273/301 lr=0.000019 n=32 loss_per_token=0.000124 elapsed=136.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+34422.2s 323 epoch=0 step=274/301 lr=0.000018 n=32 loss_per_token=0.000162 elapsed=136.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+34559.7s 324 epoch=0 step=275/301 lr=0.000017 n=32 loss_per_token=0.000860 elapsed=137.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+34697.1s 325 epoch=0 step=276/301 lr=0.000017 n=32 loss_per_token=0.000288 elapsed=137.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.3GiB peak_reserved=87.0GiB
+34834.1s 326 epoch=0 step=277/301 lr=0.000016 n=32 loss_per_token=0.001186 elapsed=136.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.9GiB
+34971.7s 327 epoch=0 step=278/301 lr=0.000015 n=32 loss_per_token=0.000249 elapsed=137.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=84.1GiB peak_reserved=86.8GiB
+35108.8s 328 epoch=0 step=279/301 lr=0.000015 n=32 loss_per_token=0.000710 elapsed=137.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=85.0GiB peak_reserved=87.7GiB
+35245.8s 329 epoch=0 step=280/301 lr=0.000014 n=32 loss_per_token=0.001224 elapsed=137.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=85.0GiB peak_reserved=87.6GiB
+35384.0s 330 epoch=0 step=281/301 lr=0.000013 n=32 loss_per_token=0.000146 elapsed=138.1s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.2GiB peak_reserved=86.8GiB
+35520.5s 331 epoch=0 step=282/301 lr=0.000013 n=32 loss_per_token=0.000103 elapsed=136.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.0GiB peak_reserved=86.6GiB
+35657.1s 332 epoch=0 step=283/301 lr=0.000012 n=32 loss_per_token=0.000062 elapsed=136.6s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.4GiB
+35793.3s 333 epoch=0 step=284/301 lr=0.000011 n=32 loss_per_token=0.000148 elapsed=136.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.7GiB peak_reserved=86.3GiB
+35928.7s 334 epoch=0 step=285/301 lr=0.000011 n=32 loss_per_token=0.000284 elapsed=135.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=84.1GiB peak_reserved=86.7GiB
+36064.0s 335 epoch=0 step=286/301 lr=0.000010 n=32 loss_per_token=0.001039 elapsed=135.4s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.3GiB peak_reserved=85.8GiB
+36193.2s 336 epoch=0 step=287/301 lr=0.000009 n=32 loss_per_token=0.001032 elapsed=129.2s alloc=67.1GiB reserved=67.6GiB peak_alloc=83.4GiB peak_reserved=85.9GiB
+36302.5s 337 epoch=0 step=288/301 lr=0.000009 n=32 loss_per_token=0.393650 elapsed=108.9s alloc=67.1GiB reserved=67.5GiB peak_alloc=68.9GiB peak_reserved=69.7GiB
+36412.1s 338 epoch=0 step=289/301 lr=0.000008 n=32 loss_per_token=0.367760 elapsed=110.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=69.0GiB peak_reserved=69.7GiB
+36521.6s 339 epoch=0 step=290/301 lr=0.000007 n=32 loss_per_token=0.319148 elapsed=109.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=69.0GiB peak_reserved=69.6GiB
+36630.6s 340 epoch=0 step=291/301 lr=0.000007 n=32 loss_per_token=0.305244 elapsed=109.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=68.7GiB peak_reserved=69.3GiB
+36740.2s 341 epoch=0 step=292/301 lr=0.000006 n=32 loss_per_token=0.343537 elapsed=109.6s alloc=67.1GiB reserved=67.5GiB peak_alloc=68.7GiB peak_reserved=69.3GiB
+36848.6s 342 epoch=0 step=293/301 lr=0.000005 n=32 loss_per_token=0.349870 elapsed=107.8s alloc=67.1GiB reserved=67.5GiB peak_alloc=68.5GiB peak_reserved=69.1GiB
+36958.4s 343 epoch=0 step=294/301 lr=0.000005 n=32 loss_per_token=0.213101 elapsed=110.0s alloc=67.1GiB reserved=67.5GiB peak_alloc=69.0GiB peak_reserved=69.7GiB
+37083.5s 344 epoch=0 step=295/301 lr=0.000004 n=32 loss_per_token=0.013913 elapsed=125.5s alloc=67.1GiB reserved=67.5GiB peak_alloc=81.1GiB peak_reserved=83.3GiB
+37214.3s 345 epoch=0 step=296/301 lr=0.000003 n=32 loss_per_token=0.000028 elapsed=130.7s alloc=67.1GiB reserved=67.5GiB peak_alloc=81.7GiB peak_reserved=84.0GiB
+37345.5s 346 epoch=0 step=297/301 lr=0.000003 n=32 loss_per_token=0.000066 elapsed=131.2s alloc=67.1GiB reserved=67.5GiB peak_alloc=81.3GiB peak_reserved=83.7GiB
+37476.5s 347 epoch=0 step=298/301 lr=0.000002 n=32 loss_per_token=0.000039 elapsed=131.0s alloc=67.1GiB reserved=67.6GiB peak_alloc=82.3GiB peak_reserved=84.8GiB
+37606.9s 348 epoch=0 step=299/301 lr=0.000001 n=32 loss_per_token=0.000028 elapsed=130.4s alloc=67.1GiB reserved=67.5GiB peak_alloc=82.0GiB peak_reserved=84.3GiB
+37738.6s 349 epoch=0 step=300/301 lr=0.000001 n=32 loss_per_token=0.000075 elapsed=131.7s alloc=67.1GiB reserved=67.6GiB peak_alloc=82.8GiB peak_reserved=85.3GiB
+37738.8s 350 /usr/local/lib/python3.12/dist-packages/peft/utils/save_and_load.py:279: UserWarning: Setting `save_embedding_layers` to `True` as embedding layers found in `target_modules`.
+37738.8s 351 warnings.warn("Setting `save_embedding_layers` to `True` as embedding layers found in `target_modules`.")
+37738.8s 352 
+37738.8s 353 /usr/local/lib/python3.12/dist-packages/peft/utils/save_and_load.py:279: UserWarning: Setting `save_embedding_layers` to `True` as embedding layers found in `target_modules`.
+37738.8s 354 warnings.warn("Setting `save_embedding_layers` to `True` as embedding layers found in `target_modules`.")
+37896.2s 355 Done.
+37896.2s 356 {
+37896.2s 357 "run_root": "/kaggle/working/kaggle-v20-sft-repro-0414-104905",
+37896.2s 358 "adapter_dir": "/kaggle/working/kaggle-v20-sft-repro-0414-104905/adapter",
+37896.2s 359 "submission_zip": "/kaggle/working/kaggle-v20-sft-repro-0414-104905/submission.zip",
+37896.2s 360 "num_examples": 9622,
+37896.2s 361 "total_steps": 301,
+37896.2s 362 "total_tokens": 39030839,
+37896.2s 363 "local_micro_batch_size": 1,
+37896.2s 364 "save_raw_logprobs": false
+37896.2s 365 }
+37900.3s 366 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+37900.3s 367 cells[i][c] = re.sub('\\\\\|', '|', cell)
+37900.4s 368 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+37900.4s 369 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+37900.8s 370 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+37901.0s 371 [NbConvertApp] Writing 105464 bytes to __notebook__.ipynb
+37902.1s 372 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+37902.6s 373 [NbConvertApp] Writing 475383 bytes to __results__.html
