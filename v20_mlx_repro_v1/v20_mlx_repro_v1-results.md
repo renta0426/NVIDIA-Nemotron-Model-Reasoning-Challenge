@@ -115,13 +115,15 @@
 - source_document: `README.md`
 - source_document: `A-Open-ProgressPrizePublication/README.md`
 - run: `v20_mlx_repro_v1_fullrun_targetfix_mb1`
-- status: `training_in_progress`
-- latest_observed_step: `240 / 245`
-- latest_train_loss: `0.00010081154012745797`
-- latest_trained_tokens: `26088323`
-- latest_peak_memory_gb: `221.9409`
-- latest_step_elapsed_seconds: `303.7`
-- estimated_remaining_hours_from_step240: `0.4`
+- status: `training_complete`
+- final_step: `245 / 245`
+- final_train_loss: `0.00030877206662561054`
+- final_trained_tokens: `26568807`
+- final_peak_memory_gb: `221.9409`
+- final_step_elapsed_seconds: `213.2064`
+- total_elapsed_seconds: `75247.1154`
+- final_adapter_saved: `adapter/adapters.safetensors` (`3552656149` bytes)
+- smoke_eval_status: `started automatically at 2026-04-15T21:28:19Z; awaiting validation outputs`
 - current fullrun adapter dir still has only report files (`latest_train_report.json`, `train_report.jsonl`) and no mid-run `adapters.safetensors`, so this launch remains vulnerable until final save.
 - During live-run auditing, the waiting `eval300` watcher was found to use `postprocess-run --postprocess-eval-kind adapter_validation`, but the single-file CLI only accepts `adapter-validation`. The stale watcher was stopped and relaunched with the correct hyphenated kind before training completion, so post-smoke merge/postprocess will not fail on that typo.
 - Preflight-only failed smoke directories (`v20_mlx_repro_v1_smoke_targetfix`, `_mb2`, `_mb4`, `_mb8`) were deleted during retrain monitoring. The retained artifacts are the successful corrected 1-step smoke run (`6.6 GB`) and the live fullrun root.
