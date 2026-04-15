@@ -123,7 +123,11 @@
 - final_step_elapsed_seconds: `213.2064`
 - total_elapsed_seconds: `75247.1154`
 - final_adapter_saved: `adapter/adapters.safetensors` (`3552656149` bytes)
-- smoke_eval_status: `started automatically at 2026-04-15T21:28:19Z; awaiting validation outputs`
+- smoke_eval_status: `completed automatically at 2026-04-15T21:42:58Z`
+- smoke_eval_overall: `7 / 8 = 0.875`
+- smoke_eval_wrong_only: `000b53cf` (`bit_manipulation`, expected `01000011`, predicted `00011111`, minlogprob `-0.125`)
+- smoke_eval_artifacts: `smoke_eval_validation.csv`, `smoke_eval_results.csv`, `smoke_eval_validation_summary.json`
+- eval300_status: `watcher verdict PASS at 2026-04-15T21:43:15Z; 4 shards launched`
 - current fullrun adapter dir still has only report files (`latest_train_report.json`, `train_report.jsonl`) and no mid-run `adapters.safetensors`, so this launch remains vulnerable until final save.
 - During live-run auditing, the waiting `eval300` watcher was found to use `postprocess-run --postprocess-eval-kind adapter_validation`, but the single-file CLI only accepts `adapter-validation`. The stale watcher was stopped and relaunched with the correct hyphenated kind before training completion, so post-smoke merge/postprocess will not fail on that typo.
 - Preflight-only failed smoke directories (`v20_mlx_repro_v1_smoke_targetfix`, `_mb2`, `_mb4`, `_mb8`) were deleted during retrain monitoring. The retained artifacts are the successful corrected 1-step smoke run (`6.6 GB`) and the live fullrun root.
