@@ -87,3 +87,25 @@
 - During the long sharded run, GPU utilization temporarily collapsed even though memory stayed allocated. `pmset -g therm` showed no thermal/performance warning, and restarting only the shard workers restored GPU saturation, so this looked like a stuck MLX/Metal run state rather than a system-wide protection mode.
 - After all four shards finished, the first merge attempt failed with a `sample_selection` scope bug in `run_merge_adapter_validation()`. The single-file monolith was patched, then `merge-adapter-validation` and `postprocess-run` were rerun successfully.
 - Separate vMLX / vLLM-MLX engine probes are recorded in `appendix/mlx_faster.md`.
+
+## 2026-04-15 target-fix smoke preflight
+
+- Root-cause investigation showed the previous failed run had only `lm_head` LoRA weights because MLX local module names require the `mixer.` prefix. `default_lora_keys()` was corrected accordingly and now emits a preflight `lora_match_summary.json`.
+- Corrected MLX LoRA target match now lines up with the Kaggle/PEFT reproduction log:
+  - `q_proj 6`
+  - `k_proj 6`
+  - `v_proj 6`
+  - `o_proj 6`
+  - `in_proj 23`
+  - `out_proj 23`
+  - `up_proj 2967`
+  - `down_proj 2967`
+  - `lm_head 1`
+  - `trainable params 888,154,112` (`2.7356%`)
+- A 1-step smoke train at `micro_batch_size=1` succeeded under MLX with this corrected target coverage:
+  - run: `v20_mlx_repro_v1_smoke_targetfix_mb1`
+  - `train_loss = 0.3835325885531003`
+  - `step_tokens = 104262`
+  - `elapsed_seconds = 305.9085`
+  - `peak_memory_gb = 214.8353`
+- The same corrected 888M-trainable setup OOMed at `micro_batch_size=16`, so the corrected full retrain was relaunched as `v20_mlx_repro_v1_fullrun_targetfix_mb1`.
