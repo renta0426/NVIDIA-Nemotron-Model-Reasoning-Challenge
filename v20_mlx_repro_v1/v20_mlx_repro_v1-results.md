@@ -112,6 +112,9 @@
 - By step 8, that pattern had held for the entire first `8` optimizer steps: step 1 remained identical, and **steps 2-8 were all lower-loss than the completed baseline at the same LR**. The latest step-8 comparison was baseline `0.08271774132149194` vs nobc `0.05319287599338549` (delta `-0.02952486532810645`), with peak memory still unchanged at `221.9409 GB`.
 - Operational status at the step-8 milestone: the detached **smoke watcher v2** was still alive and polling every 5 minutes for `training_result.json`, and the detached **eval300 chain watcher** was armed to archive smoke outputs and launch the 300-row 4-shard eval only if the smoke summary completes healthy (`>= 7/8`).
 - The same pattern still held at **step 9**: baseline `0.07380936467549064` vs nobc `0.0484179373020636` (delta `-0.02539142737342704`). So the no-bias-correction run remained consistently ahead of baseline through the first `9` optimizer steps while keeping the same peak memory ceiling.
+- By **step 16**, the run was still healthy and the early lead had persisted through the full first `16` optimizer steps. Step 1 remained identical, and **every step from 2 through 16 was lower-loss than baseline at the same LR**. The latest step-16 comparison was baseline `0.02783931793607595` vs nobc `0.011274035962362598` (delta `-0.016565281973713354`).
+- The last seven step deltas before that milestone were all favorable as well: step 10 `-0.021160975163088465`, step 11 `-0.017265712553091263`, step 12 `-0.005616846187828005`, step 13 `-0.022684687865911227`, step 14 `-0.0023306986872442294`, step 15 `-0.020183764532881662`, step 16 `-0.016565281973713354`.
+- Operationally, the step16 watcher completed successfully, while the detached `smoke_watch_v2` continued polling for `training_result.json` and the detached `eval300` chain watcher remained armed behind it.
 
 ## Important assumptions
 
