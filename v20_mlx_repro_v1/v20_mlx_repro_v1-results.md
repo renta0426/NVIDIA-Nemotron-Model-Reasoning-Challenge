@@ -104,6 +104,11 @@
 - Interpretation of that short probe: inside the current MLX monolith, the bias-correction toggle changes the optimization path measurably by step 2 without changing memory behavior. This is **not** evidence of a final-score gain yet, but it is enough to justify treating `--no-bias-correction` as the next highest-signal full-run candidate before attempting harder optimizer/backend rewrites.
 - 2026-04-16 launch decision: started a new full retrain candidate named **`v20_mlx_repro_v1_fullrun_targetfix_mb1_nobc`** with the same exact snapshot replay and `micro_batch_size=1`, changing only the MLX optimizer flag to **`--no-bias-correction`**. This is the first full run explicitly targeting the measured optimizer-path gap while keeping the rest of the successful MLX reproduction contract fixed.
 - Early monitoring snapshot for that full run: **step 1 completed successfully** with `train_loss = 0.3835325885531003`, `lr = 0.0002`, `step_tokens = 104262`, `trained_tokens = 104262`, and `peak_memory_gb = 214.8353`. Those values are identical to the first step of the completed `v20_mlx_repro_v1_fullrun_targetfix_mb1` baseline, so the new run is at least healthy through the first optimizer step and only begins to diverge later if the no-bias-correction path truly matters.
+- By step 4, the no-bias-correction full run was still healthy and was tracking **lower loss than the completed baseline at the same LR on every step after step 1**:
+  - step 2: baseline `0.537891700011057` vs nobc `0.3553264494481507` (delta `-0.1825652505629063`)
+  - step 3: baseline `0.3002787976761552` vs nobc `0.2584564291858825` (delta `-0.041822368490272654`)
+  - step 4: baseline `0.18214266110983754` vs nobc `0.16342326138546515` (delta `-0.018719399724372393`)
+- Peak memory stayed unchanged versus baseline through step 4 (`221.9409 GB` after step 2+), so the observed early improvement is a training-path effect, not a memory/throughput tradeoff artifact.
 
 ## Important assumptions
 
