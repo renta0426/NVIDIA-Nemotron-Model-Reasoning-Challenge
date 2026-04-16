@@ -74,9 +74,25 @@
 | numeral | 47 | 47 | 1.000000 | 15.7% | 100.0% | 15.7% |
 | unit_conversion | 54 | 54 | 1.000000 | 18.0% | 100.0% | 18.0% |
 
+## Post-eval notes
+
+- Final MLX reproduced run on `adapter_validation_stratified_category_300_of_950`: **`246 / 300 = 0.82`**
+- Strong families:
+  - `gravity = 50 / 50`
+  - `numeral = 47 / 47`
+  - `unit_conversion = 54 / 54`
+  - `cipher = 50 / 51`
+- Main loss buckets:
+  - `cryptarithm_deduce = 0 / 23`
+  - `equation_numeric_guess = 0 / 2`
+  - `cryptarithm_guess = 1 / 5`
+  - `equation_numeric_deduce = 7 / 15`
+  - `bit_manipulation = 37 / 53`
+- Publication deterministic reasoners benchmarked directly on the same 300-row subset reached **`257 / 300 = 0.856667`**.
+- Reasoner-over-model gains were concentrated in `equation_numeric_deduce` (`7 -> 15` correct), with smaller gains in `bit_manipulation` (`37 -> 39`) and `cipher` (`50 -> 51`), while both model and reasoners remained weak on `cryptarithm_*` and `equation_numeric_guess`.
+
 ## Important assumptions
 
 - Training data uses the exact checked-in v20 snapshot `04-08-16-14/tokens` + `logprobs/index.jsonl`, not the current `corpus.jsonl`.
 - Optimizer-step grouping uses the recorded `step` assignments from the snapshot, so the MLX run replays the actual v20 batch membership/order.
 - MLX-specific assumptions not explicit in the public v20 config: `lora_alpha = 32`, `lora_dropout = 0.0`, `Adam bias_correction = True`.
-
