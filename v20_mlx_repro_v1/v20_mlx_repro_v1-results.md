@@ -115,6 +115,11 @@
 - By **step 16**, the run was still healthy and the early lead had persisted through the full first `16` optimizer steps. Step 1 remained identical, and **every step from 2 through 16 was lower-loss than baseline at the same LR**. The latest step-16 comparison was baseline `0.02783931793607595` vs nobc `0.011274035962362598` (delta `-0.016565281973713354`).
 - The last seven step deltas before that milestone were all favorable as well: step 10 `-0.021160975163088465`, step 11 `-0.017265712553091263`, step 12 `-0.005616846187828005`, step 13 `-0.022684687865911227`, step 14 `-0.0023306986872442294`, step 15 `-0.020183764532881662`, step 16 `-0.016565281973713354`.
 - Operationally, the step16 watcher completed successfully, while the detached `smoke_watch_v2` continued polling for `training_result.json` and the detached `eval300` chain watcher remained armed behind it.
+- By **step 32**, the run was still healthy (`train_loss = 0.002505089915434086`, `lr = 0.00017469387755102042`, peak memory `221.9409 GB`) and remained mostly ahead of baseline, but the earlier “all steps after step 1 are lower-loss” pattern no longer held strictly. There was a small temporary regression window at steps `26-28`:
+  - step 26: baseline `0.002767294444093858` vs nobc `0.002949561201867092` (delta `+0.00018226675777323386`)
+  - step 27: baseline `0.0038937293759880314` vs nobc `0.004263069305825183` (delta `+0.00036933992983715193`)
+  - step 28: baseline `0.0031311420987780083` vs nobc `0.00321180630144808` (delta `+0.00008066420267007152`)
+- After that blip, the run returned to lower-loss values at steps `29-32`, including step 32 itself: baseline `0.0029800718671799775` vs nobc `0.002505089915434086` (delta `-0.0004749819517458915`). So the current evidence still favors the no-bias-correction path overall, but not as a monotonic per-step win.
 
 ## Important assumptions
 
