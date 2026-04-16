@@ -90,6 +90,11 @@
   - `bit_manipulation = 37 / 53`
 - Publication deterministic reasoners benchmarked directly on the same 300-row subset reached **`257 / 300 = 0.856667`**.
 - Reasoner-over-model gains were concentrated in `equation_numeric_deduce` (`7 -> 15` correct), with smaller gains in `bit_manipulation` (`37 -> 39`) and `cipher` (`50 -> 51`), while both model and reasoners remained weak on `cryptarithm_*` and `equation_numeric_guess`.
+- When the published first-950 notebook ratios are projected onto this exact 300-row subset, the expected counts are roughly `gravity 50`, `numeral 47`, `unit_conversion 54`, `cipher 49.74`, `bit_manipulation 46.73`, `equation_numeric_deduce 13.12`, `cryptarithm_deduce 1.94`, `cryptarithm_guess 1.07`, `equation_numeric_guess 0`. The MLX run is therefore close on the easy families and `cipher`, while the real reproduction gap is concentrated in `bit_manipulation` and `equation_numeric_deduce`.
+- All `8/8` current `equation_numeric_deduce` misses in `validation.csv` were long incomplete generations with **no** `\boxed{}` and **no** closing `</think>`, so the visible failure mode there is truncation / runaway reasoning rather than answer-extraction loss.
+- However, a same-weights **no-thinking** probe on those exact `8` failed `equation_numeric_deduce` rows recovered **`0 / 8`**; outputs collapsed to short wrong answers (average `24.5` chars) instead of the long truncated traces. This means the long-thinking behavior changes how the failure appears, but turning thinking off does **not** rescue the missing skill.
+- A same-weights **no-thinking** probe on the exact `16` failed `bit_manipulation` rows likewise recovered **`0 / 16`** (average `822.1` chars, median `102.5`), so the main bit losses also persist without the long-thinking path.
+- Current diagnosis: the dominant residual is more consistent with **training / weight divergence** from the original v20 path than with MLX eval extraction bugs or thinking-mode verbosity alone. Thinking still matters as a secondary inference-behavior factor for `equation_numeric_deduce`, because it turns short wrong answers into long unfinished traces, but it is not the main source of the accuracy gap.
 
 ## Important assumptions
 
