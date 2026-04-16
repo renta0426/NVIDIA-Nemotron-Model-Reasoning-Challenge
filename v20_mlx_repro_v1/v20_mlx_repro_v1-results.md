@@ -111,6 +111,7 @@
 - Peak memory stayed unchanged versus baseline through step 4 (`221.9409 GB` after step 2+), so the observed early improvement is a training-path effect, not a memory/throughput tradeoff artifact.
 - By step 8, that pattern had held for the entire first `8` optimizer steps: step 1 remained identical, and **steps 2-8 were all lower-loss than the completed baseline at the same LR**. The latest step-8 comparison was baseline `0.08271774132149194` vs nobc `0.05319287599338549` (delta `-0.02952486532810645`), with peak memory still unchanged at `221.9409 GB`.
 - Operational status at the step-8 milestone: the detached **smoke watcher v2** was still alive and polling every 5 minutes for `training_result.json`, and the detached **eval300 chain watcher** was armed to archive smoke outputs and launch the 300-row 4-shard eval only if the smoke summary completes healthy (`>= 7/8`).
+- The same pattern still held at **step 9**: baseline `0.07380936467549064` vs nobc `0.0484179373020636` (delta `-0.02539142737342704`). So the no-bias-correction run remained consistently ahead of baseline through the first `9` optimizer steps while keeping the same peak memory ceiling.
 
 ## Important assumptions
 
