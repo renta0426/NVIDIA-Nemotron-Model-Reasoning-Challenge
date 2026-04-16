@@ -1,74 +1,171 @@
-# v20_corrective_corpus_v3 — default-1 exposure ablation (ON HOLD)
+# v20_corrective_corpus_v3 results
 
-> Repository: [README.md](../../README.md) | submission.zip | max_tokens=7680, max_num_seqs=64
+> 競技契約の正本は `README.md`。  
+> 戦略根拠は `README.md` と `A-Open-ProgressPrizePublication/README.md`。  
+> この v3 は **旧 d1 除外アブレーションを mainline に昇格するものではなく**、**現行 MLX 再現 run の失敗行に直接合わせた corrective corpus generator** を同フォルダへ追加した記録。
 
-## Audit status
+## 目的
 
-**ON HOLD**. The original v3 premise was invalidated by a direct audit of `reasoning/*.txt` vs `train.csv`.
+- 現行 MLX 再現 run  
+  `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_targetfix_mb1/adapter_validation/validation_summary.json`
+  の **`246 / 300 = 0.82`** を起点に、今この run が落としている行へ直接オーバーレイを張る。
+- `README.md` の deterministic / boxed-answer 契約を守りつつ、`A-Open-ProgressPrizePublication/README.md` が明示する
+  - bit の長期 main lever
+  - equation_numeric の deterministic trace 有効性
+  - cryptarithm の splitting / concatenation 弱さ
+  を、**現行失敗分布**で再配分する。
+- v2 は旧 Kaggle 系差分寄りで、現行 54 wrong のうち **5 行しか拾えていなかった**。v3 はここを修正する。
 
-- The removed set is still **92 snapshot rows / 66 base problem IDs / 648,074 tokens**
-- But in the current repo state, those **66 base problem IDs are all teacher-correct**
-- So this bundle is **not a confirmed contamination cleanup**
-- It is a **default-1 exposure ablation** that removes correct teacher traces and leaves at least one known non-d1 teacher error (`ef2fe526`) in the remaining v20 binary overlap
+## 現行失敗プロファイル（MLX reproduced run）
 
-Reference: corrected discussion in `A-Open-ProgressPrizePublication/v20_to_088_strategy.md` §v3 review.
+- source run: `v20_mlx_repro_v1/v20_mlx_repro_v1-results.md`
+- local eval: **`246 / 300 = 0.82`**
+- 同じ 300 行に対する publication deterministic reasoners: **`257 / 300 = 0.856667`**
+- wrong total: `54`
+- category 別:
+  - `cryptarithm_deduce = 23`
+  - `cryptarithm_guess = 4`
+  - `equation_numeric_deduce = 8`
+  - `equation_numeric_guess = 2`
+  - `bit_manipulation = 16`
+  - `cipher = 1`
 
-## Bundle
+train metadata に突き合わせると、現行 wrong は主に次へ写像された。
 
-| Metric | v20 baseline | v3 (this) | Delta |
-|--------|-------------|-----------|-------|
-| Examples | 7830 | 7738 | −92 |
-| Steps (bs=32) | ~245 | 245 | −0 |
-| Total tokens | 27,850,703 | 27,202,629 | −648,074 |
-| Loss tokens | 26,568,807 | 25,945,530 | −623,277 |
-| Categories | 9 | 9 | — |
-| bit_manipulation | 1754 | 1662 | −92 |
+- `glyph_len5 = 27`（cryptarithm 系）
+- `numeric_2x2 = 10`（equation_numeric 系）
+- `bit_structured_byte_formula / bit_prompt_local_exact_formula / bit_other = 16`
+- `text_monoalphabetic = 1`
 
-File: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v3_bundle.jsonl` (236.6 MB)
+つまり v2 の binary 寄り補正だけでは足りず、**現行 MLX では symbolic equation / cryptarithm 補正を前面へ出す必要がある**。
 
-## Promotion Gates
+## 実装
 
-| Gate | Threshold | Status |
-|------|-----------|--------|
-| Proxy overall | ≥ 179/200 | HOLD |
-| Proxy binary | ≥ 80/92 | HOLD |
-| Proxy bit_structured_byte_formula | ≥ 26/31 | HOLD |
-| Easy-family no-regression | No new drops | HOLD |
-| Public LB | ≥ 0.86 | HOLD |
+- Script: `versions/v20_corrective_corpus_v3/reproduce_v20_corrective_corpus_v3.py`
+- 形式: **single-file monolith**
+- 既定入力:
+  - `cuda-train-data-analysis-v1/artifacts/train_recommended_learning_target_v1.csv`
+  - `data/train.csv`
+  - `A-Open-ProgressPrizePublication/nemotron/problems.jsonl`
+  - `A-Open-ProgressPrizePublication/nemotron/reasoning/*.txt`
+  - `A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14/logprobs/index.jsonl`
+  - `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_targetfix_mb1/adapter_validation/validation.csv`
+  - `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_targetfix_mb1/adapter_validation/validation_summary.json`
+- 既定出力:
+  - `corrective_selection.csv`
+  - `current_mlx_failure_profile.csv`
+  - `corrective_overlay_unique.jsonl`
+  - `corrective_overlay_repeated.jsonl`
+  - `anchor_watchlist.csv`
+  - `corrective_overlay_summary.json`
+  - `reports/corrective_overlay_report.md`
+- optional:
+  - `--write-training-bundle`
+  - `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v3_bundle.jsonl`
 
-## Measured Results
+### v2 からの設計差分
 
-### Local Validation (train.csv head 950)
+- **旧 signal 中心** → **現行 MLX wrong row 中心**
+- **binary + easy guardrail** → **exact current failures + typed support**
+- 新 bucket:
+  - `current_symbol_glyph_failures`
+  - `current_symbol_numeric_failures`
+  - `current_bit_failures`
+  - `current_cipher_failures`
+  - `symbol_numeric_support`
+  - `symbol_glyph_support`
+  - `bit_formula_support`
+- numeric support は **現行 failure operator と同じ operator** を優先。
+- glyph support は **現行 failure answer 文字集合** に寄せる。
+- bit support は **現行 failure の solver / abstract family** に寄せる。
+- `0ec17d2e` は `train_recommended_learning_target_v1.csv` に不在だったため、`train.csv + reasoning + problems.jsonl` から fallback で拾う。
 
-| Category | v20 | v3 | Delta |
-|----------|-----|-----|-------|
-| **Overall** | 837/950 | — | — |
+## Smoke generation
 
-### Leaderboard Proxy (200 rows)
+実行コマンド:
 
-| Category | v20 | v3 | Delta |
-|----------|-----|-----|-------|
-| **Overall** | 176/200 | — | — |
-| Binary | 76/92 | — | — |
-| bit_structured_byte_formula | 23/31 | — | — |
+```bash
+uv run python -m py_compile versions/v20_corrective_corpus_v3/reproduce_v20_corrective_corpus_v3.py
+uv run python versions/v20_corrective_corpus_v3/reproduce_v20_corrective_corpus_v3.py --run-name smoke_current_mlx_failure_focus
+```
 
-### Public Leaderboard
+## 2026-04-16 測定結果: `smoke_current_mlx_failure_focus`
 
-| Run | Score |
-|-----|-------|
-| v20 baseline | 0.84–0.85 |
-| v1 corrective | (not submitted) |
-| v2 corrective | 0.83–0.84 |
-| **v3 (this)** | ⏳ |
+- current failure coverage:
+  - v2 overlap on current 54 wrong: **`5 / 54`**
+  - v3 overlap on current 54 wrong: **`54 / 54`**
+- selected unique rows: **`134`**
+- selected repeated rows: **`290`**
+- exact current failure rows: **`54`**
+- support rows: **`80`**
 
-## Key Watchlist Rows
+bucket 別 unique:
 
-Always-wrong binary proxy rows with wrong d1 teacher:
-`01e09228, 101410e4, 12154247, 12fd5b6c, 1532c0d1, 2230fad0, 257e7158, 2d790c98, 31966698, a6192d29`
+- `current_symbol_glyph_failures = 27`
+- `current_symbol_numeric_failures = 10`
+- `current_bit_failures = 16`
+- `current_cipher_failures = 1`
+- `symbol_numeric_support = 24`
+- `symbol_glyph_support = 32`
+- `bit_formula_support = 24`
 
-Rows that moved across v20/v1/v2 and still need targeted treatment:
-`012fb81b, 0520a6ec, 0a50c4a8, 59c78e51, 8e5d6fe6, b9500f41, c30a782a, fa67da07`
+bucket 別 repeated:
 
-## Recording
+- `current_symbol_glyph_failures = 81`
+- `current_symbol_numeric_failures = 40`
+- `current_bit_failures = 32`
+- `current_cipher_failures = 1`
+- `symbol_numeric_support = 48`
+- `symbol_glyph_support = 64`
+- `bit_formula_support = 24`
 
-All scores are recorded from measured outputs only. This v3 bundle is currently on hold pending a corrected mainline binary corpus.
+failure signal 要約:
+
+- numeric failure operators:
+  - `* = 2`
+  - `} = 2`
+  - `" = 1`
+  - `' = 1`
+  - `+ = 1`
+  - `- = 1`
+  - `: = 1`
+  - `^ = 1`
+- glyph failure answer chars 上位:
+  - `: = 9`
+  - `$ = 6`
+  - `" = 5`
+  - `(`, `<`, `>`, `?` が各 `4`
+- bit failure solver 上位:
+  - `binary_structured_byte_formula = 5`
+  - `binary_structured_byte_formula_abstract = 5`
+  - `binary_prompt_local_stage2_unique_exact = 2`
+
+## 生成物
+
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/artifacts/current_mlx_failure_profile.csv`
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/artifacts/corrective_selection.csv`
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/artifacts/corrective_overlay_unique.jsonl`
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/artifacts/corrective_overlay_repeated.jsonl`
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/artifacts/anchor_watchlist.csv`
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/artifacts/corrective_overlay_summary.json`
+- `versions/v20_corrective_corpus_v3/outputs/smoke_current_mlx_failure_focus/reports/corrective_overlay_report.md`
+
+## Measured score ledger
+
+| run | kind | measured source score | corrective coverage | notes |
+| --- | --- | ---: | ---: | --- |
+| smoke_current_mlx_failure_focus | corpus generation smoke | source MLX validation `246 / 300 = 0.82` | `54 / 54 = 1.0000` | no training yet; `134` unique / `290` repeated |
+
+## 次のアクション
+
+- この v3 overlay を使った学習・再評価はまだ未実施。
+- 次は `equation_numeric_deduce` と `cryptarithm_*` の改善が本当に取れるか、`numeral / gravity / unit_conversion` 無劣化で検証する。
+- public / proxy / local の 3 軸で、README 契約下の score を継続記録する。
+
+## Historical note
+
+同フォルダに残っている以下は **旧 v3 d1 exclusion / default-1 exposure ablation** の監査用 artifact。現時点の mainline corrective corpus 方針ではないが、履歴として保持する。
+
+- `versions/v20_corrective_corpus_v3/d1_exclusion_list.json`
+- `versions/v20_corrective_corpus_v3/v3_bundle_summary.json`
+
