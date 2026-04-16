@@ -1,16 +1,16 @@
-"""v3 corrective corpus: remove 'default 1' contaminated training examples.
+"""v3 corrective corpus: ablation that removes v20 examples whose teacher trace contains 'default 1'.
 
-Root cause analysis (v3 strategy review) showed that 92 token snapshots
-(66 unique problem IDs, 648K tokens) contain teacher reasoning with
-'default 1' fallback that produces WRONG answers.  Proxy binary accuracy
-with 'default 1' in model output is 11-17%; without it, 96-100%.
+Important audit note:
+- In the current repository state, the 92 removed snapshot rows
+  (66 unique base problem IDs, 648K tokens) are teacher-correct when
+  checked against train.csv.
+- This script therefore should be treated as a `default 1` exposure
+  ablation, not a proven contamination-cleaning step.
 
 This script:
   1. Loads the v20 base snapshot (7830 token dirs)
-  2. Identifies and excludes the 92 'default 1' contaminated dirs
-  3. Writes a clean bundle for Kaggle training
-
-No overlay is added — this is a pure signal-cleaning experiment.
+  2. Identifies and excludes the 92 rows whose teacher trace contains `default 1`
+  3. Writes a comparison bundle for Kaggle training
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ def build_clean_bundle(
     d1_problem_ids: set[str],
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Build v20 bundle with default-1 examples removed."""
+    """Build a v20 bundle with default-1-trace examples removed."""
     config = read_json(BASE_SNAPSHOT_CONFIG_PATH)
     batch_size = int(config["batch_size"])
     base_rows = load_base_snapshot_index()
@@ -137,8 +137,8 @@ def build_clean_bundle(
         "d1_excluded_problem_count": len(d1_problem_ids),
         "d1_excluded_row_count": len(excluded_rows),
         "note": (
-            "v3 signal-cleaning bundle: v20 base minus 'default 1' contaminated "
-            "teacher examples. No overlay added — pure subtractive experiment."
+            "v3 ablation bundle: v20 base minus examples whose teacher trace "
+            "contains 'default 1'. No overlay added."
         ),
     }
 

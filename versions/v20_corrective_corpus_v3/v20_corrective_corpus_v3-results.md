@@ -1,14 +1,17 @@
-# v20_corrective_corpus_v3 — default-1 signal cleaning
+# v20_corrective_corpus_v3 — default-1 exposure ablation (ON HOLD)
 
 > Repository: [README.md](../../README.md) | submission.zip | max_tokens=7680, max_num_seqs=64
 
-## Strategy
+## Audit status
 
-**SUBTRACTIVE**: Remove 92 contaminated training examples containing `default 1` teacher-solver fallback.
-These 92 token snapshots (66 base problem IDs + 26 -p0 continuations) carry wrong gold answers
-and teach the model a harmful `default 1 → bit = 1` shortcut.
+**ON HOLD**. The original v3 premise was invalidated by a direct audit of `reasoning/*.txt` vs `train.csv`.
 
-Root cause analysis: `A-Open-ProgressPrizePublication/v20_to_088_strategy.md` §v3 review.
+- The removed set is still **92 snapshot rows / 66 base problem IDs / 648,074 tokens**
+- But in the current repo state, those **66 base problem IDs are all teacher-correct**
+- So this bundle is **not a confirmed contamination cleanup**
+- It is a **default-1 exposure ablation** that removes correct teacher traces and leaves at least one known non-d1 teacher error (`ef2fe526`) in the remaining v20 binary overlap
+
+Reference: corrected discussion in `A-Open-ProgressPrizePublication/v20_to_088_strategy.md` §v3 review.
 
 ## Bundle
 
@@ -27,11 +30,11 @@ File: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corp
 
 | Gate | Threshold | Status |
 |------|-----------|--------|
-| Proxy overall | ≥ 179/200 | ⏳ |
-| Proxy binary | ≥ 80/92 | ⏳ |
-| Proxy bit_structured_byte_formula | ≥ 26/31 | ⏳ |
-| Easy-family no-regression | No new drops | ⏳ |
-| Public LB | ≥ 0.86 | ⏳ |
+| Proxy overall | ≥ 179/200 | HOLD |
+| Proxy binary | ≥ 80/92 | HOLD |
+| Proxy bit_structured_byte_formula | ≥ 26/31 | HOLD |
+| Easy-family no-regression | No new drops | HOLD |
+| Public LB | ≥ 0.86 | HOLD |
 
 ## Measured Results
 
@@ -60,12 +63,12 @@ File: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corp
 
 ## Key Watchlist Rows
 
-Always-wrong proxy rows with wrong d1 teacher (unreachable without solver fix):
-`0bfdba12, 3bfb9f72, 46685dd9, 49db3133, 51dc24a2, 729f5d30, 72ba7a3a, 79c42e3f, c1c18e68, ce065d18`
+Always-wrong binary proxy rows with wrong d1 teacher:
+`01e09228, 101410e4, 12154247, 12fd5b6c, 1532c0d1, 2230fad0, 257e7158, 2d790c98, 31966698, a6192d29`
 
-v1-only-win rows (should flip back to correct if d1 signal is removed):
-`46cc4f06, 0e9e62a3, 8ce0e3bd`
+Rows that moved across v20/v1/v2 and still need targeted treatment:
+`012fb81b, 0520a6ec, 0a50c4a8, 59c78e51, 8e5d6fe6, b9500f41, c30a782a, fa67da07`
 
 ## Recording
 
-All scores are recorded from measured outputs only. Placeholders marked ⏳.
+All scores are recorded from measured outputs only. This v3 bundle is currently on hold pending a corrected mainline binary corpus.
