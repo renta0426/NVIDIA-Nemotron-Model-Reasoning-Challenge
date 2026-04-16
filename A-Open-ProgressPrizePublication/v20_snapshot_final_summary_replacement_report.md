@@ -1,136 +1,143 @@
-# v20 snapshot FINAL_SUMMARY replacement report
+# v20 snapshot FINAL_SUMMARY 置換レポート
 
-> Repository note: canonical challenge contract lives in `README.md`.
-> This report reviews whether parts of `A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14` should be rebuilt with `cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md`-aligned teacher traces while preserving the submission target as `submission.zip`.
-> Measured score changes from any replacement run must be recorded in the relevant version ledger before promotion.
+> Repository note: challenge の canonical contract は `README.md` を参照してください。
+> このレポートは `A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14` の一部を `cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md` に沿った teacher trace で作り直すべきかを整理したものです。提出目標は引き続き `submission.zip` です。
+> 置換や overlay を伴う run を実施した場合、計測済みスコアは対応する version ledger に必ず追記してください。
 
-## Conclusion
+## 先に結論
 
-**Yes, but only selectively.** The right move is **not** to rebuild the whole `04-08-16-14` snapshot from `FINAL_SUMMARY_REPORT.md`.
+**はい。ただし一部だけです。**  
+`04-08-16-14` 全体を `FINAL_SUMMARY_REPORT.md` ベースで作り直すべきではありません。
 
-The README-grounded reason is:
+README を根拠にすると、判断は次の 3 点に集約されます。
 
-1. The original A-Open win path already had strong deterministic coverage on easy families and a large slice of `bit_manipulation`.
-2. The current audit shows that the earlier broad `default 1 contamination` story was wrong for the frozen v20 snapshot.
-3. The remaining value of `FINAL_SUMMARY` is therefore **surgical replacement and teacher-correct overlay**, not wholesale regeneration.
+1. 元の A-Open 勝ち筋は、すでに easy family と `bit_manipulation` の大きな部分で強い deterministic teacher を持っていた。
+2. その後の監査で、以前の「`default 1` 汚染をまとめて除去すべき」という理解は、凍結済み v20 snapshot に対しては誤りだと分かった。
+3. したがって `FINAL_SUMMARY` の使い道は、**全面再生成**ではなく、**監査済み誤答の外科的置換と teacher-correct overlay** である。
 
-## README-grounded framing
+## README を基準にした位置づけ
 
-`A-Open-ProgressPrizePublication/README.md` says the winning bet was:
+`A-Open-ProgressPrizePublication/README.md` では、勝ち筋は次のように説明されている。
 
-- deterministic code-generated chain-of-thought,
-- strong `bit_manipulation`,
-- Tinker SFT,
-- minimum-logprob-oriented training,
-- and a target `bit_manipulation` solve rate of `1364 / 1602 = 85.1%`, not 100%.
+- code で生成した deterministic chain-of-thought
+- `bit_manipulation` を主戦場にすること
+- Tinker による SFT
+- min logprob を意識した学習
+- `bit_manipulation` の目標 solve rate は `1364 / 1602 = 85.1%`
 
-That matters because `FINAL_SUMMARY_REPORT.md` should be read as a **later audit and curation layer**, not as the original source of every trace inside `04-08-16-14`.
+重要なのは、README 自体が **bit を 100% 解けるとは書いていない** ことです。  
+したがって `FINAL_SUMMARY_REPORT.md` は、元の v20 snapshot の直接の生成元というより、**あとから teacher 品質と活用可能領域を精査した監査・整理レイヤ** と読むのが正確です。
 
-## What is actually aligned with FINAL_SUMMARY
+## FINAL_SUMMARY と直接つながっている部分
 
-There are two distinct layers:
+実際には 2 つの層があります。
 
-| Layer | Relationship to `FINAL_SUMMARY_REPORT.md` | Practical reading |
+| 層 | `FINAL_SUMMARY_REPORT.md` との関係 | 実務上の読み方 |
 | --- | --- | --- |
-| Original v20 snapshot `04-08-16-14` | **Indirect / partial** | It comes from the original README-era Nemotron teacher pipeline, not from the later audit report. |
-| Current corrective work (`v3_mainline`) | **Direct / strong** | It uses `FINAL_SUMMARY`-style curation: teacher-correct filtering, structured bit prioritization, and surgical base cleanup. |
+| 元の v20 snapshot `04-08-16-14` | **間接的 / 部分的** | README 時代の Nemotron teacher pipeline から来た base。`FINAL_SUMMARY` から直接生成されたものではない。 |
+| 現在の corrective work (`v3_mainline`) | **直接的 / 強い** | teacher-correct filtering、structured bit 優先、base の外科的 cleanup という `FINAL_SUMMARY` 的な使い方をしている。 |
 
-So the current run is already moving in the correct direction: **keep the historical v20 base where it is proven safe, and apply `FINAL_SUMMARY` only where it adds audited value.**
+つまり現在の方針として正しいのは、**安全性が確認できている v20 base は残し、`FINAL_SUMMARY` は価値が監査で確認できた箇所だけに適用する** ことです。
 
-## What should not be rewritten
+## 作り直してはいけない部分
 
-### 1. Do not rewrite the whole snapshot
+### 1. snapshot 全体の再生成はしない
 
-The frozen v20 snapshot is a historical training artifact. It should be treated as a base distribution, not as a file to regenerate blindly from today's repo state.
+`04-08-16-14` は歴史的な training artifact です。  
+いまの repo 状態から無条件に再生成する対象ではなく、**base distribution として扱うべき**です。
 
-Reasons:
+理由は次のとおりです。
 
-- current `reasoning/*.txt` and `problems.jsonl` are not guaranteed to be a perfect time match to the historical `04-08-16-14` snapshot,
-- `nemotron/corpus.py` only includes `rule_found` rows for normal categories, so the mere existence of wrong reasoning files in the repo does **not** mean they all entered training,
-- the snapshot contains many easy-family examples that README and later validation both show were already strong.
+- 現在の `reasoning/*.txt` と `problems.jsonl` は、当時の `04-08-16-14` snapshot と完全な時点一致を保証しない。
+- `nemotron/corpus.py` は通常カテゴリでは `rule_found` の行だけを学習に入れるので、repo 内に誤答 reasoning file が存在することと、実際に training に入ったことは同義ではない。
+- snapshot には README 上でも後続 validation 上でも強いことが確認されている easy family の例が多数含まれる。
 
-### 2. Do not use `default 1` as a blanket rewrite rule
+### 2. `default 1` を一括置換ルールにしない
 
-This was the most important correction from the v3 audit.
+ここが v3 監査で最も大きく修正された点です。
 
-- In the full binary reasoning pool, `default 1` is often dangerous.
-- But in the actual v20 snapshot overlap, the `92` rows tied to `66` `default 1` base problems were teacher-correct.
+- binary reasoning 全体で見ると、`default 1` はたしかに危険信号である。
+- しかし、実際の v20 snapshot overlap に入っていた `default 1` 関連の `92` rows / `66` base IDs は teacher-correct だった。
 
-Therefore:
+したがって、
 
-- **`default 1` is a monitoring signal**
-- **not an automatic replacement criterion**
+- **`default 1` は監視対象**
+- **自動置換条件ではない**
 
-## What should be replaced or excluded
+という扱いに下げるべきです。
 
-### 1. Known metric-wrong base bit rows
+## 置換・除外すべき部分
 
-This is the cleanest replacement target.
+### 1. 監査で誤答確定した base bit rows
 
-Current audited finding:
+ここは最もきれいな置換対象です。
 
-- known wrong base problem in the frozen v20 overlap: `ef2fe526`
-- base rows affected: `ef2fe526`, `ef2fe526-p0`
+現時点で確認済みのものは次です。
 
-This is why the current `v3_mainline` excludes `ef2fe526*` from the base snapshot.
+- 凍結済み v20 overlap に存在する既知の metric-wrong base problem: `ef2fe526`
+- 影響 row: `ef2fe526`, `ef2fe526-p0`
 
-### 2. Any future bit rows proven wrong by direct audit
+このため、現在の `v3_mainline` では `ef2fe526*` を base snapshot から除外しています。
 
-The replacement policy should stay evidence-first:
+### 2. 今後、直接監査で誤答と確定した bit rows
 
-1. verify the frozen snapshot row exists,
-2. verify teacher boxed answer against `train.csv` using metric-consistent comparison,
-3. only then remove or replace.
+今後の置換ルールも evidence-first にすべきです。
 
-This is the safe pattern. Broad heuristics alone are not enough.
+1. まず凍結 snapshot に当該 row が実在するか確認する
+2. `train.csv` と teacher の boxed answer を metric 整合的に照合する
+3. そのうえで除外または置換する
 
-## What should be rebuilt with FINAL_SUMMARY-derived data
+この順序でないと、広すぎるヒューリスティックで正答 trace まで削る危険があります。
 
-The high-EV use of `FINAL_SUMMARY` is **not** full snapshot reconstruction. It is:
+## FINAL_SUMMARY 由来データで作り直すべき部分
+
+`FINAL_SUMMARY` の高 EV な使い方は、snapshot 全体の再構築ではありません。狙うべきは次です。
 
 1. **teacher-correct-only overlay**
-2. **bit-heavy reallocation toward high-value families**
-3. **small guardrails for easy families so binary strengthening does not regress them**
+2. **bit の中でも高価値 family への再配分**
+3. **binary 強化で easy family を壊さないための軽い guardrail**
 
-That is exactly the logic of `versions/v20_corrective_corpus_v3_mainline/`.
+これはそのまま `versions/v20_corrective_corpus_v3_mainline/` の設計思想です。
 
-Current audited implementation properties:
+現時点の監査済み実装特性は次のとおりです。
 
-- remove only the known wrong base problem `ef2fe526`,
-- filter out `130` teacher-incorrect binary overlay candidates before selection,
-- selected overlay teacher mismatches: `0`,
-- concentrate overlay on:
+- 既知の誤答 base problem `ef2fe526` だけを除外
+- binary overlay 候補から teacher-incorrect を `130` 件除外してから選抜
+- 実際に採用した overlay の teacher mismatch は `0`
+- overlay は主に
   - `binary_structured_core`
   - `binary_other_light`
-- keep easy-family guardrails light.
+ へ集中
+- easy family の guardrail は軽く維持
 
-## Family-level recommendation
+## family ごとの推奨方針
 
-| Family / slice | Recommendation | Why |
+| family / slice | 推奨 | 理由 |
 | --- | --- | --- |
-| stable easy families already strong in README (`numeral`, `gravity`, `unit`, much of `cipher`) | **Keep base as-is** | Little upside, unnecessary rewrite risk |
-| `bit` rows with direct audited teacher error | **Replace / exclude** | Clear correctness win |
-| `bit_structured_*` and other teacher-correct curated binary rows from `FINAL_SUMMARY` | **Add as overlay** | Best current upside per README and later proxy work |
-| `default 1` snapshot rows with teacher-correct answers | **Keep unless a direct audit fails them** | Earlier blanket removal claim was false |
-| answer-only / manual-review rows from `FINAL_SUMMARY` | **Do not use as automatic trace replacement** | They are not trace-safe by default |
+| README 上ですでに強い stable easy family (`numeral`, `gravity`, `unit`, `cipher` の多く) | **base を維持** | 上振れ余地が小さく、置換リスクの方が高い |
+| 直接監査で teacher 誤答が確定した `bit` rows | **置換 / 除外** | correctness の改善が明確 |
+| `FINAL_SUMMARY` 由来の teacher-correct curated binary rows | **overlay として追加** | README 以降の分析でも最も期待値が高い改善軸 |
+| teacher-correct と確認済みの `default 1` snapshot rows | **監査で落ちない限り維持** | 以前の一括除去仮説が誤りだったため |
+| `FINAL_SUMMARY` の answer-only / manual-review 行 | **自動 trace 置換には使わない** | trace-safe と確定していない |
 
-## Answer to the main question
+## 主質問への回答
 
-**Yes, some parts of `A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14` are worth rebuilding with `FINAL_SUMMARY`-aligned data, but only a narrow audited `bit` subset.**
+**はい。`A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14` の一部は `FINAL_SUMMARY` に沿って作り直す価値があります。**  
+ただし対象は **監査済みの狭い `bit` subset** に限るべきです。
 
-The recommended policy is:
+推奨ポリシーは次です。
 
-1. keep the frozen v20 snapshot as the base,
-2. surgically remove known wrong base bit rows,
-3. add only teacher-correct `FINAL_SUMMARY`-derived bit overlays,
-4. avoid wholesale replacement of the historical snapshot,
-5. record measured validation / proxy / leaderboard changes after every run.
+1. 凍結済み v20 snapshot は base として維持する
+2. 既知の誤答 base bit rows だけを外科的に除外する
+3. `FINAL_SUMMARY` 由来でも **teacher-correct-only** の binary overlay だけを追加する
+4. 歴史的 snapshot 全体の wholesale replacement はしない
+5. 各 run 後に validation / proxy / leaderboard の実測結果を必ず記録する
 
-## Operational implication for the current line
+## 現在の mainline への含意
 
-This report supports the current corrected mainline direction:
+このレポートは、現在の corrected mainline 方針を支持します。
 
-- **old v3 ablation**: too aggressive, removed many teacher-correct `default 1` rows
-- **current `v3_mainline`**: correct direction, because it uses `FINAL_SUMMARY` as a curation and replacement aid rather than as a reason to discard the entire v20 base
+- **old v3 ablation**: 攻めすぎで、teacher-correct な `default 1` rows まで削っていた
+- **current `v3_mainline`**: 正しい方向。`FINAL_SUMMARY` を「v20 base 全否定の根拠」ではなく、「置換と overlay の監査基盤」として使っている
 
-In short: **rewrite a small audited `bit` subset, not the whole snapshot.**
+要するに、**作り直すのは snapshot 全体ではなく、監査済みの狭い `bit` subset だけ**です。
