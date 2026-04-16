@@ -120,6 +120,10 @@
   - step 27: baseline `0.0038937293759880314` vs nobc `0.004263069305825183` (delta `+0.00036933992983715193`)
   - step 28: baseline `0.0031311420987780083` vs nobc `0.00321180630144808` (delta `+0.00008066420267007152`)
 - After that blip, the run returned to lower-loss values at steps `29-32`, including step 32 itself: baseline `0.0029800718671799775` vs nobc `0.002505089915434086` (delta `-0.0004749819517458915`). So the current evidence still favors the no-bias-correction path overall, but not as a monotonic per-step win.
+- By **step 64**, the run was still healthy (`train_loss = 0.0012180586039128197`, `lr = 0.00014857142857142858`, peak memory `221.9409 GB`) but the comparison had become genuinely mixed. Over steps `33-64`, nobc beat baseline on `18` steps and trailed it on `14`, so the early “clear lead” had flattened into a noisy near-parity band rather than extending cleanly.
+- The best mid-interval nobc advantage in that range was at **step 37**: baseline `0.00313631660629276` vs nobc `0.0022576154011858403` (delta `-0.0008787012051069197`). The largest regression was at **step 50**: baseline `0.0026276590617166137` vs nobc `0.003612740336377012` (delta `+0.0009850812746603982`).
+- The latest `step 64` comparison itself was slightly unfavorable: baseline `0.0010592759516110453` vs nobc `0.0012180586039128197` (delta `+0.00015878265230177433`). The last eight observed deltas before that milestone were also mixed (`57:+0.0001754491682079949`, `58:-0.0005867738223887373`, `59:-0.00012433267955250119`, `60:-0.00024202774411651224`, `61:+0.0001650570247500756`, `62:+0.00035625744249894765`, `63:+0.00007016177498834868`, `64:+0.00015878265230177433`).
+- Interpretation at the step64 milestone: `--no-bias-correction` is still a plausible strict-reproduction candidate, but it is no longer behaving like an obviously dominant improvement over the completed baseline. The decisive signal now needs to come from the full-run end state plus downstream smoke / eval300, not from early-step loss alone.
 
 ## Important assumptions
 
