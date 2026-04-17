@@ -159,6 +159,7 @@ class TrainingArtifacts:
     run_root: Path
     shadow_model_dir: Path
     adapter_dir: Path
+    bundle_token_dir: Path
     step_plan_path: Path
     snapshot_contract_path: Path
     config_path: Path
@@ -257,6 +258,12 @@ def write_command_script(path: Path, tokens: Sequence[str]) -> None:
     )
 
 
+def resolve_training_data_path(args: argparse.Namespace) -> Path:
+    if getattr(args, "training_bundle_path", None) is not None:
+        return Path(args.training_bundle_path).resolve()
+    return SNAPSHOT_ROOT
+
+
 def build_command_prefix(command: str) -> list[str]:
     return ["uv", "run", "python", command_path_value(Path(__file__).resolve()), command]
 
@@ -266,6 +273,8 @@ def build_train_command_tokens(args: argparse.Namespace) -> list[str]:
     append_command_option(tokens, "--model-root", Path(args.model_root))
     append_command_option(tokens, "--output-root", Path(args.output_root))
     append_command_option(tokens, "--run-name", args.run_name)
+    if args.training_bundle_path is not None:
+        append_command_option(tokens, "--training-bundle-path", Path(args.training_bundle_path))
     if bool(args.force_shadow_model):
         tokens.append("--force-shadow-model")
     append_command_option(tokens, "--seed", int(args.seed))
@@ -862,9 +871,18 @@ def render_step_plan(step_plan: Sequence[StepPlan]) -> list[dict[str, Any]]:
             {
                 "step": step.step,
                 "size": len(step.examples),
-                "problem_ids": [example.problem_id for example in step.examples],
-                "categories": [example.category for example in step.examples],
-                "token_paths": [example.token_path for example in step.examples],
+                "examples": [
+                    {
+                        "problem_id": example.problem_id,
+                        "category": example.category,
+                        "token_path": example.token_path,
+                        "prompt_length": int(example.prompt_length),
+                        "completion_length": int(example.completion_length),
+                        "total_length": int(example.total_length),
+                        "num_loss_tokens": int(example.num_loss_tokens),
+                    }
+                    for example in step.examples
+                ],
             }
         )
     return rows
@@ -975,6 +993,8 @@ def build_training_manifest(args: argparse.Namespace, step_plan: Sequence[StepPl
     microsteps = sum(
         math.ceil(len(step.examples) / max(1, int(args.micro_batch_size))) for step in step_plan
     )
+    training_data_path = resolve_training_data_path(args)
+    training_source_type = "single_file_bundle" if getattr(args, "training_bundle_path", None) is not None else "snapshot"
     return {
         "created_at": utc_now(),
         "repo_root": str(REPO_ROOT),
@@ -983,6 +1003,11 @@ def build_training_manifest(args: argparse.Namespace, step_plan: Sequence[StepPl
         "run_root": str((Path(args.output_root).resolve() / args.run_name).resolve()),
         "shadow_model_dir": str(shadow_model_dir.resolve()),
         "snapshot_root": str(SNAPSHOT_ROOT.resolve()),
+        "training_data": {
+            "source_type": training_source_type,
+            "path": str(training_data_path),
+            "snapshot_root": str(SNAPSHOT_ROOT.resolve()),
+        },
         "readme_contract": README_EVAL_CONTRACT,
         "training": {
             "backend": "mlx",
@@ -1043,6 +1068,7 @@ def build_prepare_artifacts(args: argparse.Namespace) -> TrainingArtifacts:
         run_root=run_root,
         shadow_model_dir=shadow_model_dir,
         adapter_dir=run_root / "adapter",
+        bundle_token_dir=run_root / "training_bundle_tokens",
         step_plan_path=run_root / "step_plan.json",
         snapshot_contract_path=run_root / "snapshot_contract.json",
         config_path=run_root / "run_manifest.json",
@@ -1055,7 +1081,16 @@ def build_prepare_artifacts(args: argparse.Namespace) -> TrainingArtifacts:
 
 def prepare_run(args: argparse.Namespace) -> TrainingArtifacts:
     artifacts = build_prepare_artifacts(args)
-    step_plan, snapshot_contract = load_snapshot_step_plan(SNAPSHOT_ROOT)
+    if getattr(args, "training_bundle_path", None) is not None:
+        bundle_path = Path(args.training_bundle_path).resolve()
+        if artifacts.bundle_token_dir.exists():
+            shutil.rmtree(artifacts.bundle_token_dir)
+        step_plan, snapshot_contract = load_training_bundle_step_plan(
+            bundle_path,
+            materialized_root=artifacts.bundle_token_dir,
+        )
+    else:
+        step_plan, snapshot_contract = load_snapshot_step_plan(SNAPSHOT_ROOT)
     expected_batch_size = int(snapshot_contract["source_config"]["batch_size"])
     expected_micro_batch_size = int(snapshot_contract["source_config"]["micro_batch_size"])
     if int(args.batch_size) != expected_batch_size:
@@ -1148,13 +1183,14 @@ def create_adapter_config_payload(
     args: argparse.Namespace,
     total_steps: int,
 ) -> dict[str, Any]:
+    training_data_path = resolve_training_data_path(args)
     return {
         "model": str(shadow_model_dir),
         "train": True,
         "fine_tune_type": "lora",
         "optimizer": "adam",
         "optimizer_config": {"adam": {}, "adamw": {}, "muon": {}, "sgd": {}, "adafactor": {}},
-        "data": str(SNAPSHOT_ROOT),
+        "data": str(training_data_path),
         "seed": int(args.seed),
         "num_layers": -1,
         "batch_size": int(args.micro_batch_size),
@@ -1182,6 +1218,8 @@ def create_adapter_config_payload(
         "mask_prompt": True,
         "enable_thinking": True,
         "v20_snapshot_root": str(SNAPSHOT_ROOT),
+        "training_data_source": "single_file_bundle" if getattr(args, "training_bundle_path", None) is not None else "snapshot",
+        "training_data_path": str(training_data_path),
         "v20_effective_batch_size": int(args.batch_size),
         "v20_micro_batch_size": int(args.micro_batch_size),
         "v20_optimizer_steps": int(total_steps),
@@ -1236,6 +1274,26 @@ def build_local_mlx_bundle(run_root: Path, adapter_dir: Path) -> dict[str, Any]:
 
 def load_step_plan(path: Path) -> list[StepPlan]:
     rows = load_json(path)
+    if rows and "examples" in rows[0]:
+        step_plan: list[StepPlan] = []
+        for row in rows:
+            step_examples = []
+            for order_in_step, example_row in enumerate(row["examples"]):
+                step_examples.append(
+                    SnapshotExample(
+                        problem_id=str(example_row["problem_id"]),
+                        category=str(example_row["category"]),
+                        step=int(row["step"]),
+                        order_in_step=order_in_step,
+                        token_path=str(example_row["token_path"]),
+                        prompt_length=int(example_row["prompt_length"]),
+                        completion_length=int(example_row["completion_length"]),
+                        total_length=int(example_row["total_length"]),
+                        num_loss_tokens=int(example_row["num_loss_tokens"]),
+                    )
+                )
+            step_plan.append(StepPlan(step=int(row["step"]), examples=tuple(step_examples)))
+        return step_plan
     step_plan: list[StepPlan] = []
     for row in rows:
         step_plan.append(
@@ -1263,6 +1321,132 @@ def load_step_plan(path: Path) -> list[StepPlan]:
     full_step_plan, _ = load_snapshot_step_plan(SNAPSHOT_ROOT)
     full_by_step = {step.step: step for step in full_step_plan}
     return [full_by_step[step.step] for step in step_plan]
+
+
+def build_bundle_token_path(materialized_root: Path, *, step: int, order_in_step: int, problem_id: str) -> Path:
+    safe_problem_id = re.sub(r"[^A-Za-z0-9._-]+", "_", str(problem_id)).strip("._")
+    if not safe_problem_id:
+        safe_problem_id = "example"
+    return materialized_root / f"step_{step:04d}" / f"{order_in_step:04d}_{safe_problem_id}.json"
+
+
+def load_training_bundle_step_plan(bundle_path: Path, *, materialized_root: Path) -> tuple[list[StepPlan], dict[str, Any]]:
+    if not bundle_path.exists():
+        raise FileNotFoundError(f"Missing training bundle at {bundle_path}")
+    steps_by_id: OrderedDict[int, list[SnapshotExample]] = OrderedDict()
+    current_order_per_step: dict[int, int] = defaultdict(int)
+    category_counts: Counter[str] = Counter()
+    total_examples = 0
+    total_masked_tokens = 0
+    total_unmasked_tokens = 0
+    max_total_length = 0
+    manifest: dict[str, Any] | None = None
+
+    with bundle_path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            text = line.strip()
+            if not text:
+                continue
+            record = json.loads(text)
+            record_type = str(record.get("record_type", ""))
+            if record_type == "manifest":
+                manifest = dict(record)
+                continue
+            if record_type != "example":
+                raise ValueError(f"Unexpected record_type={record_type!r} at {bundle_path}:{line_number}")
+            problem_id = str(record.get("example_id") or record.get("source_problem_id") or f"line{line_number}")
+            category = str(record["category"])
+            step = int(record["step"])
+            order_in_step = current_order_per_step[step]
+            current_order_per_step[step] += 1
+            tokens = [int(token) for token in record["tokens"]]
+            mask = [int(flag) for flag in record["mask"]]
+            if len(tokens) != len(mask):
+                raise ValueError(
+                    f"Mismatched token/mask lengths for {problem_id} at {bundle_path}:{line_number}"
+                )
+            completion_length = int(record["num_loss_tokens"])
+            if sum(mask) != completion_length:
+                raise ValueError(
+                    f"num_loss_tokens mismatch for {problem_id} at {bundle_path}:{line_number}: "
+                    f"{sum(mask)} != {completion_length}"
+                )
+            if str(record.get("source", "")) == "base_snapshot" and str(record.get("segment", "")) == "synthetic.jsonl":
+                token_path = SNAPSHOT_ROOT / "tokens" / problem_id / "synthetic.json"
+                if not token_path.exists():
+                    token_path = build_bundle_token_path(
+                        materialized_root,
+                        step=step,
+                        order_in_step=order_in_step,
+                        problem_id=problem_id,
+                    )
+                    write_json(token_path, {"tokens": tokens, "mask": mask})
+            else:
+                token_path = build_bundle_token_path(
+                    materialized_root,
+                    step=step,
+                    order_in_step=order_in_step,
+                    problem_id=problem_id,
+                )
+                write_json(token_path, {"tokens": tokens, "mask": mask})
+            prompt_length = derive_prompt_length(mask, token_path=Path(token_path))
+            total_examples += 1
+            total_masked_tokens += prompt_length
+            total_unmasked_tokens += completion_length
+            max_total_length = max(max_total_length, len(tokens))
+            category_counts[category] += 1
+            steps_by_id.setdefault(step, []).append(
+                SnapshotExample(
+                    problem_id=problem_id,
+                    category=category,
+                    step=step,
+                    order_in_step=order_in_step,
+                    token_path=str(Path(token_path).resolve()),
+                    prompt_length=prompt_length,
+                    completion_length=completion_length,
+                    total_length=len(tokens),
+                    num_loss_tokens=completion_length,
+                )
+            )
+
+    if manifest is None:
+        raise ValueError(f"Missing manifest record in training bundle {bundle_path}")
+    step_plan = [
+        StepPlan(step=step, examples=tuple(examples))
+        for step, examples in steps_by_id.items()
+    ]
+    step_batch_sizes = [len(step.examples) for step in step_plan]
+    source_config = dict(manifest.get("base_snapshot_config") or {})
+    source_stats = dict(source_config.get("stats") or {})
+    contract = {
+        "training_source": "single_file_bundle",
+        "bundle_path": str(bundle_path.resolve()),
+        "bundle_manifest": manifest,
+        "materialized_token_root": str(materialized_root.resolve()),
+        "num_examples": total_examples,
+        "num_steps": len(step_plan),
+        "step_batch_sizes": step_batch_sizes,
+        "min_step_batch": min(step_batch_sizes) if step_batch_sizes else 0,
+        "max_step_batch": max(step_batch_sizes) if step_batch_sizes else 0,
+        "total_masked_tokens": total_masked_tokens,
+        "total_unmasked_tokens": total_unmasked_tokens,
+        "max_total_length": max_total_length,
+        "category_counts": dict(sorted(category_counts.items())),
+        "source_config": source_config,
+        "matches_source_config": {
+            "num_examples": total_examples == int(source_stats.get("num_examples", total_examples)),
+            "total_masked_tokens": total_masked_tokens
+            == int(source_stats.get("total_masked_tokens", total_masked_tokens)),
+            "total_unmasked_tokens": total_unmasked_tokens
+            == int(source_stats.get("total_unmasked_tokens", total_unmasked_tokens)),
+            "total_steps": len(step_plan) == int(source_stats.get("total_steps", len(step_plan))),
+            "batch_size": int(source_config.get("batch_size", 32)) == 32,
+            "micro_batch_size": int(source_config.get("micro_batch_size", 16)) == 16,
+            "max_length": int(source_config.get("max_length", 8192)) == 8192,
+            "lora_rank": int(source_config.get("lora_rank", 32)) == 32,
+        },
+    }
+    return step_plan, contract
 
 
 def collect_runtime_preflight() -> dict[str, Any]:
@@ -2798,10 +2982,13 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
     prompt_policy = eval_result.get("prompt_policy")
     run_manifest = load_run_manifest_for_result(run_result)
     training_settings = run_manifest.get("training", {}) if isinstance(run_manifest, dict) else {}
+    training_data = run_manifest.get("training_data", {}) if isinstance(run_manifest, dict) else {}
     adam_settings = training_settings.get("adam", {}) if isinstance(training_settings, dict) else {}
     latest_train_report = run_result.get("latest_train_report") or {}
     run_root = Path(str(run_result["run_root"])).resolve()
     train_cmd_path = run_root / "train_cmd.sh"
+    training_source_type = str(training_data.get("source_type", "snapshot"))
+    training_source_path = training_data.get("path")
     training_summary_lines: list[str] = []
     if train_cmd_path.exists():
         training_summary_lines.append(f"- train_cmd_path: `{command_path_value(train_cmd_path)}`")
@@ -2824,13 +3011,14 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
         "# v20_mlx_repro_v1 results",
         "",
         "> Repository note: canonical challenge contract lives in `README.md`.",
-        "> This version is a local MLX reproduction of A-Open v20 using `A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14/` as the exact training snapshot.",
-        "> It does **not** claim submission.zip parity; it measures how closely MLX reproduces the published v20 training/eval behavior.",
+        "> This version is a local MLX training/evaluation runner for A-Open v20-style Nemotron LoRA experiments.",
+        "> It does **not** claim submission.zip parity; it measures local behavior under the README-grounded evaluation contract.",
         "",
         "## Source contract",
         "",
         f"- Top-level README: `{relative_to_repo(README_PATH)}`",
         f"- V20 snapshot: `{relative_to_repo(SNAPSHOT_ROOT)}`",
+        f"- training_source_type: `{training_source_type}`",
         "",
         "## Run summary",
         "",
@@ -2843,6 +3031,7 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
         "## Training settings",
         "",
         f"- backend: `mlx`",
+        *([f"- training_source_path: `{training_source_path}`"] if training_source_path else []),
         f"- optimizer_steps: `{latest_train_report.get('step', '')}`",
         f"- last_train_loss: `{latest_train_report.get('train_loss', '')}`",
         f"- last_lr: `{latest_train_report.get('lr', '')}`",
@@ -3089,6 +3278,12 @@ def parse_args() -> argparse.Namespace:
         target.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
         target.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
         target.add_argument("--run-name", type=str, default=DEFAULT_RUN_NAME)
+        target.add_argument(
+            "--training-bundle-path",
+            type=Path,
+            default=None,
+            help="Optional single-file training bundle JSONL to use instead of the fixed 04-08-16-14 snapshot.",
+        )
         target.add_argument("--force-shadow-model", action="store_true")
         target.add_argument("--seed", type=int, default=123)
         target.add_argument("--batch-size", type=int, default=32, help="Effective optimizer batch size.")
