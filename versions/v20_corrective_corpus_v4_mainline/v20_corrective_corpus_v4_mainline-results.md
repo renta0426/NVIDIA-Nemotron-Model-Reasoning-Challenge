@@ -46,10 +46,10 @@
 
 - run: `v20_mlx_v4_mainline_mb1_nobc`
 - source bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v4_mainline_bundle.jsonl`
-- latest observed train step: `120 / 271`
-- latest observed train loss: `0.0016371859370561898`
-- latest observed trained tokens: `12993057`
-- latest observed total elapsed seconds: `36666.8262`
+- latest observed train step: `151 / 271`
+- latest observed train loss: `0.0006831351554695836`
+- latest observed trained tokens: `16348896`
+- latest observed total elapsed seconds: `46123.8802`
 - note: this is only a live training snapshot from `adapter/latest_train_report.json`, **not** a measured validation score
 
 ## 2026-04-17 corpus generation: `v4_mainline_default`
