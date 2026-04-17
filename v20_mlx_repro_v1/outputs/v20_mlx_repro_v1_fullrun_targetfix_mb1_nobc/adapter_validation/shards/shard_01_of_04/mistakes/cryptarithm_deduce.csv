@@ -1,0 +1,175 @@
+id,prompt,answer,output,category,predicted,correct,minlogprob
+083ed8fe,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+!(*() = (/<<
+[(*<< = [[//
+""&-/: = :)
+[!-)! = )
+Now, determine the result for: <&*:/",<#):,"We need to infer the transformation rule from the examples.
+
+First, let me assign letters to each symbol:
+! -> A
+( -> B
+/ -> C
+< -> D
+[ -> E
+"" -> F
+& -> G
+: -> H
+) -> I
+Operators:
+* -> x
+- -> y
+
+Converting examples to letter form:
+
+  「!(*()」 = 「(/<<」:
+    input:  ! ( * ( ) : ! -> A, ( -> B, * -> x, ( -> B, ) -> I -> AB x BI
+    output: ( / < < : ( -> B, / -> C, < -> D, < -> D -> BCDD
+
+  「[(*<<」 = 「[[//」:
+    input:  [ ( * < < : [ -> E, ( -> B, * -> x, < -> D, < -> D -> EB x DD
+    output: [ [ / / : [ -> E, [ -> E, / -> C, / -> C -> EECC
+
+  「""&-/:」 = 「:)」:
+    input:  "" & - / : : "" -> F, & -> G, - -> y, / -> C, : -> H -> FG y CH
+    output: : ) : : -> H, ) -> I -> HI
+
+  「[!-)!」 = 「)」:
+    input:  [ ! - ) ! : [ -> E, ! -> A, - -> y, ) -> I, ! -> A -> EA y IA
+    output: ) : ) -> I -> I
+
+Each input is 5 characters: two symbol-digits, an operator, two more symbol-digits.
+Operator x: unknown
+Operator y: unknown
+
+The question operator is x, which is unknown.
+As the question operator is unknown, we default to concatenation.
+
+Converting question ""<&*:/"": < & * : / : < -> D, & -> G, * -> x, : -> H, / -> C -> DG x HC
+
+Applying to DG x HC:
+  concatenation(DG, HC) = DG || HC = DGHC
+  Converting back: D G H C : D -> <, G -> &, H -> :, C -> / -> <&:/
+
+I will now return the answer in \boxed{}
+The answer in \boxed is
+\boxed{<&:/}
+</think>
+\boxed{<&:/}",cryptarithm_deduce,<&:/,False,-0.375
+0a2b9109,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+|:*%( = ^^
+#|-|# = -?$
+?%)|( = (^^
+|?*(| = ?:!
+Now, determine the result for: $[-^:",-?:,"We need to infer the transformation rule from the examples.
+
+First, let me assign letters to each symbol:
+| -> A
+: -> B
+% -> C
+^ -> D
+# -> E
+- -> F
+? -> G
+$ -> H
+( -> I
+! -> J
+[ -> K
+Operators:
+* -> x
+- -> y
++ -> z
+
+Converting examples to letter form:
+
+  「|:*%(」 = 「^^」:
+    input:  | : * % ( : | -> A, : -> B, * -> x, % -> C, ( -> I -> AB x CI
+    output: ^ ^ : ^ -> D, ^ -> D -> DD
+
+  「#|-|#」 = 「-?$」:
+    input:  # | - | # : # -> E, | -> A, - -> y, | -> A, # -> E -> EA y AE
+    output: - ? $ : - -> F, ? -> G, $ -> H -> FGH
+
+  「?%)|(」 = 「(^^」:
+    input:  ? % ) | ( : ? -> G, % -> C, ) -> z, | -> A, ( -> I -> GC z AI
+    output: ( ^ ^ : ( -> I, ^ -> D, ^ -> D -> IDD
+
+  「|?*(|」 = 「?:!」:
+    input:  | ? * ( | : | -> A, ? -> G, * -> x, ( -> I, | -> A -> AG x IA
+    output: ? : ! : ? -> G, : -> B, ! -> J -> GBJ
+
+Each input is 5 characters: two symbol-digits, an operator, two more symbol-digits.
+Operator x: unknown
+Operator y: unknown
+
+The question operator is z, which is unknown.
+As the question operator is unknown, we default to concatenation.
+
+Converting question ""$[ - ^ :"": $ [ - ^ : : $ -> H, [ -> K, - -> y, ^ -> D, : -> B -> HK y DB
+
+Applying to HK y DB:
+  concatenation(HK, DB) = HK || DB = HKDB
+  Converting back: H K D B : H -> $, K -> [, D -> ^, B -> : -> $[^:
+
+I will now return the answer in \boxed{}
+The answer in \boxed is
+\boxed{$[^:}
+</think>
+\boxed{$[^:}",cryptarithm_deduce,$[^:,False,-1.0
+0b0a3643,"In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:
+#/-\@ = -@#
+""""+#) = )/
+'#+/# = %""
+\)-)@ = -'""
+Now, determine the result for: '/-%)","""""","We need to infer the transformation rule from the examples.
+
+First, let me assign letters to each symbol:
+# -> A
+/ -> B
+\ -> C
+@ -> D
+- -> E
+"" -> F
+) -> G
+' -> H
+% -> I
+Operators:
+- -> x
++ -> y
+* -> z
+
+Converting examples to letter form:
+
+  「#/-\@」 = 「-@#」:
+    input:  # / - \ @ : # -> A, / -> B, - -> x, \ -> C, @ -> D -> AB x CD
+    output: - @ # : - -> E, @ -> D, # -> A -> EDA
+
+  「""""+#)」 = 「)/」:
+    input:  "" "" + # ) : "" -> F, "" -> F, + -> y, # -> A, ) -> G -> FF y AG
+    output: ) / : ) -> G, / -> B -> GB
+
+  「'#+/#」 = 「%""」:
+    input:  ' # + / # : ' -> H, # -> A, + -> y, / -> B, # -> A -> HA y BA
+    output: % "" : % -> I, "" -> F -> IF
+
+  「)-@」 = 「-'」:
+    input:  ) - @ : ) -> G, - -> x, @ -> D -> G x D
+    output: - ' : - -> E, ' -> H -> EH
+
+Each input is 5 characters: two symbol-digits, an operator, two more symbol-digits.
+Operator y: reverse concatenation
+Operator x: unknown
+
+The question operator is y, which is reverse concatenation.
+
+Converting question ""'/-%)"": ' / - % ) : ' -> H, / -> B, - -> x, % -> I, ) -> G -> HB x IG
+
+Applying to HB x IG:
+  reverse concatenation(HB, IG) = IG || HB = IGHB
+  Converting back: I G H B : I -> %, G -> ), H -> ', B -> / -> %')/
+
+I will now return the answer in \boxed{}
+The answer in \boxed is
+\boxed{%')/}
+</think>
+\boxed{%')/}",cryptarithm_deduce,%')/,False,-0.8125
