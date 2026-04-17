@@ -8,6 +8,7 @@ import math
 import os
 import platform
 import re
+import shlex
 import shutil
 import socket
 import sys
@@ -217,6 +218,138 @@ def relative_to_repo(path: Path) -> str:
         return str(path.resolve().relative_to(REPO_ROOT))
     except ValueError:
         return str(path.resolve())
+
+
+def command_path_value(path: Path) -> str:
+    return relative_to_repo(Path(path).resolve())
+
+
+def command_scalar_value(value: Any) -> str:
+    if isinstance(value, Path):
+        return command_path_value(value)
+    return str(value)
+
+
+def append_command_option(tokens: list[str], flag: str, value: Any) -> None:
+    tokens.extend([flag, command_scalar_value(value)])
+
+
+def append_command_bool_option(tokens: list[str], flag: str, enabled: bool) -> None:
+    tokens.append(flag if enabled else f"--no-{flag.removeprefix('--')}")
+
+
+def render_shell_command(tokens: Sequence[str]) -> str:
+    return " \\\n  ".join(shlex.quote(str(token)) for token in tokens)
+
+
+def write_command_script(path: Path, tokens: Sequence[str]) -> None:
+    write_text(
+        path,
+        "\n".join(
+            [
+                "#!/bin/bash",
+                "set -euo pipefail",
+                f"cd {shlex.quote(str(REPO_ROOT))}",
+                render_shell_command(tokens),
+                "",
+            ]
+        ),
+    )
+
+
+def build_command_prefix(command: str) -> list[str]:
+    return ["uv", "run", "python", command_path_value(Path(__file__).resolve()), command]
+
+
+def build_train_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("train")
+    append_command_option(tokens, "--model-root", Path(args.model_root))
+    append_command_option(tokens, "--output-root", Path(args.output_root))
+    append_command_option(tokens, "--run-name", args.run_name)
+    if bool(args.force_shadow_model):
+        tokens.append("--force-shadow-model")
+    append_command_option(tokens, "--seed", int(args.seed))
+    append_command_option(tokens, "--batch-size", int(args.batch_size))
+    append_command_option(tokens, "--micro-batch-size", int(args.micro_batch_size))
+    append_command_option(tokens, "--learning-rate", float(args.learning_rate))
+    append_command_option(tokens, "--max-seq-length", int(args.max_seq_length))
+    append_command_bool_option(tokens, "--fixed-train-padding", bool(args.fixed_train_padding))
+    append_command_option(tokens, "--lora-rank", int(args.lora_rank))
+    append_command_option(tokens, "--lora-alpha", float(args.lora_alpha))
+    append_command_option(tokens, "--lora-dropout", float(args.lora_dropout))
+    append_command_option(tokens, "--beta1", float(args.beta1))
+    append_command_option(tokens, "--beta2", float(args.beta2))
+    append_command_option(tokens, "--eps", float(args.eps))
+    append_command_option(tokens, "--weight-decay", float(args.weight_decay))
+    append_command_bool_option(tokens, "--bias-correction", bool(args.bias_correction))
+    append_command_option(tokens, "--steps-per-report", int(args.steps_per_report))
+    append_command_option(tokens, "--save-every-steps", int(args.save_every_steps))
+    if args.resume_adapter_file is not None:
+        append_command_option(tokens, "--resume-adapter-file", Path(args.resume_adapter_file))
+    append_command_option(tokens, "--max-optimizer-steps", int(args.max_optimizer_steps))
+    return tokens
+
+
+def build_eval_adapter_validation_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("eval-adapter-validation")
+    append_command_option(tokens, "--output-root", Path(args.output_root))
+    append_command_option(tokens, "--run-name", args.run_name)
+    append_command_option(tokens, "--max-tokens", int(args.max_tokens))
+    append_command_option(tokens, "--temperature", float(args.temperature))
+    append_command_option(tokens, "--top-p", float(args.top_p))
+    append_command_option(tokens, "--max-num-seqs", int(args.max_num_seqs))
+    append_command_option(tokens, "--max-model-len", int(args.max_model_len))
+    append_command_option(tokens, "--prompt-chunk-size", int(args.prompt_chunk_size))
+    append_command_option(tokens, "--prefill-batch-size", int(args.prefill_batch_size))
+    append_command_option(tokens, "--completion-batch-size", int(args.completion_batch_size))
+    append_command_option(tokens, "--eval-limit", int(args.eval_limit))
+    append_command_option(tokens, "--validation-sample-size", int(args.validation_sample_size))
+    append_command_option(tokens, "--validation-subset-size", int(args.validation_subset_size))
+    append_command_option(tokens, "--validation-subset-mode", str(args.validation_subset_mode))
+    append_command_option(tokens, "--eval-shards", int(args.eval_shards))
+    append_command_option(tokens, "--eval-shard-index", int(args.eval_shard_index))
+    append_command_bool_option(tokens, "--eval-enable-thinking", bool(args.eval_enable_thinking))
+    append_command_bool_option(tokens, "--lazy-load", bool(args.lazy_load))
+    if bool(args.force_single_generate):
+        tokens.append("--force-single-generate")
+    return tokens
+
+
+def build_merge_adapter_validation_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("merge-adapter-validation")
+    append_command_option(tokens, "--output-root", Path(args.output_root))
+    append_command_option(tokens, "--run-name", args.run_name)
+    append_command_option(tokens, "--max-tokens", int(args.max_tokens))
+    append_command_option(tokens, "--temperature", float(args.temperature))
+    append_command_option(tokens, "--top-p", float(args.top_p))
+    append_command_option(tokens, "--max-num-seqs", int(args.max_num_seqs))
+    append_command_option(tokens, "--max-model-len", int(args.max_model_len))
+    append_command_option(tokens, "--prompt-chunk-size", int(args.prompt_chunk_size))
+    append_command_option(tokens, "--prefill-batch-size", int(args.prefill_batch_size))
+    append_command_option(tokens, "--completion-batch-size", int(args.completion_batch_size))
+    append_command_option(tokens, "--validation-sample-size", int(args.validation_sample_size))
+    append_command_option(tokens, "--validation-subset-size", int(args.validation_subset_size))
+    append_command_option(tokens, "--validation-subset-mode", str(args.validation_subset_mode))
+    append_command_bool_option(tokens, "--eval-enable-thinking", bool(args.eval_enable_thinking))
+    return tokens
+
+
+def build_postprocess_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("postprocess-run")
+    append_command_option(tokens, "--output-root", Path(args.output_root))
+    append_command_option(tokens, "--run-name", args.run_name)
+    append_command_option(tokens, "--postprocess-eval-kind", str(args.postprocess_eval_kind))
+    return tokens
+
+
+def load_run_manifest_for_result(run_result: dict[str, Any]) -> dict[str, Any]:
+    run_root_raw = run_result.get("run_root")
+    if not run_root_raw:
+        return {}
+    manifest_path = Path(str(run_root_raw)).resolve() / "run_manifest.json"
+    if not manifest_path.exists():
+        return {}
+    return load_json(manifest_path)
 
 
 def resolve_hf_snapshot(model_root: Path) -> Path:
@@ -941,17 +1074,7 @@ def prepare_run(args: argparse.Namespace) -> TrainingArtifacts:
     write_json(artifacts.step_plan_path, render_step_plan(step_plan))
     run_manifest = build_training_manifest(args, step_plan, artifacts.shadow_model_dir)
     write_json(artifacts.config_path, run_manifest)
-    write_text(
-        artifacts.run_root / "train_cmd.sh",
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -euo pipefail",
-                f'"{sys.executable}" "{Path(__file__).resolve()}" train --output-root "{Path(args.output_root).resolve()}" --run-name "{args.run_name}"',
-                "",
-            ]
-        ),
-    )
+    write_command_script(artifacts.run_root / "train_cmd.sh", build_train_command_tokens(args))
     return artifacts
 
 
@@ -1159,6 +1282,10 @@ def render_train_markdown_summary(training_result: dict[str, Any]) -> str:
     lines.append(f"- run_root: `{training_result['run_root']}`")
     lines.append(f"- shadow_model_dir: `{training_result['shadow_model_dir']}`")
     lines.append(f"- adapter_dir: `{training_result['adapter_dir']}`")
+    if training_result.get("run_manifest_path"):
+        lines.append(f"- run_manifest_path: `{training_result['run_manifest_path']}`")
+    if training_result.get("train_cmd_path"):
+        lines.append(f"- train_cmd_path: `{training_result['train_cmd_path']}`")
     lines.append(f"- optimizer_steps_completed: `{latest.get('step', '')}`")
     lines.append(f"- latest_train_loss: `{latest.get('train_loss', '')}`")
     lines.append(f"- latest_lr: `{latest.get('lr', '')}`")
@@ -1867,8 +1994,10 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
         "final_adapter_path": str(final_adapter_path),
         "runtime_preflight_path": str((artifacts.run_root / "runtime_preflight.json").resolve()),
         "latest_train_report": last_report,
+        "run_manifest_path": str(artifacts.config_path.resolve()),
         "snapshot_contract_path": str(artifacts.snapshot_contract_path.resolve()),
         "step_plan_path": str(artifacts.step_plan_path.resolve()),
+        "train_cmd_path": str((artifacts.run_root / "train_cmd.sh").resolve()),
         "mlx_bundle": bundle_manifest,
     }
     write_json(artifacts.training_result_path, training_result)
@@ -2109,6 +2238,7 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     summary_path = validation_root / "validation_summary.json"
     checkpoint_path = validation_root / "validation_records_checkpoint.csv"
     ensure_dir(validation_root)
+    write_command_script(validation_root / "eval_cmd.sh", build_eval_adapter_validation_command_tokens(args))
     if summary_path.exists() and progress_path.exists():
         progress_payload = load_json(progress_path)
         if progress_payload.get("status") == "complete":
@@ -2507,6 +2637,7 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     adapter_dir = Path(training_result["adapter_dir"]).resolve()
     base_validation_root = run_root / "adapter_validation"
     shard_root = base_validation_root / "shards"
+    write_command_script(base_validation_root / "merge_cmd.sh", build_merge_adapter_validation_command_tokens(args))
     if not shard_root.exists():
         raise FileNotFoundError(f"Missing adapter validation shard directory at {shard_root}")
 
@@ -2665,6 +2796,22 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
     evaluation_settings = eval_result.get("evaluation_settings")
     aggregation = eval_result.get("aggregation")
     prompt_policy = eval_result.get("prompt_policy")
+    run_manifest = load_run_manifest_for_result(run_result)
+    training_settings = run_manifest.get("training", {}) if isinstance(run_manifest, dict) else {}
+    adam_settings = training_settings.get("adam", {}) if isinstance(training_settings, dict) else {}
+    latest_train_report = run_result.get("latest_train_report") or {}
+    run_root = Path(str(run_result["run_root"])).resolve()
+    train_cmd_path = run_root / "train_cmd.sh"
+    training_summary_lines: list[str] = []
+    if train_cmd_path.exists():
+        training_summary_lines.append(f"- train_cmd_path: `{command_path_value(train_cmd_path)}`")
+    if isinstance(training_settings, dict) and training_settings:
+        if "micro_batch_size" in training_settings:
+            training_summary_lines.append(f"- training_micro_batch_size: `{training_settings.get('micro_batch_size', '')}`")
+        if "lora_rank" in training_settings:
+            training_summary_lines.append(f"- lora_rank: `{training_settings.get('lora_rank', '')}`")
+        if isinstance(adam_settings, dict) and "bias_correction" in adam_settings:
+            training_summary_lines.append(f"- adam_bias_correction: `{adam_settings.get('bias_correction', '')}`")
     source_documents = list(eval_result.get("source_documents") or [])
     if not source_documents:
         source_documents = [
@@ -2691,13 +2838,15 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
         f"- shadow_model_dir: `{run_result['shadow_model_dir']}`",
         f"- adapter_dir: `{run_result['adapter_dir']}`",
         f"- snapshot_contract_path: `{run_result['snapshot_contract_path']}`",
+        f"- run_manifest_path: `{run_result.get('run_manifest_path', command_path_value(run_root / 'run_manifest.json'))}`",
         "",
         "## Training settings",
         "",
         f"- backend: `mlx`",
-        f"- optimizer_steps: `{run_result['latest_train_report']['step']}`",
-        f"- last_train_loss: `{run_result['latest_train_report']['train_loss']}`",
-        f"- last_lr: `{run_result['latest_train_report']['lr']}`",
+        f"- optimizer_steps: `{latest_train_report.get('step', '')}`",
+        f"- last_train_loss: `{latest_train_report.get('train_loss', '')}`",
+        f"- last_lr: `{latest_train_report.get('lr', '')}`",
+        *training_summary_lines,
         "",
         "## Evaluation result",
         "",
@@ -2828,10 +2977,17 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
             "",
             "- Training data uses the exact checked-in v20 snapshot `04-08-16-14/tokens` + `logprobs/index.jsonl`, not the current `corpus.jsonl`.",
             "- Optimizer-step grouping uses the recorded `step` assignments from the snapshot, so the MLX run replays the actual v20 batch membership/order.",
-            "- MLX-specific assumptions not explicit in the public v20 config: `lora_alpha = 32`, `lora_dropout = 0.0`, `Adam bias_correction = True`.",
             "",
         ]
     )
+    if isinstance(training_settings, dict) and training_settings:
+        lines.insert(
+            -1,
+            "- MLX-specific assumptions not explicit in the public v20 config: "
+            f"`lora_alpha = {training_settings.get('lora_alpha', '')}`, "
+            f"`lora_dropout = {training_settings.get('lora_dropout', '')}`, "
+            f"`Adam bias_correction = {adam_settings.get('bias_correction', '')}`.",
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -2861,6 +3017,7 @@ def run_full(args: argparse.Namespace) -> dict[str, Any]:
 
 def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
     run_root = Path(args.output_root).resolve() / args.run_name
+    write_command_script(run_root / "postprocess_cmd.sh", build_postprocess_command_tokens(args))
     training_result_path = run_root / "training_result.json"
     if not training_result_path.exists():
         raise FileNotFoundError(f"Missing training_result.json at {training_result_path}")
