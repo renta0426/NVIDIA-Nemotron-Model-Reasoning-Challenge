@@ -41,6 +41,16 @@
 - A short-lived parallel MLX contrast run for `v3_mainline` was launched on 2026-04-17, but was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`.
 - The active MLX lane is therefore now **only** `v20_mlx_v4_mainline_mb1_nobc`.
 
+### Live MLX progress snapshot
+
+- run: `v20_mlx_v4_mainline_mb1_nobc`
+- source bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v4_mainline_bundle.jsonl`
+- latest observed train step: `5 / 271`
+- latest observed train loss: `0.1686978055728231`
+- latest observed trained tokens: `561708`
+- latest observed total elapsed seconds: `1601.6793`
+- note: this is only a live training snapshot from `adapter/latest_train_report.json`, **not** a measured validation score
+
 ## 2026-04-17 corpus generation: `v4_mainline_default`
 
 ### Core decisions
