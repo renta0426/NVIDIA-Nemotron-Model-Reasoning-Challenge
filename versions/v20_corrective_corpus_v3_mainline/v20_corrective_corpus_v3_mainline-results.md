@@ -31,6 +31,7 @@
 - Teacher-correct overlay audit: **done**
 - Kaggle training run: **done**
 - Validation / proxy evaluation: **done**
+- MLX full-run against the same single-file bundle: **running**
 - `submission.zip` export: **pending**
 
 ## 2026-04-16 corpus generation: `v3_mainline_default`
@@ -87,6 +88,7 @@
 | run | data change | validation | proxy | public leaderboard | notes |
 | --- | --- | ---: | ---: | ---: | --- |
 | v3_mainline_default (`results-v3`) | v20 minus `ef2fe526*` + teacher-correct-only binary overlay + heavier binary repeats / lighter guardrails | `801/950 = 84.3%` | `180/200 = 0.9000` | user-reported `0.84-0.85` | proxy improved, but validation collapsed from answer-surface regressions; not promotable |
+| v20_mlx_v3_mainline_mb1_nobc | same v3 single-file bundle on the MLX reproduction path with `micro_batch_size=1` and `Adam bias_correction=False` | running | pending | pending | launched 2026-04-17 as a parallel MLX contrast against the v4 surface-repair bundle; score entry will be filled only after measured adapter-validation completes |
 
 ## Recording
 

@@ -32,6 +32,7 @@
 - Bundle generation: **done**
 - Bundle audit: **done**
 - Kaggle training run: **pending**
+- MLX full-run against the same single-file bundle: **running**
 - Validation / proxy evaluation: **pending**
 - `submission.zip` export: **pending**
 
@@ -119,6 +120,7 @@ The design target is not merely a higher proxy. It is a bundle that can keep pro
 | run | data change | validation | proxy | public leaderboard | notes |
 | --- | --- | ---: | ---: | ---: | --- |
 | v4_mainline_default | v20 base minus `ef2fe526*` + teacher-correct-only binary overlay + explicit terminal-surface repair buckets | pending | pending | pending | bundle generated; ready for Kaggle training |
+| v20_mlx_v4_mainline_mb1_nobc | same v4 single-file bundle on the MLX reproduction path with `micro_batch_size=1` and `Adam bias_correction=False` | running | pending | pending | launched 2026-04-17; pipeline log at `v20_mlx_repro_v1/outputs/v20_mlx_v4_mainline_mb1_nobc/pipeline.log`; score entry will be filled only after measured adapter-validation completes |
 
 ## Recording
 
