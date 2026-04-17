@@ -11,7 +11,7 @@ uv \
   --output-root \
   v20_mlx_repro_v1/outputs \
   --run-name \
-  v20_mlx_v4_bundle_train_smoke1 \
+  v20_mlx_v4_mainline_mb1_nobc \
   --training-bundle-path \
   A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v4_mainline_bundle.jsonl \
   --seed \
@@ -45,4 +45,4 @@ uv \
   --save-every-steps \
   0 \
   --max-optimizer-steps \
-  1
+  0
