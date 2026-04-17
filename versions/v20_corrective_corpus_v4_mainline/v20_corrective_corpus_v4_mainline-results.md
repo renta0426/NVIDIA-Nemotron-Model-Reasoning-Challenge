@@ -36,6 +36,11 @@
 - Validation / proxy evaluation: **pending**
 - `submission.zip` export: **pending**
 
+### Operational note
+
+- A short-lived parallel MLX contrast run for `v3_mainline` was launched on 2026-04-17, but was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`.
+- The active MLX lane is therefore now **only** `v20_mlx_v4_mainline_mb1_nobc`.
+
 ## 2026-04-17 corpus generation: `v4_mainline_default`
 
 ### Core decisions
