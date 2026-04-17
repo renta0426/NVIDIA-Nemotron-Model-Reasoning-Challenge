@@ -33,6 +33,7 @@
 - Validation / proxy evaluation: **done**
 - MLX full-run against the same single-file bundle: **aborted before first step**
 - `submission.zip` export: **pending**
+- Operational cleanup: on 2026-04-17 the tracked `shadow_model/` and `training_bundle_tokens/` trees under `v20_mlx_v3_mainline_mb1_nobc` were pruned after the RAM abort; manifests/logs remain.
 
 ## 2026-04-16 corpus generation: `v3_mainline_default`
 

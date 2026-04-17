@@ -40,6 +40,7 @@
 
 - A short-lived parallel MLX contrast run for `v3_mainline` was launched on 2026-04-17, but was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`.
 - The active MLX lane is therefore now **only** `v20_mlx_v4_mainline_mb1_nobc`.
+- Disk hygiene on 2026-04-17: after bundle ingest was proven and the v3 contrast lane was aborted, the tracked `shadow_model/` and `training_bundle_tokens/` trees for `v20_mlx_v4_bundle_prepare_smoke` and `v20_mlx_v3_mainline_mb1_nobc` were pruned to reclaim local storage while preserving manifests, logs, and score ledgers.
 
 ### Live MLX progress snapshot
 
