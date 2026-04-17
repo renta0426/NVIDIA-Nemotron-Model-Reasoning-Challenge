@@ -78,6 +78,12 @@
 | numeral | 47 / 47 | 47 / 47 | 0 |
 | unit_conversion | 54 / 54 | 54 / 54 | 0 |
 
+## Retained output runs
+
+- `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_targetfix_mb1`
+- `v20_mlx_repro_v1/outputs/v20_mlx_repro_v1_fullrun_targetfix_mb1_nobc`
+- All other intermediate MLX output directories under `v20_mlx_repro_v1/outputs/` were pruned after the `0.846667` result was confirmed, so the workspace now keeps only the latest best run and the immediately previous `0.8+` baseline run.
+
 ## Interpretation
 
 - `Adam bias_correction=False` was a **real high-signal MLX-side change**: it did not move the symbolic `cryptarithm_*` families, but it completely closed the observed `equation_numeric_deduce` gap on this local300 slice.
