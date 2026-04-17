@@ -72,6 +72,12 @@ RESULT_V2_PROXY_PATH = (
     / "leaderboard_proxy_eval_row_level.csv"
 )
 RESULT_V3_PROXY_PATH = RESULT_ROOT / "leaderboard_proxy_eval-v3" / "artifacts" / "leaderboard_proxy_eval_row_level.csv"
+VALIDATION_REFERENCE_PATHS = {
+    "base_v20": RESULT_BASE_VALIDATION_PATH,
+    "binary_reference_v1": RESULT_BINARY_REFERENCE_VALIDATION_PATH,
+    "corrective_v2": RESULT_V2_VALIDATION_PATH,
+    "corrective_v3": RESULT_V3_VALIDATION_PATH,
+}
 
 README_EVAL_CONTRACT = {
     "max_lora_rank": 32,
@@ -520,6 +526,220 @@ def load_measured_signals() -> dict[str, Any]:
         "v1_selected": v1_selected,
         "outcome_score": outcome_score,
     }
+
+
+def sanitize_tag(value: str | None) -> str:
+    text = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "").strip()).strip("._-")
+    return text or "measured"
+
+
+@lru_cache(maxsize=1)
+def load_train_metadata_map() -> dict[str, dict[str, str]]:
+    metadata = read_csv_map(TRAIN_RECOMMENDED_PATH)
+    train_prompts = load_train_prompts()
+    categories = load_problem_categories()
+    for row_id, row in train_prompts.items():
+        merged = dict(metadata.get(row_id, {}))
+        merged.setdefault("id", row_id)
+        merged.setdefault("answer", row.get("answer", ""))
+        merged.setdefault("category", categories.get(row_id, ""))
+        merged.setdefault("family_short", str(merged.get("template_main_label", "") or merged.get("family_short", "")).strip())
+        merged.setdefault("template_subtype", str(merged.get("template_subtype", "")).strip())
+        metadata[row_id] = merged
+    return metadata
+
+
+def compare_validation_rows(
+    current_rows: dict[str, dict[str, str]],
+    reference_rows: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    improved: set[str] = set()
+    regressed: set[str] = set()
+    unchanged: set[str] = set()
+    surface_box_regressed: set[str] = set()
+    shared_ids = sorted(set(current_rows) & set(reference_rows))
+    for row_id in shared_ids:
+        current_correct = current_rows[row_id]["correct"] == "True"
+        reference_correct = reference_rows[row_id]["correct"] == "True"
+        if (not reference_correct) and current_correct:
+            improved.add(row_id)
+        elif reference_correct and (not current_correct):
+            regressed.add(row_id)
+        else:
+            unchanged.add(row_id)
+        if is_surface_box_regression(reference_rows[row_id], current_rows[row_id]):
+            surface_box_regressed.add(row_id)
+    return {
+        "shared_ids": shared_ids,
+        "improved": improved,
+        "regressed": regressed,
+        "unchanged": unchanged,
+        "surface_box_regressed": surface_box_regressed,
+    }
+
+
+def build_measured_validation_analysis(
+    *,
+    measured_validation_csv: Path,
+    measured_tag: str,
+) -> dict[str, Any]:
+    readme_contract = verify_readme_eval_contract()
+    current_rows = read_csv_map(measured_validation_csv)
+    metadata_map = load_train_metadata_map()
+    reference_rows_by_label = {
+        label: read_csv_map(reference_path)
+        for label, reference_path in VALIDATION_REFERENCE_PATHS.items()
+    }
+    comparisons: dict[str, dict[str, Any]] = {}
+    for label, reference_rows in reference_rows_by_label.items():
+        comparisons[label] = compare_validation_rows(current_rows, reference_rows)
+
+    delta_rows: list[dict[str, Any]] = []
+    for row_id in sorted(current_rows):
+        current_row = current_rows[row_id]
+        meta = metadata_map.get(row_id, {})
+        row_payload: dict[str, Any] = {
+            "id": row_id,
+            "category": current_row.get("category", ""),
+            "family_short": str(meta.get("family_short", "")).strip(),
+            "template_subtype": str(meta.get("template_subtype", "")).strip(),
+            "gold_answer": current_row.get("answer", ""),
+            "current_predicted": current_row.get("predicted", ""),
+            "current_correct": current_row.get("correct", "") == "True",
+            "current_minlogprob": current_row.get("minlogprob", ""),
+        }
+        for label, reference_rows in reference_rows_by_label.items():
+            reference_row = reference_rows.get(row_id)
+            delta_key = f"delta_vs_{label}"
+            surface_key = f"surface_box_regressed_vs_{label}"
+            ref_correct_key = f"{label}_correct"
+            if reference_row is None:
+                row_payload[ref_correct_key] = ""
+                row_payload[delta_key] = "missing_reference"
+                row_payload[surface_key] = False
+                continue
+            reference_correct = reference_row.get("correct", "") == "True"
+            current_correct = row_payload["current_correct"]
+            if (not reference_correct) and current_correct:
+                delta = "improved"
+            elif reference_correct and (not current_correct):
+                delta = "regressed"
+            else:
+                delta = "unchanged"
+            row_payload[ref_correct_key] = reference_correct
+            row_payload[delta_key] = delta
+            row_payload[surface_key] = is_surface_box_regression(reference_row, current_row)
+        delta_rows.append(row_payload)
+
+    overall_correct = sum(1 for row in current_rows.values() if row.get("correct", "") == "True")
+    overall_total = len(current_rows)
+    comparison_summary: dict[str, Any] = {}
+    for label, comparison in comparisons.items():
+        regressed_by_template = Counter(
+            str(metadata_map.get(row_id, {}).get("template_subtype", "")).strip() or "unknown"
+            for row_id in comparison["regressed"]
+        )
+        improved_by_template = Counter(
+            str(metadata_map.get(row_id, {}).get("template_subtype", "")).strip() or "unknown"
+            for row_id in comparison["improved"]
+        )
+        comparison_summary[label] = {
+            "reference_path": relative_to_repo(VALIDATION_REFERENCE_PATHS[label]),
+            "shared_rows": len(comparison["shared_ids"]),
+            "improved_count": len(comparison["improved"]),
+            "regressed_count": len(comparison["regressed"]),
+            "unchanged_count": len(comparison["unchanged"]),
+            "surface_box_regressed_count": len(comparison["surface_box_regressed"]),
+            "improved_ids": sorted(comparison["improved"]),
+            "regressed_ids": sorted(comparison["regressed"]),
+            "surface_box_regressed_ids": sorted(comparison["surface_box_regressed"]),
+            "improved_by_template_subtype": dict(sorted(improved_by_template.items())),
+            "regressed_by_template_subtype": dict(sorted(regressed_by_template.items())),
+        }
+
+    return {
+        "created_at": utc_now(),
+        "readme_contract": readme_contract,
+        "measured_tag": measured_tag,
+        "measured_validation_csv": relative_to_repo(measured_validation_csv),
+        "overall": {
+            "correct": overall_correct,
+            "total": overall_total,
+            "accuracy": round(overall_correct / overall_total, 6) if overall_total else 0.0,
+        },
+        "comparison_summary": comparison_summary,
+        "row_level": delta_rows,
+    }
+
+
+def write_measured_validation_analysis(
+    *,
+    artifacts_dir: Path,
+    reports_dir: Path,
+    measured_validation_csv: Path,
+    measured_tag: str,
+) -> dict[str, Any]:
+    payload = build_measured_validation_analysis(
+        measured_validation_csv=measured_validation_csv,
+        measured_tag=measured_tag,
+    )
+    row_level = payload["row_level"]
+    fieldnames = [
+        "id",
+        "category",
+        "family_short",
+        "template_subtype",
+        "gold_answer",
+        "current_predicted",
+        "current_correct",
+        "current_minlogprob",
+    ]
+    for label in VALIDATION_REFERENCE_PATHS:
+        fieldnames.extend(
+            [
+                f"{label}_correct",
+                f"delta_vs_{label}",
+                f"surface_box_regressed_vs_{label}",
+            ]
+        )
+    csv_name = f"measured_validation_{measured_tag}_row_level.csv"
+    json_name = f"measured_validation_{measured_tag}_summary.json"
+    md_name = f"measured_validation_{measured_tag}_summary.md"
+    write_csv(artifacts_dir / csv_name, row_level, fieldnames=fieldnames)
+    payload_without_rows = dict(payload)
+    payload_without_rows.pop("row_level", None)
+    write_json(artifacts_dir / json_name, payload_without_rows)
+
+    lines = [
+        f"# measured validation analysis: {measured_tag}",
+        "",
+        f"- measured_validation_csv: `{payload['measured_validation_csv']}`",
+        f"- overall_accuracy: `{payload['overall']['accuracy']}` ({payload['overall']['correct']}/{payload['overall']['total']})",
+        f"- README.md contract verified against: `{relative_to_repo(README_PATH)}`",
+        "",
+        "## Reference deltas",
+        "",
+    ]
+    for label, summary in payload["comparison_summary"].items():
+        lines.extend(
+            [
+                f"### {label}",
+                "",
+                f"- reference_path: `{summary['reference_path']}`",
+                f"- improved: `{summary['improved_count']}`",
+                f"- regressed: `{summary['regressed_count']}`",
+                f"- surface_box_regressed: `{summary['surface_box_regressed_count']}`",
+                "",
+            ]
+        )
+        if summary["regressed_by_template_subtype"]:
+            lines.append("| regressed template_subtype | count |")
+            lines.append("| --- | ---: |")
+            for subtype, count in sorted(summary["regressed_by_template_subtype"].items()):
+                lines.append(f"| {subtype} | {count} |")
+            lines.append("")
+    (reports_dir / md_name).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return payload_without_rows
 
 
 def choose_guardrail_ids(
@@ -1242,6 +1462,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--run-name", default="v4_mainline_default")
     parser.add_argument("--validation-csv", type=Path, default=None)
+    parser.add_argument("--analysis-only", action="store_true")
+    parser.add_argument("--measured-validation-csv", type=Path, default=None)
+    parser.add_argument("--measured-tag", default=None)
     parser.add_argument("--bucket-limits", default=None)
     parser.add_argument("--repeat-counts", default=None)
     parser.add_argument("--write-training-bundle", action="store_true")
@@ -1251,9 +1474,31 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    validation_csv = None if args.validation_csv is None else args.validation_csv.resolve()
+    measured_validation_csv = (
+        None if args.measured_validation_csv is None else args.measured_validation_csv.resolve()
+    )
+    measured_tag = sanitize_tag(args.measured_tag or (measured_validation_csv.stem if measured_validation_csv else None))
+    run_root = OUTPUT_ROOT / args.run_name
+    artifacts_dir = run_root / "artifacts"
+    reports_dir = run_root / "reports"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.analysis_only:
+        if measured_validation_csv is None:
+            raise SystemExit("--analysis-only requires --measured-validation-csv")
+        summary = write_measured_validation_analysis(
+            artifacts_dir=artifacts_dir,
+            reports_dir=reports_dir,
+            measured_validation_csv=measured_validation_csv,
+            measured_tag=measured_tag,
+        )
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
     bucket_limits = parse_bucket_limits(args.bucket_limits)
     repeat_counts = parse_repeat_counts(args.repeat_counts)
-    validation_csv = None if args.validation_csv is None else args.validation_csv.resolve()
 
     candidates, diagnostics = build_budgeted_candidates(bucket_limits)
     selected = select_candidates(candidates, bucket_limits=bucket_limits)
@@ -1262,12 +1507,6 @@ def main() -> None:
     training_bundle = None
     if args.write_training_bundle:
         training_bundle = build_training_bundle(repeated_rows=repeated_rows, bundle_path=args.bundle_path.resolve())
-
-    run_root = OUTPUT_ROOT / args.run_name
-    artifacts_dir = run_root / "artifacts"
-    reports_dir = run_root / "reports"
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
-    reports_dir.mkdir(parents=True, exist_ok=True)
 
     selection_rows = []
     for row in unique_rows:
@@ -1379,6 +1618,14 @@ def main() -> None:
         "\n".join(report_lines) + "\n",
         encoding="utf-8",
     )
+
+    if measured_validation_csv is not None:
+        write_measured_validation_analysis(
+            artifacts_dir=artifacts_dir,
+            reports_dir=reports_dir,
+            measured_validation_csv=measured_validation_csv,
+            measured_tag=measured_tag,
+        )
 
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

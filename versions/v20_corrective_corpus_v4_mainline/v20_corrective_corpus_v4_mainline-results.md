@@ -21,6 +21,9 @@
 
 - Script: `versions/v20_corrective_corpus_v4_mainline/reproduce_v20_corrective_corpus_v4_mainline.py`
 - Style: single-file monolith
+- Added MLX measured-validation diff support:
+  - `--analysis-only --measured-validation-csv <validation.csv> --measured-tag <tag>`
+  - emits row-level regression packs against `base_v20`, `binary_reference_v1`, `corrective_v2`, and `corrective_v3`
 - Bundle:
   - `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v4_mainline_bundle.jsonl`
 - Kaggle notebook path:
