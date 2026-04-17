@@ -76,19 +76,63 @@ BUCKET_ORDER = (
 
 DEFAULT_BUCKET_LIMITS = {
     "binary_verified_core": 192,
-    "surface_numeral_boxed": 28,
+    "surface_numeral_boxed": 34,
     "surface_cipher_boxed": 6,
     "surface_unit_tail": 6,
     "easy_gravity_fragile": 6,
 }
 
 DEFAULT_REPEAT_COUNTS = {
-    "binary_verified_core": 3,
-    "surface_numeral_boxed": 2,
-    "surface_cipher_boxed": 2,
-    "surface_unit_tail": 2,
+    "binary_verified_core": 2,
+    "surface_numeral_boxed": 1,
+    "surface_cipher_boxed": 1,
+    "surface_unit_tail": 1,
     "easy_gravity_fragile": 1,
 }
+
+PRIORITY_BINARY_FAMILIES = (
+    "xor(shl,shr)",
+    "choose(shl,shr,rol)",
+    "choose(shl,shr,ror)",
+    "majority(ror,shl,shr)",
+    "majority(rol,shl,shr)",
+    "xor(ror,shl)",
+    "or(rol,shr)",
+    "or(ror,shr)",
+)
+
+PRIORITY_BINARY_FAMILY_QUOTAS = {
+    "xor(shl,shr)": 80,
+    "choose(shl,shr,rol)": 18,
+    "choose(shl,shr,ror)": 16,
+    "majority(ror,shl,shr)": 16,
+    "majority(rol,shl,shr)": 16,
+    "xor(ror,shl)": 10,
+    "or(rol,shr)": 8,
+    "or(ror,shr)": 8,
+}
+
+BINARY_SPILLOVER_SLOTS = 20
+BINARY_PRIORITY_EXTRA_VARIANTS = 1
+
+SOURCE_ROW_METADATA_FIELDS = (
+    "selection_tier",
+    "template_subtype",
+    "teacher_solver_candidate",
+    "hard_score",
+    "audit_reasons",
+    "analysis_notes",
+    "symbol_query_operator",
+    "bit_query_binary",
+    "bit_structured_formula_name",
+    "bit_structured_formula_prediction",
+    "bit_structured_formula_abstract_family",
+    "bit_structured_formula_abstract_support",
+    "bit_not_structured_formula_name",
+    "bit_not_structured_formula_prediction",
+    "bit_not_structured_formula_abstract_family",
+    "bit_not_structured_formula_abstract_support",
+)
 
 SELECTION_TIER_PRIORITY = {
     "verified_trace_ready": 3,
@@ -246,6 +290,227 @@ def parse_int(value: Any, default: int = 0) -> int:
         return int(float(text))
     except (TypeError, ValueError):
         return default
+
+
+def copy_source_metadata(target: dict[str, str], source_row: dict[str, str]) -> None:
+    for field in SOURCE_ROW_METADATA_FIELDS:
+        target[field] = str(source_row.get(field, "")).strip()
+
+
+def binary_family_key(row: dict[str, str]) -> str:
+    return (
+        str(row.get("bit_structured_formula_abstract_family", "")).strip()
+        or str(row.get("bit_not_structured_formula_abstract_family", "")).strip()
+        or str(row.get("bit_structured_formula_name", "")).strip()
+        or str(row.get("bit_not_structured_formula_name", "")).strip()
+        or str(row.get("teacher_solver_candidate", "")).strip()
+        or str(row.get("template_subtype", "")).strip()
+        or "NONE"
+    )
+
+
+def build_completion_from_think_lines(lines: list[str], answer: str) -> str:
+    return "\n".join(["<think>", *lines, "</think>", f"\\boxed{{{answer}}}<|im_end|>"])
+
+
+def build_binary_completion(candidate: Candidate, assistant_style: str) -> str:
+    row = candidate.row
+    family = binary_family_key(row)
+    exact_rule = str(row.get("bit_structured_formula_name", "")).strip() or str(
+        row.get("bit_not_structured_formula_name", "")
+    ).strip()
+    solver = str(row.get("teacher_solver_candidate", "")).strip() or "verified_binary_rule"
+    if assistant_style == "trace_family_commit":
+        lines = [
+            f"Verified binary family: {family}." if family != "NONE" else "Use the verified binary rule from the examples.",
+            f"Concrete rule here: {exact_rule}." if exact_rule else f"Recovered solver pattern: {solver}.",
+            "Apply the same transformation to the query and preserve exact 8-bit closure with leading zeros.",
+            "Only the final byte belongs in the box.",
+        ]
+    elif assistant_style == "trace_query_commit":
+        lines = [
+            "Use the same verified binary rule from the examples.",
+            f"The stable rule family is {family}." if family != "NONE" else f"The recovered solver family is {solver}.",
+            "Keep the output as one exact 8-bit byte with leading zeros.",
+            "Do not place any extra digits outside the final box.",
+        ]
+    elif assistant_style == "trace_closure_commit":
+        lines = [
+            "The verified binary mapping is stable across the examples.",
+            "Return only the final transformed 8-bit byte with leading zeros.",
+            "No intermediate bytes belong outside the final box.",
+        ]
+    else:
+        raise ValueError(f"Unsupported binary assistant style: {assistant_style}")
+    return build_completion_from_think_lines(lines, answer=row["answer"])
+
+
+def build_surface_completion(candidate: Candidate) -> str:
+    row = candidate.row
+    bucket = candidate.bucket
+    if bucket == "surface_numeral_boxed":
+        lines = [
+            "Use the verified numeral conversion from the examples.",
+            "Keep the final numeral surface exact.",
+            "Return only the final answer in \\boxed{...}.",
+        ]
+    elif bucket == "surface_cipher_boxed":
+        lines = [
+            "Use the verified cipher mapping from the examples.",
+            "Do not add quotes, slashes, or extra symbols.",
+            "Return only the final answer in \\boxed{...}.",
+        ]
+    elif bucket == "surface_unit_tail":
+        lines = [
+            "Use the verified unit conversion from the examples.",
+            "Keep decimal formatting and trailing zeros exact.",
+            "Return only the final answer in \\boxed{...}.",
+        ]
+    elif bucket == "easy_gravity_fragile":
+        lines = [
+            "Use the verified gravity rule from the examples.",
+            "Keep the final numeric formatting exact.",
+            "Return only the final answer in \\boxed{...}.",
+        ]
+    else:
+        raise ValueError(f"Unsupported surface bucket: {bucket}")
+    return build_completion_from_think_lines(lines, answer=row["answer"])
+
+
+def build_supervision_variants(candidate: Candidate, base_variant_count: int) -> list[dict[str, str]]:
+    if candidate.bucket == "binary_verified_core":
+        variant_styles = ["trace_family_commit", "trace_query_commit"]
+        if binary_family_key(candidate.row) in PRIORITY_BINARY_FAMILIES:
+            variant_styles.append("trace_closure_commit")
+        target_count = base_variant_count + (
+            BINARY_PRIORITY_EXTRA_VARIANTS if binary_family_key(candidate.row) in PRIORITY_BINARY_FAMILIES else 0
+        )
+        target_count = min(target_count, len(variant_styles))
+        return [
+            {
+                "assistant_style": style,
+                "supervision_role": "stage_a_short_trace",
+                "completion_text": build_binary_completion(candidate, style),
+            }
+            for style in variant_styles[:target_count]
+        ]
+    return [
+        {
+            "assistant_style": "surface_boxed_tail",
+            "supervision_role": "stage_c_tail_only",
+            "completion_text": build_surface_completion(candidate),
+        }
+    ]
+
+
+def extract_think_body(completion_text: str) -> str:
+    start = completion_text.find("<think>")
+    end = completion_text.find("</think>")
+    if start == -1 or end == -1 or end <= start:
+        return ""
+    return completion_text[start + len("<think>") : end].strip()
+
+
+def nonempty_line_count(text: str) -> int:
+    return sum(1 for line in text.splitlines() if line.strip())
+
+
+def validate_canonical_v5a(
+    *,
+    unique_rows: list[dict[str, Any]],
+    repeated_rows: list[dict[str, Any]],
+    training_bundle: dict[str, Any] | None,
+    bucket_limits: dict[str, int],
+) -> dict[str, Any]:
+    unique_by_bucket: dict[str, set[str]] = defaultdict(set)
+    for row in unique_rows:
+        unique_by_bucket[row["bucket"]].add(row["id"])
+    mandatory_missing: dict[str, list[str]] = {}
+    for bucket, ids in MEASURED_MANDATORY_IDS.items():
+        missing = sorted(set(ids) - unique_by_bucket.get(bucket, set()))
+        if missing:
+            mandatory_missing[bucket] = missing
+    binary_selected = [row for row in unique_rows if row["bucket"] == "binary_verified_core"]
+    surface_selected = [row for row in unique_rows if row["bucket"] != "binary_verified_core"]
+    binary_family_counts = Counter(binary_family_key(row) for row in binary_selected)
+    repeated_style_counts = Counter(row["assistant_style"] for row in repeated_rows)
+    repeated_bucket_style_counts = Counter(f"{row['bucket']}::{row['assistant_style']}" for row in repeated_rows)
+    binary_nonverified_ids = sorted(
+        row["id"] for row in binary_selected if str(row.get("selection_tier", "")).strip() != "verified_trace_ready"
+    )
+    stage_b_like_ids = sorted(
+        row["id"] for row in binary_selected if str(row.get("selection_tier", "")).strip() in {"answer_only_keep", "manual_audit_priority"}
+    )
+    surface_unexpected_categories = sorted(
+        {row["category"] for row in surface_selected if row["category"] not in {"numeral", "cipher", "unit_conversion", "gravity"}}
+    )
+    binary_answer_in_think = sorted(
+        {
+            row["id"]
+            for row in repeated_rows
+            if row["bucket"] == "binary_verified_core" and row["answer"] in extract_think_body(row["completion_text"])
+        }
+    )
+    surface_answer_in_think = sorted(
+        {
+            row["id"]
+            for row in repeated_rows
+            if row["bucket"] != "binary_verified_core" and row["answer"] in extract_think_body(row["completion_text"])
+        }
+    )
+    binary_max_think_lines = max(
+        (nonempty_line_count(extract_think_body(row["completion_text"])) for row in repeated_rows if row["bucket"] == "binary_verified_core"),
+        default=0,
+    )
+    surface_max_think_lines = max(
+        (nonempty_line_count(extract_think_body(row["completion_text"])) for row in repeated_rows if row["bucket"] != "binary_verified_core"),
+        default=0,
+    )
+    priority_family_presence = {family: binary_family_counts.get(family, 0) for family in PRIORITY_BINARY_FAMILIES}
+    token_share: dict[str, float] = {}
+    if training_bundle is not None:
+        overlay_tokens_by_bucket = training_bundle.get("overlay_tokens_by_bucket", {})
+        total_overlay_tokens = sum(int(value) for value in overlay_tokens_by_bucket.values())
+        if total_overlay_tokens > 0:
+            token_share = {
+                bucket: round(int(value) / total_overlay_tokens, 4)
+                for bucket, value in sorted(overlay_tokens_by_bucket.items())
+            }
+    errors: list[str] = []
+    if mandatory_missing:
+        errors.append("mandatory anchor が欠落している")
+    if binary_nonverified_ids:
+        errors.append("Stage A に verified_trace_ready 以外が混入している")
+    if stage_b_like_ids:
+        errors.append("Stage B 相当の selection_tier が Stage A に混入している")
+    if surface_unexpected_categories:
+        errors.append("Stage C に想定外 category が混入している")
+    if binary_answer_in_think:
+        errors.append("Stage A の think 内に最終 answer が再掲されている")
+    if surface_answer_in_think:
+        errors.append("Stage C の think 内に最終 answer が再掲されている")
+    if binary_max_think_lines > 4:
+        errors.append("Stage A の think 行数が長すぎる")
+    if surface_max_think_lines > 3:
+        errors.append("Stage C の think 行数が長すぎる")
+    if training_bundle is not None and int(training_bundle.get("retokenized_overlay_problem_count", 0)) <= 0:
+        errors.append("overlay が retokenize されていない")
+    return {
+        "canonical_checks_passed": not errors,
+        "errors": errors,
+        "mandatory_missing": mandatory_missing,
+        "binary_nonverified_ids": binary_nonverified_ids,
+        "stage_b_like_ids": stage_b_like_ids,
+        "surface_unexpected_categories": surface_unexpected_categories,
+        "binary_family_counts": dict(sorted(binary_family_counts.items())),
+        "priority_family_presence": priority_family_presence,
+        "repeated_style_counts": dict(sorted(repeated_style_counts.items())),
+        "repeated_bucket_style_counts": dict(sorted(repeated_bucket_style_counts.items())),
+        "binary_max_think_lines": binary_max_think_lines,
+        "surface_max_think_lines": surface_max_think_lines,
+        "overlay_token_share_by_bucket": token_share,
+        "configured_bucket_limits": dict(bucket_limits),
+    }
 
 
 def read_csv_map(path: Path, key: str = "id") -> dict[str, dict[str, str]]:
@@ -526,14 +791,15 @@ def choose_guardrail_ids(
         if row_id in train_prompts and (row_id in base_index_map or (REASONING_DIR / f"{row_id}.txt").exists()):
             chosen.append(row_id)
             seen.add(row_id)
+    fill_target = max(limit, len(chosen))
     for _, _, row_id in sorted(ranked):
         if row_id in seen:
             continue
         chosen.append(row_id)
         seen.add(row_id)
-        if len(chosen) >= limit:
+        if len(chosen) >= fill_target:
             break
-    return chosen[:limit]
+    return chosen
 
 
 def make_candidate(
@@ -561,9 +827,15 @@ def make_candidate(
     merged.setdefault("audit_reasons", "")
     merged.setdefault("analysis_notes", "")
     merged.setdefault("symbol_query_operator", "")
+    merged.setdefault("bit_query_binary", "")
     merged.setdefault("bit_structured_formula_name", "")
     merged.setdefault("bit_structured_formula_prediction", "")
     merged.setdefault("bit_structured_formula_abstract_family", "")
+    merged.setdefault("bit_structured_formula_abstract_support", "")
+    merged.setdefault("bit_not_structured_formula_name", "")
+    merged.setdefault("bit_not_structured_formula_prediction", "")
+    merged.setdefault("bit_not_structured_formula_abstract_family", "")
+    merged.setdefault("bit_not_structured_formula_abstract_support", "")
     return Candidate(
         row=merged,
         bucket=bucket,
@@ -669,16 +941,7 @@ def build_budgeted_candidates(bucket_limits: dict[str, int]) -> tuple[list[Candi
             priority_key=priority_key,
         )
         if candidate is not None:
-            candidate.row["selection_tier"] = tier
-            candidate.row["template_subtype"] = str(row.get("template_subtype", "")).strip()
-            candidate.row["teacher_solver_candidate"] = str(row.get("teacher_solver_candidate", "")).strip()
-            candidate.row["hard_score"] = str(row.get("hard_score", ""))
-            candidate.row["audit_reasons"] = str(row.get("audit_reasons", "")).strip()
-            candidate.row["analysis_notes"] = str(row.get("analysis_notes", "")).strip()
-            candidate.row["symbol_query_operator"] = str(row.get("symbol_query_operator", "")).strip()
-            candidate.row["bit_structured_formula_name"] = str(row.get("bit_structured_formula_name", "")).strip()
-            candidate.row["bit_structured_formula_prediction"] = str(row.get("bit_structured_formula_prediction", "")).strip()
-            candidate.row["bit_structured_formula_abstract_family"] = str(row.get("bit_structured_formula_abstract_family", "")).strip()
+            copy_source_metadata(candidate.row, row)
             candidates.append(candidate)
 
     support_specs = [
@@ -883,11 +1146,54 @@ def load_ranked_candidates(validation_csv: Path | None) -> tuple[list[Candidate]
 def select_candidates(candidates: list[Candidate], bucket_limits: dict[str, int]) -> list[Candidate]:
     selected: list[Candidate] = []
     counts = Counter()
-    for candidate in candidates:
-        if counts[candidate.bucket] >= bucket_limits[candidate.bucket]:
-            continue
+    seen_ids: set[tuple[str, str]] = set()
+
+    def add_candidate(candidate: Candidate) -> None:
+        key = (candidate.bucket, candidate.row["id"])
+        if key in seen_ids:
+            return
         selected.append(candidate)
         counts[candidate.bucket] += 1
+        seen_ids.add(key)
+
+    binary_candidates = [candidate for candidate in candidates if candidate.bucket == "binary_verified_core"]
+    priority_limit = max(0, bucket_limits["binary_verified_core"] - BINARY_SPILLOVER_SLOTS)
+    priority_family_counts: Counter[str] = Counter()
+    for candidate in binary_candidates:
+        if candidate.row["id"] in MEASURED_MANDATORY_IDS["binary_verified_core"]:
+            if counts["binary_verified_core"] >= bucket_limits["binary_verified_core"]:
+                break
+            add_candidate(candidate)
+            priority_family_counts[binary_family_key(candidate.row)] += 1
+    family_candidates: dict[str, list[Candidate]] = defaultdict(list)
+    for candidate in binary_candidates:
+        key = (candidate.bucket, candidate.row["id"])
+        if key in seen_ids:
+            continue
+        family_candidates[binary_family_key(candidate.row)].append(candidate)
+    for family in PRIORITY_BINARY_FAMILIES:
+        quota = PRIORITY_BINARY_FAMILY_QUOTAS[family]
+        for candidate in family_candidates.get(family, []):
+            if counts["binary_verified_core"] >= priority_limit:
+                break
+            if priority_family_counts[family] >= quota:
+                break
+            add_candidate(candidate)
+            priority_family_counts[family] += 1
+    for candidate in binary_candidates:
+        if counts["binary_verified_core"] >= bucket_limits["binary_verified_core"]:
+            break
+        add_candidate(candidate)
+
+    for bucket in BUCKET_ORDER:
+        if bucket == "binary_verified_core":
+            continue
+        for candidate in candidates:
+            if candidate.bucket != bucket:
+                continue
+            if counts[bucket] >= bucket_limits[bucket]:
+                break
+            add_candidate(candidate)
     return selected
 
 
@@ -896,17 +1202,15 @@ def build_overlay_rows(selected: list[Candidate], repeat_counts: dict[str, int])
     repeated_rows: list[dict[str, Any]] = []
     for candidate in selected:
         row_id = candidate.row["id"]
-        reasoning_text = (REASONING_DIR / f"{row_id}.txt").read_text(encoding="utf-8").rstrip("\n")
-        answer = candidate.row["answer"]
-        completion_text = build_completion_text(reasoning_text, answer)
-        repeat_count = repeat_counts[candidate.bucket]
+        variants = build_supervision_variants(candidate, base_variant_count=repeat_counts[candidate.bucket])
+        repeat_count = len(variants)
         base = {
             "id": row_id,
             "category": candidate.row["category"],
             "bucket": candidate.bucket,
             "prompt": candidate.row["prompt"],
-            "answer": answer,
-            "completion_text": completion_text,
+            "answer": candidate.row["answer"],
+            "completion_text": variants[0]["completion_text"],
             "selection_tier": candidate.row["selection_tier"],
             "template_subtype": candidate.row["template_subtype"],
             "teacher_solver_candidate": candidate.row["teacher_solver_candidate"],
@@ -914,18 +1218,27 @@ def build_overlay_rows(selected: list[Candidate], repeat_counts: dict[str, int])
             "proxy_failed": candidate.proxy_failed,
             "validation_failed": candidate.validation_failed,
             "recommended_repeat_count": repeat_count,
+            "assistant_styles": [variant["assistant_style"] for variant in variants],
             "hard_score": parse_float(candidate.row["hard_score"], 0.0),
             "audit_reasons": candidate.row["audit_reasons"],
             "analysis_notes": candidate.row["analysis_notes"],
             "symbol_query_operator": candidate.row["symbol_query_operator"],
+            "bit_query_binary": candidate.row.get("bit_query_binary", ""),
             "bit_structured_formula_name": candidate.row["bit_structured_formula_name"],
             "bit_structured_formula_prediction": candidate.row["bit_structured_formula_prediction"],
             "bit_structured_formula_abstract_family": candidate.row["bit_structured_formula_abstract_family"],
+            "bit_not_structured_formula_name": candidate.row.get("bit_not_structured_formula_name", ""),
+            "bit_not_structured_formula_prediction": candidate.row.get("bit_not_structured_formula_prediction", ""),
+            "bit_not_structured_formula_abstract_family": candidate.row.get("bit_not_structured_formula_abstract_family", ""),
+            "binary_family_key": binary_family_key(candidate.row),
         }
         unique_rows.append(base)
-        for overlay_index in range(repeat_count):
+        for overlay_index, variant in enumerate(variants, start=1):
             repeated = dict(base)
-            repeated["overlay_instance"] = overlay_index + 1
+            repeated["completion_text"] = variant["completion_text"]
+            repeated["assistant_style"] = variant["assistant_style"]
+            repeated["supervision_role"] = variant["supervision_role"]
+            repeated["overlay_instance"] = overlay_index
             repeated_rows.append(repeated)
     return unique_rows, repeated_rows
 
@@ -968,6 +1281,7 @@ def build_summary(
     diagnostics: dict[str, Any],
     watchlist: list[dict[str, Any]],
     validation_csv: Path | None,
+    canonical_validation: dict[str, Any],
     training_bundle: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     selected_by_bucket = Counter(candidate.bucket for candidate in selected)
@@ -996,6 +1310,7 @@ def build_summary(
         "proxy_failed_selected": sum(1 for row in unique_rows if row["proxy_failed"]),
         "validation_failed_selected": sum(1 for row in unique_rows if row["validation_failed"]),
         "diagnostics": diagnostics,
+        "canonical_validation": canonical_validation,
         "anchor_watchlist": watchlist,
         "training_bundle": training_bundle,
     }
@@ -1053,8 +1368,9 @@ def build_training_bundle(
     max_seq_len = 0
     category_counts: Counter[str] = Counter()
     overlay_by_bucket: Counter[str] = Counter()
+    overlay_tokens_by_bucket: Counter[str] = Counter()
+    overlay_examples_by_style: Counter[str] = Counter()
     retokenized_overlay_ids: set[str] = set()
-    synthetic_cache: dict[str, tuple[list[int], list[int], int]] = {}
 
     manifest = {
         "record_type": "manifest",
@@ -1105,24 +1421,13 @@ def build_training_bundle(
         for overlay_offset, row in enumerate(repeated_rows):
             problem_id = str(row["id"])
             segment = "synthetic.jsonl"
-            key = (problem_id, segment)
-            if key in base_examples:
-                entry = base_examples[key]
-                base_row = entry["row"]
-                tokens = entry["tokens"]
-                mask = entry["mask"]
-                category = str(base_row["category"])
-                num_loss_tokens = int(base_row["num_loss_tokens"])
-            else:
-                if problem_id not in synthetic_cache:
-                    tokens, mask = tokenize_overlay_example(
-                        prompt=str(row["prompt"]),
-                        completion_text=str(row["completion_text"]),
-                    )
-                    synthetic_cache[problem_id] = (tokens, mask, sum(mask))
-                tokens, mask, num_loss_tokens = synthetic_cache[problem_id]
-                category = str(row["category"])
-                retokenized_overlay_ids.add(problem_id)
+            tokens, mask = tokenize_overlay_example(
+                prompt=str(row["prompt"]),
+                completion_text=str(row["completion_text"]),
+            )
+            category = str(row["category"])
+            num_loss_tokens = sum(mask)
+            retokenized_overlay_ids.add(problem_id)
             overlay_step = base_step_count + (overlay_offset // batch_size)
             payload = {
                 "record_type": "example",
@@ -1135,6 +1440,8 @@ def build_training_bundle(
                 "num_loss_tokens": num_loss_tokens,
                 "bucket": row["bucket"],
                 "overlay_instance": int(row["overlay_instance"]),
+                "assistant_style": row["assistant_style"],
+                "supervision_role": row["supervision_role"],
                 "recommended_repeat_count": int(row["recommended_repeat_count"]),
                 "proxy_failed": bool(row["proxy_failed"]),
                 "validation_failed": bool(row["validation_failed"]),
@@ -1150,6 +1457,8 @@ def build_training_bundle(
             max_seq_len = max(max_seq_len, len(tokens))
             category_counts[category] += 1
             overlay_by_bucket[row["bucket"]] += 1
+            overlay_tokens_by_bucket[row["bucket"]] += len(tokens)
+            overlay_examples_by_style[row["assistant_style"]] += 1
 
     total_steps = base_step_count + ((len(repeated_rows) + batch_size - 1) // batch_size)
     return {
@@ -1167,9 +1476,12 @@ def build_training_bundle(
         "total_unmasked_tokens": total_unmasked_tokens,
         "max_seq_len": max_seq_len,
         "overlay_by_bucket": dict(overlay_by_bucket),
+        "overlay_tokens_by_bucket": dict(overlay_tokens_by_bucket),
+        "overlay_examples_by_style": dict(sorted(overlay_examples_by_style.items())),
         "category_counts": dict(sorted(category_counts.items())),
         "retokenized_overlay_problem_ids": sorted(retokenized_overlay_ids),
         "retokenized_overlay_problem_count": len(retokenized_overlay_ids),
+        "retokenized_overlay_example_count": len(repeated_rows),
     }
 
 
@@ -1233,6 +1545,16 @@ def main() -> None:
     training_bundle = None
     if args.write_training_bundle:
         training_bundle = build_training_bundle(repeated_rows=repeated_rows, bundle_path=args.bundle_path.resolve())
+    canonical_validation = validate_canonical_v5a(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        training_bundle=training_bundle,
+        bucket_limits=bucket_limits,
+    )
+    if not canonical_validation["canonical_checks_passed"]:
+        raise SystemExit(
+            "Canonical v5a validation failed: " + "; ".join(canonical_validation["errors"])
+        )
 
     run_root = OUTPUT_ROOT / args.run_name
     artifacts_dir = run_root / "artifacts"
@@ -1251,9 +1573,12 @@ def main() -> None:
                 "template_subtype": row["template_subtype"],
                 "teacher_solver_candidate": row["teacher_solver_candidate"],
                 "recommended_repeat_count": row["recommended_repeat_count"],
+                "assistant_styles": "|".join(row["assistant_styles"]),
                 "proxy_failed": row["proxy_failed"],
                 "validation_failed": row["validation_failed"],
                 "hard_score": row["hard_score"],
+                "binary_family_key": row["binary_family_key"],
+                "bit_query_binary": row["bit_query_binary"],
                 "source_tags": "|".join(row["source_tags"]),
             }
         )
@@ -1265,6 +1590,7 @@ def main() -> None:
         diagnostics=diagnostics,
         watchlist=watchlist,
         validation_csv=validation_csv,
+        canonical_validation=canonical_validation,
         training_bundle=training_bundle,
     )
 
@@ -1279,9 +1605,12 @@ def main() -> None:
             "template_subtype",
             "teacher_solver_candidate",
             "recommended_repeat_count",
+            "assistant_styles",
             "proxy_failed",
             "validation_failed",
             "hard_score",
+            "binary_family_key",
+            "bit_query_binary",
             "source_tags",
         ],
     )
@@ -1320,10 +1649,26 @@ def main() -> None:
     report_lines.extend(
         [
             "",
+            "## Canonical validation",
+            "",
+            f"- passed: `{summary['canonical_validation']['canonical_checks_passed']}`",
+            f"- binary max think lines: `{summary['canonical_validation']['binary_max_think_lines']}`",
+            f"- surface max think lines: `{summary['canonical_validation']['surface_max_think_lines']}`",
+            "",
             "## Kaggle single-file bundle",
             "",
         ]
     )
+    for error in summary["canonical_validation"]["errors"]:
+        report_lines.append(f"- validation error: `{error}`")
+    for family, count in summary["canonical_validation"]["priority_family_presence"].items():
+        report_lines.append(f"- Stage A family `{family}`: `{count}`")
+    report_lines.append("")
+    report_lines.append("## Overlay supervision styles")
+    report_lines.append("")
+    for style, count in summary["canonical_validation"]["repeated_style_counts"].items():
+        report_lines.append(f"- `{style}`: `{count}`")
+    report_lines.append("")
     if training_bundle is None:
         report_lines.append("- not generated in this run")
     else:
@@ -1333,6 +1678,8 @@ def main() -> None:
                 f"- total examples: `{training_bundle['total_examples']}`",
                 f"- overlay examples: `{training_bundle['overlay_examples']}`",
                 f"- total steps: `{training_bundle['total_steps']}`",
+                f"- retokenized overlay problems: `{training_bundle['retokenized_overlay_problem_count']}`",
+                f"- retokenized overlay examples: `{training_bundle['retokenized_overlay_example_count']}`",
             ]
         )
     report_lines.extend(
