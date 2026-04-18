@@ -41,8 +41,8 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
 - post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
-- latest observed eval checkpoint: `492 / 950` rows completed
-- latest observed eval partial score: `422 / 492 = 0.8577`
+- latest observed eval checkpoint: `496 / 950` rows completed
+- latest observed eval partial score: `426 / 496 = 0.8589`
 - latest observed eval partial read: the checkpoint is still consistent with the earlier prefix read: `numeral / cipher / unit / gravity` remain materially more stable than v3, so the live misses continue to look concentrated in the harder `bit` / `cryptarithm` slices rather than a renewed boxed-surface collapse
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - operational note:
