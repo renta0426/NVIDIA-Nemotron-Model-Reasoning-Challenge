@@ -252,6 +252,28 @@ symbol は大きく 2 つに分かれました。
 
 次の curation ループはここから始めるのが最短です。
 
+### 4.6 strict verified ceiling の再確認
+
+未コミット復旧後に `A-Open-ProgressPrizePublication/nemotron/problems.jsonl` を照合したところ、`symbol_equation` 1,555 行は公開 problem category 上でちょうど
+
+- `equation_numeric_deduce` `596`
+- `equation_numeric_guess` `136`
+- `cryptarithm_deduce` `659`
+- `cryptarithm_guess` `164`
+
+へ分かれていました。したがって、strict な `verified_trace_ready` を保ったまま 90% (`1,400`) を目指すには、少なくとも `cryptarithm_guess` から `9` 行以上を defensible に verified へ上げる必要があります。なぜなら、**numeric 全 732 行と cryptarithm_deduce 全 659 行をすべて verified にしても `1,391 / 1,555 = 89.45%` にしか届かない**ためです。
+
+さらに、公開 reasoner 実装では unknown query operator に対して
+
+- `equation_numeric`: abs-diff fallback
+- `cryptarithm`: concat fallback
+
+を明示的に使っており、これは answer-level heuristic としては有用でも trace-safe verified の根拠にはなりません。実際、復旧後に既存 `cryptarithm_deduce.py` を `glyph_len5` 全件へ再適用すると gold 一致は `99` 行見つかりましたが、これは全件 `same_operator_example_count = 0` の unseen-query-operator regime にあり、90% verified へ直結する新 family ではありませんでした。さらに `cryptarithm_guess` `164` 行だけを 5 秒 timeout で深掘りしても gold 一致は `4` 行しかなく、**strict singleton match は `0`** でした。加えて、未コミット復旧 scratch をベースにした拡張 cryptarithm solver（signed subtraction / concat / reverse operands / reverse outputs / non-unique mapping 許容）を同 split 全件へ 20 秒 timeout で再適用しても、**gold 一致は `0`** でした。また、`equation_numeric_guess` `136` 行に対して operator identity をいったん捨てた global exact scan も回しましたが、**全 example を exact に満たす一意 spec で gold まで一致した行は `0`** でした。
+
+詳細は `reports/60_symbol_verified_ceiling_from_problem_categories.md`、`reports/61_symbol_numeric_guess_global_exact_scan.md`、`reports/62_cryptarithm_guess_solver5s_scan.md`、`reports/63_official_generator_source_search.md`、`reports/64_cryptarithm_guess_extended_solver_scan.md`、`reports/65_symbol_missing_evidence_requirements.md` に分離しました。結論として、現行の strict verified 定義を保つ限り、この family を 90% へ押し上げるには **`cryptarithm_guess` の query operator semantics を外部から確定できる追加ソース** が必要です。現時点で、その generator / semantics を固定できる公式 public source も確認できていません。
+
+この結論を row-level に固定するため、`code/train_data_analysis_v1.py` へ prompt-only strict audit を追加し、`artifacts/symbol_strict_prompt_audit_v1.csv` と `artifacts/symbol_strict_prompt_gap_summary_v1.csv`、`reports/32_symbol_strict_prompt_audit.md` を生成するようにしました。最新の audit では `symbol_equation` の strict prompt-safe verified は `110` 行で、残差は主に `cryptarithm_deduce` の latent-rule nonunique / unseen-query-operator、`equation_numeric_deduce` の needs-cross-row-evidence / low-support、`equation_numeric_guess` の unseen-query-operator / prompt-exact-conflict に分解されています。
+
 ## 5. 最終成果物一覧
 
 ### 5.1 最重要 CSV
@@ -288,6 +310,8 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_four_bit_boolean_verified_v1.csv` | `binary_four_bit_boolean` で gold を再現した current verified 38 行の台帳（baseline 比の純増は 9 行） |
 | `artifacts/binary_manual_exact_reverified_v1.csv` | prompt-backed manual exact reread を後段で再適用し、`verified_trace_ready` に戻した 62 行の台帳 |
 | `artifacts/binary_exact_disambiguation_verified_v1.csv` | strict audit 後に、4 exact libraries 全体で 1 つの `(formula, prediction)` に収束した `overall_unique_exact_formula` 154 行の台帳 |
+| `artifacts/symbol_strict_prompt_audit_v1.csv` | `symbol_equation` 全 1,555 行に対する prompt-only strict audit 台帳 |
+| `artifacts/symbol_strict_prompt_gap_summary_v1.csv` | strict audit の gap reason / problem category 集計 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 117 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_minus_direct_plain_support_v1.csv` | prompt-exact な direct `-` plain subfamily の support 台帳 |
