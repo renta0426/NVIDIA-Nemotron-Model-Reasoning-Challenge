@@ -519,3 +519,282 @@ v1-v5 はその上で row-level corrective を積んだが、
 である。
 
 これが、単なる v5 の延長ではなく、0.88 を狙うための最初の本当の方針転換だと判断する。
+
+## 12. v6 として何を実験すべきか
+
+前提として、週に `3-4` run しか回せないなら、理想的な一変数ずつの対照実験はできない。
+したがって v6 は、
+
+- **証拠が強い変更は束ねて mainline へ入れる**
+- **不確実性が高い軸だけを別 run で切る**
+- **低期待値の枝は mainline から外す**
+
+という run 設計にするべきである。
+
+### 12.1 v6 で mainline に必ず入れるべき部分
+
+これは「対照実験に回す候補」ではなく、v1-v5 の証拠から見て **入れない理由の方が弱い変更** である。
+
+#### A. `v5a Stage C` 相当の easy-family surface stabilizer
+
+残す対象:
+
+- numeral boxed closure
+- unit tail stabilization
+- gravity fragile tail
+- cipher final boxed closure
+
+理由:
+
+- v3 で guardrail を薄くすると numeral / boxed surface が崩壊した
+- v5a では repeated `52` 行程度の小さな lane で numeral / unit を有意に回復できた
+- ここは cheap で再現性が高く、削る合理性が薄い
+
+結論:
+
+- **v6 では Stage C は fixed component とみなす**
+- ここを毎回いじって比較するのは run の無駄
+
+#### B. exact binary closure lane の拡張
+
+必須対象:
+
+- `binary_structured_byte_formula`
+- `binary_bit_permutation_bijection`
+- `binary_bit_permutation_independent`
+- `binary_prompt_local_stage2_unique_exact`
+- `binary_four_bit_boolean`
+
+理由:
+
+- v1-v5 で persistent hard core が消えていない
+- v5a は family-level short trace に寄せすぎて permutation / structured-byte を落とした
+- `FINAL_SUMMARY` の strict verified pool には未活用の余地がまだある
+
+結論:
+
+- **v6 mainline は binary の量を増やすのではなく、query-specific exact closure を持つ teacher を増やす**
+
+#### C. anti-`default 1` counterexample lane
+
+対象:
+
+- proxy / validation で `default 1` を繰り返し出した hard binary rows
+- 近傍 family の exact positive / negative contrast pair
+
+理由:
+
+- `default 1` は v20, v4, v5 で何度も再発している代表 failure mode
+- これは generic binary 増量ではなく、**明示的な counterexample supervision** を入れる方が筋がよい
+
+結論:
+
+- **v6 では anti-`default 1` は独立 lane として mainline に含める**
+
+#### D. minimal symbol-prefix repair lane
+
+対象:
+
+- v4 で効いた prefix / suffix / operator-preservation 型の極小 repair
+
+理由:
+
+- v5a でここを抜くと `numeric_2x2` や symbol prefix の小回帰が起きた
+- ただし broad symbol mainline は低期待値
+
+結論:
+
+- **v6 では broad symbol ではなく minimal repair だけ戻す**
+
+### 12.2 v6 で mainline に入れない部分
+
+run 数が少ない以上、ここを mainline に混ぜると解釈不能になる。
+
+#### A. `cryptarithm_guess` の大規模強化
+
+理由:
+
+- strict verified 化の証拠がない
+- local heuristic を積んでも generator evidence gap は埋まっていない
+- run 予算に対して EV が低い
+
+#### B. `answer_only_keep` の full CoT teacher 化
+
+理由:
+
+- reasoning teacher としては unsafe
+- surface lane と reasoning lane が再び混ざる
+
+#### C. easy family の本体 CoT の再設計
+
+理由:
+
+- 既に高得点
+- 壊したときのコストが大きい
+- easy family は preservation lane として扱う方が得
+
+#### D. `train_split_with_cot.csv` への全面置換
+
+理由:
+
+- baseline 系全体スコアが低い
+- donor としては有用だが、teacher の置換先ではない
+
+### 12.3 v6 で分離して比較すべき 3 つの不確実軸
+
+週 `3-4` run しかないなら、厳密な全組み合わせ比較はやらない。切るべき軸は次の 3 つに限る。
+
+#### 軸1. short closure rewrite は効くか
+
+問い:
+
+- exact teacher を baseline / LLM 風の短い boxed-friendly closure に rewrite すると、binary content を保ったまま public に効くか
+
+理由:
+
+- これは v6 の本質的な新規性
+- ただしまだ未検証
+
+#### 軸2. token-skill auxiliary を modernized すると binary を壊さず効くか
+
+問い:
+
+- v20 augmentations の現代化が、current direct-training path でも効くか
+
+理由:
+
+- README の弱点認識とは整合する
+- ただし binary mainline と混ぜたときの干渉は未測定
+
+#### 軸3. binary の追加予算は permutation 重視と structured-byte 重視のどちらが高 EV か
+
+問い:
+
+- 限られた overlay 予算を、どちらへ厚く振るべきか
+
+理由:
+
+- v5a は permutation が薄すぎた
+- ただし persistent hard core は structured-byte にも多い
+
+### 12.4 週 3 run の場合の推奨編成
+
+最も現実的な編成は次の 3 run。
+
+#### Run 1: `v6-core`
+
+入れるもの:
+
+- fixed Stage C
+- exact binary closure lane 拡張
+- anti-`default 1` lane
+- minimal symbol-prefix repair
+
+入れないもの:
+
+- short closure rewrite
+- modernized token-skill augmentations
+- risky な binary token representation 変更
+
+役割:
+
+- **新しい v6 の基準線**
+- 以後の比較対象は全部これにする
+
+期待:
+
+- v4 の public edge を維持 / 超過しつつ、v5a より binary proxy を戻す
+
+#### Run 2: `v6-core + short-closure`
+
+Run 1 に追加:
+
+- exact teacher から蒸留した short closure rewrite lane
+
+役割:
+
+- 「short closure が本当に mainline 価値を持つか」を測る
+
+見るべき指標:
+
+- proxy binary
+- format_ok_content_wrong_rate
+- numeral / unit の no-regression
+
+#### Run 3: `v6-core + token-skill`
+
+Run 1 に追加:
+
+- spelling / splitting / concatenation / text-to-character / boxed closure の modernized auxiliary
+
+役割:
+
+- token weakness repair が current path でも効くかを測る
+
+見るべき指標:
+
+- symbol / text / boxed-surface failure
+- binary collateral damage の有無
+
+### 12.5 週 4 run できる場合の追加 1 本
+
+4 本目は、次のどちらか一方だけを入れる。
+
+#### Option A. `v6-core + permutation-heavy`
+
+目的:
+
+- overlay 予算を permutation / bijection に厚く寄せたときの EV を測る
+
+向いている条件:
+
+- `v6-core` で structured-byte は戻ったが permutation が弱い場合
+
+#### Option B. `v6-core + structured-heavy`
+
+目的:
+
+- structured-byte exact closure をさらに厚くしたときの EV を測る
+
+向いている条件:
+
+- `default 1` rows の中心が structured-byte に残る場合
+
+注意:
+
+- 4 本目で binary token representation 変更まで入れるのはやりすぎ
+- base64 / nibble 圧縮のような表現変更は **v6 本流ではなく v7 候補** とみなす方が安全
+
+### 12.6 実際の優先順位
+
+run budget が厳しいなら、v6 で優先順位は次の順。
+
+1. `v6-core`
+2. `v6-core + short-closure`
+3. `v6-core + token-skill`
+4. `v6-core + permutation-heavy` または `structured-heavy`
+
+この順にする理由は単純で、
+
+- 1本目で新しい mainline の骨格を作る
+- 2本目で teacher architecture 変更の本命仮説を検証する
+- 3本目で README 由来の token weakness repair を測る
+- 4本目で binary 内部の予算配分を詰める
+
+### 12.7 v6 の採用基準
+
+採用候補にする最低条件は次のように置く。
+
+- public: `0.86` を安定して再現し、`0.87` に触れる余地が見えること
+- proxy: `179/200` 以上を最低、理想は `181/200` 以上
+- proxy binary: `80/92` 以上を最低、理想は `82/92` 以上
+- numeral: `145/149` 以上
+- unit: `171/171` を維持
+- format_ok_content_wrong_rate: v4 `0.1413` 以下へ近づくこと
+
+要するに、v6 は「local が少し良い」では不十分で、
+
+- binary public edge
+- easy-family surface stability
+
+を同時に満たした run だけを昇格対象にするべきである。
