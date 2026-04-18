@@ -11,7 +11,8 @@
 - Training / validation / leaderboard score: 未計測
 - Local regeneration status: `uv run python versions/v20_corrective_corpus_v6_structured_short_closure/reproduce_v20_corrective_corpus_v6_structured_short_closure.py --run-name v6_structured_short_closure_default --write-training-bundle` を current branch で実行し、README 契約と canonical checks を通した上で bundle 再生成に成功
 - Branch purpose: structured-byte persistent hard core を厚く押す `structured-heavy` と、teacher architecture 本命である `short-closure` を合成した高EV比較線
-- Execution note: `v20_mlx_v6_permutation_heavy_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定する方針
+- Execution note: `v20_mlx_v6_permutation_heavy_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定済み
+- Post-run automation: `v6-structured-short-train-watch` / `v6-structured-short-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
 
 ## Generated artifacts
 
