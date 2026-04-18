@@ -35,13 +35,13 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 
 - active run: `v20_mlx_v4_mainline_mb1_nobc`
 - source bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v4_mainline_bundle.jsonl`
-- latest observed train step: `229 / 271`
-- latest observed train loss: `0.00025048651245899485`
-- latest observed trained tokens: `24875477`
-- latest observed total elapsed seconds: `69929.9466`
+- latest observed train step: `271 / 271` (train completed)
+- latest observed train loss: `0.0002936268817514455`
+- latest observed trained tokens: `31369667`
+- latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
-- remaining train steps at this snapshot: `42`
-- note: this is a live MLX training snapshot from `adapter/latest_train_report.json`, **not** a measured validation score
+- post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
+- note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
   - tracked heavy artifacts for the aborted v3 lane were pruned, and only the active v4 MLX lane remains
