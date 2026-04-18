@@ -12,6 +12,7 @@
 - Local regeneration status: `uv run python versions/v20_corrective_corpus_v6_short_closure/reproduce_v20_corrective_corpus_v6_short_closure.py --run-name v6_short_closure_default --write-training-bundle` を current branch で実行し、README 契約と canonical checks を通した上で bundle 再生成に成功
 - Branch purpose: `v6-core` の exact-binary mainline を保持したまま、binary と easy family に short-closure rewrite lane を追加し、`v20_to_088_reassessment_2026-04-18.md` の Run 2 を MLX full-run 可能な単一ファイルとして固定した
 - Execution note: 現在の RAM 状況を踏まえて即時 3 本目起動は避け、`v20_mlx_v6_mainline_mb1_nobc` の `training_result.json` 出現をトリガにこの full pipeline が自動起動する detached queue を設定済み
+- Post-run automation: `v6-short-train-watch` / `v6-short-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
 
 ## Generated artifacts
 

@@ -12,6 +12,7 @@
 - Local regeneration status: `uv run python versions/v20_corrective_corpus_v6_token_skill/reproduce_v20_corrective_corpus_v6_token_skill.py --run-name v6_token_skill_default --write-training-bundle` を current branch で実行し、README 契約と canonical checks を通した上で bundle 再生成に成功
 - Branch purpose: `v6-core` の exact-binary mainline を保持したまま、binary leading-zero exactness / boxed closure / prefix retention を補強する token-skill auxiliary lane を追加し、`v20_to_088_reassessment_2026-04-18.md` の Run 3 を MLX full-run 可能な単一ファイルとして固定した
 - Execution note: `v20_mlx_v6_short_closure_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定済みで、実験列が途切れないようにしている
+- Post-run automation: `v6-token-train-watch` / `v6-token-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
 
 ## Generated artifacts
 
