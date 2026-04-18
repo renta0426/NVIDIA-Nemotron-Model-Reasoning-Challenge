@@ -932,3 +932,327 @@ README 契約と v1-v3 実測から、v4 の昇格条件は次にする。
 したがって v4 の基本判断は明確です。
 
 **「binary を強くする」だけでは駄目で、README の boxed-first metric に対して terminal answer surface を別 line で守る run だけが 0.88 候補になる。**
+
+## v4 実測を踏まえた v5 戦略
+
+### 1. 先に結論
+
+**v5 は v4 の bucket 調整版ではなく、学習目的を段階分離した mainline に作り直す。**
+
+理由は単純です。
+
+- v4 の public 改善は本物だったが、改善は **binary にしか出ていない**
+- 一方で local debt の主因は **numeral / unit の verified family 上の boxed-surface 崩れ**であり、データ不足ではない
+- broad symbol / cryptarithm の answer-only を mainline に混ぜても、0.88 に届くだけの EV は見えていない
+
+したがって v5 の本質は「v4 を少し強くする」ことではなく、**binary frontier 学習、ambiguous answer-only 学習、easy-family surface 安定化**を別ステージに分けることです。
+
+### 2. v4 実測が示したこと
+
+まず measured fact を固定します。
+
+- public leaderboard 実測: `0.86 x2`, `0.85 x3`
+- validation: `813 / 950 = 0.8558`
+- proxy: `179 / 200 = 0.8950`
+
+v20 -> v4 の差分で見ると、proxy 改善は **3 行だけ**です。
+
+- `fa67da07`
+- `0520a6ec`
+- `0a50c4a8`
+
+しかも **3 行とも bit_manipulation** で、proxy regression は `0` 行でした。つまり public を押し上げたのは、README の仮説どおり **binary gain** です。
+
+一方で validation wrong `137` 行を tier で切ると、失敗の性質はまったく違います。
+
+| category | answer_only_keep | manual_audit_priority | verified_trace_ready |
+| --- | ---: | ---: | ---: |
+| bit_manipulation | `3` | `2` | `14` |
+| cipher | `1` | `0` | `0` |
+| cryptarithm_deduce | `66` | `0` | `0` |
+| cryptarithm_guess | `11` | `0` | `0` |
+| equation_numeric_deduce | `4` | `1` | `0` |
+| equation_numeric_guess | `7` | `0` | `0` |
+| numeral | `0` | `0` | `25` |
+| unit_conversion | `0` | `0` | `3` |
+
+ここから読めることは明確です。
+
+1. **numeral 25 行と unit 3 行の debt は、教師不足ではない**
+  どちらも `verified_trace_ready` 側で落ちている。つまり v5 で必要なのは coverage 追加ではなく、**最後の boxed answer を壊さない短い surface alignment** です。
+
+2. **cryptarithm / equation の wrong は answer-only 側に偏っている**
+  ここは局所改善余地はあっても、0.88 本命線の主戦場ではありません。
+
+3. **binary はまだ未解決だが、no-solver abyss ではない**
+  validation wrong の bit 19 行中 `14` 行は `verified_trace_ready`、`14` 行は teacher 非空です。つまり次に必要なのは「新しい大雑把な family を足す」ことではなく、**既に solver 根拠がある hard binary をより短く安定して出させること**です。
+
+### 3. v4 tweak では足りない理由
+
+v4 generator 自体が、まだ **overlay correction** の思想に留まっています。
+
+v4 の default unique overlay 上限は次でした。
+
+- `binary_structured_core`: `176`
+- `binary_other_light`: `64`
+- `surface_numeral_boxed`: `36`
+- `surface_cipher_boxed`: `8`
+- `surface_cryptarithm_boxed`: `12`
+- `surface_unit_tail`: `8`
+- `surface_symbol_prefix`: `4`
+- `easy_gravity_fragile`: `12`
+
+つまり v4 は、binary 側でも **unique row としては 240 行しか mainline に強く押していない**。
+
+これに対して、`cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md` の current ledger は次です。
+
+- bit_manipulation: `1229 verified / 271 answer_only / 87 manual / 15 exclude`
+- そのうち `bit_structured_formula_safe = 707`
+- `bit_structured_formula_abstract_support >= 20 = 734`
+
+要するに、v4 は **1229 verified binary rows を使える状況なのに、そのうち 240 row を corrective overlay として再提示しただけ**です。これでは 0.86 帯に届いても、0.88 帯に上がるには弱い。
+
+さらに、残っている proxy binary wrong `13` 行の性質も v4 tweak 限界を示しています。
+
+- `13` 行中 `8` 行が `verified_trace_ready`
+- `13` 行中 `5` 行が `abstract_support >= 20`
+- しかし `structured_formula_safe` は `1` 行しかない
+
+つまり残差は、v4 が得意だった「安全な formula-safe row を少し厚くする」領域ではなく、**abstract family は見えているが trace がまだ長い / 不安定な領域**です。
+
+したがって v5 の中心課題は、bucket repeat を 1 段いじることではありません。**row-level corrective から family-level binary curriculum へ移ること**です。
+
+### 4. 学習データ側の根拠
+
+`FINAL_SUMMARY_REPORT.md` の current ledger から、v5 に使うべき根拠は次です。
+
+#### binary 側
+
+- verified binary は `1229` 行ある
+- `structured_formula_safe = 707`
+- `abstract_support >= 20 = 734`
+- 上位 abstract family は
+  - `xor(shl,shr) = 322`
+  - `choose(shl,shr,rol) = 59`
+  - `majority(ror,shl,shr) = 52`
+  - `choose(shl,shr,ror) = 42`
+  - `majority(rol,shl,shr) = 41`
+
+この分布は、「binary をまだ上げる余地は十分あるが、その余地は prompt-local singleton 補修ではなく、**抽象 family を短い trace で安定に書かせること**にある」と読めます。
+
+#### symbol 側
+
+- symbol_equation は `110 verified / 1410 answer_only / 26 manual / 9 exclude`
+- `numeric_formula_nonempty = 252`
+- `same_operator_ge2 = 301`
+
+一見大きな pool ですが、v4 proxy wrong symbol `8` 行を見ると
+
+- `7` 行が `answer_only_keep`
+- `numeric_formula_nonempty` は `2` 行だけ
+- `same_operator_ge2` は `1` 行だけ
+
+でした。つまり broad symbol を mainline に戻しても、いま残っている proxy / public の main pain を効率よく削る保証がない。**symbol は side-branch に隔離すべきで、本命ではない**です。
+
+#### easy family 側
+
+validation wrong の numeral `25` 行、unit `3` 行は全て `verified_trace_ready` 側です。これは README の boxed-first extraction 契約と合わせると、
+
+- reasoning を新たに教える必要はない
+- しかし推論末尾の出し方はまだ不安定
+
+という意味です。したがって v5 では **easy-family boxed surface stabilizer を最後に別 stage で入れる** 必要があります。
+
+### 5. v5 の設計原則
+
+v5 では次の 5 原則に切り替えます。
+
+1. **verified trace と answer-only を同じ役割で混ぜない**
+2. **binary は row repeat ではなく abstract family curriculum で上げる**
+3. **easy family の boxed surface は別 stage で守る**
+4. **broad symbol / cryptarithm は本命 mainline から外す**
+5. **README の boxed-first metric を hard gate にする**
+
+### 6. v5 の具体構成
+
+v5 は 3 stage に分ける。
+
+#### Stage A: binary_verified_core
+
+ここが v5 の本体です。
+
+- ベースは v20 snapshot を維持
+- 追加する主軸は `bit_manipulation` の `verified_trace_ready` のみ
+- 特に `abstract_support >= 20` の family を優先し、row 単位ではなく **family 単位の短い reasoning template** へ寄せる
+- 最優先 family は
+  - `xor(shl,shr)`
+  - `choose(shl,shr,rol)`
+  - `choose(shl,shr,ror)`
+  - `majority(ror,shl,shr)`
+  - `majority(rol,shl,shr)`
+  - `xor(ror,shl)`
+  - `or(rol,shr)`
+  - `or(ror,shr)`
+
+ここで狙うのは、「この row の答えを覚えさせる」ことではなく、**rotate/shift source を見て abstract operator family を確定し、8bit answer を compact に書き切る手順を学習させること**です。
+
+したがって v5 の binary 改善は、v4 の `binary_structured_core` repeat を増やすのではなく、**trace 自体を短く作り直した verified family curriculum** にする。
+
+#### Stage B: binary_answer_only_bridge
+
+これは frontier 拡張用の補助 stage です。
+
+- 対象は `bit_manipulation` の `answer_only_keep` に限定
+- ただし long CoT は使わず、**terse boxed-answer supervision** に寄せる
+- 候補 source は
+  - `bit_prompt_local_current_consensus_answer_only`
+  - `bit_prompt_local_nested_support3_or_abstract_answer_only`
+  - hybrid consensus 系 answer-only
+  - low-support structured-byte answer-only
+
+README 契約上、ここで必要なのは diverse reasoning ではなく **最終 answer の安定性**です。したがって stage B は trace teacher ではなく、**binary frontier を answer-only で薄く押し広げる stage** として扱います。
+
+#### Stage C: boxed_surface_stabilizer
+
+これは v4 まで無理に overlay へ混ぜていた surface line を、明示的に独立させる stage です。
+
+- 対象 family は `numeral`, `unit_conversion`, `gravity`, `cipher`
+- measured regression / failure id を mandatory anchor として固定
+- 学習目標は reasoning 追加ではなく **最後の boxed answer を壊さないこと**
+- target text は末尾 1-2 文を強く揃え、`\boxed{...}` 終端を完全に固定する
+- cryptarithm / broad symbol はここへ混ぜない
+
+validation debt の中心である numeral `25` 行と unit `3` 行が既に verified family 側にある以上、ここは「少量の repair line」ではなく、**short post-tune として最後に明示的にかける**べきです。
+
+### 7. v5 の配分方針
+
+token budget の考え方も v4 から変えます。
+
+- Stage A: `70-75%`
+- Stage B: `15-20%`
+- Stage C: `8-10%`
+
+重要なのは、**answer-only を大きな比率で mainline に入れない**ことです。`FINAL_SUMMARY_REPORT.md` でも、`answer_only_keep` は trace teacher と混同せず、boxed answer 安定化用に低比率で混ぜるべきと整理されています。v5 はこの原則に忠実に戻す。
+
+### 7.5 Kaggle 12 時間制限下での解釈
+
+ここは誤読しやすいので明記する。
+
+**v5 の Stage A / B / C は、まず「学習目的の分離」を意味する。必ずしも 3 回の逐次追加学習を意味しない。**
+
+Kaggle で 1 run あたり 12 時間制限がある以上、標準解釈は次です。
+
+1. **単一 run 版**
+  - 1 回の学習データ bundle の中で、Stage A/B/C を別 role のデータ群として混在させる
+  - ただし token 配分と row の性質を分ける
+  - `v5a`, `v5b`, `v5c`, `v5d` はまずこの解釈で試す
+
+2. **逐次追加学習版**
+  - Stage A 学習済み adapter に対して Stage B, Stage C を順に短く post-tune する
+  - これは wallclock に余裕がある場合、または Stage C だけを very short post-tune に落とせる場合の上位版
+  - Kaggle 12 時間制限下では、最初から main route にしない
+
+したがって、`v5b: Stage A + Stage B + Stage C` の第一義は
+
+- Stage A 用 verified binary core を主成分に置き
+- Stage B 用 binary answer-only を低比率で混ぜ
+- Stage C 用 easy-family boxed stabilizer を末尾寄りに少量混ぜる
+
+という **単一 bundle・単一学習 run** です。
+
+### 7.6 なぜ段階という言葉を使うのか
+
+段階という表現を使っている理由は、学習を 3 回に分けたいからではなく、**3 つの目的が互いに干渉するから**です。
+
+v4 までの問題は、次の 3 目的を 1 本の corrective overlay で同時に達成しようとしたことにあります。
+
+1. binary frontier を上げる
+2. answer-only の曖昧な hard slice を拾う
+3. numeral / unit / cipher の boxed surface を壊さない
+
+この 3 つは loss の向きが違います。
+
+- Stage A は **abstract binary を短く安定に出す**方向
+- Stage B は **hard binary の最終 answer を薄く押し広げる**方向
+- Stage C は **easy family の末尾フォーマットを固定する**方向
+
+つまり段階化の合理性は、training run の回数ではなく **objective separation** にあります。
+
+### 7.7 12 時間制限下の推奨運用
+
+v4 が `9h 14m` だった以上、Kaggle 上では次の順で進めるのが妥当です。
+
+1. **最初に試す本命は v5a 1 本でよい**
+  - `Stage A + 短い Stage C`
+  - Stage B はまだ入れない
+  - 理由は、v4 の public gain は binary 起点で、local debt は easy-family surface 起点だから
+
+2. **v5a が proxy / validation の両面で改善したら v5b を試す**
+  - このときの Stage B は frontier 拡張の追加オプションとして扱う
+  - 最初から全部載せにしない
+
+3. **v5c / v5d は ablation ではなく second-wave comparison として回す**
+  - `v5c`: binary をもっと強くした時に surface が再崩壊するかを見る
+  - `v5d`: surface をもっと強くした時に binary gain が削れるかを見る
+
+4. **逐次追加学習は初回 mainline の後で検討する**
+  - もしやるなら `Stage C only` の very short post-tune に限定する
+  - A -> B -> C の full chained 追加学習を最初から狙うのは、12 時間制限では危険
+
+### 8. v5 でやらないこと
+
+1. **v4 の bucket limit / repeat だけを少し動かす**
+2. **broad symbol overlay を mainline に戻す**
+3. **cryptarithm answer-only を大きく混ぜる**
+4. **numeral debt を coverage 問題だと誤認する**
+5. **binary hard slice を row repeat のみで押し切ろうとする**
+
+### 9. v5 の並列 run 設計
+
+README とこの repo の運用方針どおり、v5 は 1 本ずつ試すのではなく並列で回す。
+
+1. **v5a: Stage A + 短い Stage C**
+  - 最も clean な本命。binary verified core を主役にし、最後に easy-family surface だけ軽く合わせる。
+
+2. **v5b: Stage A + Stage B + Stage C**
+  - frontier 拡張も同時に狙う balanced run。
+
+3. **v5c: stronger abstract binary**
+  - `abstract_support >= 20` family をさらに厚くし、Stage B を削る。
+
+4. **v5d: stronger surface lock**
+  - Stage A は v5a と同じ、Stage C を numeral / unit 側に寄せる。
+
+5. **v5e: symbol side-branch**
+  - `numeric_2x2` の narrow answer-only だけを薄く試す比較線。mainline 候補にはしない。
+
+### 10. v5 の promotion gates
+
+v5 は public `0.88` を狙う以上、v4 より gate を上げる。
+
+- proxy overall: **`181/200` 以上**
+- proxy binary: **`82/92` 以上**
+- validation numeral: **`147/149` 以上**
+- validation unit_conversion: **`170/171` 以上、理想は `171/171`**
+- validation gravity: **`159/159` 維持**
+- validation cipher: **`158/162` 以上**
+- validation 上の `\box` 終端崩れ: **0**
+- proxy binary の `format_ok だが content_wrong` を v4 より明確に削る
+
+特に重要なのは、**proxy を binary gate、validation を surface gate として分離して見ること**です。v4 実測は、この 2 つを一つの mixed overlay で同時達成するのが難しいことを示しました。だから v5 は stage-separated にする。
+
+### 11. v5 の最終判断
+
+ここまでの README、v4 実測、train ledger をまとめると、判断ははっきりしています。
+
+**0.88 に届く v5 は、v4 の修正版ではない。**
+
+必要なのは
+
+- `bit_manipulation` verified pool を使った **abstract binary re-mainline**
+- binary answer-only を薄く載せる **bridge stage**
+- numeral / unit / cipher / gravity の boxed 終端を最後に締める **surface stabilizer stage**
+
+の 3 段構成です。
+
+つまり v5 の本質は、**「何を追加するか」ではなく、「何を同じ学習フェーズに入れないか」を決めること**にあります。
