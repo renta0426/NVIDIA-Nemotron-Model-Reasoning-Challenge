@@ -5,10 +5,12 @@
 - Created: 2026-04-18 UTC
 - Generator: `versions/v20_corrective_corpus_v6_mainline/reproduce_v20_corrective_corpus_v6_mainline.py`
 - Run name: `v6_mainline_default`
+- Queued MLX full-run: `v20_mlx_v6_mainline_mb1_nobc`
 - Strategy source: `versions/v20_to_088_reassessment_2026-04-18.md`
 - Bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v6_mainline_bundle.jsonl`
 - Training / validation / leaderboard score: 未計測
 - Local regeneration status: current branch で `uv run python versions/v20_corrective_corpus_v6_mainline/reproduce_v20_corrective_corpus_v6_mainline.py --run-name v6_mainline_default --write-training-bundle` を再実行し、canonical checks を通した上で bundle 再生成に成功
+- Execution note: current branch では `v20_mlx_v4_mainline_mb1_nobc` の pipeline 完了後に `v20_mlx_v6_mainline_mb1_nobc` を自動起動する detached chain launcher を設定済み
 
 ## Generated artifacts
 
