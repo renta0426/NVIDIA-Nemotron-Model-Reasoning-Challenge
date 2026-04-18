@@ -41,9 +41,9 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
 - post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
-- latest observed eval checkpoint: `496 / 950` rows completed
-- latest observed eval partial score: `426 / 496 = 0.8589`
-- latest observed eval partial read: the checkpoint is still consistent with the earlier prefix read: `numeral / cipher / unit / gravity` remain materially more stable than v3, so the live misses continue to look concentrated in the harder `bit` / `cryptarithm` slices rather than a renewed boxed-surface collapse
+- latest observed eval checkpoint: `500 / 950` rows completed
+- latest observed eval partial score: `429 / 500 = 0.8580`
+- latest observed eval partial read: through 500 checked rows, `numeral 84/84`, `cipher 82/83`, `unit 88/93`, and `gravity 77/80` stay strong. The largest live miss buckets remain `cryptarithm_deduce` (`29` misses) and `bit_manipulation` (`17` misses), so the observed loss is still concentrated in hard binary / cryptarithm slices rather than a renewed boxed-surface collapse.
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
