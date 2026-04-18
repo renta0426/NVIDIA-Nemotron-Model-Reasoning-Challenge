@@ -559,6 +559,96 @@ def collect_symbol_numeric_operator_formula_matches(prompt: str, query_text: str
     }
 
 
+def collect_symbol_numeric_global_exact_formula_matches(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
+    query_match = SYMBOL_NUMERIC_EXPRESSION_PATTERN.match(str(query_text))
+    if query_match is None:
+        return {
+            "query_operator": "",
+            "example_count": 0,
+            "candidate_predictions": [],
+            "winning_specs": [],
+        }
+    query_x_text = query_match.group(1)
+    query_operator = query_match.group(2)
+    query_y_text = query_match.group(3)
+    examples = parse_symbol_numeric_examples(prompt)
+    candidate_predictions: set[str] = set()
+    winning_specs: list[tuple[str, str, str]] = []
+
+    for template_name, template in SYMBOL_NUMERIC_STRING_TEMPLATES.items():
+        for reverse_inputs in (False, True):
+            for reverse_output in (False, True):
+                spec_formula_name = f"{template_name}__rev_in{int(reverse_inputs)}_rev_out{int(reverse_output)}"
+                valid = True
+                for left_value_text, operator, right_value_text, output_text in examples:
+                    rendered = render_symbol_numeric_string_template(
+                        template,
+                        reverse_symbol_numeric_text(left_value_text) if reverse_inputs else str(left_value_text),
+                        str(operator),
+                        reverse_symbol_numeric_text(right_value_text) if reverse_inputs else str(right_value_text),
+                    )
+                    if reverse_output:
+                        rendered = reverse_symbol_numeric_rendered_output(rendered, str(operator))
+                    if str(rendered) != str(output_text):
+                        valid = False
+                        break
+                if not valid:
+                    continue
+                predicted_answer = render_symbol_numeric_string_template(
+                    template,
+                    reverse_symbol_numeric_text(query_x_text) if reverse_inputs else query_x_text,
+                    query_operator,
+                    reverse_symbol_numeric_text(query_y_text) if reverse_inputs else query_y_text,
+                )
+                if reverse_output:
+                    predicted_answer = reverse_symbol_numeric_rendered_output(predicted_answer, query_operator)
+                if template_name.startswith("abs_diff_2d") and len(str(answer).strip()) != len(str(predicted_answer)):
+                    continue
+                candidate_predictions.add(str(predicted_answer))
+                winning_specs.append((spec_formula_name, "string_template", str(predicted_answer)))
+
+    for formula_name, formula in SYMBOL_NUMERIC_FORMULAS.items():
+        for format_name, formatter in iter_symbol_numeric_formatters(formula_name):
+            for reverse_inputs in (False, True):
+                for reverse_output in (False, True):
+                    spec_formula_name = f"{formula_name}__rev_in{int(reverse_inputs)}_rev_out{int(reverse_output)}"
+                    valid = True
+                    for left_value_text, operator, right_value_text, output_text in examples:
+                        x_value = int(reverse_symbol_numeric_text(left_value_text) if reverse_inputs else str(left_value_text))
+                        y_value = int(reverse_symbol_numeric_text(right_value_text) if reverse_inputs else str(right_value_text))
+                        numeric_value = formula(x_value, y_value)
+                        if numeric_value is None:
+                            valid = False
+                            break
+                        rendered = formatter(str(operator), numeric_value)
+                        if reverse_output:
+                            rendered = reverse_symbol_numeric_rendered_output(rendered, str(operator))
+                        if str(rendered) != str(output_text):
+                            valid = False
+                            break
+                    if not valid:
+                        continue
+                    query_x_value = int(reverse_symbol_numeric_text(query_x_text) if reverse_inputs else query_x_text)
+                    query_y_value = int(reverse_symbol_numeric_text(query_y_text) if reverse_inputs else query_y_text)
+                    query_numeric_value = formula(query_x_value, query_y_value)
+                    if query_numeric_value is None:
+                        continue
+                    predicted_answer = formatter(query_operator, query_numeric_value)
+                    if reverse_output:
+                        predicted_answer = reverse_symbol_numeric_rendered_output(predicted_answer, query_operator)
+                    if formula_name.startswith("abs_diff_2d") and len(str(answer).strip()) != len(str(predicted_answer)):
+                        continue
+                    candidate_predictions.add(str(predicted_answer))
+                    winning_specs.append((spec_formula_name, format_name, str(predicted_answer)))
+
+    return {
+        "query_operator": query_operator,
+        "example_count": len(examples),
+        "candidate_predictions": sorted(candidate_predictions),
+        "winning_specs": winning_specs,
+    }
+
+
 def solve_symbol_numeric_operator_formula(prompt: str, query_text: str, answer: str) -> dict[str, Any]:
     match_info = collect_symbol_numeric_operator_formula_matches(prompt, query_text, answer)
     if not match_info["query_operator"]:
@@ -2575,6 +2665,355 @@ def grouped_counts(frame: pd.DataFrame, group_columns: list[str], name: str = "r
         .sort_values([name] + group_columns, ascending=[False] + [True] * len(group_columns))
         .reset_index(drop=True)
     )
+
+
+@lru_cache(maxsize=1)
+def load_symbol_problem_category_map_cached(problems_path_text: str) -> dict[str, str]:
+    problems_path = Path(problems_path_text)
+    if not problems_path.exists():
+        return {}
+    category_map: dict[str, str] = {}
+    with problems_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            record = json.loads(stripped)
+            category_map[str(record.get("id", ""))] = str(record.get("category", ""))
+    return category_map
+
+
+def load_symbol_problem_category_map(repo_root: Path) -> dict[str, str]:
+    problems_path = repo_root / "A-Open-ProgressPrizePublication" / "nemotron" / "problems.jsonl"
+    return load_symbol_problem_category_map_cached(str(problems_path))
+
+
+def join_pipe_values(values: list[str], limit: int = 12) -> str:
+    clean_values = [str(value) for value in values if str(value)]
+    if len(clean_values) <= limit:
+        return "|".join(clean_values)
+    head = clean_values[:limit]
+    head.append(f"...(+{len(clean_values) - limit} more)")
+    return "|".join(head)
+
+
+def classify_symbol_strict_prompt_record(
+    row: dict[str, Any],
+    problem_category: str,
+) -> dict[str, Any]:
+    family = str(row.get("family", ""))
+    if family != "symbol_equation":
+        return {
+            "symbol_problem_category": "",
+            "symbol_strict_audit_scope": "",
+            "symbol_strict_status": "",
+            "symbol_strict_gap_reason": "",
+            "symbol_strict_prompt_spec_count": 0,
+            "symbol_strict_prompt_prediction_count": 0,
+            "symbol_strict_prompt_predictions": "",
+            "symbol_strict_prompt_specs": "",
+            "symbol_strict_gold_in_prompt_predictions": False,
+            "symbol_strict_prompt_verifiable": False,
+        }
+
+    prompt = str(row.get("prompt", ""))
+    query_text = str(row.get("query_raw", ""))
+    answer = str(row.get("answer", ""))
+    subtype = str(row.get("template_subtype", ""))
+    selection_tier = str(row.get("selection_tier", ""))
+    analysis_notes = str(row.get("analysis_notes", ""))
+    same_operator_example_count = int(row.get("symbol_same_operator_example_count", 0))
+
+    audit_scope = ""
+    strict_status = ""
+    gap_reason = ""
+    prompt_spec_count = 0
+    prompt_prediction_count = 0
+    prompt_predictions_text = ""
+    prompt_specs_text = ""
+    gold_in_predictions = False
+    prompt_verifiable = False
+
+    if selection_tier == "verified_trace_ready":
+        audit_scope = "verified_selection"
+        strict_status = "verified_prompt"
+        prompt_spec_count = 1
+        prompt_prediction_count = 1
+        prompt_predictions_text = str(answer)
+        prompt_specs_text = str(row.get("teacher_solver_candidate", "")) or "verified_prompt"
+        gold_in_predictions = True
+        prompt_verifiable = True
+    elif subtype == "numeric_2x2":
+        if same_operator_example_count >= 1:
+            local_match_info = collect_symbol_numeric_operator_formula_matches(prompt, query_text, answer)
+            prompt_predictions = [str(value) for value in local_match_info["candidate_predictions"]]
+            prompt_specs = [f"{formula_name}:{format_name}" for formula_name, format_name, _ in local_match_info["winning_specs"]]
+            audit_scope = "same_operator_only"
+            prompt_spec_count = int(len(local_match_info["winning_specs"]))
+            prompt_prediction_count = int(len(prompt_predictions))
+            prompt_predictions_text = join_pipe_values(prompt_predictions)
+            prompt_specs_text = join_pipe_values(prompt_specs)
+            gold_in_predictions = any(answers_match(answer, predicted_answer) for predicted_answer in prompt_predictions)
+            if prompt_prediction_count == 0:
+                strict_status = "needs_cross_row_evidence"
+                gap_reason = "same_operator_examples_exist_but_no_exact_row_local_rule"
+            elif prompt_prediction_count == 1 and gold_in_predictions:
+                strict_status = "support_below_verified_threshold"
+                gap_reason = "same_operator_rule_is_unique_but_support_below_verified_threshold"
+            elif prompt_prediction_count == 1:
+                strict_status = "prompt_exact_conflict"
+                gap_reason = "same_operator_exact_rule_disagrees_with_gold"
+            else:
+                strict_status = "prompt_ambiguous"
+                gap_reason = "multiple_same_operator_rules_survive"
+        else:
+            global_match_info = collect_symbol_numeric_global_exact_formula_matches(prompt, query_text, answer)
+            prompt_predictions = [str(value) for value in global_match_info["candidate_predictions"]]
+            prompt_specs = [f"{formula_name}:{format_name}" for formula_name, format_name, _ in global_match_info["winning_specs"]]
+            audit_scope = "all_examples_global"
+            prompt_spec_count = int(len(global_match_info["winning_specs"]))
+            prompt_prediction_count = int(len(prompt_predictions))
+            prompt_predictions_text = join_pipe_values(prompt_predictions)
+            prompt_specs_text = join_pipe_values(prompt_specs)
+            gold_in_predictions = any(answers_match(answer, predicted_answer) for predicted_answer in prompt_predictions)
+            if prompt_prediction_count == 0:
+                strict_status = "unseen_query_operator"
+                gap_reason = "query_operator_unseen_no_exact_prompt_rule"
+            elif prompt_prediction_count == 1 and gold_in_predictions:
+                strict_status = "support_below_verified_threshold"
+                gap_reason = "single_global_exact_prediction_exists_but_query_operator_is_unseen"
+            elif prompt_prediction_count == 1:
+                strict_status = "prompt_exact_conflict"
+                gap_reason = "all_examples_exact_rule_disagrees_with_gold"
+            else:
+                strict_status = "prompt_ambiguous"
+                gap_reason = "multiple_global_exact_rules_survive"
+    elif subtype == "glyph_len5":
+        audit_scope = "glyph_structure"
+        if analysis_notes == "symbol_glyph_training_answer_only":
+            strict_status = "unseen_query_operator"
+            gap_reason = "glyph_query_operator_unseen_and_no_trace_safe_rule"
+        elif analysis_notes == "symbol_glyph_grouped_exact_answer_only":
+            strict_status = "latent_rule_nonunique"
+            gap_reason = "grouped_model_keeps_answer_but_not_unique_trace"
+        elif not bool(row.get("glyph_multiset_possible", False)):
+            strict_status = "latent_rule_nonunique"
+            gap_reason = "no_examples_only_glyph_multiset_mapping"
+        elif not bool(row.get("glyph_order_acyclic", False)):
+            strict_status = "latent_rule_nonunique"
+            gap_reason = "glyph_output_order_not_acyclic"
+        else:
+            strict_status = "latent_rule_nonunique"
+            gap_reason = "glyph_prompt_structure_not_uniquely_identified"
+    else:
+        audit_scope = "symbol_char_map"
+        if bool(row.get("suspect_label", False)):
+            strict_status = "prompt_exact_conflict"
+            gap_reason = "prompt_char_mapping_disagrees_with_gold"
+        else:
+            strict_status = "latent_rule_nonunique"
+            gap_reason = "symbol_prompt_not_resolved_by_exact_char_map"
+
+    if strict_status:
+        strict_status = f"{selection_tier}:{strict_status}"
+    prompt_verifiable = bool(strict_status == "verified_trace_ready:verified_prompt")
+    return {
+        "symbol_problem_category": problem_category,
+        "symbol_strict_audit_scope": audit_scope,
+        "symbol_strict_status": strict_status,
+        "symbol_strict_gap_reason": gap_reason,
+        "symbol_strict_prompt_spec_count": int(prompt_spec_count),
+        "symbol_strict_prompt_prediction_count": int(prompt_prediction_count),
+        "symbol_strict_prompt_predictions": prompt_predictions_text,
+        "symbol_strict_prompt_specs": prompt_specs_text,
+        "symbol_strict_gold_in_prompt_predictions": bool(gold_in_predictions),
+        "symbol_strict_prompt_verifiable": bool(prompt_verifiable),
+    }
+
+
+def apply_symbol_strict_prompt_audit(
+    analysis_df: pd.DataFrame,
+    repo_root: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    problem_category_map = load_symbol_problem_category_map(repo_root)
+    audit_records = [
+        classify_symbol_strict_prompt_record(record, problem_category_map.get(str(record.get("id", "")), ""))
+        for record in analysis_df.to_dict(orient="records")
+    ]
+    audit_df = pd.DataFrame(audit_records)
+    for column in audit_df.columns:
+        analysis_df[column] = audit_df[column]
+
+    symbol_audit_df = (
+        analysis_df.loc[analysis_df["family"] == "symbol_equation"]
+        .copy()
+        .sort_values(
+            [
+                "template_subtype",
+                "symbol_problem_category",
+                "selection_tier",
+                "symbol_strict_status",
+                "symbol_same_operator_example_count",
+                "hard_score",
+                "id",
+            ],
+            ascending=[True, True, True, True, False, False, True],
+        )
+        .reset_index(drop=True)
+    )
+    summary_df = grouped_counts(
+        symbol_audit_df,
+        [
+            "template_subtype",
+            "symbol_problem_category",
+            "selection_tier",
+            "symbol_strict_audit_scope",
+            "symbol_strict_status",
+            "symbol_strict_gap_reason",
+        ],
+        name="rows",
+    )
+    return analysis_df, symbol_audit_df, summary_df
+
+
+def classify_symbol_trace_teacher_record(row: dict[str, Any]) -> dict[str, Any]:
+    family = str(row.get("family", ""))
+    if family != "symbol_equation":
+        return {
+            "symbol_trace_teacher_tier": "",
+            "symbol_trace_policy": "",
+            "symbol_trace_gold_role": "",
+            "symbol_trace_contract": "",
+            "symbol_trace_allowed": False,
+        }
+
+    selection_tier = str(row.get("selection_tier", ""))
+    strict_status = str(row.get("symbol_strict_status", ""))
+    strict_gap_reason = str(row.get("symbol_strict_gap_reason", ""))
+
+    if selection_tier == "verified_trace_ready" and bool(row.get("symbol_strict_prompt_verifiable", False)):
+        return {
+            "symbol_trace_teacher_tier": "prompt_verified_trace",
+            "symbol_trace_policy": "strict_prompt_safe",
+            "symbol_trace_gold_role": "final_check_only",
+            "symbol_trace_contract": "prompt_only",
+            "symbol_trace_allowed": True,
+        }
+
+    if selection_tier != "answer_only_keep":
+        return {
+            "symbol_trace_teacher_tier": "no_trace_teacher",
+            "symbol_trace_policy": "not_answer_only",
+            "symbol_trace_gold_role": "not_applicable",
+            "symbol_trace_contract": "none",
+            "symbol_trace_allowed": False,
+        }
+
+    if strict_status.endswith(":support_below_verified_threshold"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "unique_rule_below_verified_support",
+            "symbol_trace_gold_role": "final_check_only",
+            "symbol_trace_contract": "non_prompt_evidence_needed",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":prompt_ambiguous"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_rule_choice",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":needs_cross_row_evidence"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_family_choice",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":unseen_query_operator"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_operator_semantics",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":latent_rule_nonunique"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_latent_hypothesis",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":prompt_exact_conflict"):
+        return {
+            "symbol_trace_teacher_tier": "no_trace_teacher",
+            "symbol_trace_policy": "prompt_conflict_requires_external_semantics",
+            "symbol_trace_gold_role": "insufficient_even_with_gold",
+            "symbol_trace_contract": "none",
+            "symbol_trace_allowed": False,
+        }
+
+    if strict_gap_reason:
+        return {
+            "symbol_trace_teacher_tier": "no_trace_teacher",
+            "symbol_trace_policy": "unclassified_gap",
+            "symbol_trace_gold_role": "insufficient_even_with_gold",
+            "symbol_trace_contract": "none",
+            "symbol_trace_allowed": False,
+        }
+
+    return {
+        "symbol_trace_teacher_tier": "no_trace_teacher",
+        "symbol_trace_policy": "no_symbol_trace_policy",
+        "symbol_trace_gold_role": "not_applicable",
+        "symbol_trace_contract": "none",
+        "symbol_trace_allowed": False,
+    }
+
+
+def apply_symbol_trace_teacher_policy(
+    analysis_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    policy_records = [classify_symbol_trace_teacher_record(record) for record in analysis_df.to_dict(orient="records")]
+    policy_df = pd.DataFrame(policy_records)
+    for column in policy_df.columns:
+        analysis_df[column] = policy_df[column]
+
+    symbol_policy_df = (
+        analysis_df.loc[analysis_df["family"] == "symbol_equation"]
+        .copy()
+        .sort_values(
+            [
+                "symbol_trace_teacher_tier",
+                "symbol_trace_policy",
+                "symbol_problem_category",
+                "template_subtype",
+                "hard_score",
+                "id",
+            ],
+            ascending=[True, True, True, True, False, True],
+        )
+        .reset_index(drop=True)
+    )
+    summary_df = grouped_counts(
+        symbol_policy_df,
+        [
+            "symbol_trace_teacher_tier",
+            "symbol_trace_policy",
+            "symbol_trace_gold_role",
+            "symbol_trace_contract",
+            "symbol_problem_category",
+        ],
+        name="rows",
+    )
+    return analysis_df, symbol_policy_df, summary_df
 
 
 def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -7322,6 +7761,10 @@ def build_reports(
     symbol_query_only_rejection_df: pd.DataFrame,
     symbol_mimic_union_df: pd.DataFrame,
     symbol_round2_cluster_df: pd.DataFrame,
+    symbol_strict_audit_df: pd.DataFrame,
+    symbol_strict_gap_summary_df: pd.DataFrame,
+    symbol_trace_policy_df: pd.DataFrame,
+    symbol_trace_policy_summary_df: pd.DataFrame,
 ) -> None:
     reports_dir = out_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -7441,6 +7884,87 @@ def build_reports(
         glyph_exact_df["exact_coarse_status"] == "query_has_unseen_chars"
     ].copy() if len(glyph_exact_df) else pd.DataFrame(
         columns=["id", "answer", "query_raw", "glyph_query_unseen_chars"]
+    )
+    symbol_strict_status_summary_df = grouped_counts(
+        symbol_strict_audit_df,
+        ["selection_tier", "symbol_strict_status", "symbol_problem_category"],
+        name="rows",
+    ) if len(symbol_strict_audit_df) else pd.DataFrame(
+        columns=["selection_tier", "symbol_strict_status", "symbol_problem_category", "rows"]
+    )
+    symbol_strict_unseen_count = int(
+        symbol_strict_audit_df["symbol_strict_gap_reason"].eq("query_operator_unseen_no_exact_prompt_rule").sum()
+    ) if len(symbol_strict_audit_df) else 0
+    symbol_strict_conflict_count = int(
+        symbol_strict_audit_df["symbol_strict_status"].fillna("").str.endswith(":prompt_exact_conflict").sum()
+    ) if len(symbol_strict_audit_df) else 0
+    symbol_strict_ambiguous_count = int(
+        symbol_strict_audit_df["symbol_strict_status"].fillna("").str.endswith(":prompt_ambiguous").sum()
+    ) if len(symbol_strict_audit_df) else 0
+    symbol_strict_support_gap_count = int(
+        symbol_strict_audit_df["symbol_strict_status"].fillna("").str.endswith(":support_below_verified_threshold").sum()
+    ) if len(symbol_strict_audit_df) else 0
+    symbol_strict_top_gap_df = (
+        symbol_strict_audit_df.loc[
+            ~symbol_strict_audit_df["symbol_strict_status"].eq("verified_trace_ready:verified_prompt")
+        ]
+        .sort_values(
+            ["symbol_strict_status", "symbol_same_operator_example_count", "hard_score", "id"],
+            ascending=[True, False, False, True],
+        )
+        .reset_index(drop=True)
+    ) if len(symbol_strict_audit_df) else pd.DataFrame(
+        columns=[
+            "id",
+            "template_subtype",
+            "symbol_problem_category",
+            "selection_tier",
+            "symbol_same_operator_example_count",
+            "symbol_strict_status",
+            "symbol_strict_gap_reason",
+            "answer",
+            "query_raw",
+        ]
+    )
+    symbol_trace_prompt_verified_count = int(
+        (symbol_trace_policy_df["symbol_trace_teacher_tier"] == "prompt_verified_trace").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_trace_synthetic_count = int(
+        (symbol_trace_policy_df["symbol_trace_teacher_tier"] == "synthetic_trace_hypothesis").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_trace_blocked_count = int(
+        (symbol_trace_policy_df["symbol_trace_teacher_tier"] == "no_trace_teacher").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_trace_gold_selected_count = int(
+        (symbol_trace_policy_df["symbol_trace_gold_role"] == "candidate_selection_required").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_synthetic_trace_df = (
+        symbol_trace_policy_df.loc[
+            symbol_trace_policy_df["symbol_trace_teacher_tier"] == "synthetic_trace_hypothesis"
+        ]
+        .copy()
+        .sort_values(
+            [
+                "symbol_trace_policy",
+                "symbol_problem_category",
+                "template_subtype",
+                "hard_score",
+                "id",
+            ],
+            ascending=[True, True, True, False, True],
+        )
+        .reset_index(drop=True)
+    ) if len(symbol_trace_policy_df) else pd.DataFrame(
+        columns=[
+            "id",
+            "template_subtype",
+            "symbol_problem_category",
+            "symbol_trace_policy",
+            "symbol_trace_gold_role",
+            "symbol_strict_status",
+            "answer",
+            "query_raw",
+        ]
     )
 
     overview_lines = [
@@ -7640,6 +8164,8 @@ def build_reports(
         f"- `symbol_equation/numeric_2x2`: remaining non-suspect rows with `same_operator_example_count = 0` now move to `answer_only_keep` as raw final-answer supervision (`{numeric_no_same_op_training_answer_only_count}` rows), because README evaluation is final-answer accuracy and there is no same-op evidence to justify trace promotion anyway.",
         f"- `symbol_equation/numeric_2x2`: `{len(symbol_query_only_rejection_df)}` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities).",
         f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield no unique latent rule for the residual glyph slice. With no concrete suspect signal, the remaining glyph rows now stay only as answer-only training labels (`{glyph_training_answer_only_count}` rows), not as trace-ready teachers.",
+        f"- `symbol_equation`: prompt-only strict audit now records why rows fail verification (`unseen_query_operator={symbol_strict_unseen_count}`, `prompt_ambiguous={symbol_strict_ambiguous_count}`, `prompt_exact_conflict={symbol_strict_conflict_count}`, `support_gap={symbol_strict_support_gap_count}`) without changing the existing tiers.",
+        f"- `symbol_equation`: synthetic trace policy now separates `prompt_verified_trace={symbol_trace_prompt_verified_count}` from `synthetic_trace_hypothesis={symbol_trace_synthetic_count}` and `no_trace_teacher={symbol_trace_blocked_count}`; gold-based candidate selection is required on `{symbol_trace_gold_selected_count}` rows, so these traces stay explicitly non-verified.",
         "",
     ]
     (reports_dir / "11_latest_snapshot.md").write_text("\n".join(latest_lines) + "\n", encoding="utf-8")
@@ -7978,6 +8504,90 @@ def build_reports(
     ]
     (reports_dir / "24_glyph_exact_coarse_scan.md").write_text("\n".join(glyph_exact_lines) + "\n", encoding="utf-8")
 
+    strict_prompt_lines = [
+        f"# {SCRIPT_VERSION} symbol strict prompt audit",
+        "",
+        "README.md 基準ではコンペ評価は final boxed answer accuracy だが、この report は `verified_trace_ready` を prompt-only trace teacher として再監査した補助レイヤー。",
+        "",
+        f"- verified_prompt rows: `{int(symbol_strict_audit_df['symbol_strict_prompt_verifiable'].sum()) if len(symbol_strict_audit_df) else 0}`",
+        f"- unseen_query_operator rows: `{symbol_strict_unseen_count}`",
+        f"- prompt_ambiguous rows: `{symbol_strict_ambiguous_count}`",
+        f"- prompt_exact_conflict rows: `{symbol_strict_conflict_count}`",
+        f"- support_below_verified_threshold rows: `{symbol_strict_support_gap_count}`",
+        "",
+        "## Status summary",
+        "",
+        markdown_table(symbol_strict_status_summary_df, list(symbol_strict_status_summary_df.columns), limit=40),
+        "",
+        "## Gap summary",
+        "",
+        markdown_table(symbol_strict_gap_summary_df, list(symbol_strict_gap_summary_df.columns), limit=40),
+        "",
+        "## Representative unresolved rows",
+        "",
+        markdown_table(
+            symbol_strict_top_gap_df,
+            [
+                "id",
+                "template_subtype",
+                "symbol_problem_category",
+                "selection_tier",
+                "symbol_same_operator_example_count",
+                "symbol_strict_status",
+                "symbol_strict_gap_reason",
+                "answer",
+                "query_raw",
+            ],
+            limit=40,
+        ),
+        "",
+        "Interpretation: `symbol_equation` の残差は主に 1) query operator 未出、2) prompt-consistent exact rule の多義性、3) unique local rule はあるが support が薄い low-shot slice、4) glyph の latent rule 非一意、に分かれる。これで 90% ceiling の主因を row-level / machine-readable に固定した。",
+        "",
+    ]
+    (reports_dir / "32_symbol_strict_prompt_audit.md").write_text("\n".join(strict_prompt_lines) + "\n", encoding="utf-8")
+
+    synthetic_trace_lines = [
+        f"# {SCRIPT_VERSION} symbol synthetic trace policy",
+        "",
+        "README.md の契約では評価は final boxed answer accuracy だが、repo 内の trace 教師は `verified_trace_ready` とそれ以外を分けて扱う。ここでは `symbol_equation` について、prompt-only verified と synthetic / pseudo trace を明示的に分離する。",
+        "",
+        f"- `prompt_verified_trace`: `{symbol_trace_prompt_verified_count}`",
+        f"- `synthetic_trace_hypothesis`: `{symbol_trace_synthetic_count}`",
+        f"- `no_trace_teacher`: `{symbol_trace_blocked_count}`",
+        f"- rows requiring gold-based candidate selection: `{symbol_trace_gold_selected_count}`",
+        "",
+        "## Policy summary",
+        "",
+        markdown_table(symbol_trace_policy_summary_df, list(symbol_trace_policy_summary_df.columns), limit=40),
+        "",
+        "## Synthetic trace candidates",
+        "",
+        markdown_table(
+            symbol_synthetic_trace_df,
+            [
+                "id",
+                "template_subtype",
+                "symbol_problem_category",
+                "symbol_trace_policy",
+                "symbol_trace_gold_role",
+                "symbol_strict_status",
+                "answer",
+                "query_raw",
+            ],
+            limit=60,
+        ),
+        "",
+        "## Policy contract",
+        "",
+        "1. `prompt_verified_trace`: prompt-only で一意かつ trace-safe。既存 `verified_trace_ready` と同義。",
+        "2. `synthetic_trace_hypothesis`: 学習用の一貫した導出は作れるが、prompt semantics を証明したものではない。gold を候補選択に使う場合は必ずこの tier に留める。",
+        "3. `no_trace_teacher`: current prompt / gold / exact DSL の組み合わせだけでは、trace を書いても benchmark row の semantics を正当化できない。",
+        "",
+        "Interpretation: これで `answer_only_keep` の中でも、README 準拠の accuracy 目的で保持している supervision と、strict verified としては使えない synthetic trace をコード上で切り分けられる。今後の ablation では `prompt_verified_trace` と `synthetic_trace_hypothesis` を別々に投入できる。",
+        "",
+    ]
+    (reports_dir / "66_symbol_synthetic_trace_policy.md").write_text("\n".join(synthetic_trace_lines) + "\n", encoding="utf-8")
+
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:
     repo_root = repo_root.resolve()
@@ -7986,7 +8596,10 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     artifacts_dir = out_root / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    v1 = load_module("analysis_v1_train_module", repo_root / "versions" / "v1" / "code" / "train.py")
+    v1_module_path = repo_root / "versions" / "v1" / "code" / "train.py"
+    if not v1_module_path.exists():
+        v1_module_path = repo_root / "versions" / "archive" / "v1" / "code" / "train.py"
+    v1 = load_module("analysis_v1_train_module", v1_module_path)
 
     train_df = pd.read_csv(repo_root / "data" / "train.csv")
     public_test_df = pd.read_csv(repo_root / "data" / "test.csv")
@@ -8031,6 +8644,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df, symbol_glyph_grouped_candidate_df = apply_symbol_glyph_grouped_exact_answer_only_curation(analysis_df)
     analysis_df, symbol_numeric_no_same_op_training_candidate_df = apply_symbol_numeric_no_same_op_training_label_curation(analysis_df)
     analysis_df, symbol_glyph_training_candidate_df = apply_symbol_glyph_training_label_curation(analysis_df)
+    analysis_df, symbol_strict_audit_df, symbol_strict_gap_summary_df = apply_symbol_strict_prompt_audit(analysis_df, repo_root)
+    analysis_df, symbol_trace_policy_df, symbol_trace_policy_summary_df = apply_symbol_trace_teacher_policy(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -8287,6 +8902,14 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_glyph_grouped_candidate_df, artifacts_dir / "symbol_glyph_grouped_exact_answer_only_candidates_v1.csv")
     write_dataframe(symbol_numeric_no_same_op_training_candidate_df, artifacts_dir / "symbol_numeric_no_same_op_training_answer_only_candidates_v1.csv")
     write_dataframe(symbol_glyph_training_candidate_df, artifacts_dir / "symbol_glyph_training_answer_only_candidates_v1.csv")
+    write_dataframe(symbol_strict_audit_df, artifacts_dir / "symbol_strict_prompt_audit_v1.csv")
+    write_dataframe(symbol_strict_gap_summary_df, artifacts_dir / "symbol_strict_prompt_gap_summary_v1.csv")
+    write_dataframe(symbol_trace_policy_df, artifacts_dir / "symbol_trace_teacher_policy_v1.csv")
+    write_dataframe(symbol_trace_policy_summary_df, artifacts_dir / "symbol_trace_teacher_summary_v1.csv")
+    write_dataframe(
+        symbol_trace_policy_df.loc[symbol_trace_policy_df["symbol_trace_teacher_tier"] == "synthetic_trace_hypothesis"].reset_index(drop=True),
+        artifacts_dir / "symbol_synthetic_trace_candidates_v1.csv",
+    )
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
@@ -8347,6 +8970,10 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         symbol_query_only_rejection_df,
         symbol_mimic_union_df,
         symbol_round2_cluster_df,
+        symbol_strict_audit_df,
+        symbol_strict_gap_summary_df,
+        symbol_trace_policy_df,
+        symbol_trace_policy_summary_df,
     )
 
     manifest = {

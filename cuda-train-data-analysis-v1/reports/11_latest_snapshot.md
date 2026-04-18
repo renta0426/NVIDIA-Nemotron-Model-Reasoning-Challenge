@@ -1,6 +1,6 @@
 # cuda-train-data-analysis-v1 latest snapshot
 
-- generated_at_utc: `2026-04-11T23:32:49.189542+00:00`
+- generated_at_utc: `2026-04-18T07:36:50.831264+00:00`
 - verified_trace_ready: `6711`
 - answer_only_keep: `2652`
 - manual_audit_priority: `113`
@@ -34,4 +34,6 @@
 - `symbol_equation/numeric_2x2`: remaining non-suspect rows with `same_operator_example_count = 0` now move to `answer_only_keep` as raw final-answer supervision (`136` rows), because README evaluation is final-answer accuracy and there is no same-op evidence to justify trace promotion anyway.
 - `symbol_equation/numeric_2x2`: `1` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`1` same-op conflicts, `0` format ambiguities).
 - `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield no unique latent rule for the residual glyph slice. With no concrete suspect signal, the remaining glyph rows now stay only as answer-only training labels (`470` rows), not as trace-ready teachers.
+- `symbol_equation`: prompt-only strict audit now records why rows fail verification (`unseen_query_operator=108`, `prompt_ambiguous=56`, `prompt_exact_conflict=55`, `support_gap=114`) without changing the existing tiers.
+- `symbol_equation`: synthetic trace policy now separates `prompt_verified_trace=110` from `synthetic_trace_hypothesis=1368` and `no_trace_teacher=77`; gold-based candidate selection is required on `1254` rows, so these traces stay explicitly non-verified.
 
