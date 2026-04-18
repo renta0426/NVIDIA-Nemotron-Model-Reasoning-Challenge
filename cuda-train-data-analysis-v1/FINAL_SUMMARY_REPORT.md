@@ -272,7 +272,7 @@ symbol は大きく 2 つに分かれました。
 
 詳細は `reports/60_symbol_verified_ceiling_from_problem_categories.md`、`reports/61_symbol_numeric_guess_global_exact_scan.md`、`reports/62_cryptarithm_guess_solver5s_scan.md`、`reports/63_official_generator_source_search.md`、`reports/64_cryptarithm_guess_extended_solver_scan.md`、`reports/65_symbol_missing_evidence_requirements.md` に分離しました。結論として、現行の strict verified 定義を保つ限り、この family を 90% へ押し上げるには **`cryptarithm_guess` の query operator semantics を外部から確定できる追加ソース** が必要です。現時点で、その generator / semantics を固定できる公式 public source も確認できていません。
 
-この結論を row-level に固定するため、`code/train_data_analysis_v1.py` へ prompt-only strict audit を追加し、`artifacts/symbol_strict_prompt_audit_v1.csv` と `artifacts/symbol_strict_prompt_gap_summary_v1.csv`、`reports/32_symbol_strict_prompt_audit.md` を生成するようにしました。最新の audit では `symbol_equation` の strict prompt-safe verified は `110` 行で、残差は主に `cryptarithm_deduce` の latent-rule nonunique / unseen-query-operator、`equation_numeric_deduce` の needs-cross-row-evidence / low-support、`equation_numeric_guess` の unseen-query-operator / prompt-exact-conflict に分解されています。
+この結論を row-level に固定するため、`code/train_data_analysis_v1.py` へ prompt-only strict audit を追加し、`artifacts/symbol_strict_prompt_audit_v1.csv` と `artifacts/symbol_strict_prompt_gap_summary_v1.csv`、`reports/32_symbol_strict_prompt_audit.md` を生成するようにしました。最新の audit では `symbol_equation` の strict prompt-safe verified は `110` 行で、残差は主に `cryptarithm_deduce` の latent-rule nonunique / unseen-query-operator、`equation_numeric_deduce` の needs-cross-row-evidence / low-support、`equation_numeric_guess` の unseen-query-operator / prompt-exact-conflict に分解されています。さらに README の Accuracy 契約と internal trace policy を切り分けるため、`artifacts/symbol_trace_teacher_policy_v1.csv`、`artifacts/symbol_trace_teacher_summary_v1.csv`、`artifacts/symbol_synthetic_trace_candidates_v1.csv`、`reports/66_symbol_synthetic_trace_policy.md` を追加し、`prompt_verified_trace` と `synthetic_trace_hypothesis` を明示的に分離しました。
 
 ## 5. 最終成果物一覧
 
@@ -312,6 +312,9 @@ symbol は大きく 2 つに分かれました。
 | `artifacts/binary_exact_disambiguation_verified_v1.csv` | strict audit 後に、4 exact libraries 全体で 1 つの `(formula, prediction)` に収束した `overall_unique_exact_formula` 154 行の台帳 |
 | `artifacts/symbol_strict_prompt_audit_v1.csv` | `symbol_equation` 全 1,555 行に対する prompt-only strict audit 台帳 |
 | `artifacts/symbol_strict_prompt_gap_summary_v1.csv` | strict audit の gap reason / problem category 集計 |
+| `artifacts/symbol_trace_teacher_policy_v1.csv` | `symbol_equation` の trace 教師 policy 台帳（`prompt_verified_trace` / `synthetic_trace_hypothesis` / `no_trace_teacher`） |
+| `artifacts/symbol_trace_teacher_summary_v1.csv` | trace policy の category / gold-role 集計 |
+| `artifacts/symbol_synthetic_trace_candidates_v1.csv` | synthetic / pseudo trace 候補の抽出台帳 |
 | `artifacts/binary_round2_cluster_summary_v1.csv` | `binary_low_gap` 117 行を gap 構造と uniqueness flag で round2 向けに cluster 化した台帳 |
 | `artifacts/symbol_operator_summary_v1.csv` | numeric symbol の operator 別内訳 |
 | `artifacts/symbol_minus_direct_plain_support_v1.csv` | prompt-exact な direct `-` plain subfamily の support 台帳 |

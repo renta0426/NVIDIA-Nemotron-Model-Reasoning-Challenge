@@ -2877,6 +2877,145 @@ def apply_symbol_strict_prompt_audit(
     return analysis_df, symbol_audit_df, summary_df
 
 
+def classify_symbol_trace_teacher_record(row: dict[str, Any]) -> dict[str, Any]:
+    family = str(row.get("family", ""))
+    if family != "symbol_equation":
+        return {
+            "symbol_trace_teacher_tier": "",
+            "symbol_trace_policy": "",
+            "symbol_trace_gold_role": "",
+            "symbol_trace_contract": "",
+            "symbol_trace_allowed": False,
+        }
+
+    selection_tier = str(row.get("selection_tier", ""))
+    strict_status = str(row.get("symbol_strict_status", ""))
+    strict_gap_reason = str(row.get("symbol_strict_gap_reason", ""))
+
+    if selection_tier == "verified_trace_ready" and bool(row.get("symbol_strict_prompt_verifiable", False)):
+        return {
+            "symbol_trace_teacher_tier": "prompt_verified_trace",
+            "symbol_trace_policy": "strict_prompt_safe",
+            "symbol_trace_gold_role": "final_check_only",
+            "symbol_trace_contract": "prompt_only",
+            "symbol_trace_allowed": True,
+        }
+
+    if selection_tier != "answer_only_keep":
+        return {
+            "symbol_trace_teacher_tier": "no_trace_teacher",
+            "symbol_trace_policy": "not_answer_only",
+            "symbol_trace_gold_role": "not_applicable",
+            "symbol_trace_contract": "none",
+            "symbol_trace_allowed": False,
+        }
+
+    if strict_status.endswith(":support_below_verified_threshold"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "unique_rule_below_verified_support",
+            "symbol_trace_gold_role": "final_check_only",
+            "symbol_trace_contract": "non_prompt_evidence_needed",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":prompt_ambiguous"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_rule_choice",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":needs_cross_row_evidence"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_family_choice",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":unseen_query_operator"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_operator_semantics",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":latent_rule_nonunique"):
+        return {
+            "symbol_trace_teacher_tier": "synthetic_trace_hypothesis",
+            "symbol_trace_policy": "answer_conditioned_latent_hypothesis",
+            "symbol_trace_gold_role": "candidate_selection_required",
+            "symbol_trace_contract": "answer_conditioned",
+            "symbol_trace_allowed": True,
+        }
+    if strict_status.endswith(":prompt_exact_conflict"):
+        return {
+            "symbol_trace_teacher_tier": "no_trace_teacher",
+            "symbol_trace_policy": "prompt_conflict_requires_external_semantics",
+            "symbol_trace_gold_role": "insufficient_even_with_gold",
+            "symbol_trace_contract": "none",
+            "symbol_trace_allowed": False,
+        }
+
+    if strict_gap_reason:
+        return {
+            "symbol_trace_teacher_tier": "no_trace_teacher",
+            "symbol_trace_policy": "unclassified_gap",
+            "symbol_trace_gold_role": "insufficient_even_with_gold",
+            "symbol_trace_contract": "none",
+            "symbol_trace_allowed": False,
+        }
+
+    return {
+        "symbol_trace_teacher_tier": "no_trace_teacher",
+        "symbol_trace_policy": "no_symbol_trace_policy",
+        "symbol_trace_gold_role": "not_applicable",
+        "symbol_trace_contract": "none",
+        "symbol_trace_allowed": False,
+    }
+
+
+def apply_symbol_trace_teacher_policy(
+    analysis_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    analysis_df = analysis_df.copy()
+    policy_records = [classify_symbol_trace_teacher_record(record) for record in analysis_df.to_dict(orient="records")]
+    policy_df = pd.DataFrame(policy_records)
+    for column in policy_df.columns:
+        analysis_df[column] = policy_df[column]
+
+    symbol_policy_df = (
+        analysis_df.loc[analysis_df["family"] == "symbol_equation"]
+        .copy()
+        .sort_values(
+            [
+                "symbol_trace_teacher_tier",
+                "symbol_trace_policy",
+                "symbol_problem_category",
+                "template_subtype",
+                "hard_score",
+                "id",
+            ],
+            ascending=[True, True, True, True, False, True],
+        )
+        .reset_index(drop=True)
+    )
+    summary_df = grouped_counts(
+        symbol_policy_df,
+        [
+            "symbol_trace_teacher_tier",
+            "symbol_trace_policy",
+            "symbol_trace_gold_role",
+            "symbol_trace_contract",
+            "symbol_problem_category",
+        ],
+        name="rows",
+    )
+    return analysis_df, symbol_policy_df, summary_df
+
+
 def apply_bit_structured_formula_promotions(analysis_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     analysis_df = analysis_df.copy()
     bit_mask = analysis_df["family"] == "bit_manipulation"
@@ -7624,6 +7763,8 @@ def build_reports(
     symbol_round2_cluster_df: pd.DataFrame,
     symbol_strict_audit_df: pd.DataFrame,
     symbol_strict_gap_summary_df: pd.DataFrame,
+    symbol_trace_policy_df: pd.DataFrame,
+    symbol_trace_policy_summary_df: pd.DataFrame,
 ) -> None:
     reports_dir = out_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -7781,6 +7922,46 @@ def build_reports(
             "symbol_same_operator_example_count",
             "symbol_strict_status",
             "symbol_strict_gap_reason",
+            "answer",
+            "query_raw",
+        ]
+    )
+    symbol_trace_prompt_verified_count = int(
+        (symbol_trace_policy_df["symbol_trace_teacher_tier"] == "prompt_verified_trace").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_trace_synthetic_count = int(
+        (symbol_trace_policy_df["symbol_trace_teacher_tier"] == "synthetic_trace_hypothesis").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_trace_blocked_count = int(
+        (symbol_trace_policy_df["symbol_trace_teacher_tier"] == "no_trace_teacher").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_trace_gold_selected_count = int(
+        (symbol_trace_policy_df["symbol_trace_gold_role"] == "candidate_selection_required").sum()
+    ) if len(symbol_trace_policy_df) else 0
+    symbol_synthetic_trace_df = (
+        symbol_trace_policy_df.loc[
+            symbol_trace_policy_df["symbol_trace_teacher_tier"] == "synthetic_trace_hypothesis"
+        ]
+        .copy()
+        .sort_values(
+            [
+                "symbol_trace_policy",
+                "symbol_problem_category",
+                "template_subtype",
+                "hard_score",
+                "id",
+            ],
+            ascending=[True, True, True, False, True],
+        )
+        .reset_index(drop=True)
+    ) if len(symbol_trace_policy_df) else pd.DataFrame(
+        columns=[
+            "id",
+            "template_subtype",
+            "symbol_problem_category",
+            "symbol_trace_policy",
+            "symbol_trace_gold_role",
+            "symbol_strict_status",
             "answer",
             "query_raw",
         ]
@@ -7984,6 +8165,7 @@ def build_reports(
         f"- `symbol_equation/numeric_2x2`: `{len(symbol_query_only_rejection_df)}` query-only arithmetic lookalikes were rechecked; the remaining slice still stays manual (`{symbol_query_only_conflict_count}` same-op conflicts, `{symbol_query_only_ambiguous_count}` format ambiguities).",
         f"- `symbol_equation/glyph_len5`: 70 rows satisfy multiset mapping and 46 also satisfy a global output-order DAG, but exact examples-only rechecks still yield no unique latent rule for the residual glyph slice. With no concrete suspect signal, the remaining glyph rows now stay only as answer-only training labels (`{glyph_training_answer_only_count}` rows), not as trace-ready teachers.",
         f"- `symbol_equation`: prompt-only strict audit now records why rows fail verification (`unseen_query_operator={symbol_strict_unseen_count}`, `prompt_ambiguous={symbol_strict_ambiguous_count}`, `prompt_exact_conflict={symbol_strict_conflict_count}`, `support_gap={symbol_strict_support_gap_count}`) without changing the existing tiers.",
+        f"- `symbol_equation`: synthetic trace policy now separates `prompt_verified_trace={symbol_trace_prompt_verified_count}` from `synthetic_trace_hypothesis={symbol_trace_synthetic_count}` and `no_trace_teacher={symbol_trace_blocked_count}`; gold-based candidate selection is required on `{symbol_trace_gold_selected_count}` rows, so these traces stay explicitly non-verified.",
         "",
     ]
     (reports_dir / "11_latest_snapshot.md").write_text("\n".join(latest_lines) + "\n", encoding="utf-8")
@@ -8364,6 +8546,48 @@ def build_reports(
     ]
     (reports_dir / "32_symbol_strict_prompt_audit.md").write_text("\n".join(strict_prompt_lines) + "\n", encoding="utf-8")
 
+    synthetic_trace_lines = [
+        f"# {SCRIPT_VERSION} symbol synthetic trace policy",
+        "",
+        "README.md の契約では評価は final boxed answer accuracy だが、repo 内の trace 教師は `verified_trace_ready` とそれ以外を分けて扱う。ここでは `symbol_equation` について、prompt-only verified と synthetic / pseudo trace を明示的に分離する。",
+        "",
+        f"- `prompt_verified_trace`: `{symbol_trace_prompt_verified_count}`",
+        f"- `synthetic_trace_hypothesis`: `{symbol_trace_synthetic_count}`",
+        f"- `no_trace_teacher`: `{symbol_trace_blocked_count}`",
+        f"- rows requiring gold-based candidate selection: `{symbol_trace_gold_selected_count}`",
+        "",
+        "## Policy summary",
+        "",
+        markdown_table(symbol_trace_policy_summary_df, list(symbol_trace_policy_summary_df.columns), limit=40),
+        "",
+        "## Synthetic trace candidates",
+        "",
+        markdown_table(
+            symbol_synthetic_trace_df,
+            [
+                "id",
+                "template_subtype",
+                "symbol_problem_category",
+                "symbol_trace_policy",
+                "symbol_trace_gold_role",
+                "symbol_strict_status",
+                "answer",
+                "query_raw",
+            ],
+            limit=60,
+        ),
+        "",
+        "## Policy contract",
+        "",
+        "1. `prompt_verified_trace`: prompt-only で一意かつ trace-safe。既存 `verified_trace_ready` と同義。",
+        "2. `synthetic_trace_hypothesis`: 学習用の一貫した導出は作れるが、prompt semantics を証明したものではない。gold を候補選択に使う場合は必ずこの tier に留める。",
+        "3. `no_trace_teacher`: current prompt / gold / exact DSL の組み合わせだけでは、trace を書いても benchmark row の semantics を正当化できない。",
+        "",
+        "Interpretation: これで `answer_only_keep` の中でも、README 準拠の accuracy 目的で保持している supervision と、strict verified としては使えない synthetic trace をコード上で切り分けられる。今後の ablation では `prompt_verified_trace` と `synthetic_trace_hypothesis` を別々に投入できる。",
+        "",
+    ]
+    (reports_dir / "66_symbol_synthetic_trace_policy.md").write_text("\n".join(synthetic_trace_lines) + "\n", encoding="utf-8")
+
 
 def run_analysis(repo_root: Path, out_root: Path) -> None:
     repo_root = repo_root.resolve()
@@ -8421,6 +8645,7 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     analysis_df, symbol_numeric_no_same_op_training_candidate_df = apply_symbol_numeric_no_same_op_training_label_curation(analysis_df)
     analysis_df, symbol_glyph_training_candidate_df = apply_symbol_glyph_training_label_curation(analysis_df)
     analysis_df, symbol_strict_audit_df, symbol_strict_gap_summary_df = apply_symbol_strict_prompt_audit(analysis_df, repo_root)
+    analysis_df, symbol_trace_policy_df, symbol_trace_policy_summary_df = apply_symbol_trace_teacher_policy(analysis_df)
 
     baseline_coverage = parse_baseline_teacher_table(repo_root / "try-cuda-train-result.md")
     family_summary_df = family_summary_table(analysis_df)
@@ -8679,6 +8904,12 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
     write_dataframe(symbol_glyph_training_candidate_df, artifacts_dir / "symbol_glyph_training_answer_only_candidates_v1.csv")
     write_dataframe(symbol_strict_audit_df, artifacts_dir / "symbol_strict_prompt_audit_v1.csv")
     write_dataframe(symbol_strict_gap_summary_df, artifacts_dir / "symbol_strict_prompt_gap_summary_v1.csv")
+    write_dataframe(symbol_trace_policy_df, artifacts_dir / "symbol_trace_teacher_policy_v1.csv")
+    write_dataframe(symbol_trace_policy_summary_df, artifacts_dir / "symbol_trace_teacher_summary_v1.csv")
+    write_dataframe(
+        symbol_trace_policy_df.loc[symbol_trace_policy_df["symbol_trace_teacher_tier"] == "synthetic_trace_hypothesis"].reset_index(drop=True),
+        artifacts_dir / "symbol_synthetic_trace_candidates_v1.csv",
+    )
     write_dataframe(binary_cluster_df, artifacts_dir / "binary_cluster_summary_v1.csv")
     write_dataframe(glyph_summary_df, artifacts_dir / "glyph_multiset_summary_v1.csv")
     write_dataframe(symbol_query_only_rejection_df, artifacts_dir / "remaining_symbol_query_only_rejection_v1.csv")
@@ -8741,6 +8972,8 @@ def run_analysis(repo_root: Path, out_root: Path) -> None:
         symbol_round2_cluster_df,
         symbol_strict_audit_df,
         symbol_strict_gap_summary_df,
+        symbol_trace_policy_df,
+        symbol_trace_policy_summary_df,
     )
 
     manifest = {
