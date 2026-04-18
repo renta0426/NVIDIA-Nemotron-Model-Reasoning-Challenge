@@ -11,7 +11,7 @@
 - Training / validation / leaderboard score: 未計測
 - Local regeneration status: current branch で `uv run python versions/v20_corrective_corpus_v6_mainline/reproduce_v20_corrective_corpus_v6_mainline.py --run-name v6_mainline_default --write-training-bundle` を再実行し、canonical checks を通した上で bundle 再生成に成功
 - Execution note: initially queued behind `v20_mlx_v4_mainline_mb1_nobc`, but after confirming large RAM headroom and that the live v4 eval process used about `66 GB` RSS, the waiting chain was superseded and `v20_mlx_v6_mainline_mb1_nobc` was launched immediately in parallel
-- Live MLX snapshot: train `step 57`, trained tokens `6243445`, peak memory `221.9409 GB` (latest polled snapshot still did not include a fresh loss field; last recorded non-null loss before this was `0.0021125080239912876` at step `52`)
+- Live MLX snapshot: train `step 60`, loss `0.0013375700543687005`, trained tokens `6560537`, peak memory `221.9409 GB`
 - Post-run automation: validation summary watcher and measured diff-pack chain are both armed for `v20_mlx_v6_mainline_mb1_nobc`
 
 ## Generated artifacts
