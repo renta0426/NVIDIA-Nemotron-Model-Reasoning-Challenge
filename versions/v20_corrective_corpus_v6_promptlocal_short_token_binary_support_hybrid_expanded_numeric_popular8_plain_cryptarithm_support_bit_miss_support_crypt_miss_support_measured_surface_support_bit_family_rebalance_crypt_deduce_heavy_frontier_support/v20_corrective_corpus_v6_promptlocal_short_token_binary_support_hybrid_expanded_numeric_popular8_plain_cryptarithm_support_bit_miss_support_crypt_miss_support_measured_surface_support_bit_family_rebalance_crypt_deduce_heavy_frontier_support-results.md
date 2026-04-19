@@ -9,6 +9,7 @@
 - Bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v6_promptlocal_short_token_binary_support_hybrid_expanded_numeric_popular8_plain_cryptarithm_support_bit_miss_support_crypt_miss_support_measured_surface_support_bit_family_rebalance_crypt_deduce_heavy_frontier_support_bundle.jsonl`
 - Training / validation / leaderboard score: 未計測
 - Local regeneration status: `uv run python ...bit_family_rebalance_crypt_deduce_heavy_frontier_support.py --write-training-bundle` で canonical checks を通して bundle 再生成に成功
+- Launch status: queued predecessor chain を待たず手動前倒し起動を試したが、`v20_mlx_v4_mainline_mb1_nobc` eval + `v20_mlx_v6_mainline_mb1_nobc` train + `v20_mlx_v6_frontier_oct_heavy_expanded_mb1_nobc` train と重なったタイミングで **Metal OOM** が発生し、`pipeline.log` には `Command buffer execution failed: Insufficient Memory` が残った。直後に heavy_count gate 付き relaunch も仕込んだが、再起動で run completion 前に中断した
 
 ## README-grounded motivation
 

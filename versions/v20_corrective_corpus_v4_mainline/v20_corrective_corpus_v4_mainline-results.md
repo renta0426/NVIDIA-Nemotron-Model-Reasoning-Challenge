@@ -41,10 +41,11 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
 - post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
-- latest observed eval checkpoint: `544 / 950` rows completed
-- latest observed eval partial score: `465 / 544 = 0.8548`
-- latest observed eval partial read: checkpoint CSV 再集計では `544` 行時点で `465` correct。`numeral 91/91` は依然として完全で、surface 側は `cipher 89/90`, `unit_conversion 99/104`, `gravity 79/83` と大崩れしていない。一方で主失点は依然として `bit_manipulation 17 miss` と `cryptarithm_deduce 36 miss` に集中しており、`equation_numeric_guess` も `0/5` のまま。measured adapter-validation 最終値はまだ未確定で full summary 生成待ち
+- latest observed eval checkpoint: `575 / 950` rows completed
+- latest observed eval partial score: `493 / 575 = 0.857391`
+- latest observed eval partial read: checkpoint CSV 再集計では `575` 行時点で `493` correct。主失点は `cryptarithm_deduce 37 miss`, `bit_manipulation 19 miss`, `cryptarithm_guess 8 miss`, `equation_numeric_guess 5 miss` に集中し、easy 側は `unit_conversion 101/106`, `gravity 91/95`, `cipher 91/92`, `numeral 98/98` と維持されている。したがって frontier stack の設計は引き続き bit / crypt / equation tail を優先してよい
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
+- interruption note: この 950 validation は OOM 後の再起動でまだ未完了。ここまでの partial は frontier-support / oct-heavy の前倒し判断に使った latest measured checkpoint として記録する
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
   - tracked heavy artifacts for the aborted v3 lane were pruned, and only the active v4 MLX lane remains

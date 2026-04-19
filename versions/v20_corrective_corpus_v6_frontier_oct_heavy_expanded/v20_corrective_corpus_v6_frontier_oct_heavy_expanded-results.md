@@ -9,6 +9,7 @@
 - Planned MLX full-run: `v20_mlx_v6_frontier_oct_heavy_expanded_mb1_nobc`
 - Bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v6_frontier_oct_heavy_expanded_bundle.jsonl`
 - Training / validation / leaderboard score: 未計測
+- Launch status: queue 待ちを外して detached 手動起動し、実際に MLX train process まで到達したことを `ps` で確認した。ただし同時に frontier-support 側を重ねたタイミングで環境全体が OOM 再起動に入ったため、本 branch も score 取得前に中断した
 
 ## README-grounded motivation
 
