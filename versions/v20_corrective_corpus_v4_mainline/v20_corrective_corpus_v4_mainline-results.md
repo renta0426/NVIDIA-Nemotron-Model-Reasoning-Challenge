@@ -41,9 +41,9 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
 - post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
-- latest observed eval checkpoint: `535 / 950` rows completed
-- latest observed eval partial score: `456 / 535 = 0.8523`
-- latest observed eval partial read: checkpoint CSV 再集計では `535` 行時点で `456` correct。`numeral 87/87` は依然として完全で、主失点は `bit_manipulation 17 miss` と `cryptarithm_deduce 36 miss` に集中している。surface 側は `cipher 88/89`, `unit_conversion 96/101`, `gravity 78/82` で大崩れしておらず、measured adapter-validation 最終値はまだ未確定で full summary 生成待ち
+- latest observed eval checkpoint: `544 / 950` rows completed
+- latest observed eval partial score: `465 / 544 = 0.8548`
+- latest observed eval partial read: checkpoint CSV 再集計では `544` 行時点で `465` correct。`numeral 91/91` は依然として完全で、surface 側は `cipher 89/90`, `unit_conversion 99/104`, `gravity 79/83` と大崩れしていない。一方で主失点は依然として `bit_manipulation 17 miss` と `cryptarithm_deduce 36 miss` に集中しており、`equation_numeric_guess` も `0/5` のまま。measured adapter-validation 最終値はまだ未確定で full summary 生成待ち
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
