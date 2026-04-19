@@ -41,9 +41,9 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
 - post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
-- latest observed eval checkpoint: `524 / 950` rows completed
-- latest observed eval partial score: `448 / 524 = 0.8550`
-- latest observed eval partial read: checkpoint CSV 再集計では `524` 行時点で `448` correct。partial は `0.8560` から `0.8550` にわずかに低下したが、依然として measured adapter-validation 最終値は未確定で、full summary 生成待ち
+- latest observed eval checkpoint: `531 / 950` rows completed
+- latest observed eval partial score: `453 / 531 = 0.8531`
+- latest observed eval partial read: checkpoint CSV 再集計では `531` 行時点で `453` correct。直前の `448 / 524 = 0.8550` からわずかに低下したが、`numeral 86/86` は維持されており、依然として主失点は `bit_manipulation 17 miss` と `cryptarithm_deduce 35 miss` に集中している。measured adapter-validation 最終値はまだ未確定で、full summary 生成待ち
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
