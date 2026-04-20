@@ -14,6 +14,7 @@
 - Live MLX snapshot: train `step 112`, trained tokens `12183194`, peak memory `221.9755 GB`
 - Post-run automation: validation summary watcher and measured diff-pack chain are both armed for `v20_mlx_v6_mainline_mb1_nobc`
 - Interruption note: run itself had entered stable train, but OOM-triggered restart happened before validation / postprocess could complete; current ledger therefore records the last observed train snapshot only
+- Relaunch note (2026-04-20): `v20_mlx_v4_mainline_mb1_nobc` eval を継続させたまま、`v20_mlx_v6_mainline_mb1_nobc` を `v20_mlx_repro_v1/outputs/v6/auxiliary` 配下で fresh full-train として再起動した。起動直後のため latest step はまだ旧 interrupted snapshot を示すが、grouped run root では `adapter_config.json` が再生成され、new train process が常駐している
 
 ## Generated artifacts
 
