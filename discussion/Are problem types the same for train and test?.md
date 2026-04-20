@@ -3,12 +3,13 @@ Repository note: this discussion is useful context, but it does not replace the 
 
 There appear to be six different problem types in the training set:
 
-numbers are secretly converted into a different numeral system
-the gravitational constant has been secretly changed
-a secret set of transformation rules is applied to equations
-secret encryption rules are used on text
-a secret bit manipulation rule transforms 8-bit binary numbers
-a secret unit conversion is applied to measurements
+- numbers are secretly converted into a different numeral system
+- the gravitational constant has been secretly changed
+- a secret set of transformation rules is applied to equations
+- secret encryption rules are used on text
+- a secret bit manipulation rule transforms 8-bit binary numbers
+- a secret unit conversion is applied to measurements
+
 Are these the same set of problem types that appear in the test set? The approach to this competition is completely different depending on whether we are looking at all new question types or not so it would be helpful to know the answer to this question.
 
 
