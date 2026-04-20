@@ -13,6 +13,7 @@
 - Branch purpose: `promptlocal_short_token_binary_support_full` の full prompt-local support lane を維持したまま、さらに `bit_structured_byte_formula` の answer-only support lane を narrow に追加し、bit support の separate lanes が **stack するか**を見る hybrid branch
 - Execution note: `v20_mlx_v6_structured_short_token_binary_support_full_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定
 - Post-run automation: `v6-promptlocal-short-token-binary-support-hybrid-train-watch` / `v6-promptlocal-short-token-binary-support-hybrid-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
+- Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/support` 配下で actual grouped-root train/eval watcher を再配置し、predecessor `training_result.json` 待ちの launch queue と train 完了後の adapter-validation / postprocess を実体として arm した
 
 ## Generated artifacts
 
