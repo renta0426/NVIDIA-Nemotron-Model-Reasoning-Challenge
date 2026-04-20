@@ -12,7 +12,7 @@
 - Local regeneration status: current branch で `uv run python versions/v20_corrective_corpus_v6_mainline/reproduce_v20_corrective_corpus_v6_mainline.py --run-name v6_mainline_default --write-training-bundle` を再実行し、canonical checks を通した上で bundle 再生成に成功
 - Execution note: initially queued behind `v20_mlx_v4_mainline_mb1_nobc`, but after confirming large RAM headroom and that the live v4 eval process used about `66 GB` RSS, the waiting chain was superseded and `v20_mlx_v6_mainline_mb1_nobc` was launched immediately in parallel
 - Live MLX snapshot (pre-OOM interrupted run): train `step 112`, trained tokens `12183194`, peak memory `221.9755 GB`
-- Post-run automation: validation summary watcher and measured diff-pack chain are both armed for `v20_mlx_v6_mainline_mb1_nobc`
+- Post-run automation: grouped rerun 向けに adapter-validation watcher と postprocess watcher を re-arm 済みで、`v20_mlx_v6_mainline_mb1_nobc` の `training_result.json` 出現後に `README.md` 契約 (`max_tokens 7680`, `top_p 1.0`, `temperature 0.0`, `max_model_len 8192`) の条件で adapter validation を起動する
 - Interruption note: run itself had entered stable train, but OOM-triggered restart happened before validation / postprocess could complete; current ledger therefore records the last observed train snapshot only
 - Relaunch note (2026-04-20): `v20_mlx_v4_mainline_mb1_nobc` eval を継続させたまま、`v20_mlx_v6_mainline_mb1_nobc` を `v20_mlx_repro_v1/outputs/v6/auxiliary` 配下で fresh full-train として再起動した。grouped run root では `adapter_config.json` / `train_report.jsonl` / `latest_train_report.json` が再生成され、現在の fresh run は `step 6`, `trained_tokens 658356`, `train_loss 0.09877014974349398`, `peak_memory 221.9409 GB` まで進行している
 
