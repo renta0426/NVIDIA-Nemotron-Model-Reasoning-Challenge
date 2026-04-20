@@ -13,6 +13,7 @@
 - Branch purpose: `popular8_capped_fallback_tail_boost` の次段として、fallback operators (`%`, `` ` ``) の **second unique row を先に確保**し、その上で popular8 extra unique を詰める branch
 - Execution note: `v20_mlx_v6_promptlocal_short_token_numeric_guess_popular8_capped_fallback_tail_boost_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定
 - Post-run automation: `v6-promptlocal-short-token-popular8-fallback-unique-train-watch` / `v6-promptlocal-short-token-popular8-fallback-unique-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
+- Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/numeric_guess` 配下で actual grouped-root train/eval watcher を再配置し、numeric popular8 chain の predecessor 完了待ち launch queue と train 完了後の adapter-validation / postprocess を実体として arm した
 
 ## Generated artifacts
 

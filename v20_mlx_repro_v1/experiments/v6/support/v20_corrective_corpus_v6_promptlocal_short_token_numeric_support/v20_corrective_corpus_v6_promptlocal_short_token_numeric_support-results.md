@@ -13,6 +13,7 @@
 - Branch purpose: `bit_other` / prompt-local exact rows を厚くしたまま、`short-closure` と `token-skill` の両補助 lane を維持しつつ、`numeric_2x2 answer_only_keep` を narrow support lane として追加する branch
 - Execution note: `v20_mlx_v6_promptlocal_short_token_skill_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定済み
 - Post-run automation: `v6-promptlocal-short-token-numeric-train-watch` / `v6-promptlocal-short-token-numeric-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
+- Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/support` 配下で actual grouped-root train/eval watcher を再配置し、`short_token_skill` 完了後の launch queue と train 完了後の adapter-validation / postprocess を実体として arm した
 
 ## Generated artifacts
 
