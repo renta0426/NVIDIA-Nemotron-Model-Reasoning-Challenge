@@ -116,6 +116,13 @@ CORE_NUMERIC_FAMILIES.append(("abs(x-y)+op", "op_suffix", "abs(x-y)"))
 
 CORE_COMPOSITE_FAMILIES = [
     "concat|x+y|nat|y//x|nat|strip0",
+    "concat|x+y|nat|y//x|pad2|strip0",
+    "concat|x+y|pad2|y//x|nat|strip0",
+    "concat|x+y|pad2|y//x|pad2|strip0",
+    "pairconcat|min:ac_bd:strip0|max:ad_bc|keep",
+    "pairconcat|min:ac_bd:strip0|max:ad_bc|strip0",
+    "pairconcat|min:ac_bd:strip0|max:ac_bd|keep",
+    "pairconcat|min:ac_bd:strip0|max:ac_bd|strip0",
     "concat|x|nat|y|nat|keep",
     "concat|x//y|pad2|x//y|nat|keep",
     "concat|x-y|nat|x//y|nat|strip0",
@@ -125,13 +132,16 @@ CORE_COMPOSITE_FAMILIES = [
     "concat|y|nat|x|nat|keep",
     "mix|x|nat|max:ac_bd|scalar_first",
     "mix|y//x|nat|sum:ac_bd:strip0|scalar_first",
+    "mix|y//x|nat|sum:ac_bd:strip0swap|scalar_first",
     "mix|min:ac_bd:strip0|x|nat|pair_first",
     "mix|x+y|nat|diff:ac_bd:strip0|scalar_first",
     "mix|diff:ab_cd:swap|x//y|pad2|pair_first",
     "mix|prod:ad_bc:swap|x//y|pad2|pair_first",
     "mix|max:ac_bd:swap|x+y|nat|pair_first",
     "copymix|scalar|x+y|nat|c|expr_first",
+    "copymix|scalar|x+y|pad2|c|expr_first",
     "copymix|scalar|x+y|nat|a|expr_first",
+    "copymix|scalar|x+y|pad2|a|expr_first",
     "copymix|scalar|y//x|nat|a|expr_first",
     "copymix|generic|prod:ac_bd:strip0|plain|aa|copy_first",
     "copymix|scalar|x|nat|cc|expr_first",
@@ -141,7 +151,9 @@ CORE_COMPOSITE_FAMILIES = [
     "copymix|scalar|x|nat|cd|expr_first",
     "copymix|scalar|y|pad2|ba|expr_first",
     "mask|scalar|x+y|nat|NNc",
+    "mask|scalar|x+y|pad2|NNc",
     "mask|scalar|x+y|nat|NNa",
+    "mask|scalar|x+y|pad2|NNa",
     "mask|scalar|x+y|nat|cNN",
     "mask|scalar|x+y|nat|aNN",
     "mask|scalar|x+y|nat|NNca",
@@ -556,6 +568,20 @@ def core_parse_scalar_concat_family(family_name: str) -> tuple[str, str, str, st
     return left_expr, left_mode, right_expr, right_mode, strip_flag == "strip0"
 
 
+def core_parse_pair_concat_family(family_name: str) -> tuple[str, str, bool] | None:
+    if not family_name.startswith("pairconcat|"):
+        return None
+    parts = family_name.split("|")
+    if len(parts) != 4:
+        return None
+    _, left_expr, right_expr, strip_flag = parts
+    if core_parse_generic_family(left_expr) is None or core_parse_generic_family(right_expr) is None:
+        return None
+    if strip_flag not in {"keep", "strip0"}:
+        return None
+    return left_expr, right_expr, strip_flag == "strip0"
+
+
 def core_parse_scalar_pair_family(family_name: str) -> tuple[str, str, str, str] | None:
     if not family_name.startswith("mix|"):
         return None
@@ -645,39 +671,22 @@ def core_family_compatible(
             return False
         return all("".join(left[i] for i in idxs) == right for left, right in pairs)
 
-    family_length_ranges = {
-        "x+y": (1, 3),
-        "x-y": (1, 3),
-        "y-x": (1, 3),
-        "abs(x-y)": (1, 2),
-        "x*y": (1, 4),
-        "x%y": (1, 2),
-        "y%x": (1, 2),
-        "x//y": (1, 2),
-        "y//x": (1, 2),
-        "op+abs(x-y)": (2, 3),
-        "abs(x-y)+op": (2, 3),
-        "op_prefix:x-y": (2, 4),
-        "op_prefix:y-x": (2, 4),
-        "op_prefix:abs(x-y)": (2, 3),
-        "op_suffix:x-y": (2, 4),
-        "op_suffix:y-x": (2, 4),
-        "op_suffix:abs(x-y)": (2, 3),
-    }
     mode_info = core_family_mode(family_name)
     generic_info = None if mode_info is not None else core_parse_generic_family(family_name)
     composite_info = None
     if mode_info is None and generic_info is None:
         composite_info = (
             core_parse_scalar_concat_family(family_name)
+            or core_parse_pair_concat_family(family_name)
             or core_parse_scalar_pair_family(family_name)
             or core_parse_copy_mix_family(family_name)
             or core_parse_mask_family(family_name)
         )
     if mode_info is None and generic_info is None and composite_info is None:
         return False
-    if family_name in family_length_ranges:
-        min_length, max_length = family_length_ranges[family_name]
+    family_length_bounds = core_family_length_bounds(family_name)
+    if family_length_bounds is not None:
+        min_length, max_length = family_length_bounds
         if any(not (min_length <= len(right) <= max_length) for _, right in pairs):
             return False
     mode = mode_info[0] if mode_info is not None else ("op_prefix" if generic_info and generic_info[0] else "op_suffix" if generic_info and generic_info[1] else "plain")
@@ -838,6 +847,133 @@ def core_render_copy_text(copy_spec: str, x: int, y: int) -> str:
     return "".join(mapping[ch] for ch in copy_spec)
 
 
+def core_scalar_length_bounds(expr_name: str, mode: str) -> tuple[int, int] | None:
+    if mode == "pad2":
+        return 2, 2
+    if expr_name in {"x", "y", "abs(x-y)", "x%y", "y%x", "x//y", "y//x"}:
+        return 1, 2
+    if expr_name in {"x+y", "x-y", "y-x"}:
+        return 1, 3
+    if expr_name == "x*y":
+        return 1, 4
+    return None
+
+
+def core_generic_length_bounds(family_name: str) -> tuple[int, int] | None:
+    parsed = core_parse_generic_family(family_name)
+    if parsed is None:
+        return None
+    prefix_op, suffix_op, func_name, _, _, strip0 = parsed
+    if func_name in {"sum", "diff", "rdiff", "prod"}:
+        min_length, max_length = 2, 4
+    elif func_name in {"absdiff", "max", "min"}:
+        min_length, max_length = 2, 2
+    else:
+        return None
+    if strip0:
+        min_length = 0
+    if prefix_op or suffix_op:
+        min_length += 1
+        max_length += 1
+    return min_length, max_length
+
+
+def core_family_length_bounds(family_name: str) -> tuple[int, int] | None:
+    if family_name in CORE_STRUCT_FAMILIES:
+        length = len(CORE_STRUCT_FAMILIES[family_name])
+        return length, length
+
+    numeric_bounds = {
+        "x+y": (1, 3),
+        "x-y": (1, 3),
+        "y-x": (1, 3),
+        "abs(x-y)": (1, 2),
+        "x*y": (1, 4),
+        "x%y": (1, 2),
+        "y%x": (1, 2),
+        "x//y": (1, 2),
+        "y//x": (1, 2),
+        "op+abs(x-y)": (2, 3),
+        "abs(x-y)+op": (2, 3),
+        "op_prefix:x-y": (2, 4),
+        "op_prefix:y-x": (2, 4),
+        "op_prefix:abs(x-y)": (2, 3),
+        "op_suffix:x-y": (2, 4),
+        "op_suffix:y-x": (2, 4),
+        "op_suffix:abs(x-y)": (2, 3),
+    }
+    if family_name in numeric_bounds:
+        return numeric_bounds[family_name]
+
+    generic_bounds = core_generic_length_bounds(family_name)
+    if generic_bounds is not None:
+        return generic_bounds
+
+    scalar_concat = core_parse_scalar_concat_family(family_name)
+    if scalar_concat is not None:
+        left_expr, left_mode, right_expr, right_mode, strip0 = scalar_concat
+        left_bounds = core_scalar_length_bounds(left_expr, left_mode)
+        right_bounds = core_scalar_length_bounds(right_expr, right_mode)
+        if left_bounds is None or right_bounds is None:
+            return None
+        min_length = left_bounds[0] + right_bounds[0]
+        max_length = left_bounds[1] + right_bounds[1]
+        if strip0:
+            min_length = 0
+        return min_length, max_length
+
+    pair_concat = core_parse_pair_concat_family(family_name)
+    if pair_concat is not None:
+        left_expr, right_expr, strip0 = pair_concat
+        left_bounds = core_generic_length_bounds(left_expr)
+        right_bounds = core_generic_length_bounds(right_expr)
+        if left_bounds is None or right_bounds is None:
+            return None
+        min_length = left_bounds[0] + right_bounds[0]
+        max_length = left_bounds[1] + right_bounds[1]
+        if strip0:
+            min_length = 0
+        return min_length, max_length
+
+    scalar_pair = core_parse_scalar_pair_family(family_name)
+    if scalar_pair is not None:
+        scalar_expr, scalar_mode, pair_name, _ = scalar_pair
+        scalar_bounds = core_scalar_length_bounds(scalar_expr, scalar_mode)
+        pair_bounds = core_generic_length_bounds(pair_name)
+        if scalar_bounds is None or pair_bounds is None:
+            return None
+        return scalar_bounds[0] + pair_bounds[0], scalar_bounds[1] + pair_bounds[1]
+
+    copy_mix = core_parse_copy_mix_family(family_name)
+    if copy_mix is not None:
+        expr_kind, expr_name, expr_mode, copy_spec, _, _ = copy_mix
+        if expr_kind == "scalar":
+            expr_bounds = core_scalar_length_bounds(expr_name, expr_mode)
+        else:
+            expr_bounds = core_generic_length_bounds(expr_name)
+        if expr_bounds is None:
+            return None
+        copy_length = len(copy_spec)
+        return expr_bounds[0] + copy_length, expr_bounds[1] + copy_length
+
+    mask_family = core_parse_mask_family(family_name)
+    if mask_family is not None:
+        _, _, _, template = mask_family
+        return len(template), len(template)
+
+    return None
+
+
+def core_tokens_literal_signature(
+    tokens: tuple[tuple[str, str], ...] | list[tuple[str, str]],
+) -> tuple[tuple[int, str], ...]:
+    return tuple(
+        (index, value)
+        for index, (kind, value) in enumerate(tokens)
+        if kind in {"op", "sign"}
+    )
+
+
 def core_render_mask_tokens(
     expr_kind: str,
     expr_name: str,
@@ -880,6 +1016,18 @@ def core_render_composite_tokens(
         left_expr, left_mode, right_expr, right_mode, strip0 = scalar_concat
         left_text = core_render_scalar_text(left_expr, left_mode, x, y)
         right_text = core_render_scalar_text(right_expr, right_mode, x, y)
+        if left_text is None or right_text is None:
+            return None
+        text = left_text + right_text
+        if strip0:
+            text = text.replace("0", "")
+        return core_string_to_tokens(text)
+
+    pair_concat = core_parse_pair_concat_family(family_name)
+    if pair_concat is not None:
+        left_expr, right_expr, strip0 = pair_concat
+        left_text = core_render_pair_text(left_expr, x, y)
+        right_text = core_render_pair_text(right_expr, x, y)
         if left_text is None or right_text is None:
             return None
         text = left_text + right_text
@@ -984,38 +1132,56 @@ def core_family_records(family_name: str, operator_symbol: str) -> tuple[tuple[s
     return tuple(records)
 
 
+@lru_cache(maxsize=None)
+def core_family_output_index(
+    family_name: str,
+    operator_symbol: str,
+) -> dict[tuple[int, tuple[tuple[int, str], ...]], tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...]]:
+    by_signature: dict[
+        tuple[int, tuple[tuple[int, str], ...]],
+        list[tuple[str, str, tuple[tuple[str, str], ...]]],
+    ] = defaultdict(list)
+    for sx, sy, tokens in core_family_records(family_name, operator_symbol):
+        key = (len(tokens), core_tokens_literal_signature(tokens))
+        by_signature[key].append((sx, sy, tokens))
+    return {signature: tuple(records) for signature, records in by_signature.items()}
+
+
 def core_example_maps(family_name: str, left: str, right: str) -> list[dict[str, str]]:
     if family_name in CORE_STRUCT_FAMILIES:
         return [{}] if "".join(left[index] for index in CORE_STRUCT_FAMILIES[family_name]) == right else []
 
     local_maps: list[dict[str, str]] = []
     seen: set[tuple[tuple[str, str], ...]] = set()
-    for sx, sy, tokens in core_family_records(family_name, left[2]):
-        if len(tokens) != len(right):
+    for (token_length, literal_signature), records in core_family_output_index(family_name, left[2]).items():
+        if token_length != len(right):
             continue
-        symbol_sequence = [left[0], left[1], left[3], left[4]]
-        digit_sequence = [sx[0], sx[1], sy[0], sy[1]]
-        valid = True
-        for right_char, (token_kind, token_value) in zip(right, tokens):
-            if token_kind == "digit":
-                symbol_sequence.append(right_char)
-                digit_sequence.append(token_value)
-            elif token_kind in {"op", "sign"}:
-                if right_char != token_value:
-                    valid = False
-                    break
-            else:
-                raise KeyError(token_kind)
-        if not valid:
+        if any(right[index] != value for index, value in literal_signature):
             continue
-        symbol_map = core_make_symbol_map("".join(symbol_sequence), "".join(digit_sequence))
-        if symbol_map is None:
-            continue
-        frozen = tuple(sorted(symbol_map.items()))
-        if frozen in seen:
-            continue
-        seen.add(frozen)
-        local_maps.append(symbol_map)
+        for sx, sy, tokens in records:
+            symbol_sequence = [left[0], left[1], left[3], left[4]]
+            digit_sequence = [sx[0], sx[1], sy[0], sy[1]]
+            valid = True
+            for right_char, (token_kind, token_value) in zip(right, tokens):
+                if token_kind == "digit":
+                    symbol_sequence.append(right_char)
+                    digit_sequence.append(token_value)
+                elif token_kind in {"op", "sign"}:
+                    if right_char != token_value:
+                        valid = False
+                        break
+                else:
+                    raise KeyError(token_kind)
+            if not valid:
+                continue
+            symbol_map = core_make_symbol_map("".join(symbol_sequence), "".join(digit_sequence))
+            if symbol_map is None:
+                continue
+            frozen = tuple(sorted(symbol_map.items()))
+            if frozen in seen:
+                continue
+            seen.add(frozen)
+            local_maps.append(symbol_map)
     return local_maps
 
 
@@ -1126,6 +1292,7 @@ def explain_symbol_row_with_core_solver(
 
     if family_priority is None:
         family_priority = CORE_FAMILY_PRIORITY
+    family_rank = {name: index for index, name in enumerate(family_priority)}
 
     family_options: dict[str, list[str]] = {}
     group_maps_by_operator: dict[str, dict[str, list[dict[str, str]]]] = {}
@@ -1149,13 +1316,45 @@ def explain_symbol_row_with_core_solver(
             candidate_maps[family_name] = reduced_maps
         if not candidates:
             return None
-        family_options[operator_symbol] = candidates
+        family_options[operator_symbol] = sorted(
+            candidates,
+            key=lambda family_name: (
+                len(candidate_maps[family_name]),
+                family_rank.get(family_name, len(family_rank)),
+            ),
+        )
         group_maps_by_operator[operator_symbol] = candidate_maps
 
     target_answer = str(row["answer"])
     target_left = target
+    target_operator = target_left[2]
+    target_maps_by_family = {
+        family_name: core_example_maps(family_name, target_left, target_answer)
+        for family_name in family_options[target_operator]
+    }
+    family_options[target_operator] = [
+        family_name
+        for family_name in family_options[target_operator]
+        if target_maps_by_family[family_name]
+    ]
+    if not family_options[target_operator]:
+        return None
+    family_options[target_operator].sort(
+        key=lambda family_name: (
+            len(target_maps_by_family[family_name]),
+            len(group_maps_by_operator[target_operator][family_name]),
+            family_rank.get(family_name, len(family_rank)),
+        )
+    )
 
-    ordered_operators = sorted(operator_symbols, key=lambda op: (len(family_options[op]), op))
+    ordered_operators = sorted(
+        operator_symbols,
+        key=lambda op: (
+            sum(len(group_maps_by_operator[op][family_name]) for family_name in family_options[op]),
+            len(family_options[op]),
+            op,
+        ),
+    )
     explored = 0
 
     def recurse(index: int, current_assignment: dict[str, str], current_map: dict[str, str]) -> dict | None:
@@ -1163,8 +1362,8 @@ def explain_symbol_row_with_core_solver(
         if explored >= max_assignments:
             return None
         if index == len(ordered_operators):
-            target_family = current_assignment[target_left[2]]
-            target_maps = core_example_maps(target_family, target_left, target_answer)
+            target_family = current_assignment[target_operator]
+            target_maps = target_maps_by_family[target_family]
             for target_map in target_maps:
                 merged = core_join_symbol_maps(current_map, target_map)
                 if merged is not None:
@@ -1181,6 +1380,11 @@ def explain_symbol_row_with_core_solver(
             for family_map in group_maps_by_operator[operator_symbol][family_name]:
                 merged_map = core_join_symbol_maps(current_map, family_map)
                 if merged_map is None:
+                    continue
+                if operator_symbol == target_operator and not any(
+                    core_join_symbol_maps(merged_map, target_map) is not None
+                    for target_map in target_maps_by_family[family_name]
+                ):
                     continue
                 current_assignment[operator_symbol] = family_name
                 result = recurse(index + 1, current_assignment, merged_map)
@@ -1515,10 +1719,11 @@ def build_report(df: pd.DataFrame) -> str:
     lines.append("- guess 系は unseen operator / unseen symbol が混ざるため、prompt 単独の帰納よりも train 全体から族 priors を持ち込む設計が必要です。")
     lines.append("- したがって solver を作るなら、まず numeric 系でテンプレート辞書を増やし、その後 cryptarithm 系へ symbol substitution 層を載せる順が最短です。")
     lines.append("")
-    lines.append("## Learned Solver")
+    lines.append("## Learned Solver (Reference Only)")
     lines.append("")
-    lines.append("- 同じ単一ファイル analyze_symbol_rules.py に full-prompt 文字列を入力する learned prompt solver を追加しました。")
-    lines.append("- 再現コマンドは `--train-prompt-solver --epochs 40 --batch-size 64 --learning-rate 0.002 --seed 42` です。")
+    lines.append("- 同じ単一ファイル analyze_symbol_rules.py には full-prompt 文字列を入力する learned prompt solver も残しています。")
+    lines.append("- ただしこれは explicit rule discovery の達成判定には使いません。現在の主タスクは、明示的 family / solver の拡張で symbolic 行を説明できる範囲を増やすことです。")
+    lines.append("- 参考記録として、再現コマンドは `--train-prompt-solver --epochs 40 --batch-size 64 --learning-rate 0.002 --seed 42` です。")
     lines.append("- 2026-04-20 の再現実行では symbolic 823 行に対して epoch 20 で exact 1.0000 を記録しました。")
     lines.append("- 測定詳細は data/symbol_rule_analysis_2026-04-20/prompt_solver_measurement_2026-04-20.md に記録しています。")
     lines.append("")
