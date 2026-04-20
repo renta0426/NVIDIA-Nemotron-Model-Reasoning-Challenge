@@ -41,9 +41,9 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - latest observed total elapsed seconds: `82419.2484`
 - latest observed peak memory: `221.942 GB`
 - post-train state: `training_result.json` is present and `eval-adapter-validation --validation-sample-size 950` is now running
-- latest observed eval checkpoint: `576 / 950` rows completed
-- latest observed eval partial score: `494 / 576 = 0.857639`
-- latest observed eval partial read: checkpoint CSV 再集計では `576` 行時点で `494` correct。主失点は `cryptarithm_deduce 37 miss`, `bit_manipulation 19 miss`, `cryptarithm_guess 8 miss`, `unit_conversion 5 miss`, `equation_numeric_guess 5 miss` に集中し、easy 側は `unit_conversion 101/106`, `gravity 91/95`, `cipher 91/92`, `numeral 98/98` と維持されている。したがって frontier stack の設計は引き続き bit / crypt / equation tail を優先してよい
+- latest observed eval checkpoint: `581 / 950` rows completed
+- latest observed eval partial score: `499 / 581 = 0.858864`
+- latest observed eval partial read: checkpoint CSV 再集計では `581` 行時点で `499` correct。主失点は `cryptarithm_deduce 37 miss`, `bit_manipulation 19 miss`, `cryptarithm_guess 8 miss`, `unit_conversion 5 miss`, `equation_numeric_guess 5 miss` に集中し、easy 側は `unit_conversion 101/106`, `gravity 93/97`, `cipher 92/93`, `numeral 99/99` と維持されている。したがって frontier stack の設計は引き続き bit / crypt / equation tail を優先してよい
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - interruption note: この 950 validation は OOM 後の再起動でまだ未完了だったが、2026-04-20 に `adapter_validation/eval_cmd.sh` を同一 README 契約のまま再実行し、既存 `validation_records_checkpoint.csv` から `575 -> 576` へ継続できることを確認した。ここまでの partial は frontier-support / oct-heavy の前倒し判断に使った latest measured checkpoint として継続記録する
 - operational note:
