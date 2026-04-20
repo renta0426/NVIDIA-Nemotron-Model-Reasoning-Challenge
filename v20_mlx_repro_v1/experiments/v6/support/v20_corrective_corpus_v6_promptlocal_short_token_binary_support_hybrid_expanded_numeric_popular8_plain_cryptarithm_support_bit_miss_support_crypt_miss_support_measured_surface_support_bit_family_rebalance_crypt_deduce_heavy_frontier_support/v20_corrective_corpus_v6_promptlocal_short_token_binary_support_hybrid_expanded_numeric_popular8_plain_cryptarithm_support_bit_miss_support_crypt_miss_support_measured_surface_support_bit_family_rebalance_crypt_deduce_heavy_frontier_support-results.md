@@ -11,6 +11,7 @@
 - Local regeneration status: `uv run python ...bit_family_rebalance_crypt_deduce_heavy_frontier_support.py --write-training-bundle` で canonical checks を通して bundle 再生成に成功
 - Launch status: queued predecessor chain を待たず手動前倒し起動を試したが、`v20_mlx_v4_mainline_mb1_nobc` eval + `v20_mlx_v6_mainline_mb1_nobc` train + `v20_mlx_v6_frontier_oct_heavy_expanded_mb1_nobc` train と重なったタイミングで **Metal OOM** が発生し、`pipeline.log` には `Command buffer execution failed: Insufficient Memory` が残った。直後に heavy_count gate 付き relaunch も仕込んだが、再起動で run completion 前に中断した
 - Queue note (2026-04-20): 三重起動による OOM を避けるため、この expanded frontier-support run は `v20_mlx_v6_mainline_mb1_nobc` の `training_result.json` 出現と mainline train process 終了を待ってから、`v20_mlx_repro_v1/outputs/v6/support` 配下で fresh relaunch する detached queue に切り替えた
+- Eval automation note (2026-04-20): grouped support root 向けに `training_result.json` 出現後の adapter-validation watcher と `postprocess-run --postprocess-eval-kind adapter-validation` watcher を追加し、train 完了後に README 契約の validation を自動起動する
 
 ## README-grounded motivation
 

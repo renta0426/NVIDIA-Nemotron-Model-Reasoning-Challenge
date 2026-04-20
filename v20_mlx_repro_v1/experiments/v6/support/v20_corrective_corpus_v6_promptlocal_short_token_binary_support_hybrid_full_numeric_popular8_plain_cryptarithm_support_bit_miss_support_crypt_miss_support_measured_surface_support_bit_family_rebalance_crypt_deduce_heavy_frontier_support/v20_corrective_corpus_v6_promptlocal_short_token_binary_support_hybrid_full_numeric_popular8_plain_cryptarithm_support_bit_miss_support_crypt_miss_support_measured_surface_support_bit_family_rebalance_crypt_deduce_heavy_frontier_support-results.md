@@ -10,6 +10,7 @@
 - Training / validation / leaderboard score: 未計測
 - Local regeneration status: `uv run python ...bit_family_rebalance_crypt_deduce_heavy_frontier_support.py --write-training-bundle` で canonical checks を通して bundle 再生成に成功
 - Queue note (2026-04-20): OOM を避けつつ full-budget 比較を維持するため、この full frontier-support run は expanded frontier-support run の `training_result.json` 出現と train process 終了を待ってから、`v20_mlx_repro_v1/outputs/v6/support` 配下で fresh relaunch する detached queue に設定した
+- Eval automation note (2026-04-20): grouped support root 向けに `training_result.json` 出現後の adapter-validation watcher と `postprocess-run --postprocess-eval-kind adapter-validation` watcher を追加し、train 完了後に README 契約の validation を自動起動する
 
 ## README-grounded motivation
 
