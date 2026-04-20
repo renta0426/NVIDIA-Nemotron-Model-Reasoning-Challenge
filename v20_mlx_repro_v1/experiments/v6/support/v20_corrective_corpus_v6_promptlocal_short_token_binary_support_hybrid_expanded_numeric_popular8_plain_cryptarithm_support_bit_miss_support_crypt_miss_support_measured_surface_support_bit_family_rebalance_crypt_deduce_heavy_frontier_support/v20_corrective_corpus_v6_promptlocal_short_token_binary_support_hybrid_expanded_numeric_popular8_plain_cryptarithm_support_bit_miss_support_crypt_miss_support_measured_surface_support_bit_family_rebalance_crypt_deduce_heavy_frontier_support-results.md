@@ -13,6 +13,7 @@
 - Queue note (2026-04-20): 三重起動による OOM を避けるため、この expanded frontier-support run は `v20_mlx_v6_mainline_mb1_nobc` の `training_result.json` 出現と mainline train process 終了を待ってから、`v20_mlx_repro_v1/outputs/v6/support` 配下で fresh relaunch する detached queue に切り替えた
 - Eval automation note (2026-04-20): grouped support root 向けに `training_result.json` 出現後の adapter-validation watcher と `postprocess-run --postprocess-eval-kind adapter-validation` watcher を追加し、train 完了後に README 契約の validation を自動起動する
 - Launch note (2026-04-20): `vm_stat` で free pages が約 `11.1M`、active MLX jobs がまだ 4 本未満に収まっていたため、queue 待ちを打ち切って `v20_mlx_v6_promptlocal_short_token_binary_support_hybrid_expanded_numeric_popular8_plain_cryptarithm_support_bit_miss_support_crypt_miss_support_measured_surface_support_bit_family_rebalance_crypt_deduce_heavy_frontier_support_mb1_nobc` を detached full-train として前倒し起動した
+- Live-process note (2026-04-20): この fresh launch も `pipeline.log` がまだ空で `adapter/latest_train_report.json` 未生成のままだが、python train process の `sample` では main thread が `mlx::core::eval -> eval_impl -> std::condition_variable::wait` に入っていた。初回 OOM 後の再ハングではなく MLX eval / loader phase の継続とみなし、free pages 約 `4642`・active python `5` 本の間は kill / relaunch を行わず queue 進行だけを待つ
 
 ## README-grounded motivation
 

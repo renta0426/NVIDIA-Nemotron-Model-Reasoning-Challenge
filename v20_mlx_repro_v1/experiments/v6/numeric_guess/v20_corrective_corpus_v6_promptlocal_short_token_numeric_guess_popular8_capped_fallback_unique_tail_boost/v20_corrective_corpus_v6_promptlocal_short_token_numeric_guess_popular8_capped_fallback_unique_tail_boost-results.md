@@ -15,6 +15,7 @@
 - Post-run automation: `v6-promptlocal-short-token-popular8-fallback-unique-train-watch` / `v6-promptlocal-short-token-popular8-fallback-unique-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
 - Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/numeric_guess` 配下で actual grouped-root train/eval watcher を再配置し、numeric popular8 chain の predecessor 完了待ち launch queue と train 完了後の adapter-validation / postprocess を実体として arm した
 - Launch note (2026-04-20): `vm_stat` で free pages が約 `11.1M`、active MLX jobs が `v4 eval + v6 mainline train` の 2 本だけであることを確認したため、queue 待ちを打ち切って `v20_mlx_v6_promptlocal_short_token_numeric_guess_popular8_capped_fallback_unique_tail_boost_mb1_nobc` を detached full-train として前倒し起動した
+- Live-process note (2026-04-20): launch 後しばらく `pipeline.log` は空で `adapter/latest_train_report.json` も未生成だが、python train process を `sample` すると main thread は `mlx::core::eval -> eval_impl -> std::condition_variable::wait` に入っていた。現時点では dead queue entry ではなく MLX eval / loader phase の継続とみなし、free pages が約 `4642`、active python が `5` 本のため restart せずこのまま監視を続ける
 
 ## Generated artifacts
 

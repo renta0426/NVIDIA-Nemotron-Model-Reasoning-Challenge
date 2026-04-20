@@ -17,6 +17,7 @@
 - Relaunch note (2026-04-20): `v20_mlx_v4_mainline_mb1_nobc` eval を継続させたまま、`v20_mlx_v6_mainline_mb1_nobc` を `v20_mlx_repro_v1/outputs/v6/auxiliary` 配下で fresh full-train として再起動した。grouped run root では `adapter_config.json` / `train_report.jsonl` / `latest_train_report.json` が再生成され、現在の fresh run は `step 6`, `trained_tokens 658356`, `train_loss 0.09877014974349398`, `peak_memory 221.9409 GB` まで進行している
 - live-process note (2026-04-20): `sample` では main thread が `mlx::core::eval -> eval_impl` の下で `gpu::eval` / `metal::Device::commit_command_buffer` / AGX dispatch に入っており、fresh mainline train は idle ではなく Metal command buffer 実行待ちを含む MLX GPU 計算中と判断した
 - Artifact hygiene note (2026-04-20): 現在の active roots (`v20_mlx_v4_mainline_mb1_nobc`, `v20_mlx_v6_mainline_mb1_nobc`) には触れず、inactive な targetfix / aborted frontier roots に残っていた stale `shadow_model` と `training_bundle_tokens` を prune して、次の full-run 用に local workspace を整理した
+- Resource gate note (2026-04-20): `README.md` 契約の full-run 群を維持したまま live 本数を `v4 eval + 4 train = 5 python` に増やした結果、`vm_stat` の free pages は約 `4642` まで低下した。`manual_launch_watch.log` でも v6 mainline はまだ `step 6` のままなので、これ以上の即時 launch は止め、既存 root が `latest_train_report.json` を更新するか `training_result.json` を出すまで queue 自動進行を優先する
 
 ## Measured results
 
