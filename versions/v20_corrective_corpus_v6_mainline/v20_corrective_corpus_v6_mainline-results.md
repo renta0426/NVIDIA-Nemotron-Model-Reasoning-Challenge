@@ -18,6 +18,7 @@
 - live-process note (2026-04-20): `sample` では main thread が `mlx::core::eval -> eval_impl` の下で `gpu::eval` / `metal::Device::commit_command_buffer` / AGX dispatch に入っており、fresh mainline train は idle ではなく Metal command buffer 実行待ちを含む MLX GPU 計算中と判断した
 - Artifact hygiene note (2026-04-20): 現在の active roots (`v20_mlx_v4_mainline_mb1_nobc`, `v20_mlx_v6_mainline_mb1_nobc`) には触れず、inactive な targetfix / aborted frontier roots に残っていた stale `shadow_model` と `training_bundle_tokens` を prune して、次の full-run 用に local workspace を整理した
 - Resource gate note (2026-04-20): `README.md` 契約の full-run 群を維持したまま live 本数を `v4 eval + 4 train = 5 python` に増やした結果、`vm_stat` の free pages は約 `4642` まで低下した。`manual_launch_watch.log` でも v6 mainline はまだ `step 6` のままなので、これ以上の即時 launch は止め、既存 root が `latest_train_report.json` を更新するか `training_result.json` を出すまで queue 自動進行を優先する
+- staleness note (2026-04-20): fresh run の `adapter/latest_train_report.json` mtime は `2026-04-20T17:53:03+09:00` から動いていないが、再度の `sample` でも main thread は `mlx::core::eval -> eval_impl -> std::condition_variable::wait` に残っていた。したがって report 側だけが静止している long Metal wait とみなし、OOM を避けるため train を維持したまま watcher 監視を続ける
 
 ## Measured results
 
