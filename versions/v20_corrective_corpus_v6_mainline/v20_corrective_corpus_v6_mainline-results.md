@@ -8,13 +8,68 @@
 - Active MLX full-run: `v20_mlx_v6_mainline_mb1_nobc`
 - Strategy source: `versions/v20_to_088_reassessment_2026-04-18.md`
 - Bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v6_mainline_bundle.jsonl`
-- Training / validation / leaderboard score: 未計測
+- Training / validation / leaderboard score: validation `829 / 950 = 0.8726`, leaderboard proxy `180 / 200 = 0.9000`, official leaderboard `0.83-0.85`
 - Local regeneration status: current branch で `uv run python versions/v20_corrective_corpus_v6_mainline/reproduce_v20_corrective_corpus_v6_mainline.py --run-name v6_mainline_default --write-training-bundle` を再実行し、canonical checks を通した上で bundle 再生成に成功
 - Execution note: initially queued behind `v20_mlx_v4_mainline_mb1_nobc`, but after confirming large RAM headroom and that the live v4 eval process used about `66 GB` RSS, the waiting chain was superseded and `v20_mlx_v6_mainline_mb1_nobc` was launched immediately in parallel
 - Live MLX snapshot: train `step 112`, trained tokens `12183194`, peak memory `221.9755 GB`
 - Post-run automation: validation summary watcher and measured diff-pack chain are both armed for `v20_mlx_v6_mainline_mb1_nobc`
 - Interruption note: run itself had entered stable train, but OOM-triggered restart happened before validation / postprocess could complete; current ledger therefore records the last observed train snapshot only
 - Relaunch note (2026-04-20): `v20_mlx_v4_mainline_mb1_nobc` eval を継続させたまま、`v20_mlx_v6_mainline_mb1_nobc` を `v20_mlx_repro_v1/outputs/v6/auxiliary` 配下で fresh full-train として再起動した。起動直後のため latest step はまだ旧 interrupted snapshot を示すが、grouped run root では `adapter_config.json` が再生成され、new train process が常駐している
+
+## Measured results
+
+### Validation summary
+
+- total: `829 / 950 = 0.8726`
+- bit_manipulation: `150 / 169 = 0.8876`
+- numeral: `138 / 149 = 0.9262`
+- unit_conversion: `171 / 171 = 1.0000`
+- gravity: `158 / 159 = 0.9937`
+- cipher: `161 / 162 = 0.9938`
+
+Interpretation:
+
+- v6 matches v5a on total validation (`829 / 950`) while shifting the gains back toward binary.
+- Compared with v4, validation improves by `+16` rows net (`26` improved, `10` regressed).
+- Compared with v20, v6 is still `-8` rows on validation, and almost all of that remaining easy-family debt is numeral boxed-surface loss.
+
+### Proxy summary
+
+- overall: `180 / 200 = 0.9000`
+- binary: `80 / 92 = 0.8696`
+- symbol: `24 / 32 = 0.7500`
+- gravity / roman / text / unit: all `100%`
+- binary `format_ok_content_wrong_rate`: `0.1209`
+- binary `format_failure_rate`: `0.0109`
+
+Interpretation:
+
+- v6 is the strongest measured proxy run in this corrective family so far.
+- Compared with v4, proxy improves by `+1` row net: it flips `c30a782a` and `59c78e51` to correct, but regresses `069dbaab`.
+- Compared with v5a, proxy improves by `+7` rows net and recovers the binary edge that v5a had lost.
+
+### Official leaderboard summary
+
+- user-reported official submissions: `0.83-0.85`
+- measured range is below v4 mainline, which had `0.85-0.86`
+
+Interpretation:
+
+- v6 is a clear example that the current proxy set is directionally useful for binary progress but not yet calibrated well enough to choose the best public run.
+- The simplest reading is not just "slight distribution shift". More precisely, the hidden/public set appears to weight some extraction-sensitive or under-covered surface slices more heavily than the current proxy does.
+- Therefore v6 should be treated as a proxy-strong diagnostic branch, not as the new public mainline.
+
+### Measured failure shape
+
+- `results-v6/mistakes/numeral.csv` shows `11` numeral wrong rows, and all `11` are `surface_no_box` failures rather than wrong Roman strings. The last line already contains the right Roman answer surface, but boxed extraction is absent.
+- Proxy persistent binary hard rows across `v20`, `v4`, `v5a`, and `v6` are now reduced to `11`: `012fb81b`, `01e09228`, `101410e4`, `12154247`, `12fd5b6c`, `1532c0d1`, `2230fad0`, `257e7158`, `2d790c98`, `31966698`, `a6192d29`.
+- This means v6 did remove part of the previous hard-core set, but it did not eliminate the binary frontier debt.
+
+### Directional conclusion
+
+- v6 is strong enough to keep as a research branch because it exposes real binary gains that v4 and v5a do not fully capture.
+- v6 is not strong enough to replace v4 as the public mainline, because official leaderboard evidence now shows `v4 > v6` despite `v6 > v4` on proxy.
+- The next decision should therefore be: keep v4 as the public baseline, and use v6 only as a donor branch for the next mainline candidate.
 
 ## Generated artifacts
 
@@ -100,8 +155,14 @@
 - `teacher_incorrect_filtered_count = 177`。このため measured hard IDs の一部は mainline mandatory anchor に昇格させていない。
 - 特に `binary_prompt_local_exact` の hard measured IDs は teacher correctness が立っておらず、mainline では lane 維持のみに留めた。
 - `binary_structured_exact_core` でも persistent hard rows の一部は teacher incorrect のままで、v6-core だけでは hard-core 完治ではない。
+- `results-v6/mistakes/numeral.csv` の `11` miss はすべて boxed-surface failure であり、v6 でも easy-family extraction debt が残っている。
+- proxy は `180 / 200` に到達したが、official leaderboard は `0.83-0.85` に留まり、v4 より弱かった。したがって current proxy には public mainline を選ぶには無視できない blind spot がある。
+- その blind spot は単なる binary family coverage 不足だけではなく、boxed-first extraction や easy-family terminal stability の hidden weighting 差を含んでいる可能性が高い。
 
 ## Next evaluation gate
 
-- まず v6-core を学習して、`versions/v20_to_088_reassessment_2026-04-18.md` の gate 通り proxy binary `80/92` 以上を確認する。
-- その後に `v6-core + short-closure` と `v6-core + token-skill` を branch run として切る。
+- official calibration は完了し、v6 は public mainline gate を通過しなかった。
+- 次の本命は `v4` を土台にしつつ、`v6` から binary gain のみを移植する mixed mainline に置くべきである。
+- 具体的には、new branch の前に boxed-surface regression set を追加して、v6 で露呈した numeral no-box failure を先に封じる。
+- その上で `v6-core + short-closure` 相当の binary closure donor を `v4` 系へ移植する branch を最優先にする。
+- `v6-core + token-skill` は current proxy/public mismatch の原因切り分け用 second branch に下げる。
