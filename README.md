@@ -114,3 +114,16 @@ test.csv A sample test set to help you author your submissions. When your submis
 id - A unique identifier for each puzzle.
 prompt - As in train.csv.
 Note that your submission must be a file submission.zip containing a LoRA adapter. See the Evaluation page for details.
+
+---
+I ran the base model (yes, the base model) over all the 9500 problems at least once. These are the results.:
+
+Cryptarithm (Guess) (0 solved / 0 partial / 164 total)
+Cryptarithm (Deduce) (2 solved / 0 partial / 659 total)
+Equation Numeric (Guess) (5 solved / 1 partial / 136 total)
+Equation Numeric (Deduce) (171 solved / 12 partial / 596 total)
+Bit Manipulation (128 solved / 25 partial / 1602 total)
+Cipher (483 solved / 90 partial / 1576 total)
+Gravity (935 solved / 120 partial / 1597 total)
+Unit Conversion (1188 solved / 71 partial / 1594 total)
+Numeral (1511 solved / 20 partial / 1576 total)
