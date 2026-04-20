@@ -16,6 +16,7 @@
 - Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/support` 配下で actual grouped-root train/eval watcher を再配置し、predecessor `training_result.json` 待ちの launch queue と train 完了後の adapter-validation / postprocess を実体として arm した
 - Launch note (2026-04-20): `vm_stat` で free pages が約 `11.1M`、active MLX jobs が `v4 eval + v6 mainline train` の 2 本だけであることを確認したため、queue 待ちを打ち切って `v20_mlx_v6_promptlocal_short_token_binary_support_mb1_nobc` を detached full-train として前倒し起動した
 - Live-process note (2026-04-20): launch 後もしばらく `pipeline.log` は空、`adapter/latest_train_report.json` も未生成だが、python train process の `sample` では main thread が `mlx::core::eval -> eval_impl -> std::condition_variable::wait` に滞在していた。よって hard hang ではなく MLX eval / loader 待ちと判断し、free pages 約 `4642`・active python `5` 本の間は追加 launch を止めて現 run を維持する
+- Pause note (2026-04-20): その後も `latest_train_report.json` は出ず、`top` では `0% CPU`, 約 `95 GB RSS`, `state=stuck` のまま mainline 2 本を圧迫したため、この live train は一旦停止した。grouped-root queue / eval watcher は残してあり、resource 条件が戻れば再開できる
 
 ## Generated artifacts
 

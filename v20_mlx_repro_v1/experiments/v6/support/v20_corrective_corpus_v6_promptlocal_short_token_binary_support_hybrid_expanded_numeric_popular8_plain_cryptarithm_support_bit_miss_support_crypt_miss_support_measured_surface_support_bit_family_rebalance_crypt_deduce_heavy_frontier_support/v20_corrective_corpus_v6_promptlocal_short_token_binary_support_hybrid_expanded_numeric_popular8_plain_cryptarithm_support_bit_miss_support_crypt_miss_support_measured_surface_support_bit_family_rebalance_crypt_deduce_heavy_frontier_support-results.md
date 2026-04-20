@@ -14,6 +14,7 @@
 - Eval automation note (2026-04-20): grouped support root 向けに `training_result.json` 出現後の adapter-validation watcher と `postprocess-run --postprocess-eval-kind adapter-validation` watcher を追加し、train 完了後に README 契約の validation を自動起動する
 - Launch note (2026-04-20): `vm_stat` で free pages が約 `11.1M`、active MLX jobs がまだ 4 本未満に収まっていたため、queue 待ちを打ち切って `v20_mlx_v6_promptlocal_short_token_binary_support_hybrid_expanded_numeric_popular8_plain_cryptarithm_support_bit_miss_support_crypt_miss_support_measured_surface_support_bit_family_rebalance_crypt_deduce_heavy_frontier_support_mb1_nobc` を detached full-train として前倒し起動した
 - Live-process note (2026-04-20): この fresh launch も `pipeline.log` がまだ空で `adapter/latest_train_report.json` 未生成のままだが、python train process の `sample` では main thread が `mlx::core::eval -> eval_impl -> std::condition_variable::wait` に入っていた。初回 OOM 後の再ハングではなく MLX eval / loader phase の継続とみなし、free pages 約 `4642`・active python `5` 本の間は kill / relaunch を行わず queue 進行だけを待つ
+- Pause note (2026-04-20): その後も `latest_train_report.json` は出ず、`top` では `0% CPU`, 約 `59 GB RSS`, `state=stuck` のまま step 0 停滞が続いたため、この live train は一旦停止した。`queue-frontier-support-after-v6-mainline.log` の delayed relaunch と grouped-root eval watcher は残してあり、mainline が終わった後に再開できる
 
 ## README-grounded motivation
 

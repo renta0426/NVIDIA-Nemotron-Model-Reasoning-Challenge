@@ -49,6 +49,7 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - completion watcher note: `adapter_validation/validation_summary.json` 出現後に `postprocess-run --postprocess-eval-kind adapter-validation` を自動実行する watcher を 2026-04-20 に re-arm した
 - live-process note (2026-04-20): `sample` では main thread が `mlx::core::async_eval -> eval_impl -> std::condition_variable::wait` の下で Metal command buffer completion を待っており、evaluation process は停止ではなく MLX GPU 側の長時間 row を継続中と判断した
 - stagnation note (2026-04-20): `validation_records_checkpoint.csv` の mtime は `2026-04-20T18:50:38+09:00` で `590 / 950`, `506 correct` のまま止まっている一方、再度の `sample` でも同じ `async_eval -> eval_impl -> std::condition_variable::wait` が続いていた。現時点では true hang と断定せず、checkpoint が増えるか `validation_summary.json` が出るまで restart せずに維持する
+- Resource cleanup note (2026-04-20): `step 0` から進まない manual launch 3 本が `top` 上で `stuck` かつ大きい RSS を抱え、`PhysMem unused` をほぼ食い切っていたため、それらは停止して v4 eval へ資源を戻した。checkpoint 自体はまだ `590 / 950` のままだが、少なくともこれで low-priority train による追加圧迫は止めた
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
   - tracked heavy artifacts for the aborted v3 lane were pruned, and only the active v4 MLX lane remains

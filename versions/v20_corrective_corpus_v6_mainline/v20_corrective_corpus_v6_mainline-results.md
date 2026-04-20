@@ -19,6 +19,7 @@
 - Artifact hygiene note (2026-04-20): 現在の active roots (`v20_mlx_v4_mainline_mb1_nobc`, `v20_mlx_v6_mainline_mb1_nobc`) には触れず、inactive な targetfix / aborted frontier roots に残っていた stale `shadow_model` と `training_bundle_tokens` を prune して、次の full-run 用に local workspace を整理した
 - Resource gate note (2026-04-20): `README.md` 契約の full-run 群を維持したまま live 本数を `v4 eval + 4 train = 5 python` に増やした結果、`vm_stat` の free pages は約 `4642` まで低下した。`manual_launch_watch.log` でも v6 mainline はまだ `step 6` のままなので、これ以上の即時 launch は止め、既存 root が `latest_train_report.json` を更新するか `training_result.json` を出すまで queue 自動進行を優先する
 - staleness note (2026-04-20): fresh run の `adapter/latest_train_report.json` mtime は `2026-04-20T17:53:03+09:00` から動いていないが、再度の `sample` でも main thread は `mlx::core::eval -> eval_impl -> std::condition_variable::wait` に残っていた。したがって report 側だけが静止している long Metal wait とみなし、OOM を避けるため train を維持したまま watcher 監視を続ける
+- Cleanup note (2026-04-20): `top` では manual launch した 3 本が `0% CPU`, `59-95 GB RSS`, `state=stuck` のまま step 0 停滞を続け、physmem unused も `1.5 GB` 前後まで落ちていたため、priority を `v4 eval + v6 mainline` に戻す目的で `numeric_fallback_unique` / `binary_support_base` / `frontier_support_expanded` の live train を停止した。対応する queue / eval watcher は残しており、resource が戻った後に再開できる
 
 ## Measured results
 
