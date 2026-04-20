@@ -14,6 +14,7 @@
 - Execution note: `v20_mlx_v6_promptlocal_short_token_numeric_guess_popular8_capped_fallback_unique_tail_boost_mb1_nobc` の `training_result.json` 出現後にこの full pipeline が自動起動する detached queue を設定
 - Post-run automation: `v6-promptlocal-short-token-binary-support-train-watch` / `v6-promptlocal-short-token-binary-support-eval-watch` に加えて、validation summary 出現後の measured diff-pack chain も armed
 - Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/support` 配下で actual grouped-root train/eval watcher を再配置し、predecessor `training_result.json` 待ちの launch queue と train 完了後の adapter-validation / postprocess を実体として arm した
+- Launch note (2026-04-20): `vm_stat` で free pages が約 `11.1M`、active MLX jobs が `v4 eval + v6 mainline train` の 2 本だけであることを確認したため、queue 待ちを打ち切って `v20_mlx_v6_promptlocal_short_token_binary_support_mb1_nobc` を detached full-train として前倒し起動した
 
 ## Generated artifacts
 
