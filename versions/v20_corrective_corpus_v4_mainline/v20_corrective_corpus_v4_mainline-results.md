@@ -47,6 +47,7 @@ This means v4 is **not** a solved mainline. It is a better public run than v20, 
 - note: measured adapter-validation score is still pending; the completed-train snapshot above is **not** a validation result
 - interruption note: この 950 validation は OOM 後の再起動でまだ未完了だったが、2026-04-20 に `adapter_validation/eval_cmd.sh` を同一 README 契約のまま再実行し、既存 `validation_records_checkpoint.csv` から `575 -> 576` へ継続できることを確認した。ここまでの partial は frontier-support / oct-heavy の前倒し判断に使った latest measured checkpoint として継続記録する
 - completion watcher note: `adapter_validation/validation_summary.json` 出現後に `postprocess-run --postprocess-eval-kind adapter-validation` を自動実行する watcher を 2026-04-20 に re-arm した
+- live-process note (2026-04-20): `sample` では main thread が `mlx::core::async_eval -> eval_impl -> std::condition_variable::wait` の下で Metal command buffer completion を待っており、evaluation process は停止ではなく MLX GPU 側の長時間 row を継続中と判断した
 - operational note:
   - the short-lived MLX contrast lane `v20_mlx_v3_mainline_mb1_nobc` was stopped before its first logged train step after RAM climbed to about `483.79 / 512 GB`
   - tracked heavy artifacts for the aborted v3 lane were pruned, and only the active v4 MLX lane remains
