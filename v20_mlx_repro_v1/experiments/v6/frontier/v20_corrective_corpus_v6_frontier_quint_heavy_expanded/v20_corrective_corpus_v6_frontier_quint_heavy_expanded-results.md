@@ -9,6 +9,7 @@
 - Planned MLX full-run: `v20_mlx_v6_frontier_quint_heavy_expanded_mb1_nobc`
 - Bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v6_frontier_quint_heavy_expanded_bundle.jsonl`
 - Training / validation / leaderboard score: 未計測
+- Watcher note (2026-04-20): `v20_mlx_repro_v1/outputs/v6/frontier` 配下で actual grouped-root train/eval watcher を配置し、`v20_mlx_v6_frontier_tri_heavy_expanded_mb1_nobc` 完了後に `v20_mlx_v6_frontier_quint_heavy_expanded_mb1_nobc` を auto-launch、train 完了後は adapter-validation / postprocess を自動実行するようにした
 
 ## README-grounded motivation
 
