@@ -5,6 +5,8 @@
 - Created: 2026-04-20 UTC
 - Generator: `versions/v20_corrective_corpus_v7_mainline/reproduce_v20_corrective_corpus_v7_mainline.py`
 - Strategy source: `versions/v20_to_088_reassessment_2026-04-18.md`
+- Later token-stream audit: `versions/v20_corrective_corpus_v7_mainline/v20_corrective_corpus_v7_mainline-tokenstream-audit-2026-04-21.md`
+- Later bundle-to-bundle audit: `versions/v20_corrective_corpus_v7_mainline/v20_corrective_corpus_v7_mainline-bundle-to-bundle-audit-2026-04-21.md`
 - Bundle: `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v7_mainline_bundle.jsonl`
 - Kaggle train log: `versions/v20_corrective_corpus_v7_mainline/adapter-validation-notebook.log`
 - Comparison train log: `versions/v20_corrective_corpus_v4_mainline/adapter-validation-notebook (1).log`

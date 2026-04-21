@@ -27,13 +27,13 @@ OUTPUT_ROOT = VERSION_ROOT / "outputs"
 RESULTS_MD = VERSION_ROOT / "v20_corrective_corpus_v7_mainline-results.md"
 
 README_PATH = REPO_ROOT / "README.md"
-TRAIN_CSV_PATH = REPO_ROOT / "data" / "train.csv"
 TRAINING_SFT_ROOT = REPO_ROOT / "A-Open-ProgressPrizePublication" / "nemotron" / "training" / "sft"
 BASE_SNAPSHOT_ROOT = TRAINING_SFT_ROOT / "04-08-16-14"
 BASE_SNAPSHOT_CONFIG_PATH = BASE_SNAPSHOT_ROOT / "config.json"
 BASE_SNAPSHOT_INDEX_PATH = BASE_SNAPSHOT_ROOT / "logprobs" / "index.jsonl"
 DEFAULT_BUNDLE_PATH = TRAINING_SFT_ROOT / "v20_corrective_corpus_v7_mainline_bundle.jsonl"
 MODEL_TOKENIZER_NAME = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
+OVERLAY_TOKEN_STRATEGIES = {"reuse_base_synthetic", "retokenize_all"}
 PROMPT_SUFFIX = (
     "\nPlease put your final answer inside `\\boxed{}`. "
     "For example: `\\boxed{your answer}`"
@@ -78,7 +78,42 @@ MANUAL_BINARY_DONOR_IDS = {
     "c30a782a",
     "fa67da07",
 }
-EXCLUDED_DONOR_IDS = {"069dbaab"}
+V7_NUMERAL_SURFACE_IDS = {
+    "00d9f682",
+    "018d465c",
+    "0aa2c5bf",
+    "0b2877ce",
+    "0ea93e44",
+    "105255db",
+    "1112ec96",
+    "1542039b",
+    "18840879",
+    "188fe6d4",
+    "18997574",
+}
+V7_EXPLICIT_SYNTHETIC_ROWS: dict[str, dict[str, Any]] = {
+    "1542039b": {
+        "id": "1542039b",
+        "category": "numeral",
+        "bucket": "surface_numeral_boxed_donor",
+        "prompt": "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n73 -> LXXIII\n17 -> XVII\n27 -> XXVII\n19 -> XIX\n100 -> C\nNow, write the number 54 in the Wonderland numeral system.",
+        "answer": "LIV",
+        "completion_text": "<think>\nWrite only the final Roman numeral in the box.\nDo not add extra text after the boxed answer.\n</think>\n\\boxed{LIV}<|im_end|>",
+        "assistant_style": "surface_boxed_tail",
+        "supervision_role": "lane4_surface_stabilizer",
+        "selection_tier": "v7_numeral_surface_synth",
+        "template_subtype": "roman_standard",
+        "teacher_solver_candidate": "roman_surface_boxed_only",
+        "source_tags": ["surface_numeral_boxed_donor", "v7_numeral_surface_synth"],
+        "source_mix": "v7_numeral_surface_synth",
+        "proxy_failed": False,
+        "validation_failed": True,
+        "hard_score": 0.0,
+        "audit_reasons": "",
+        "analysis_notes": "v6_numeral_no_box_backfill",
+        "symbol_query_operator": "",
+    },
+}
 
 
 def utc_now() -> str:
@@ -179,10 +214,6 @@ def verify_readme_eval_contract() -> dict[str, Any]:
     return contract
 
 
-def load_train_prompts() -> dict[str, dict[str, str]]:
-    return {row["id"]: row for row in load_csv_rows(TRAIN_CSV_PATH)}
-
-
 @lru_cache(maxsize=1)
 def get_chat_tokenizer() -> Any:
     tokenizer = AutoTokenizer.from_pretrained(MODEL_TOKENIZER_NAME, trust_remote_code=True)
@@ -268,6 +299,13 @@ def load_numeral_no_box_ids() -> set[str]:
     return ids
 
 
+def require_non_empty_string(raw: dict[str, Any], key: str, row_id: str) -> str:
+    value = str(raw.get(key, "")).strip()
+    if not value:
+        raise SystemExit(f"Missing {key} for overlay row {row_id}")
+    return value
+
+
 def default_assistant_style(bucket: str) -> str:
     if bucket.startswith("surface_") or bucket == "easy_gravity_fragile":
         return "legacy_v4_surface_trace"
@@ -278,6 +316,24 @@ def default_supervision_role(bucket: str) -> str:
     if bucket.startswith("surface_") or bucket == "easy_gravity_fragile":
         return "lane4_surface_stabilizer"
     return "lane1_v4_public_base"
+
+
+def resolve_assistant_style(raw: dict[str, Any], source_mix: str, raw_bucket: str, row_id: str) -> str:
+    explicit = str(raw.get("assistant_style", "")).strip()
+    if explicit:
+        return explicit
+    if source_mix == "v4_public_base":
+        return default_assistant_style(raw_bucket)
+    raise SystemExit(f"Missing assistant_style for overlay row {row_id}")
+
+
+def resolve_supervision_role(raw: dict[str, Any], source_mix: str, raw_bucket: str, row_id: str) -> str:
+    explicit = str(raw.get("supervision_role", "")).strip()
+    if explicit:
+        return explicit
+    if source_mix == "v4_public_base":
+        return default_supervision_role(raw_bucket)
+    raise SystemExit(f"Missing supervision_role for overlay row {row_id}")
 
 
 def normalize_bucket(bucket: str, source_mix: str) -> str:
@@ -295,19 +351,25 @@ def normalize_bucket(bucket: str, source_mix: str) -> str:
 
 
 def normalize_overlay_row(raw: dict[str, Any], source_mix: str) -> dict[str, Any]:
-    bucket = normalize_bucket(str(raw["bucket"]), source_mix)
+    row_id = require_non_empty_string(raw, "id", "<unknown>")
+    raw_bucket = require_non_empty_string(raw, "bucket", row_id)
+    category = require_non_empty_string(raw, "category", row_id)
+    prompt = require_non_empty_string(raw, "prompt", row_id)
+    answer = require_non_empty_string(raw, "answer", row_id)
+    completion_text = require_non_empty_string(raw, "completion_text", row_id)
+    assistant_style = resolve_assistant_style(raw, source_mix, raw_bucket, row_id)
+    supervision_role = resolve_supervision_role(raw, source_mix, raw_bucket, row_id)
+    bucket = normalize_bucket(raw_bucket, source_mix)
     source_tags = normalize_tags(raw.get("source_tags", []))
     source_tags.append(source_mix)
     source_tags = sorted(set(source_tags))
-    assistant_style = str(raw.get("assistant_style") or default_assistant_style(str(raw["bucket"])))
-    supervision_role = str(raw.get("supervision_role") or default_supervision_role(str(raw["bucket"])))
     return {
-        "id": str(raw["id"]),
-        "category": str(raw["category"]),
+        "id": row_id,
+        "category": category,
         "bucket": bucket,
-        "prompt": str(raw["prompt"]),
-        "answer": str(raw["answer"]),
-        "completion_text": str(raw["completion_text"]),
+        "prompt": prompt,
+        "answer": answer,
+        "completion_text": completion_text,
         "assistant_style": assistant_style,
         "supervision_role": supervision_role,
         "selection_tier": str(raw.get("selection_tier", "")),
@@ -324,43 +386,22 @@ def normalize_overlay_row(raw: dict[str, Any], source_mix: str) -> dict[str, Any
     }
 
 
-def build_synthetic_numeral_surface_row(row_id: str, train_prompts: dict[str, dict[str, str]]) -> dict[str, Any]:
-    prompt_row = train_prompts[row_id]
-    answer = str(prompt_row["answer"])
-    return {
-        "id": row_id,
-        "category": "numeral",
-        "bucket": "surface_numeral_boxed_donor",
-        "prompt": str(prompt_row["prompt"]),
-        "answer": answer,
-        "completion_text": "<think>\nWrite only the final Roman numeral in the box.\nDo not add extra text after the boxed answer.\n</think>\n\\boxed{%s}<|im_end|>" % answer,
-        "assistant_style": "surface_boxed_tail",
-        "supervision_role": "lane4_surface_stabilizer",
-        "selection_tier": "v7_numeral_surface_synth",
-        "template_subtype": "roman_standard",
-        "teacher_solver_candidate": "roman_surface_boxed_only",
-        "source_tags": ["surface_numeral_boxed_donor", "v7_numeral_surface_synth"],
-        "source_mix": "v7_numeral_surface_synth",
-        "proxy_failed": False,
-        "validation_failed": True,
-        "hard_score": 0.0,
-        "audit_reasons": "",
-        "analysis_notes": "v6_numeral_no_box_backfill",
-        "symbol_query_operator": "",
-    }
-
-
 def build_overlay_mix() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     v4_rows = load_jsonl_rows(V4_REPEATED_PATH)
     v6_rows = load_jsonl_rows(V6_REPEATED_PATH)
-    train_prompts = load_train_prompts()
     v4_to_v6_binary_improved = compute_binary_proxy_improvements(RESULT_V4_PROXY_PATH, RESULT_V6_PROXY_PATH)
     v20_to_v6_binary_improved = compute_binary_proxy_improvements(RESULT_V20_PROXY_PATH, RESULT_V6_PROXY_PATH)
-    numeral_no_box_ids = load_numeral_no_box_ids()
+    measured_numeral_no_box_ids = load_numeral_no_box_ids()
 
-    donor_binary_ids = sorted(
-        (v4_to_v6_binary_improved | v20_to_v6_binary_improved | MANUAL_BINARY_DONOR_IDS) - EXCLUDED_DONOR_IDS
-    )
+    donor_binary_ids = sorted(MANUAL_BINARY_DONOR_IDS)
+    requested_numeral_surface_ids = sorted(V7_NUMERAL_SURFACE_IDS)
+
+    unexpected_numeral_ids = sorted(V7_NUMERAL_SURFACE_IDS - measured_numeral_no_box_ids)
+    if unexpected_numeral_ids:
+        raise SystemExit(
+            "Pinned v7 numeral surface IDs are not present in the measured v6 no-box set: "
+            f"{unexpected_numeral_ids}"
+        )
 
     selected_rows: list[dict[str, Any]] = []
     existing_signatures: set[tuple[str, str, str]] = set()
@@ -379,7 +420,9 @@ def build_overlay_mix() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         signature = (normalized["id"], normalized["bucket"], normalized["completion_text"])
         if signature in existing_signatures:
             duplicate_skips[source_mix] += 1
-            return False
+            raise SystemExit(
+                f"Duplicate overlay signature for {source_mix}: {normalized['id']} {normalized['bucket']}"
+            )
         selected_rows.append(normalized)
         existing_signatures.add(signature)
         source_mix_counts[source_mix] += 1
@@ -399,29 +442,41 @@ def build_overlay_mix() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         if append_row(raw, "v6_binary_donor"):
             donor_binary_ids_present.add(row_id)
 
+    missing_binary_donor_ids = sorted(set(donor_binary_ids) - donor_binary_ids_present)
+    if missing_binary_donor_ids:
+        raise SystemExit(f"Missing pinned v7 binary donor rows in v6 artifacts: {missing_binary_donor_ids}")
+
     numeral_surface_ids_present: set[str] = set()
     for raw in v6_rows:
         row_id = str(raw["id"])
-        if row_id not in numeral_no_box_ids:
+        if row_id not in V7_NUMERAL_SURFACE_IDS:
             continue
         if str(raw["bucket"]) != "surface_numeral_boxed":
             continue
         if append_row(raw, "v6_numeral_surface_donor"):
             numeral_surface_ids_present.add(row_id)
 
-    missing_numeral_surface_ids = sorted(numeral_no_box_ids - numeral_surface_ids_present)
-    for row_id in missing_numeral_surface_ids:
-        if row_id not in train_prompts:
-            continue
-        synthetic_row = build_synthetic_numeral_surface_row(row_id, train_prompts)
-        signature = (synthetic_row["id"], synthetic_row["bucket"], synthetic_row["completion_text"])
-        if signature in existing_signatures:
-            duplicate_skips["v7_numeral_surface_synth"] += 1
-            continue
-        selected_rows.append(synthetic_row)
-        existing_signatures.add(signature)
-        source_mix_counts["v7_numeral_surface_synth"] += 1
-        numeral_surface_ids_present.add(row_id)
+    missing_v6_numeral_surface_ids = sorted(V7_NUMERAL_SURFACE_IDS - numeral_surface_ids_present)
+    explicit_synthetic_numeral_ids: list[str] = []
+    for row_id in missing_v6_numeral_surface_ids:
+        synthetic_row = V7_EXPLICIT_SYNTHETIC_ROWS.get(row_id)
+        if synthetic_row is None:
+            raise SystemExit(
+                "Missing pinned v7 numeral donor row without an explicitly pinned synthetic replacement: "
+                f"{row_id}"
+            )
+        if append_row(synthetic_row, "v7_numeral_surface_synth"):
+            numeral_surface_ids_present.add(row_id)
+            explicit_synthetic_numeral_ids.append(row_id)
+
+    remaining_missing_numeral_surface_ids = sorted(V7_NUMERAL_SURFACE_IDS - numeral_surface_ids_present)
+    if remaining_missing_numeral_surface_ids:
+        raise SystemExit(
+            f"Failed to realize the pinned v7 numeral surface set: {remaining_missing_numeral_surface_ids}"
+        )
+
+    if set(V7_EXPLICIT_SYNTHETIC_ROWS) - V7_NUMERAL_SURFACE_IDS:
+        raise SystemExit("Synthetic v7 numeral rows must be a subset of the pinned numeral surface IDs")
 
     overlay_instance_by_id: defaultdict[str, int] = defaultdict(int)
     for row in selected_rows:
@@ -435,12 +490,13 @@ def build_overlay_mix() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         "v4_to_v6_binary_proxy_improved_ids": sorted(v4_to_v6_binary_improved),
         "v20_to_v6_binary_proxy_improved_ids": sorted(v20_to_v6_binary_improved),
         "manual_binary_donor_ids": sorted(MANUAL_BINARY_DONOR_IDS),
-        "excluded_donor_ids": sorted(EXCLUDED_DONOR_IDS),
         "selected_binary_donor_ids": sorted(donor_binary_ids_present),
         "requested_binary_donor_ids": donor_binary_ids,
         "selected_numeral_surface_ids": sorted(numeral_surface_ids_present),
-        "requested_numeral_surface_ids": sorted(numeral_no_box_ids),
-        "missing_numeral_surface_ids": missing_numeral_surface_ids,
+        "requested_numeral_surface_ids": requested_numeral_surface_ids,
+        "measured_v6_numeral_no_box_ids": sorted(measured_numeral_no_box_ids),
+        "missing_v6_numeral_surface_ids": missing_v6_numeral_surface_ids,
+        "explicit_synthetic_numeral_ids": explicit_synthetic_numeral_ids,
         "source_mix_counts": dict(sorted(source_mix_counts.items())),
         "duplicate_skips": dict(sorted(duplicate_skips.items())),
     }
@@ -505,9 +561,11 @@ def build_markdown_report(summary: dict[str, Any]) -> str:
         "## Strategy",
         "",
         "- Keep the v4 public-safe overlay as the base.",
-        "- Borrow only the measured binary donor rows from v6.",
-        "- Add extra numeral boxed-surface reinforcement for the v6 no-box failures.",
+        "- Borrow only the pinned binary donor rows from v6.",
+        "- Add only the pinned numeral boxed-surface reinforcement set.",
+        "- The only allowed synthetic backfill is the explicitly pinned row 1542039b.",
         "- Avoid broad new symbol or cryptarithm expansion.",
+        "- Fail fast if source artifacts drift from the pinned v7 definition.",
         "",
         "## Overlay mix",
         "",
@@ -526,6 +584,10 @@ def build_markdown_report(summary: dict[str, Any]) -> str:
         "",
         "## Footprint",
         "",
+        f"- overlay token strategy: {summary['training_bundle'].get('overlay_token_strategy', 'unknown')}",
+        f"- overlay reuse scope: {summary['training_bundle'].get('overlay_reuse_scope', 'unknown')}",
+        f"- reused base synthetic examples: {summary['training_bundle'].get('reused_base_synthetic_example_count', 0)}",
+        f"- retokenized overlay examples: {summary['training_bundle'].get('retokenized_overlay_example_count', 0)}",
         f"- unique rows: {summary['selected_unique_rows']}",
         f"- repeated rows: {summary['selected_repeated_rows']}",
         f"- total tokens: {summary['training_bundle']['total_tokens']}",
@@ -535,7 +597,16 @@ def build_markdown_report(summary: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+def build_training_bundle(
+    repeated_rows: list[dict[str, Any]],
+    bundle_path: Path,
+    overlay_token_strategy: str,
+) -> dict[str, Any]:
+    if overlay_token_strategy not in OVERLAY_TOKEN_STRATEGIES:
+        raise SystemExit(
+            f"Unsupported overlay token strategy: {overlay_token_strategy}. "
+            f"Expected one of {sorted(OVERLAY_TOKEN_STRATEGIES)}"
+        )
     base_rows, base_examples, batch_size = load_base_snapshot_examples()
     filtered_base_rows = [
         row for row in base_rows if str(row["problem_id"]).split("-p")[0] not in BASE_EXCLUDED_IDS
@@ -554,7 +625,13 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
     overlay_tokens_by_bucket: Counter[str] = Counter()
     overlay_examples_by_style: Counter[str] = Counter()
     source_mix_counts: Counter[str] = Counter()
+    reused_base_synthetic_ids: set[str] = set()
+    reused_base_synthetic_by_source_mix: Counter[str] = Counter()
+    reused_base_synthetic_example_count = 0
     retokenized_overlay_ids: set[str] = set()
+    retokenized_overlay_by_source_mix: Counter[str] = Counter()
+    retokenized_overlay_example_count = 0
+    synthetic_cache: dict[tuple[str, str], tuple[list[int], list[int], int]] = {}
 
     manifest = {
         "record_type": "manifest",
@@ -565,10 +642,17 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
         "base_snapshot_config": read_json(BASE_SNAPSHOT_CONFIG_PATH),
         "bundle_path": relative_to_repo(bundle_path),
         "base_excluded_problem_ids": sorted(BASE_EXCLUDED_IDS),
+        "pinned_binary_donor_ids": sorted(MANUAL_BINARY_DONOR_IDS),
+        "pinned_numeral_surface_ids": sorted(V7_NUMERAL_SURFACE_IDS),
+        "explicit_synthetic_numeral_ids": sorted(V7_EXPLICIT_SYNTHETIC_ROWS),
+        "overlay_token_strategy": overlay_token_strategy,
+        "overlay_reuse_scope": (
+            "v4_public_base_only" if overlay_token_strategy == "reuse_base_synthetic" else "none"
+        ),
         "note": (
             "Single-file training bundle for Kaggle upload. "
-            "Starts from the v4 public-safe overlay, adds a narrow v6 binary donor pack, "
-            "and reinforces the numeral boxed-surface failures seen in v6."
+            "Starts from the v4 public-safe overlay, adds a pinned v6 binary donor pack, "
+            "and realizes the pinned v7 numeral boxed-surface set without dynamic donor discovery."
         ),
     }
 
@@ -604,17 +688,44 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
 
         for overlay_offset, row in enumerate(repeated_rows):
             problem_id = str(row["id"])
-            tokens, mask = tokenize_overlay_example(prompt=row["prompt"], completion_text=row["completion_text"])
-            category = row["category"]
-            num_loss_tokens = sum(mask)
-            retokenized_overlay_ids.add(problem_id)
+            segment = "synthetic.jsonl"
+            key = (problem_id, segment)
+            source_mix = str(row["source_mix"])
+            should_reuse_base_synthetic = (
+                overlay_token_strategy == "reuse_base_synthetic"
+                and source_mix == "v4_public_base"
+                and key in base_examples
+            )
+            if should_reuse_base_synthetic:
+                entry = base_examples[key]
+                base_row = entry["row"]
+                tokens = entry["tokens"]
+                mask = entry["mask"]
+                category = str(base_row["category"])
+                num_loss_tokens = int(base_row["num_loss_tokens"])
+                reused_base_synthetic_ids.add(problem_id)
+                reused_base_synthetic_by_source_mix[source_mix] += 1
+                reused_base_synthetic_example_count += 1
+            else:
+                cache_key = (problem_id, str(row["completion_text"]))
+                if cache_key not in synthetic_cache:
+                    tokens, mask = tokenize_overlay_example(
+                        prompt=str(row["prompt"]),
+                        completion_text=str(row["completion_text"]),
+                    )
+                    synthetic_cache[cache_key] = (tokens, mask, sum(mask))
+                tokens, mask, num_loss_tokens = synthetic_cache[cache_key]
+                category = str(row["category"])
+                retokenized_overlay_ids.add(problem_id)
+                retokenized_overlay_by_source_mix[source_mix] += 1
+                retokenized_overlay_example_count += 1
             overlay_step = base_step_count + (overlay_offset // batch_size)
             payload = {
                 "record_type": "example",
                 "example_id": f"{problem_id}#overlay-{row['overlay_instance']}",
                 "source_problem_id": problem_id,
                 "source": "corrective_overlay",
-                "segment": "synthetic.jsonl",
+                "segment": segment,
                 "category": category,
                 "step": overlay_step,
                 "num_loss_tokens": num_loss_tokens,
@@ -626,7 +737,7 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
                 "proxy_failed": bool(row["proxy_failed"]),
                 "validation_failed": bool(row["validation_failed"]),
                 "source_tags": row["source_tags"],
-                "source_mix": row["source_mix"],
+                "source_mix": source_mix,
                 "tokens": tokens,
                 "mask": mask,
             }
@@ -640,7 +751,7 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
             overlay_by_bucket[row["bucket"]] += 1
             overlay_tokens_by_bucket[row["bucket"]] += len(tokens)
             overlay_examples_by_style[row["assistant_style"]] += 1
-            source_mix_counts[row["source_mix"]] += 1
+            source_mix_counts[source_mix] += 1
 
     total_steps = base_step_count + ((len(repeated_rows) + batch_size - 1) // batch_size)
     return {
@@ -653,6 +764,10 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
         "total_examples": total_examples,
         "batch_size": batch_size,
         "total_steps": total_steps,
+        "overlay_token_strategy": overlay_token_strategy,
+        "overlay_reuse_scope": (
+            "v4_public_base_only" if overlay_token_strategy == "reuse_base_synthetic" else "none"
+        ),
         "total_tokens": total_tokens,
         "total_masked_tokens": total_masked_tokens,
         "total_unmasked_tokens": total_unmasked_tokens,
@@ -662,9 +777,14 @@ def build_training_bundle(repeated_rows: list[dict[str, Any]], bundle_path: Path
         "overlay_examples_by_style": dict(sorted(overlay_examples_by_style.items())),
         "source_mix_counts": dict(sorted(source_mix_counts.items())),
         "category_counts": dict(sorted(category_counts.items())),
+        "reused_base_synthetic_problem_ids": sorted(reused_base_synthetic_ids),
+        "reused_base_synthetic_problem_count": len(reused_base_synthetic_ids),
+        "reused_base_synthetic_by_source_mix": dict(sorted(reused_base_synthetic_by_source_mix.items())),
+        "reused_base_synthetic_example_count": reused_base_synthetic_example_count,
         "retokenized_overlay_problem_ids": sorted(retokenized_overlay_ids),
         "retokenized_overlay_problem_count": len(retokenized_overlay_ids),
-        "retokenized_overlay_example_count": len(repeated_rows),
+        "retokenized_overlay_by_source_mix": dict(sorted(retokenized_overlay_by_source_mix.items())),
+        "retokenized_overlay_example_count": retokenized_overlay_example_count,
     }
 
 
@@ -748,6 +868,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-name", default="v7_mainline_default")
     parser.add_argument("--write-training-bundle", action="store_true")
     parser.add_argument("--bundle-path", default=str(DEFAULT_BUNDLE_PATH))
+    parser.add_argument(
+        "--overlay-token-strategy",
+        choices=sorted(OVERLAY_TOKEN_STRATEGIES),
+        default="reuse_base_synthetic",
+        help=(
+            "How to construct overlay token streams. Historical broken v7 behavior was effectively "
+            "retokenize_all; corrected reproduction should use reuse_base_synthetic, which only "
+            "reuses base-backed token streams for v4_public_base rows and retokenizes donor/synth rows "
+            "from their own text."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -759,9 +890,14 @@ def main() -> None:
     training_bundle = {
         "path": relative_to_repo(Path(args.bundle_path)),
         "status": "skipped",
+        "overlay_token_strategy": args.overlay_token_strategy,
     }
     if args.write_training_bundle:
-        training_bundle = build_training_bundle(repeated_rows, Path(args.bundle_path))
+        training_bundle = build_training_bundle(
+            repeated_rows,
+            Path(args.bundle_path),
+            args.overlay_token_strategy,
+        )
     summary = build_summary(args.run_name, repeated_rows, unique_rows, diagnostics, training_bundle)
     write_report_files(run_root, repeated_rows, unique_rows, summary)
     print(json.dumps({

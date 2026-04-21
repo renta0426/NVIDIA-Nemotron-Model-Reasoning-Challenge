@@ -72,6 +72,7 @@ RESULT_V2_PROXY_PATH = (
     / "leaderboard_proxy_eval_row_level.csv"
 )
 RESULT_V3_PROXY_PATH = RESULT_ROOT / "leaderboard_proxy_eval-v3" / "artifacts" / "leaderboard_proxy_eval_row_level.csv"
+PROXY_ROW_LEVEL_PATH = RESULT_BASE_PROXY_PATH
 VALIDATION_REFERENCE_PATHS = {
     "base_v20": RESULT_BASE_VALIDATION_PATH,
     "binary_reference_v1": RESULT_BINARY_REFERENCE_VALIDATION_PATH,
@@ -276,6 +277,12 @@ def parse_int(value: Any, default: int = 0) -> int:
 
 def read_csv_map(path: Path, key: str = "id") -> dict[str, dict[str, str]]:
     return {row[key]: row for row in load_csv_rows(path)}
+
+
+def read_csv_map_if_exists(path: Path, key: str = "id") -> dict[str, dict[str, str]]:
+    if not path.exists():
+        return {}
+    return read_csv_map(path, key=key)
 
 
 def load_base_snapshot_index_map() -> dict[str, dict[str, Any]]:
@@ -494,7 +501,7 @@ def load_measured_signals() -> dict[str, Any]:
         elif old_correct and (not new_correct):
             v3_proxy_regressed.add(row_id)
 
-    v1_selected = read_csv_map(V1_SELECTION_PATH)
+    v1_selected = read_csv_map_if_exists(V1_SELECTION_PATH)
     outcome_score: dict[str, int] = defaultdict(int)
     for row_id in proxy_improved:
         outcome_score[row_id] += 3
@@ -865,7 +872,7 @@ def build_budgeted_candidates(bucket_limits: dict[str, int]) -> tuple[list[Candi
             source_tags.add("proxy_regressed")
         if row_id in measured["validation_regressed"]:
             source_tags.add("validation_regressed")
-        priority_key = (
+        priority_key: tuple[Any, ...] = (
             -(1 if row_id in MEASURED_MANDATORY_IDS.get(bucket, set()) else 0),
             -(1 if row_id in measured["proxy_improved"] else 0),
             -(1 if row_id in measured["validation_improved"] else 0),
@@ -926,7 +933,7 @@ def build_budgeted_candidates(bucket_limits: dict[str, int]) -> tuple[list[Candi
             source_tags = {bucket, "base_snapshot_guardrail"}
             if row_id in MEASURED_MANDATORY_IDS.get(bucket, set()):
                 source_tags.add("measured_regression")
-            priority_key = (
+            guardrail_priority_key = (
                 -(1 if row_id in MEASURED_MANDATORY_IDS.get(bucket, set()) else 0),
                 min_logprob,
                 -num_loss_tokens,
@@ -941,7 +948,7 @@ def build_budgeted_candidates(bucket_limits: dict[str, int]) -> tuple[list[Candi
                 source_tags=source_tags,
                 proxy_failed=False,
                 validation_failed=False,
-                priority_key=priority_key,
+                priority_key=guardrail_priority_key,
             )
             if candidate is not None:
                 candidates.append(candidate)
@@ -954,7 +961,7 @@ def build_budgeted_candidates(bucket_limits: dict[str, int]) -> tuple[list[Candi
         source_tags = {"surface_symbol_prefix", "proxy_symbol_prefix"}
         if row_id in MEASURED_MANDATORY_IDS["surface_symbol_prefix"]:
             source_tags.add("measured_regression")
-        priority_key = (
+        symbol_prefix_priority_key = (
             -(1 if row_id in MEASURED_MANDATORY_IDS["surface_symbol_prefix"] else 0),
             rank,
             row_id,
@@ -967,7 +974,7 @@ def build_budgeted_candidates(bucket_limits: dict[str, int]) -> tuple[list[Candi
             source_tags=source_tags,
             proxy_failed=proxy_row.get("is_correct") == "False",
             validation_failed=False,
-            priority_key=priority_key,
+            priority_key=symbol_prefix_priority_key,
         )
         if candidate is not None:
             candidate.row["template_subtype"] = str(proxy_row.get("template_subtype", "")).strip()
@@ -1128,7 +1135,7 @@ def load_ranked_candidates(validation_csv: Path | None) -> tuple[list[Candidate]
 
 def select_candidates(candidates: list[Candidate], bucket_limits: dict[str, int]) -> list[Candidate]:
     selected: list[Candidate] = []
-    counts = Counter()
+    counts: Counter[str] = Counter()
     for candidate in candidates:
         if counts[candidate.bucket] >= bucket_limits[candidate.bucket]:
             continue
