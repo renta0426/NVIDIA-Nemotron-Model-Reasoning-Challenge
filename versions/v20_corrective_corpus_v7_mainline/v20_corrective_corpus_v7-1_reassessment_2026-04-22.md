@@ -3,15 +3,18 @@
 ## Status
 
 - Created: 2026-04-22 UTC
+- Naming note: historical `v8` references in this workspace correspond to the corrected `v7` rerun, now normalized as `v7-1`
 - Evidence sources:
-  - `A-Open-ProgressPrizePublication/result/results-8/results.csv`
-  - `A-Open-ProgressPrizePublication/result/results-8/validation.csv`
+  - `A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v7_mainline_tokenreuse_bundle.jsonl`
+  - `A-Open-ProgressPrizePublication/result/results-v7-1/results.csv`
+  - `A-Open-ProgressPrizePublication/result/results-v7-1/validation.csv`
   - `A-Open-ProgressPrizePublication/result/leaderboard_proxy_eval-v7-1/reports/leaderboard_proxy_eval_summary.md`
   - `A-Open-ProgressPrizePublication/result/leaderboard_proxy_eval-v7-1/artifacts/leaderboard_proxy_eval_row_level.csv`
   - `A-Open-ProgressPrizePublication/README.md`
   - `versions/v20_corrective_corpus_v4_mainline/v20_corrective_corpus_v4_mainline-results.md`
   - `versions/v20_corrective_corpus_v6_mainline/v20_corrective_corpus_v6_mainline-results.md`
   - `versions/v20_corrective_corpus_v7_mainline/v20_corrective_corpus_v7_mainline-results.md`
+  - `versions/v20_corrective_corpus_v7_mainline/v20_corrective_corpus_v7-1_bundle_and_raw_output_audit_2026-04-22.md`
 - Measured score summary:
   - validation: `839 / 950 = 0.8832`
   - leaderboard proxy: `178 / 200 = 0.8900`
@@ -24,6 +27,8 @@
 ローカルでは `validation 839 / 950` と見栄えが良い一方で、README が主戦場と定義している `bit_manipulation` の frontier を押し上げておらず、公式スコアは `0.84` へ悪化しました。挙動としては `v2` の再発に近く、**easy-family / boxed-surface の局所回復で validation を稼ぎ、binary content を前進させないまま public で負けた run** と読むのが妥当です。
 
 したがって、`v7-1` を次の本命 branch の土台にしてはいけません。次に進む前に、**public blind spot を埋める追加の重大な検証**が残っています。
+
+学習データ差分と raw output の挙動自体は、`versions/v20_corrective_corpus_v7_mainline/v20_corrective_corpus_v7-1_bundle_and_raw_output_audit_2026-04-22.md` に分離して記録します。結論だけ先に言うと、`v7-1` の主要差分は text corpus の入れ替えではなく、`v4_public_base` の token-safe 継承を `298` 問ぶん回復したことです。
 
 ## README-grounded interpretation
 
@@ -45,11 +50,11 @@
 
 ## Scorecard
 
-| version | validation | proxy | proxy binary | public leaderboard | read |
-| --- | ---: | ---: | ---: | ---: | --- |
-| `v4_mainline` | `813/950 = 0.8558` | `179/200 = 0.8950` | `79/92 = 0.8587` | `0.85-0.86` | best public mainline in this family |
-| `v6_mainline` | `829/950 = 0.8726` | `180/200 = 0.9000` | `80/92 = 0.8696` | `0.83-0.85` | proxy-strong, public blind spot exposed |
-| `v7-1` | `839/950 = 0.8832` | `178/200 = 0.8900` | `78/92 = 0.8478` | `0.84` | local recovery, public regression |
+| version       |         validation |              proxy |     proxy binary | public leaderboard | read                                    |
+| ------------- | -----------------: | -----------------: | ---------------: | -----------------: | --------------------------------------- |
+| `v4_mainline` | `813/950 = 0.8558` | `179/200 = 0.8950` | `79/92 = 0.8587` |        `0.85-0.86` | best public mainline in this family     |
+| `v6_mainline` | `829/950 = 0.8726` | `180/200 = 0.9000` | `80/92 = 0.8696` |        `0.83-0.85` | proxy-strong, public blind spot exposed |
+| `v7-1`        | `839/950 = 0.8832` | `178/200 = 0.8900` | `78/92 = 0.8478` |             `0.84` | local recovery, public regression       |
 
 この比較で重要なのは次の 3 点です。
 
