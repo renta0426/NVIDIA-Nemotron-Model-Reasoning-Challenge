@@ -798,3 +798,301 @@ run budget が厳しいなら、v6 で優先順位は次の順。
 - easy-family surface stability
 
 を同時に満たした run だけを昇格対象にするべきである。
+
+## 13. v6-v7-1 を踏まえた更新判断
+
+ここまでの記述は v1-v5 を主対象としていたが、その後の `v6`, `v7`, `v7-1` まで含めると、結論はさらに強くなる。
+
+### 13.1 もう `04-08-16-14` の配分調整だけでは 0.88 に届かない
+
+`v6` は proxy ではこの系列の最良だった。
+
+- proxy: `180/200 = 0.9000`
+- proxy binary: `80/92 = 0.8696`
+
+しかし public は `0.83-0.85` に留まり、`v4` の `0.85-0.86` を明確に超えなかった。
+
+`v7` は token-safe 継承を壊した invalid run であり、これは teacher policy の失敗ではなく bundle 構築の失敗だった。
+
+`v7-1` はその修正版で、
+
+- validation: `839/950 = 0.8832`
+- proxy: `178/200 = 0.8900`
+- public: `0.84`
+
+まで戻したが、public best には届いていない。しかも `v7-1` の改善本体は text corpus の刷新ではなく、`v4_public_base` の token-safe 継承を `298` 問ぶん回復したことだった。
+
+つまり、`v1-v7-1` がまとめて示したのは次の一点に尽きる。
+
+**大元コーパス `A-Open-ProgressPrizePublication/nemotron/training/sft/04-08-16-14` の比率や overlay 配分を多少いじるだけでは、official `0.88` には到達しない。**
+
+ここで得られたのは
+
+- どの data mix が binary output を no-box / malformed へ崩すか
+- どの data mix が boxed termination を戻すか
+- どの lane が easy-family を守るか
+
+という挙動の知見であって、**新しい frontier teacher** ではない。
+
+### 13.2 symbol は「弱い」のではなく、現手法では完全に不動
+
+`v4`, `v6`, `v7-1` の symbol proxy `32` 行を比較すると、結果は完全一致だった。
+
+- correct: `24/32`
+- wrong: `8/32`
+- version 間の improved / regressed: `0`
+
+pattern は厳密に
+
+- `111`: `24` 行
+- `000`: `8` 行
+
+だけで、動く row が 1 件もない。
+
+固定 hard rows は次の `8` 件である。
+
+- `numeric_2x2`: `8158a14c`, `878c843c`, `b7b1d1a8`, `e8de8b47`
+- `glyph_len5`: `a85864a9`, `be7101dc`, `d7e5414c`, `dc240ebd`
+
+しかもこの `8` 件はすべて
+
+- `format_bucket = boxed`
+- `fallback_type = boxed_non_empty`
+
+で落ちている。つまり symbol の失点は boxed closure failure ではない。**中身が wrong な exact transduction failure** である。
+
+この点で symbol は binary と違う。binary は `54/92 -> 80/92 -> 78/92` と動くが、symbol は current corrective family では全く動かない。
+
+したがって、symbol を broad overlay の一部として混ぜ続けても EV は低い。必要なのは **symbol 専用 teacher program** であって、mainline mix の微調整ではない。
+
+## 14. official 0.88 に向けた抜本戦略
+
+### 14.1 全体方針
+
+次の本命は「ratio tuning の続き」ではない。明確に次の 3 つへ切り替えるべきである。
+
+1. `04-08-16-14` の easy-strength は preservation lane として最小限だけ残す
+2. スコアの主戦場である BIT に、programmatic exact teacher を新設する
+3. symbol は mainline の補修ではなく、独立の exact transduction track として切り出す
+
+ここで重要なのは、95%以上の family を 100% に近づけることより、`bit_manipulation` と `symbol` の未解決 core を直接動かすことを優先する点である。
+
+### 14.2 投資配分
+
+`v4/v6/v7-1` の実績と README の主張から、次の配分が妥当である。
+
+- `75%`: BIT mainline
+- `20%`: symbol 専用 track
+- `5%`: easy-family regression guardrail
+
+この配分にする理由は明確である。
+
+- BIT は proxy `92` 行を占め、public 変動の主因でもある
+- symbol は proxy `32` 行と母数は小さいが、現手法で `0` 行しか動かず、別アーキテクチャが必要
+- numeral / unit / gravity / cipher は preservation 対象であり、main investment の対象ではない
+
+### 14.3 BIT mainline の設計
+
+BIT 側では、ratio ではなく **teacher architecture** を更新する。
+
+必須 lane は次の 4 本である。
+
+#### A. exact closure lane
+
+対象:
+
+- `binary_structured_byte_formula`
+- `binary_bit_permutation_bijection`
+- `binary_bit_permutation_independent`
+- `binary_prompt_local_stage2_unique_exact`
+- `binary_four_bit_boolean`
+
+要件:
+
+- family abstraction で終わらず、query-specific closure まで書く
+- persistent hard core を直接叩く
+- `default 1` へ流れる余地を減らす
+
+#### B. anti-`default 1` counterexample lane
+
+対象:
+
+- `101410e4`, `12154247`, `12fd5b6c`, `2230fad0`, `257e7158`, `2d790c98`, `c30a782a`
+- `012fb81b`, `01e09228`, `1532c0d1`, `31966698`, `59c78e51`, `a6192d29`
+
+要件:
+
+- positive / negative contrast pair を明示する
+- 「それっぽい 1 埋め」ではなく exact rule を選ばせる supervision を作る
+
+#### C. model-native short closure lane
+
+対象:
+
+- exact teacher で解ける binary rows
+
+要件:
+
+- baseline/LLM 風の boxed-friendly short closure へ rewrite する
+- ただし correctness は exact teacher 側で固定する
+- long trace を短くすることが目的であり、LLM CoT を丸ごと採用しない
+
+#### D. token-efficient representation side branch
+
+README が示唆しているような
+
+- nibble 表現
+- base64 的表現
+- operator-local compact notation
+
+は試す価値がある。ただしこれは本流 mainline に直結させず、**別 branch** で比較する。
+
+理由は、表現変更は binary だけでなく tokenizer 依存挙動全体を変えうるためである。
+
+### 14.4 symbol 専用 track の設計
+
+symbol は broad symbol overlay を増やすのではなく、固定 hard `8` 行を起点に exact transduction problem として再設計する。
+
+#### A. `numeric_2x2` exact operator lane
+
+対象 IDs:
+
+- `8158a14c`
+- `878c843c`
+- `b7b1d1a8`
+- `e8de8b47`
+
+failure shape:
+
+- boxed ではある
+- operator prefix / suffix の付け方が wrong
+- leading zero / numeric normalization が wrong
+- ときどき operator semantics 自体が wrong
+
+必要なのは、演算子ごとの output canonicalization を exact に教える teacher である。boxed repair を厚くしても解決しない。
+
+#### B. `glyph_len5` exact transduction lane
+
+対象 IDs:
+
+- `a85864a9`
+- `be7101dc`
+- `d7e5414c`
+- `dc240ebd`
+
+failure shape:
+
+- boxed ではある
+- 文字列長や symbol slot が微妙に崩れる
+- symbol alphabet table の写像と copy が壊れる
+
+ここで必要なのは
+
+- symbol alphabet table の厳密化
+- per-character copy drills
+- prefix / suffix preservation
+- symbol sequence length commitment
+
+である。これは numeric_2x2 と同じ teacher ではない。
+
+#### C. symbol mini-gate を mainline から分離する
+
+次の mainline に symbol を大きく混ぜる前に、まず次の条件を満たすべきである。
+
+- fixed hard `8` 行で `2` 行以上の改善
+- binary に悪影響がない
+- boxed は元からできているので、content-only improvement が確認できる
+
+この条件を満たせない symbol data は、本命 mainline に入れない。
+
+### 14.5 easy-family の扱い
+
+easy family は次の理由で main investment から外す。
+
+- README でも主戦場は bit と明記されている
+- v7-1 でも numeral 回復だけでは public を押し上げられなかった
+- easy family の 100% 化は EV が低く、ratio tuning の再演になりやすい
+
+ただし削りすぎると `v3` や `v7` 型の regression を起こすため、次の最小 guardrail は残す。
+
+- numeral boxed closure
+- unit tail stabilization
+- gravity fragile tail
+- cipher final boxed closure
+
+これは新しい scoring source ではなく、既得点の保全策である。
+
+### 14.6 次の run 編成
+
+次の `3-4` run は、v6-core の延長ではなく **2-track + 1 guardrail** で組むべきである。
+
+#### Run 1: BIT-core
+
+入れるもの:
+
+- exact binary closure lane
+- anti-`default 1` lane
+- short closure rewrite lane の最小版
+- easy-family minimal guardrail
+
+見たい指標:
+
+- proxy binary `82/92` 以上
+- `format_ok_content_wrong_rate` の低下
+- hard watchlist の改善数
+
+#### Run 2: SYMBOL-core
+
+入れるもの:
+
+- `numeric_2x2` exact operator lane
+- `glyph_len5` exact transduction lane
+- symbol/token copy auxiliary
+
+見たい指標:
+
+- fixed hard `8` 行で `2` 行以上改善
+- binary collateral damage `0`
+
+#### Run 3: BIT-core + SYMBOL-lite
+
+条件:
+
+- Run 2 で symbol mini-gate を通った場合だけ実施
+
+入れるもの:
+
+- BIT-core
+- 改善が確認できた symbol lane のみ
+- easy-family minimal guardrail
+
+役割:
+
+- symbol の改善が binary public edge を壊さないか確認する
+
+#### Run 4: BIT representation branch
+
+入れるもの:
+
+- BIT-core
+- token-efficient representation のみ追加
+
+役割:
+
+- README の「bits を少トークンで表す」仮説の独立検証
+
+### 14.7 昇格条件
+
+official `0.88` を狙う本命 branch として昇格させる最低条件は次のように更新すべきである。
+
+- public: `0.86` 安定ではなく、`0.87` 接触を必須条件へ近づける
+- proxy binary: `82/92` 以上
+- persistent hard binary watchlist の改善が複数あること
+- symbol fixed hard `8` 行のうち少なくとも `2` 行が動くこと、または symbol を外しても public が上がる明確な証拠があること
+- easy-family guardrail regression が軽微であること
+
+要するに、次に必要なのは「better mix」ではない。
+
+**BIT は exact rule discovery teacher を作り直し、symbol は exact transduction teacher を別トラックで作り、easy family は guardrail に格下げする。**
+
+これが、v1-v7-1 の総括として最も筋の良い official `0.88` 到達戦略である。
