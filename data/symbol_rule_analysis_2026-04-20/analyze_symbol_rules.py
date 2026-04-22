@@ -165,6 +165,12 @@ CORE_COMPOSITE_FAMILIES = [
     "mask|generic|diff:ac_bd|plain|NNa",
 ]
 
+CORE_PLAIN_PROD_FAMILIES = [
+    f"prod:{pair}" if not flag else f"prod:{pair}:{flag}"
+    for pair in ["ac_bd", "ad_bc", "ab_cd", "cd_ab"]
+    for flag in ["", "swap", "strip0", "strip0swap"]
+]
+
 CORE_FAMILY_PRIORITY = [
     "drop_op",
     "swap_halves",
@@ -201,6 +207,7 @@ CORE_FAMILY_PRIORITY = [
     "op+rdiff:ac_bd",
     "rdiff:ac_bd+op",
     "rdiff:ab_cd",
+    *CORE_PLAIN_PROD_FAMILIES,
     "absdiff:ac_bd",
     "op+absdiff:ac_bd",
     "op+max:ad_bc",
@@ -758,6 +765,10 @@ def core_join_symbol_maps(left_map: dict[str, str], right_map: dict[str, str]) -
     return merged
 
 
+def core_freeze_symbol_map(symbol_map: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted(symbol_map.items()))
+
+
 def core_make_symbol_map(symbol_sequence: str, digit_sequence: str) -> dict[str, str] | None:
     mapping: dict[str, str] = {}
     used_digits: dict[str, str] = {}
@@ -1197,7 +1208,7 @@ def core_reduce_example_maps(example_maps: list[list[dict[str, str]]]) -> list[d
                 merged = core_join_symbol_maps(current_map, next_map)
                 if merged is None:
                     continue
-                frozen = tuple(sorted(merged.items()))
+                frozen = core_freeze_symbol_map(merged)
                 if frozen in seen:
                     continue
                 seen.add(frozen)
@@ -1206,6 +1217,16 @@ def core_reduce_example_maps(example_maps: list[list[dict[str, str]]]) -> list[d
         if not merged_maps:
             break
     return merged_maps
+
+
+@lru_cache(maxsize=None)
+def core_reduced_group_maps(
+    family_name: str,
+    pairs: tuple[tuple[str, str], ...],
+) -> tuple[dict[str, str], ...]:
+    return tuple(
+        core_reduce_example_maps([core_example_maps(family_name, left, right) for left, right in pairs])
+    )
 
 
 def core_add_output_constraints(
@@ -1297,19 +1318,18 @@ def explain_symbol_row_with_core_solver(
     family_options: dict[str, list[str]] = {}
     group_maps_by_operator: dict[str, dict[str, list[dict[str, str]]]] = {}
     for operator_symbol in operator_symbols:
+        pairs = tuple(by_operator.get(operator_symbol, []))
         candidates: list[str] = []
         candidate_maps: dict[str, list[dict[str, str]]] = {}
         for family_name in family_priority:
             if not core_family_compatible(
                 family_name,
                 operator_symbol,
-                by_operator.get(operator_symbol, []),
+                list(pairs),
                 operator_symbol_set,
             ):
                 continue
-            reduced_maps = core_reduce_example_maps(
-                [core_example_maps(family_name, left, right) for left, right in by_operator.get(operator_symbol, [])]
-            )
+            reduced_maps = list(core_reduced_group_maps(family_name, pairs))
             if not reduced_maps:
                 continue
             candidates.append(family_name)
@@ -1356,10 +1376,14 @@ def explain_symbol_row_with_core_solver(
         ),
     )
     explored = 0
+    failed_states: set[tuple[int, tuple[tuple[str, str], ...]]] = set()
 
     def recurse(index: int, current_assignment: dict[str, str], current_map: dict[str, str]) -> dict | None:
         nonlocal explored
         if explored >= max_assignments:
+            return None
+        state_key = (index, core_freeze_symbol_map(current_map))
+        if state_key in failed_states:
             return None
         if index == len(ordered_operators):
             target_family = current_assignment[target_operator]
@@ -1373,6 +1397,7 @@ def explain_symbol_row_with_core_solver(
                         "digit_symbols": sorted(merged),
                     }
             explored += 1
+            failed_states.add(state_key)
             return None
 
         operator_symbol = ordered_operators[index]
@@ -1391,6 +1416,7 @@ def explain_symbol_row_with_core_solver(
                 if result is not None:
                     return result
                 current_assignment.pop(operator_symbol)
+        failed_states.add(state_key)
         return None
 
     return recurse(0, {}, {})

@@ -180,3 +180,29 @@
 
 - 次の explicit grammar 候補は `computed chunk + copied digit positions` を first-class に持つ family class
 - 具体的には `expr + copy:c`, `expr + copy:a`, `copy:aa + expr`, `expr + copy:ca` などを symbolic solver へ直接入れて、hard row と first 100 coverage の差分を測る
+
+## 2026-04-21 Follow-up
+
+- README.md の cryptarithm 文脈に合わせ、search 側の冗長探索を減らすため `reduced group map cache` と `failed-state memoization` を solver に追加した。
+- ただし baseline 25 行 benchmark は `6 / 25` のままで、`max_assignments=1024` と `4096` の両方で増分なし。
+- row `012cab1f` は `max_assignments=65536` でも未解決で、さらに `>` と `]` の current family 候補どうしに pairwise consistent map が 1 つも無いことを確認した。
+- したがって hard symbolic の主因は search ceiling ではなく family basis の欠落。
+- `expr + copy:ca` / `NNca` 近傍の curated symbolic probe も追加で実施した。
+  - scalar copymix + scalar mask: 792 candidates, hard `*` rows `00457d26`, `01ef1e3e`, `035c4c40`, `053b4c86` に対して 0 hit
+  - generic copymix + generic mask: 680 candidates, 同 4 row に対して 0 hit
+- 現時点の read は次の通り。
+  - 既存 parser class の近傍拡張だけでは dominant hard rows を動かせていない
+  - `expr + copied positions` 方向は numeric unresolved では signal があるが、symbolic hard rows ではさらに別の computed chunk class が必要そう
+  - 次ターンの family mining は search tweak ではなく、新しい computed-chunk family を明示的に仮説化して当てる段階
+
+## 2026-04-22 Follow-up
+
+- current file には generic `prod:*` family の plain 16 variant が入っている。
+- first100 zero-op support は `63 / 36 / 1` から `65 / 35 / 0` へ改善した。
+- current benchmark は `uv run python data/symbol_rule_analysis_2026-04-20/analyze_symbol_rules.py --core-upper-bound --limit 100 --max-assignments 1024` で `24 / 100`。
+- ただし support 増分がそのまま solved 増分には落ちていない。
+  - `02e871e4`, `0babcba2`, `1545b8f1` は current support 上は改善しているが individually unsolved のまま。
+- 現時点の read はよりはっきりしている。
+  - `prod:*` のような未登録 generic family を足すと support は少し動く
+  - しかし dominant hard rows の主因は依然として family basis の不足か global consistency failure
+  - completion 条件の 659 / 823 explicit 回収に向けては、generic family の取りこぼし回収だけでは全く足りない
