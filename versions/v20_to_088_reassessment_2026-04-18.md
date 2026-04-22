@@ -81,14 +81,14 @@
 
 ### 3.1 スコア推移
 
-| version | validation | proxy | public leaderboard | 主な意味 |
-| --- | ---: | ---: | ---: | --- |
-| v20 | `837/950 = 0.8811` | `176/200 = 0.8800` | README: `0.84-0.85` | easy は強いが binary frontier は不足 |
-| v1 | `838/950 = 0.8821` | `178/200 = 0.8900` | Git 上未記録 | binary overlay は効いた |
-| v2 | `839/950 = 0.8832` | `176/200 = 0.8800` | ユーザー報告 `0.83-0.84` | guardrail は効くが binary を戻した |
-| v3_mainline | `801/950 = 0.8432` | `180/200 = 0.9000` | ユーザー報告 `0.84-0.85` | binary は強いが boxed surface 崩壊 |
-| v4_mainline | `813/950 = 0.8558` | `179/200 = 0.8950` | ユーザー報告 `0.85 x3, 0.86 x2` | public 向け最良バランス |
-| v5a_mainline | `829/950 = 0.8726` | `173/200 = 0.8650` | ユーザー報告 `0.85 x2` | local easy 回復、binary public edge 喪失 |
+| version      |         validation |              proxy |              public leaderboard | 主な意味                                 |
+| ------------ | -----------------: | -----------------: | ------------------------------: | ---------------------------------------- |
+| v20          | `837/950 = 0.8811` | `176/200 = 0.8800` |             README: `0.84-0.85` | easy は強いが binary frontier は不足     |
+| v1           | `838/950 = 0.8821` | `178/200 = 0.8900` |                    Git 上未記録 | binary overlay は効いた                  |
+| v2           | `839/950 = 0.8832` | `176/200 = 0.8800` |        ユーザー報告 `0.83-0.84` | guardrail は効くが binary を戻した       |
+| v3_mainline  | `801/950 = 0.8432` | `180/200 = 0.9000` |        ユーザー報告 `0.84-0.85` | binary は強いが boxed surface 崩壊       |
+| v4_mainline  | `813/950 = 0.8558` | `179/200 = 0.8950` | ユーザー報告 `0.85 x3, 0.86 x2` | public 向け最良バランス                  |
+| v5a_mainline | `829/950 = 0.8726` | `173/200 = 0.8650` |          ユーザー報告 `0.85 x2` | local easy 回復、binary public edge 喪失 |
 
 ### 3.2 実験系列から分かること
 
@@ -182,14 +182,14 @@ v20 README でも boxed-first extraction は契約の中核なのに、実験側
 
 `cuda-train-data-analysis-v1/artifacts/train_recommended_learning_target_v1.csv` の strict handoff は `9363` 行あり、内訳は次。
 
-| family | verified | answer_only |
-| --- | ---: | ---: |
-| bit_manipulation | `1229` | `271` |
-| text_decryption | `605` | `971` |
-| symbol_equation | `110` | `1410` |
-| roman_numeral | `1576` | `0` |
-| gravity_constant | `1597` | `0` |
-| unit_conversion | `1594` | `0` |
+| family           | verified | answer_only |
+| ---------------- | -------: | ----------: |
+| bit_manipulation |   `1229` |       `271` |
+| text_decryption  |    `605` |       `971` |
+| symbol_equation  |    `110` |      `1410` |
+| roman_numeral    |   `1576` |         `0` |
+| gravity_constant |   `1597` |         `0` |
+| unit_conversion  |   `1594` |         `0` |
 
 余地は大きい。しかし `FINAL_SUMMARY_REPORT.md` と追加監査メモが示す通り、`symbol_equation` は simple promotion できない。
 
