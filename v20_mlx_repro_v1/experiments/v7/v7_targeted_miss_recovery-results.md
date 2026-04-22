@@ -64,14 +64,14 @@ Known absent from `train_recommended_learning_target_v1.csv`: `0ec17d2e`
 
 ## Bundle path
 
-`/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/A-Open-ProgressPrizePublication/nemotron/training/sft/v7_targeted_miss_recovery_bundle.jsonl`
+`/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/A-Open-ProgressPrizePublication/nemotron/training/sft/MLX/v7_targeted_miss_recovery_bundle.jsonl`
 
 ## Current status
 
 - Bundle generated: YES
-- MLX training: NOT YET STARTED (run with reproduce_v20_mlx_repro.py --training-bundle-path)
+- MLX training: RUNNING (`v20_mlx_v7_targeted_miss_recovery_mlxdir_mb1_nobc`, micro-batch 1, no bias correction)
 - local300 score after training: TBD
 
 ## Generated
 
-2026-04-22T09:02:19Z
+2026-04-22T09:22:52Z
