@@ -428,8 +428,12 @@ def update_score_ledger(run_result: dict[str, Any], eval_result: dict[str, Any])
     target = resolve_score_ledger_target(run_result)
     if target is None:
         return None
+    if str(eval_result.get("evaluation_kind", "")) != "adapter_validation":
+        return None
     overall = eval_result.get("overall")
     if not isinstance(overall, dict) or "accuracy" not in overall:
+        return None
+    if int(overall.get("total", 0)) != 300:
         return None
     accuracy = float(overall["accuracy"])
     correct = overall.get("correct")
