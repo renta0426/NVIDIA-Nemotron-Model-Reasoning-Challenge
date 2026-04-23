@@ -71,7 +71,7 @@ Known absent from `train_recommended_learning_target_v1.csv`: `0ec17d2e`
 - Bundle generated: YES
 - MLX training:
   - `v20_mlx_v7_targeted_miss_recovery_mlxdir_mb1_nobc`: stopped before completion at step 183/265; no `training_result.json`
-  - `v20_mlx_v7_targeted_miss_recovery_mlxdir_mb1_nobc_ckpt20`: running again with detached execution, `save_every_steps=20`, `max_saved_checkpoints=3`, and resume-aware supervision (step 172 observed; retained periodic checkpoints are still `120 / 140 / 160`)
+  - `v20_mlx_v7_targeted_miss_recovery_mlxdir_mb1_nobc_ckpt20`: running again with detached execution, `save_every_steps=20`, `max_saved_checkpoints=3`, and resume-aware supervision (**step 184 observed**, so it has already passed the earlier `183/265` failure point; retained periodic checkpoints are `140 / 160 / 180`)
 - local300 score after training: TBD
 
 ## Generated
