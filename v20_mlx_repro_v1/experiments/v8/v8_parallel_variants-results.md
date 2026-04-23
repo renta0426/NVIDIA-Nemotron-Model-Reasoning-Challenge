@@ -80,6 +80,7 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 
 - Bundle generated: YES
 - MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (`step 35` observed after manifest fix; first periodic checkpoint `0000020_adapters.safetensors` written, second checkpoint not yet reached; unused `_debug_bundle_tokens` cleanup completed)
+- completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
 - local300 score: TBD
 
 ## symbol_cipher_recovery_mix

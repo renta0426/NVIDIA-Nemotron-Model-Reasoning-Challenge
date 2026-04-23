@@ -349,6 +349,7 @@ def build_postprocess_command_tokens(args: argparse.Namespace) -> list[str]:
     append_command_option(tokens, "--output-root", Path(args.output_root))
     append_command_option(tokens, "--run-name", args.run_name)
     append_command_option(tokens, "--postprocess-eval-kind", str(args.postprocess_eval_kind))
+    append_command_bool_option(tokens, "--cleanup-completed-run-artifacts", bool(args.cleanup_completed_run_artifacts))
     return tokens
 
 
@@ -1248,6 +1249,25 @@ def prune_saved_checkpoints(adapter_dir: Path, *, max_saved_checkpoints: int) ->
         stale.unlink()
         removed.append(stale.name)
     return removed
+
+
+def cleanup_completed_run_artifacts(run_root: Path) -> dict[str, Any]:
+    adapter_dir = run_root / "adapter"
+    removed_checkpoint_files: list[str] = []
+    for checkpoint_path in sorted(adapter_dir.glob("*_adapters.safetensors")):
+        checkpoint_path.unlink()
+        removed_checkpoint_files.append(checkpoint_path.name)
+
+    removed_dirs: list[str] = []
+    bundle_token_dir = run_root / "training_bundle_tokens"
+    if bundle_token_dir.exists():
+        shutil.rmtree(bundle_token_dir)
+        removed_dirs.append(str(bundle_token_dir.resolve()))
+
+    return {
+        "removed_checkpoint_files": removed_checkpoint_files,
+        "removed_dirs": removed_dirs,
+    }
 
 
 def summarize_directory(path: Path) -> list[dict[str, Any]]:
@@ -3216,12 +3236,18 @@ def run_full(args: argparse.Namespace) -> dict[str, Any]:
     run_result = run_train(args)
     eval_result = run_eval_aopen(args)
     update_results_files(args, run_result, eval_result)
-    return {
+    cleanup_result = None
+    if bool(args.cleanup_completed_run_artifacts):
+        cleanup_result = cleanup_completed_run_artifacts(Path(run_result["run_root"]).resolve())
+    result = {
         "run_result": run_result,
         "eval_result": eval_result,
         "results_md": str(DEFAULT_RESULTS_MD.resolve()),
         "results_json": str(DEFAULT_RESULTS_JSON.resolve()),
     }
+    if cleanup_result is not None:
+        result["cleanup_result"] = cleanup_result
+    return result
 
 
 def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
@@ -3264,13 +3290,19 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
     run_result = load_json(training_result_path)
     eval_result = load_json(eval_summary_path)
     update_results_files(args, run_result, eval_result)
-    return {
+    cleanup_result = None
+    if bool(args.cleanup_completed_run_artifacts):
+        cleanup_result = cleanup_completed_run_artifacts(run_root)
+    result = {
         "run_root": str(run_root),
         "training_result_path": str(training_result_path.resolve()),
         "eval_summary_path": str(eval_summary_path.resolve()),
         "results_md": str(DEFAULT_RESULTS_MD.resolve()),
         "results_json": str(DEFAULT_RESULTS_JSON.resolve()),
     }
+    if cleanup_result is not None:
+        result["cleanup_result"] = cleanup_result
+    return result
 
 
 def run_prepare(args: argparse.Namespace) -> dict[str, Any]:
@@ -3366,6 +3398,15 @@ def parse_args() -> argparse.Namespace:
             "--postprocess-eval-kind",
             choices=("auto", "aopen", "adapter-validation"),
             default="auto",
+        )
+        target.add_argument(
+            "--cleanup-completed-run-artifacts",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help=(
+                "After a run has both training_result.json and a completed evaluation summary, "
+                "prune periodic *_adapters.safetensors checkpoints and remove training_bundle_tokens/"
+            ),
         )
 
     prepare = subparsers.add_parser("prepare", help="Prepare the v20 snapshot contract, shadow model, and run manifest.")
