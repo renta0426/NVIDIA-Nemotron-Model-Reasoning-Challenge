@@ -170,10 +170,18 @@ CORE_COMPOSITE_FAMILIES = [
 
 CORE_2FC5_PRODUCT_TUPLE_FAMILY = (
     "prod_tuple|"
-    "prod_mod(9-p2,prod_tens13)|"
-    "prod_mod(9-p0,absdiff02)|"
-    "9-(sum_mod(prod_mod03,prod_mod12))|"
-    "9-(absdiff(sum_mod12,absdiff13))"
+    "sum_mod(sum_mod01,max13)|"
+    "prod_mod(sum_mod01,sum_mod23)|"
+    "9-(prod_tens(9-p0,p2))|"
+    "9-(sum_mod(absdiff03,max03))"
+)
+
+CORE_1785B35E_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-(prod_mod(p2,prod_mod12))|"
+    "absdiff(p3,prod_tens13)|"
+    "sum_mod(absdiff12,max12)|"
+    "prod_mod(9-p1,max02)"
 )
 
 CORE_PRODUCT_DIGIT_FAMILIES = [
@@ -182,6 +190,7 @@ CORE_PRODUCT_DIGIT_FAMILIES = [
     "prod_digits|1785|carry13|max02",
     "prod_digits|1785|carry13|p2",
     CORE_2FC5_PRODUCT_TUPLE_FAMILY,
+    CORE_1785B35E_PRODUCT_TUPLE_FAMILY,
 ]
 
 CORE_PLAIN_PROD_FAMILIES = [

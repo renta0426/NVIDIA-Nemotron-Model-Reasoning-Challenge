@@ -271,6 +271,9 @@
   - verified tuple class は `pos0 = 9-absdiff(p0, max:12)` と `pos1 in {sum_carry:01, sum_carry:13}`, `pos2 = sum_mod:23`, `pos3 in {max:02, p2}` の 4 variant。
   - explicit 00..99 enumeration では `!^*?] -> !>"?`, `:&*?? -> ]>/!`, `(!*?! -> :^:/` に対して final survivor 1 map を再現した。
   - したがって dominant row の local gap は、input-digit family ではなく `x*y` product digits 上の second-order computed-digit class で説明できる。
+  - さらに non-`*` side の joined maps 17 本を seed にして generic tuple search を掛けると、row-consistent full solve も見つかった。verified tuple は `pos0 = 9 - prod_mod(p2, prod_mod:12)`, `pos1 = absdiff(p3, prod_tens:13)`, `pos2 = sum_mod(absdiff:12, max:12)`, `pos3 = prod_mod(9-p1, max:02)`。
+  - explicit merge では final solution 1 件を再現し、digit map は `!->3, "->1, &->8, (->0, /->4, :->5, >->2, ?->6, ]->7, ^->9` になった。non-`*` families は `+ = prod:ac_bd:swap`, `- = x-y` で join する。
+  - この tuple は `prod_tuple|expr0|expr1|expr2|expr3` family として実装済みで、default solver でも `1785b35e` を solve する。
 - ただしこの second-order class の slice-wide reuse は薄い。
   - unresolved `*` 4-char groups 全体 58 件に対して、上の 4 tuple variant を example-side / target-sideで再点検すると、example-side hit row は `5 / 58`、full hit row は `0 / 58`。
   - example-side hit row は `1785b35e`, `2fc5ef5b`, `563bf8f9`, `64d775e5`, `a4e4ec1d` のみ。
@@ -317,7 +320,10 @@
   - よって `2fc5ef5b` は `1785b35e` の近傍 sibling ではあるが、そのまま同 classを target まで延ばせる行ではない。少なくとも target `*` の core transform は、現 first/second-order product-digit vocabulary とは別物である。
   - 追加で reduced third-order grammar を切ると、target `*` 単体には compact continuation が見つかった。例として `pos0 = max(min:23, prod_mod:01)`, `pos1 = sum_mod(absdiff:02, sum_mod:01)`, `pos2 = sum_mod(9-absdiff:02, sum_mod:02)`, `pos3 = sum_mod(9-absdiff:01, sum_mod:02)` は `*` examples と target の 3 instances をすべて通し、reduced map `1` 件・target join `1` 件だった。
   - ただしその star map は `&->6, %->3, ^->1` を固定し、これは `+` side reduced maps が許す overlap triple 29 種のどれにも含まれなかった。実際、existing `+` families との join count は `0` だった。
-  - したがって `2fc5ef5b` の次の search target は「target-only third-order formula を足すこと」では足りない。必要なのは、`+` side overlap と両立する別の `*`-side induced map そのものを見つけることだ。
+  - この false lead の後、search を full `+` reduced maps 190 本に戻し、残りの free symbols を `\` と `'` の 2 つだけに絞って再探索した。
+  - そこで `+ = x+y` と両立する row-consistent star tuple が見つかった。verified tuple は `pos0 = sum_mod(sum_mod:01, max:13)`, `pos1 = prod_mod(sum_mod:01, sum_mod:23)`, `pos2 = 9 - prod_tens(9-p0, p2)`, `pos3 = 9 - sum_mod(absdiff:03, max:03)`。
+  - explicit merge では full solution 1 件を再現し、digit map は `$->2, %->1, &->6, '->3, /->0, :->7, \->5, ^->4, {->8, }->9` だった。decoded row は `71*31 -> 6496`, `51*87 -> 5089`, target `60*73 -> 0651`, plus examples は `07+87 -> 94`, `26+16 -> 42` で、`x+y` と完全に整合した。
+  - よって `2fc5ef5b` は「target `*` vocabulary の外側にある unsolved row」ではなく、「second-order `1785` class では足りないが、row-consistent third-order product-digit tuple を 1 本足せば解ける row」に再分類された。
 - ただし同じ `1785b35e` class でも、non-target `*` gap row では row-level solve まで届く例がある。
   - `64d775e5` では `*` side current candidates が `0`、`+` side は example/target とも `swap_halves` 1 本だけが残る clean row だった。
   - `1785` class の variant `pos0 = 9-absdiff(p0, max:12)`, `pos1 = sum_carry:13`, `pos2 = sum_mod:23`, `pos3 = p2` を `*` examples に当てると reduced map `1` 件を得て、それが `+` examples の `swap_halves` と target `+` の `swap_halves` の両方に join した。
@@ -325,8 +331,9 @@
   - したがって earlier の `0 / 58` は「この class 単体で target `*` まで説明する full-hit がない」という意味では保たれるが、「non-target `*` gap row を既存他operator family と組んで row-level solve できる例がない」とまでは言えない。`64d775e5` はその反例である。
 - 上の `1785` class は `analyze_symbol_rules.py` に `prod_digits|1785|carry01|max02`, `prod_digits|1785|carry01|p2`, `prod_digits|1785|carry13|max02`, `prod_digits|1785|carry13|p2` の 4 family として実装した。
   - default solver (`explain_symbol_row_with_core_solver`) でも `64d775e5` は `{'+' : 'swap_halves', '*' : 'prod_digits|1785|carry01|max02'}` で solve されるようになった。
-  - 一方で `2fc5ef5b` は実装後も unsolved のままで、target `*` の新 family gap が残ることを再確認した。
+  - さらに generic `prod_tuple|expr0|expr1|expr2|expr3` interpreter を追加し、`2fc5ef5b` の row-consistent tuple を family 化したことで、default solver でも `{'*': 'prod_tuple|sum_mod(sum_mod01,max13)|prod_mod(sum_mod01,sum_mod23)|9-(prod_tens(9-p0,p2))|9-(sum_mod(absdiff03,max03))', '+': 'x+y'}` で solve されるようになった。
+  - 同じ interpreter に `1785b35e` の row-consistent tuple `prod_tuple|9-(prod_mod(p2,prod_mod12))|absdiff(p3,prod_tens13)|sum_mod(absdiff12,max12)|prod_mod(9-p1,max02)` も追加し、default solver で `{'*': 'prod_tuple|9-(prod_mod(p2,prod_mod12))|absdiff(p3,prod_tens13)|sum_mod(absdiff12,max12)|prod_mod(9-p1,max02)', '+': 'prod:ac_bd:swap', '-': 'x-y'}` を再現した。
   - wider scan で `2e9973b7` も example-side では `prod_digits|1785|carry01|max02` に hit したが、これは new coverage ではない。row 自体は既存 solver でも `{'*': 'x*y', '-': 'y-x', '+': 'drop_op'}` で既に solve 済みだった。
-  - したがってこの family の immediate value は「example-side hit row を増やすこと」ではなく、既存 solver が未解決だった non-target `*` gap row `64d775e5` を実際に 1 行回収した点にある。
+  - したがってこの wave の immediate value は「example-side hit row を増やすこと」ではなく、既存 solver が未解決だった `*`-heavy rows を実際に回収した点にある。現時点で confirmed new current coverage は `1785b35e`, `2fc5ef5b`, `64d775e5` の 3 行になった。
   - current symbolic rows のうち「`*` examples が 2 本で両方 4-char」の slice を再走査すると、この family の example-side hit row は `6` 件だった: `1785b35e`, `2e9973b7`, `2fc5ef5b`, `563bf8f9`, `64d775e5`, `a4e4ec1d`。
-  - ただし row-level で見ると、`2e9973b7` は既存 solver で既に解ける redundant hit、`1785b35e` / `2fc5ef5b` / `563bf8f9` / `a4e4ec1d` は依然 unsolved で、new current coverage として確認できたのは `64d775e5` だけだった。
+  - ただし row-level で見ると、`2e9973b7` は既存 solver で既に解ける redundant hit、`563bf8f9` / `a4e4ec1d` は依然 unsolved のままで、new current coverage として確認できたのは `1785b35e`, `2fc5ef5b`, `64d775e5` の 3 行だった。
