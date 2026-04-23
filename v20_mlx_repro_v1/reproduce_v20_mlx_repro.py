@@ -4304,7 +4304,7 @@ def parse_args() -> argparse.Namespace:
     watch_progress.add_argument("--progress-watch-log-path", type=Path, required=True)
     watch_progress.add_argument("--progress-watch-state-dir", type=Path, required=True)
     watch_progress.add_argument("--progress-watch-sleep-seconds", type=int, default=300)
-    watch_progress.add_argument("--progress-watch-step-interval", type=int, default=20)
+    watch_progress.add_argument("--progress-watch-step-interval", type=int, default=5)
     watch_progress.add_argument(
         "--watch-run-root",
         action="append",
