@@ -200,9 +200,72 @@
 - current file には generic `prod:*` family の plain 16 variant が入っている。
 - first100 zero-op support は `63 / 36 / 1` から `65 / 35 / 0` へ改善した。
 - current benchmark は `uv run python data/symbol_rule_analysis_2026-04-20/analyze_symbol_rules.py --core-upper-bound --limit 100 --max-assignments 1024` で `24 / 100`。
+- CPU RAM 枯渇対策として、`core_family_records` の重複 cache を外し、`core_family_output_index` / `core_reduced_group_maps` を bounded cache に変更した。
+- local validation では symbolic first3 rows の可否は不変で、wallclock は `28.156s -> 24.959s`。
 - ただし support 増分がそのまま solved 増分には落ちていない。
   - `02e871e4`, `0babcba2`, `1545b8f1` は current support 上は改善しているが individually unsolved のまま。
+- row `012cab1f` に対して、`concat` 近傍の unlisted family 121 本を narrow probe した。
+  - target operator `'`: 0 hit
+  - non-target `>`: 0 hit
+  - non-target `]`: 0 hit
+- row `012cab1f` に対して、target `'` の full scalar `concat` 957 本も追加で probe したが 0 hit。
+- row `012cab1f` に対して、narrow `mix` 近傍 158 本も追加で probe した。
+  - target operator `'`: 0 hit
+  - non-target `]`: 0 hit
+- row `012cab1f` に対して、さらに次の narrow probe を行ったが、すべて 0 hit。
+  - target `'`: scalar `copymix` 375 本, scalar `mask` 184 本
+  - non-target `>`: scalar `copymix` 68 本, scalar `mask` 144 本, 仮説的 mod-10 pairwise class 32 本
+  - non-target `]`: `pairconcat` 200 本
+- ここでの hit 判定は「その operator の reduced map が、残り 2 operator の current survivor family 群それぞれと pairwise merge を持つか」。
+- したがって `012cab1f` の dominant gap は current parser 近傍の `concat` / `mix` / `copymix` / `mask` / `pairconcat` / mod-10 pairwise 仮説ではない。
+- 別 anchor として row `02e871e4` も再点検した。
+  - current file では operator `+` が zero-candidate で、`*` は 8 candidate, `-` は 109 candidate。
+  - `+` の example output 長は `(2,3,3)` で、target は別 operator にある。
+  - row-local probe では unlisted generic 300 本, scalar `copymix` 76 本, full scalar `concat` 957 本, dual-chunk generic 仮説 392 本, scalar `mask_strip0` 1200 本がすべて 0 hit。
+  - `generic copymix` 2240 本と `generic mask-strip0` 1344 本も 0 hit。
+  - さらに broad `mix` 4924 本と、3 桁の independent 1-digit function strip0 仮説 5832 本も 0 hit。
+  - この output-length profile `(3,(2,3,3),None)` は symbolic 全体で 27 群あり、そのうち 14 群が current zero-candidate。
 - 現時点の read はよりはっきりしている。
   - `prod:*` のような未登録 generic family を足すと support は少し動く
   - しかし dominant hard rows の主因は依然として family basis の不足か global consistency failure
+  - `012cab1f` に関しては current parser 近傍の主要 composite grammar をかなり強く除外できたので、次の probe は新しい 2-digit generic class か parser 外の non-concat computed chunk へ移すべき
+  - `02e871e4` 型の `(2,3,3)` mixed-length cluster も zero-op 母数があるので、単発 row ではなく family class として扱う価値がある
+  - ただし `02e871e4` については current parser の broad `mix` まで空振りなので、単なる whitelist 拡張ではなく parser 外の new class を仮説化する必要がある
   - completion 条件の 659 / 823 explicit 回収に向けては、generic family の取りこぼし回収だけでは全く足りない
+
+- zero-op profile ranking を symbolic 全体で取り直した。
+  - 最大母数は `(2,(4,4),None)` で `52 / 142` zero-candidate。
+  - target-present では `(2,(4,4),4)` が `20 / 57` zero-candidate。
+  - 次点は `(2,(3,4),None)` が `21 / 42`, `(3,(4,4,4),None)` が `16 / 42`, `(3,(2,3,3),None)` が `14 / 27`。
+- `(2,(4,4),4)` の operator 分布は `*` に強く偏っている。
+  - profile 全体では `* = 34 / 57`。
+  - zero-candidate 側では `* = 16 / 20` で、残りは `%`, `|`, `&`, `>` が各 1。
+- `(2,(4,4),4)` の `*` 行では、zero/nonzero の両方が surface repetition signature `('abcd','abcd')` に集まる。
+  - nonzero 側でも zero 側でも最頻 signature が同じなので、dominant gap は formatter より arithmetic family 差分の可能性が高い。
+  - 同 signature の current nonzero rows は first candidate が plain `x*y` に落ちる (`3cb3fd89`, `a52c726c`, `d0e1010b`, `dc6c0d49`, `e62b6ae9`)。
+- dominant zero slice の representative row `1785b35e` (`(2,(4,4),4)` / operator `*`) で `x*y` 近傍を追加 probe した。
+  - `pairconcat(prod,prod)` 512 families: example-side 0 hit, target-compatible 0。
+  - custom direct check による broad basic `pairconcat` (`sum/diff/rdiff/absdiff/prod/max/min` x `ac_bd/ad_bc/ab_cd/cd_ab`, no-swap/no-strip0, 784 families) も example-side 0 hit, target-compatible 0。
+  - scalar `mask|scalar|x*y|...` + `copymix|scalar|x*y|...` 1074 families: example-side 0 hit, target-compatible 0。
+  - scalar `concat` with at least one `x*y` side 84 families: example-side 0 hit, target-compatible 0。
+  - fixed 2-digit `pairconcat(max/min/absdiff, max/min/absdiff)` 144 families: example-side 0 hit, target-compatible 0。
+  - plain 4-digit `x*y` の digit permutation 24 と 9-complement+permutation 48 も 0 hit。
+- same multiplication gap は target-absent の最大 profile `(2,(4,4),None)` にも強く出ている。
+  - profile 全体の operator 分布は `* = 77 / 142`, `+ = 29 / 142`。
+  - current zero-candidate は `* = 38 / 77`, `+ = 2 / 29`。
+  - したがって symbolic 全体の最大未解決 profile でも主因は non-target `*` 4-char support 欠落。
+- unresolved `*` 4-char rows の surface signature は cluster family に向かない。
+  - target-present `(2,(4,4),4)` の unresolved `*` 16 行は exact repetition signature が 16/16 で全て一意。
+  - target-absent `(2,(4,4),None)` の unresolved `*` 38 行も exact repetition signature が 38/38 で全て一意。
+  - したがって dominant gap は少数の repeated surface pattern ではなく、より抽象的な arithmetic family 欠落として扱うべき。
+- target-present unresolved `*` 16 行に対して、plain product-digit family を slice-wide に再点検した。
+  - explicit 00..99 enumeration で raw 4-digit `x*y` permutation 24 と 9-complement+permutation 24 を全 row に再適用したが、target-compatible hit row は `0 / 16`。
+  - 既存の raw/c9 product-digit rearrangement family では dominant slice の subset すら剥がせない。
+- ただし `1785b35e` の product-digit-derived one-digit hypothesis 自体は死んでいない。
+  - 出力 digit を input digit ではなく `x*y` の 4 桁 product digits `p0..p3` から 1-digit 関数で作る仮説を position-wise に調べると、4 position 全てで多数候補が残る。
+  - row-local viable count は position0 = 32, position1 = 38, position2 = 32, position3 = 28。
+  - 強い surviving functions は `sum_carry:01/12/13`, `9-p3`, `9-p2`, `absdiff:02/12/13`, `max:02/12` などで、以前の input-digit shallow family failure と対照的に signal がある。
+  - sub-search では position2-3 の強い pair と position1 の `sum_carry:01` / `sum_carry:13` まで小さな frontier に落ちる一方、現 library の position0 候補を足した full 4-tuple は 0 hit だった。
+  - 現時点の read は「product-digit family 全体が無い」のではなく、「位置0の関数族が現 library では不足している可能性が高い」。
+- したがって current parser-neighbor の multiplication-side extension (`x*y` concat/mask/copymix/permutation と narrow pairconcat) では、dominant `*` 4-char zero slice の representative row は説明できない。
+  - 次の multiplication-side仮説は、`x*y` 近傍ではなく parser 外の新 computed-digit transform class として立てるべき。

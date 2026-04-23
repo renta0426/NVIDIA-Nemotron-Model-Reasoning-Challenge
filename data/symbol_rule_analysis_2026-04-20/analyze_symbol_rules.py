@@ -19,6 +19,9 @@ DATA_CSV = ROOT / "data" / "train_with_classification.csv"
 README_MD = ROOT / "README.md"
 REPORT_MD = Path(__file__).with_name("analysis_report.md")
 
+CORE_FAMILY_OUTPUT_INDEX_CACHE_SIZE = 128
+CORE_REDUCED_GROUP_CACHE_SIZE = 512
+
 NUMERIC_LABELS = ["equation_numeric_guess", "equation_numeric_deduce"]
 SYMBOLIC_LABELS = ["cryptarithm_guess", "cryptarithm_deduce"]
 ALL_LABELS = SYMBOLIC_LABELS + NUMERIC_LABELS
@@ -1116,7 +1119,6 @@ def core_render_generic_tokens(family_name: str, operator_symbol: str, x: int, y
     return tokens
 
 
-@lru_cache(maxsize=None)
 def core_family_records(family_name: str, operator_symbol: str) -> tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...]:
     records: list[tuple[str, str, tuple[tuple[str, str], ...]]] = []
     mode_info = core_family_mode(family_name)
@@ -1143,7 +1145,7 @@ def core_family_records(family_name: str, operator_symbol: str) -> tuple[tuple[s
     return tuple(records)
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=CORE_FAMILY_OUTPUT_INDEX_CACHE_SIZE)
 def core_family_output_index(
     family_name: str,
     operator_symbol: str,
@@ -1219,7 +1221,7 @@ def core_reduce_example_maps(example_maps: list[list[dict[str, str]]]) -> list[d
     return merged_maps
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=CORE_REDUCED_GROUP_CACHE_SIZE)
 def core_reduced_group_maps(
     family_name: str,
     pairs: tuple[tuple[str, str], ...],
