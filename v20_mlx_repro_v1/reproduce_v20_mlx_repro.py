@@ -545,16 +545,25 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
     target = resolve_progress_ledger_target(run_root)
     if target is None:
         return None
+    training_done = (run_root / "training_result.json").exists()
+    validation_done = (run_root / "adapter_validation" / "validation_summary.json").exists()
     step, _ = read_latest_train_report(run_root)
     if step is None:
         step = read_training_result_step(run_root)
     if step is None:
         return None
     checkpoint_summary = summarize_retained_checkpoints(run_root)
+    runtime_status = "scored" if training_done and validation_done else "training_complete" if training_done else "running"
     ledger_path, section_name = target
     original_text = ledger_path.read_text(encoding="utf-8")
     updated_text = replace_markdown_line_in_section(
         original_text,
+        section_name=section_name,
+        line_prefix="- runtime status:",
+        replacement_line=f"- runtime status: `{runtime_status}`",
+    )
+    updated_text = replace_markdown_line_in_section(
+        updated_text,
         section_name=section_name,
         line_prefix="- latest observed step:",
         replacement_line=f"- latest observed step: `{step}`",
@@ -573,8 +582,9 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
         "section_name": section_name,
         "step": step,
         "checkpoint_summary": checkpoint_summary,
+        "runtime_status": runtime_status,
         "changed": changed,
-        "training_done": (run_root / "training_result.json").exists(),
+        "training_done": training_done,
     }
 
 

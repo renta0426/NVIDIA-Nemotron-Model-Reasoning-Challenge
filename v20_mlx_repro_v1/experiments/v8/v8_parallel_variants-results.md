@@ -80,6 +80,7 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 
 - Bundle generated: YES
 - MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (`step 43` observed after manifest fix; periodic checkpoints `0000020_adapters.safetensors` and `0000040_adapters.safetensors` are now both present; unused `_debug_bundle_tokens` cleanup completed)
+- runtime status: `running`
 - latest observed step: `45`
 - retained checkpoints: `0000020_adapters.safetensors / 0000040_adapters.safetensors`
 - completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
@@ -155,6 +156,7 @@ Keep direct miss pressure, then add broad answer-only stabilization for numeric_
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
 - launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached `queue-managed-run` process will auto-launch this variant once one active run finishes
+- runtime status: `not_started`
 - latest observed step: `not started`
 - retained checkpoints: `none`
 - local300 score: TBD
@@ -227,6 +229,7 @@ Balanced bridge run: moderate direct miss repeats, lighter bit-family rebalance,
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
 - launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached `queue-managed-run` process is now armed and waiting for `symbol_cipher_recovery_mix` to start, then for active train count to drop below 2 before auto-launching this variant
+- runtime status: `not_started`
 - latest observed step: `not started`
 - retained checkpoints: `none`
 - local300 score: TBD
