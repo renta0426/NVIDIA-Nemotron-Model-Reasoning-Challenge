@@ -541,7 +541,7 @@ def summarize_retained_checkpoints(run_root: Path) -> str:
     return " / ".join(checkpoint_names) if checkpoint_names else "none"
 
 
-def update_progress_ledger(run_root: Path) -> dict[str, Any] | None:
+def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, Any] | None:
     target = resolve_progress_ledger_target(run_root)
     if target is None:
         return None
@@ -566,7 +566,7 @@ def update_progress_ledger(run_root: Path) -> dict[str, Any] | None:
         replacement_line=f"- retained checkpoints: `{checkpoint_summary}`",
     )
     changed = updated_text != original_text
-    if changed:
+    if apply_changes and changed:
         write_text(ledger_path, updated_text)
     return {
         "ledger_path": str(ledger_path.resolve()),
@@ -4013,7 +4013,7 @@ def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
     while True:
         touched = False
         for run_root in watch_run_roots:
-            progress_result = update_progress_ledger(run_root)
+            progress_result = update_progress_ledger(run_root, apply_changes=False)
             if not isinstance(progress_result, dict):
                 continue
             touched = True
@@ -4035,6 +4035,12 @@ def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
             elif bool(progress_result["training_done"]) and not published_done:
                 should_publish = True
             if not should_publish:
+                continue
+            if git_index_is_locked():
+                append_log_line(log_path, f"progress_publish_git_busy path={relative_to_repo(Path(str(progress_result['ledger_path'])))}")
+                continue
+            progress_result = update_progress_ledger(run_root, apply_changes=True)
+            if not isinstance(progress_result, dict):
                 continue
             ledger_path = Path(str(progress_result["ledger_path"])).resolve()
             try:
