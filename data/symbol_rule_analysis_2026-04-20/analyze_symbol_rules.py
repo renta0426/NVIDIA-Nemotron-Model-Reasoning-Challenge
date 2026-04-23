@@ -168,6 +168,22 @@ CORE_COMPOSITE_FAMILIES = [
     "mask|generic|diff:ac_bd|plain|NNa",
 ]
 
+CORE_2FC5_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "prod_mod(9-p2,prod_tens13)|"
+    "prod_mod(9-p0,absdiff02)|"
+    "9-(sum_mod(prod_mod03,prod_mod12))|"
+    "9-(absdiff(sum_mod12,absdiff13))"
+)
+
+CORE_PRODUCT_DIGIT_FAMILIES = [
+    "prod_digits|1785|carry01|max02",
+    "prod_digits|1785|carry01|p2",
+    "prod_digits|1785|carry13|max02",
+    "prod_digits|1785|carry13|p2",
+    CORE_2FC5_PRODUCT_TUPLE_FAMILY,
+]
+
 CORE_PLAIN_PROD_FAMILIES = [
     f"prod:{pair}" if not flag else f"prod:{pair}:{flag}"
     for pair in ["ac_bd", "ad_bc", "ab_cd", "cd_ab"]
@@ -211,6 +227,7 @@ CORE_FAMILY_PRIORITY = [
     "rdiff:ac_bd+op",
     "rdiff:ab_cd",
     *CORE_PLAIN_PROD_FAMILIES,
+    *CORE_PRODUCT_DIGIT_FAMILIES,
     "absdiff:ac_bd",
     "op+absdiff:ac_bd",
     "op+max:ad_bc",
@@ -656,6 +673,88 @@ def core_parse_mask_family(family_name: str) -> tuple[str, str, str, str] | None
     return expr_kind, expr_name, expr_mode, template
 
 
+def core_parse_product_digit_family(family_name: str) -> tuple[str, str, str] | None:
+    if not family_name.startswith("prod_digits|"):
+        return None
+    parts = family_name.split("|")
+    if len(parts) != 4:
+        return None
+    _, family_key, pos1_mode, pos3_mode = parts
+    if family_key != "1785":
+        return None
+    if pos1_mode not in {"carry01", "carry13"}:
+        return None
+    if pos3_mode not in {"max02", "p2"}:
+        return None
+    return family_key, pos1_mode, pos3_mode
+
+
+def core_parse_product_digit_tuple_family(
+    family_name: str,
+) -> tuple[str, str, str, str] | None:
+    if not family_name.startswith("prod_tuple|"):
+        return None
+    parts = family_name.split("|")
+    if len(parts) != 5:
+        return None
+    _, expr0, expr1, expr2, expr3 = parts
+    return expr0, expr1, expr2, expr3
+
+
+def core_split_product_digit_expr_args(expr: str) -> tuple[str, str] | None:
+    depth = 0
+    for index, char in enumerate(expr):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        elif char == "," and depth == 0:
+            return expr[:index], expr[index + 1 :]
+    return None
+
+
+def core_eval_product_digit_expr(expr: str, prod_digits: str) -> int | None:
+    if expr in {"p0", "p1", "p2", "p3"}:
+        return int(prod_digits[int(expr[1])])
+    if expr.startswith("9-p") and len(expr) == 4 and expr[3].isdigit():
+        return 9 - int(prod_digits[int(expr[3])])
+
+    base_ops = {
+        "sum_mod": lambda a, b: (a + b) % 10,
+        "sum_carry": lambda a, b: (a + b) // 10,
+        "prod_mod": lambda a, b: (a * b) % 10,
+        "prod_tens": lambda a, b: (a * b) // 10,
+        "absdiff": lambda a, b: abs(a - b),
+        "max": lambda a, b: max(a, b),
+        "min": lambda a, b: min(a, b),
+    }
+    for op_name, op in base_ops.items():
+        if expr.startswith(op_name) and len(expr) == len(op_name) + 2 and expr[-2:].isdigit():
+            left_index = int(expr[-2])
+            right_index = int(expr[-1])
+            return op(int(prod_digits[left_index]), int(prod_digits[right_index]))
+
+    if expr.startswith("9-(") and expr.endswith(")"):
+        inner_value = core_eval_product_digit_expr(expr[3:-1], prod_digits)
+        return None if inner_value is None else 9 - inner_value
+
+    if expr.endswith(")") and "(" in expr:
+        op_name, rest = expr.split("(", 1)
+        if op_name not in base_ops:
+            return None
+        args = core_split_product_digit_expr_args(rest[:-1])
+        if args is None:
+            return None
+        left_expr, right_expr = args
+        left_value = core_eval_product_digit_expr(left_expr, prod_digits)
+        right_value = core_eval_product_digit_expr(right_expr, prod_digits)
+        if left_value is None or right_value is None:
+            return None
+        return base_ops[op_name](left_value, right_value)
+
+    return None
+
+
 def core_operator_symbols(examples: list[tuple[str, str]], target: str) -> list[str]:
     return sorted({left[2] for left, _ in examples} | {target[2]})
 
@@ -686,7 +785,9 @@ def core_family_compatible(
     composite_info = None
     if mode_info is None and generic_info is None:
         composite_info = (
-            core_parse_scalar_concat_family(family_name)
+            core_parse_product_digit_family(family_name)
+            or core_parse_product_digit_tuple_family(family_name)
+            or core_parse_scalar_concat_family(family_name)
             or core_parse_pair_concat_family(family_name)
             or core_parse_scalar_pair_family(family_name)
             or core_parse_copy_mix_family(family_name)
@@ -923,6 +1024,14 @@ def core_family_length_bounds(family_name: str) -> tuple[int, int] | None:
     if generic_bounds is not None:
         return generic_bounds
 
+    product_digit = core_parse_product_digit_family(family_name)
+    if product_digit is not None:
+        return 4, 4
+
+    product_digit_tuple = core_parse_product_digit_tuple_family(family_name)
+    if product_digit_tuple is not None:
+        return 4, 4
+
     scalar_concat = core_parse_scalar_concat_family(family_name)
     if scalar_concat is not None:
         left_expr, left_mode, right_expr, right_mode, strip0 = scalar_concat
@@ -1025,6 +1134,32 @@ def core_render_composite_tokens(
     x: int,
     y: int,
 ) -> list[tuple[str, str]] | None:
+    product_digit = core_parse_product_digit_family(family_name)
+    if product_digit is not None:
+        _, pos1_mode, pos3_mode = product_digit
+        p0, p1, p2, p3 = map(int, f"{x * y:04d}")
+        if pos1_mode == "carry01":
+            pos1 = (p0 + p1) // 10
+        else:
+            pos1 = (p1 + p3) // 10
+        if pos3_mode == "max02":
+            pos3 = max(p0, p2)
+        else:
+            pos3 = p2
+        text = f"{9 - abs(p0 - max(p1, p2))}{pos1}{(p2 + p3) % 10}{pos3}"
+        return core_string_to_tokens(text)
+
+    product_digit_tuple = core_parse_product_digit_tuple_family(family_name)
+    if product_digit_tuple is not None:
+        prod_digits = f"{x * y:04d}"
+        output_digits = []
+        for expr in product_digit_tuple:
+            value = core_eval_product_digit_expr(expr, prod_digits)
+            if value is None or not (0 <= value <= 9):
+                return None
+            output_digits.append(str(value))
+        return core_string_to_tokens("".join(output_digits))
+
     scalar_concat = core_parse_scalar_concat_family(family_name)
     if scalar_concat is not None:
         left_expr, left_mode, right_expr, right_mode, strip0 = scalar_concat

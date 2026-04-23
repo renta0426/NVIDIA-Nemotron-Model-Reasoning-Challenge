@@ -267,5 +267,66 @@
   - 強い surviving functions は `sum_carry:01/12/13`, `9-p3`, `9-p2`, `absdiff:02/12/13`, `max:02/12` などで、以前の input-digit shallow family failure と対照的に signal がある。
   - sub-search では position2-3 の強い pair と position1 の `sum_carry:01` / `sum_carry:13` まで小さな frontier に落ちる一方、現 library の position0 候補を足した full 4-tuple は 0 hit だった。
   - 現時点の read は「product-digit family 全体が無い」のではなく、「位置0の関数族が現 library では不足している可能性が高い」。
+- `1785b35e` に対して position0 を second-order combiner まで広げると、row-local では初めて full 4-tuple が立つ。
+  - verified tuple class は `pos0 = 9-absdiff(p0, max:12)` と `pos1 in {sum_carry:01, sum_carry:13}`, `pos2 = sum_mod:23`, `pos3 in {max:02, p2}` の 4 variant。
+  - explicit 00..99 enumeration では `!^*?] -> !>"?`, `:&*?? -> ]>/!`, `(!*?! -> :^:/` に対して final survivor 1 map を再現した。
+  - したがって dominant row の local gap は、input-digit family ではなく `x*y` product digits 上の second-order computed-digit class で説明できる。
+- ただしこの second-order class の slice-wide reuse は薄い。
+  - unresolved `*` 4-char groups 全体 58 件に対して、上の 4 tuple variant を example-side / target-sideで再点検すると、example-side hit row は `5 / 58`、full hit row は `0 / 58`。
+  - example-side hit row は `1785b35e`, `2fc5ef5b`, `563bf8f9`, `64d775e5`, `a4e4ec1d` のみ。
+  - 内訳は `(2,(4,4),4)` が 2 行、`(2,(4,4),None)` が 3 行で、dominant target-present slice 全体を剥がす class ではない。
+- hit rows 5 件の surface を比較しても、narrow repeated subcluster は見えない。
+  - canonical pair signatures は 5 / 5 で相互に異なり、target-present / target-absent, `cryptarithm_deduce` / `cryptarithm_guess` が混在する。
+  - したがってこの second-order class は reusable family 候補というより thin-support sibling とみなすべき。
+- 次点の unresolved zero-op profile でも、surface cluster 側の突破口は見えていない。
+  - `(2,(3,4),None)` は zero rows 21 件のうち `* = 15` が支配的で、上位 unresolved signatures は全て singleton。
+  - `(3,(4,4,4),None)` も zero rows 16 件のうち `* = 13` が支配的で、こちらも上位 unresolved signatures は全て singleton。
+  - したがって次の pivot も repeated surface ではなく、row-local arithmetic family 探索として扱うべき。
+- `(3,(4,4,4),None)` の representative row `30ac5c8e` は、`*` 側だけなら first-order product-digit family が row-local に立つ。
+  - `:/*/} -> #/&?`, `}&*#" -> #&\}`, `\}*)@ -> &&#?` に対し、`pos0 = sum_mod:03`, `pos1 = max:03`, `pos2 = p2`, `pos3 = absdiff:01` で final merged map 1 件を再現した。
+  - これは `98*87 = 8526`, `72*41 = 2952`, `57*06 = 0342` から `4823`, `4257`, `2243` を作る row-local first-order computed-digit hit で、`1785b35e` のような second-order まで要らない。
+- ただし `30ac5c8e` は clean `*` anchor ではなく multi-gap 行だった。
+  - 上の `*` map を固定して row 全体を join すると、既存 `-` family 52 本の reduced maps とは `0` 件、`+` side でも example maps / target maps ともに `0` 件しか join しない。
+  - したがってこの row は「`*` family を足せば解ける行」ではなく、少なくとも `*` 以外にも missing family が残っている証拠である。
 - したがって current parser-neighbor の multiplication-side extension (`x*y` concat/mask/copymix/permutation と narrow pairconcat) では、dominant `*` 4-char zero slice の representative row は説明できない。
   - 次の multiplication-side仮説は、`x*y` 近傍ではなく parser 外の新 computed-digit transform class として立てるべき。
+- clean な non-target `*` anchor として `99b7018f` も追加で点検した。
+  - この row は `*` examples 3 本、target は unseen `+` で、既存 family 候補数は `* = 0`。`*` 側だけを独立に見られるため、OOM を避けた lightweight probe の代表に向く。
+  - まず plain multiplication cryptarithm として解けるかを直に再点検したが、distinct digits 前提の標準形でも、leading zero を許した緩い形でも example-side exact solution は `0` 件だった。
+  - したがって `99b7018f` の missing `*` は「普通の掛け算を既存 parser が取り逃がしただけ」の型ではなく、やはり computed-digit family 側の gap とみるべき。
+- `99b7018f` の first-order product-digit probe では、inner positions にだけ強い signal が出た。
+  - position-wise top counts は `pos1: 03_min -> 6`, `pos2: 03_prod_mod -> 78`, `pos3: p3 -> 192` で、少なくとも middle digits には product-digit-derived family が掛かる余地がある。
+  - ただし strongest singles 同士をそのまま join すると `pos1 = 03_min`, `pos2 = 03_prod_mod` は `0` 件で、individual best を並べるだけでは row を説明できない。
+  - pos1 top5 x pos2 top5 の小さい直積を調べると、唯一 surviving した pair は `pos1 = prod_mod:13`, `pos2 = min:03` で、reduced map は `1` 件だった。
+  - その partial map は `"->8, $->6, '->5, )->0, :->4, >->2, \\->7, {->1, |->3` を固定し、example-side decoded products は `3876`, `1584`, `5146` になる。
+- しかし `99b7018f` は full first-order row には伸びなかった。
+  - 上の unique partial map を固定したうえで current first-order library 全体を再点検すると、outer positions `pos0` と `pos3` を延長できる候補はどちらも `0` 件だった。
+  - したがってこの row は「first-order product-digit family が全体を説明する clean hit」ではなく、「inner pair には本物の product-digit signal があるが、outer positions には richer class が要る」thin-support sibling とみなすべき。
+- `99b7018f` は outer positions だけを second-order combiner に広げると、`*` side の full local tuple まで届く。
+  - verified tuple の一例は `pos0 = 9 - sum_mod(9-p2, prod_mod:01)`, `pos1 = prod_mod:13`, `pos2 = min:03`, `pos3 = absdiff(absdiff:01, prod_tens:01)`。
+  - explicit 00..99 enumeration では `'{*\\$ -> |"||`, `||*:" -> |){:`, `"|*$> -> ^$':` に対して final survivor 1 map を再現し、`"->8, $->6, '->5, )->0, :->4, >->2, \\->7, ^->9, {->1, |->3` を得た。
+  - したがってこの row の `*` gap は、`1785b35e` より軽い「inner は first-order product-digit、outer だけ second-order」の hybrid computed-digit class で説明できる。
+  - ただし target は unseen `+` のままなので、これは row 全体の solve ではなく non-target `*` family support の新証拠として扱うべきである。
+  - さらに same-profile (`3 examples`, all `*`, 4-char outputs) 6 行にこの exact tuple を example-side で当て直すと hit は `1 / 6` で、`99b7018f` 自身しか再現しなかった。
+  - よってこの hybrid tuple も reusable family というより、`30ac5c8e` と同様に row-local thin-support sibling とみるのが妥当である。
+- clean target `*` gap として `2fc5ef5b` も追加で切った。
+  - operator-level に見ると `+` side は既存 family 候補が `10` 本ある一方、target `*` は `0` 本で、row 全体の failure は実質 `*` 側に集中している。
+  - 以前の `1785b35e` second-order class 4 variant を example-side に当て直すと、`pos1 = sum_carry:13`, `pos2 = sum_mod:23`, `pos3 = p2` を含む 1 variant だけが `*` examples を通し、reduced map も `1` 件だった。
+  - ただしその unique example map を target に延長すると、inputs は `60 * 84` に固定される一方、class が作る target output は `8044` で、gold `0673` には全く届かない。target-compatible hit は `0` 件だった。
+  - その map が誘導する numeric triples は `3569 -> 6156`, `7154 -> 7095`, `5040 -> 0673` で、ここに対して現 first-order product-digit library を再点検すると全 position `0` hit、second-order combiner を見ても `pos0 / pos1 / pos3` には候補があるのに `pos2` は `0` hit だった。
+  - よって `2fc5ef5b` は `1785b35e` の近傍 sibling ではあるが、そのまま同 classを target まで延ばせる行ではない。少なくとも target `*` の core transform は、現 first/second-order product-digit vocabulary とは別物である。
+  - 追加で reduced third-order grammar を切ると、target `*` 単体には compact continuation が見つかった。例として `pos0 = max(min:23, prod_mod:01)`, `pos1 = sum_mod(absdiff:02, sum_mod:01)`, `pos2 = sum_mod(9-absdiff:02, sum_mod:02)`, `pos3 = sum_mod(9-absdiff:01, sum_mod:02)` は `*` examples と target の 3 instances をすべて通し、reduced map `1` 件・target join `1` 件だった。
+  - ただしその star map は `&->6, %->3, ^->1` を固定し、これは `+` side reduced maps が許す overlap triple 29 種のどれにも含まれなかった。実際、existing `+` families との join count は `0` だった。
+  - したがって `2fc5ef5b` の次の search target は「target-only third-order formula を足すこと」では足りない。必要なのは、`+` side overlap と両立する別の `*`-side induced map そのものを見つけることだ。
+- ただし同じ `1785b35e` class でも、non-target `*` gap row では row-level solve まで届く例がある。
+  - `64d775e5` では `*` side current candidates が `0`、`+` side は example/target とも `swap_halves` 1 本だけが残る clean row だった。
+  - `1785` class の variant `pos0 = 9-absdiff(p0, max:12)`, `pos1 = sum_carry:13`, `pos2 = sum_mod:23`, `pos3 = p2` を `*` examples に当てると reduced map `1` 件を得て、それが `+` examples の `swap_halves` と target `+` の `swap_halves` の両方に join した。
+  - explicit merge では final solution 1 件を再現し、digit map は `!->7, $->0, %->5, &->6, /->8, @->9, \`->3` になった。
+  - したがって earlier の `0 / 58` は「この class 単体で target `*` まで説明する full-hit がない」という意味では保たれるが、「non-target `*` gap row を既存他operator family と組んで row-level solve できる例がない」とまでは言えない。`64d775e5` はその反例である。
+- 上の `1785` class は `analyze_symbol_rules.py` に `prod_digits|1785|carry01|max02`, `prod_digits|1785|carry01|p2`, `prod_digits|1785|carry13|max02`, `prod_digits|1785|carry13|p2` の 4 family として実装した。
+  - default solver (`explain_symbol_row_with_core_solver`) でも `64d775e5` は `{'+' : 'swap_halves', '*' : 'prod_digits|1785|carry01|max02'}` で solve されるようになった。
+  - 一方で `2fc5ef5b` は実装後も unsolved のままで、target `*` の新 family gap が残ることを再確認した。
+  - wider scan で `2e9973b7` も example-side では `prod_digits|1785|carry01|max02` に hit したが、これは new coverage ではない。row 自体は既存 solver でも `{'*': 'x*y', '-': 'y-x', '+': 'drop_op'}` で既に solve 済みだった。
+  - したがってこの family の immediate value は「example-side hit row を増やすこと」ではなく、既存 solver が未解決だった non-target `*` gap row `64d775e5` を実際に 1 行回収した点にある。
+  - current symbolic rows のうち「`*` examples が 2 本で両方 4-char」の slice を再走査すると、この family の example-side hit row は `6` 件だった: `1785b35e`, `2e9973b7`, `2fc5ef5b`, `563bf8f9`, `64d775e5`, `a4e4ec1d`。
+  - ただし row-level で見ると、`2e9973b7` は既存 solver で既に解ける redundant hit、`1785b35e` / `2fc5ef5b` / `563bf8f9` / `a4e4ec1d` は依然 unsolved で、new current coverage として確認できたのは `64d775e5` だけだった。
