@@ -79,7 +79,7 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 ### Status
 
 - Bundle generated: YES
-- MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), and README-style local300 watcher armed (`step 8` observed after manifest fix; first checkpoint not yet reached)
+- MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), and README-style local300 watcher armed (`step 10` observed after manifest fix; first checkpoint not yet reached)
 - local300 score: TBD
 
 ## symbol_cipher_recovery_mix
@@ -147,7 +147,7 @@ Keep direct miss pressure, then add broad answer-only stabilization for numeric_
 
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
-- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory
+- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached queue will auto-launch this variant once one active run finishes
 - local300 score: TBD
 
 ## hybrid_bridge
@@ -217,7 +217,7 @@ Balanced bridge run: moderate direct miss repeats, lighter bit-family rebalance,
 
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
-- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory
+- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached queue will auto-launch this variant once a later slot opens
 - local300 score: TBD
 
 ## Generated
