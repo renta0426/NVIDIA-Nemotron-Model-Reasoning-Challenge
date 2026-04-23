@@ -79,10 +79,11 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 ### Status
 
 - Bundle generated: YES
-- MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (`step 37` observed after manifest fix; first periodic checkpoint `0000020_adapters.safetensors` written, second checkpoint not yet reached; unused `_debug_bundle_tokens` cleanup completed)
+- MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (`step 38` observed after manifest fix; first periodic checkpoint `0000020_adapters.safetensors` written, second checkpoint not yet reached; unused `_debug_bundle_tokens` cleanup completed)
 - completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
 - score ledger update: `postprocess-run` now writes the measured local300 score back into this tracked markdown ledger automatically once an `adapter_validation` 300-row summary exists
 - score publish watcher: a detached watcher is now armed to detect completed local300 validation, rerun `postprocess-run` defensively, then `git add/commit/push` the updated tracked score ledger
+- queue refresh: both deferred queues (`symbol_cipher_recovery_mix`, `hybrid_bridge`) were re-armed so future launches also attach the same stale-progress guard wiring used by the currently active runs
 - local300 score: TBD
 
 ## symbol_cipher_recovery_mix
