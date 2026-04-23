@@ -397,6 +397,18 @@ def build_queue_managed_run_command_tokens(args: argparse.Namespace) -> list[str
     return tokens
 
 
+def build_watch_score_publish_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("watch-score-publish")
+    append_command_option(tokens, "--score-watch-log-path", Path(args.score_watch_log_path))
+    append_command_option(tokens, "--score-watch-state-dir", Path(args.score_watch_state_dir))
+    append_command_option(tokens, "--score-watch-sleep-seconds", int(args.score_watch_sleep_seconds))
+    append_command_option(tokens, "--postprocess-eval-kind", str(args.postprocess_eval_kind))
+    append_command_bool_option(tokens, "--cleanup-completed-run-artifacts", bool(args.cleanup_completed_run_artifacts))
+    for path in getattr(args, "watch_run_root", []) or []:
+        append_command_option(tokens, "--watch-run-root", Path(path))
+    return tokens
+
+
 def load_run_manifest_for_result(run_result: dict[str, Any]) -> dict[str, Any]:
     run_root_raw = run_result.get("run_root")
     if not run_root_raw:
@@ -513,6 +525,53 @@ def append_log_line(path: Path, message: str) -> None:
     ensure_dir(path.parent)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"[{local_now()}] {message}\n")
+
+
+def git_index_lock_path() -> Path:
+    return REPO_ROOT / ".git" / "index.lock"
+
+
+def git_index_is_locked() -> bool:
+    return git_index_lock_path().exists()
+
+
+def has_git_diff(path: Path) -> bool:
+    proc = subprocess.run(
+        ["git", "diff", "--quiet", "--", relative_to_repo(path)],
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
+    return proc.returncode == 1
+
+
+def commit_and_push_score_ledger(*, ledger_path: Path, run_name: str, log_path: Path) -> dict[str, Any]:
+    if git_index_is_locked():
+        append_log_line(log_path, f"git_busy run_name={run_name}")
+        return {"status": "git_busy", "ledger_path": str(ledger_path.resolve())}
+    if not has_git_diff(ledger_path):
+        append_log_line(log_path, f"no_ledger_diff run_name={run_name}")
+        return {"status": "no_ledger_diff", "ledger_path": str(ledger_path.resolve())}
+    subprocess.run(["git", "add", "--", relative_to_repo(ledger_path)], cwd=str(REPO_ROOT), check=True)
+    commit_message = f"Publish local300 score for {run_name}"
+    subprocess.run(
+        [
+            "git",
+            "commit",
+            "-m",
+            commit_message,
+            "-m",
+            "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",
+        ],
+        cwd=str(REPO_ROOT),
+        check=True,
+    )
+    subprocess.run(["git", "push"], cwd=str(REPO_ROOT), check=True)
+    append_log_line(log_path, f"score_pushed run_name={run_name}")
+    return {
+        "status": "score_pushed",
+        "ledger_path": str(ledger_path.resolve()),
+        "commit_message": commit_message,
+    }
 
 
 def make_namespace_with(args: argparse.Namespace, **updates: Any) -> argparse.Namespace:
@@ -3795,6 +3854,63 @@ def run_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
         time.sleep(queue_sleep_seconds)
 
 
+def run_watch_score_publish(args: argparse.Namespace) -> dict[str, Any]:
+    log_path = Path(args.score_watch_log_path).resolve()
+    state_dir = Path(args.score_watch_state_dir).resolve()
+    ensure_dir(state_dir)
+    watch_run_roots = [Path(path).resolve() for path in (args.watch_run_root or [])]
+    if not watch_run_roots:
+        raise ValueError("watch-score-publish requires at least one --watch-run-root")
+    write_command_script(state_dir / "score_publish_watch_cmd.sh", build_watch_score_publish_command_tokens(args))
+    append_log_line(log_path, f"watcher_start watched_runs={len(watch_run_roots)}")
+    sleep_seconds = max(30, int(args.score_watch_sleep_seconds))
+
+    while True:
+        touched = False
+        for run_root in watch_run_roots:
+            run_name = run_root.name
+            done_file = state_dir / f"{re.sub(r'[^A-Za-z0-9._-]+', '_', run_name)}.done"
+            if done_file.exists():
+                continue
+            training_result_path = run_root / "training_result.json"
+            validation_summary_path = run_root / "adapter_validation" / "validation_summary.json"
+            if not training_result_path.exists() or not validation_summary_path.exists():
+                continue
+            touched = True
+            append_log_line(log_path, f"score_detected run_name={run_name}")
+            try:
+                postprocess_args = make_namespace_with(
+                    args,
+                    output_root=run_root.parent,
+                    run_name=run_name,
+                )
+                postprocess_result = run_postprocess_existing(postprocess_args)
+            except Exception as exc:
+                append_log_line(log_path, f"postprocess_failed run_name={run_name} error={type(exc).__name__}: {exc}")
+                continue
+            score_ledger_result = postprocess_result.get("score_ledger_result")
+            if not isinstance(score_ledger_result, dict):
+                append_log_line(log_path, f"score_ledger_missing run_name={run_name}")
+                write_text(done_file, utc_now() + "\n")
+                continue
+            ledger_path = Path(str(score_ledger_result["ledger_path"])).resolve()
+            try:
+                publish_result = commit_and_push_score_ledger(
+                    ledger_path=ledger_path,
+                    run_name=run_name,
+                    log_path=log_path,
+                )
+            except Exception as exc:
+                append_log_line(log_path, f"git_publish_failed run_name={run_name} error={type(exc).__name__}: {exc}")
+                continue
+            if publish_result["status"] == "git_busy":
+                continue
+            write_text(done_file, utc_now() + "\n")
+        if not touched:
+            append_log_line(log_path, "waiting_for_scores")
+        time.sleep(sleep_seconds)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -3970,6 +4086,31 @@ def parse_args() -> argparse.Namespace:
         type=Path,
     )
     queue_managed.set_defaults(func=run_queue_managed)
+
+    watch_score_publish = subparsers.add_parser(
+        "watch-score-publish",
+        help="Watch completed local300 runs, rerun postprocess, and commit/push tracked score ledger updates safely.",
+    )
+    watch_score_publish.add_argument("--score-watch-log-path", type=Path, required=True)
+    watch_score_publish.add_argument("--score-watch-state-dir", type=Path, required=True)
+    watch_score_publish.add_argument("--score-watch-sleep-seconds", type=int, default=300)
+    watch_score_publish.add_argument(
+        "--postprocess-eval-kind",
+        choices=("auto", "aopen", "adapter-validation"),
+        default="adapter-validation",
+    )
+    watch_score_publish.add_argument(
+        "--cleanup-completed-run-artifacts",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    watch_score_publish.add_argument(
+        "--watch-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    watch_score_publish.set_defaults(func=run_watch_score_publish)
 
     return parser.parse_args()
 
