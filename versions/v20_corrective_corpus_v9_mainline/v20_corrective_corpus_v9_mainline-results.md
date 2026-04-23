@@ -8,6 +8,7 @@
 - Bundle: A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v9_mainline_bundle.jsonl
 - Overlay report: versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/reports/corrective_overlay_report.md
 - Overlay summary: versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/artifacts/corrective_overlay_summary.json
+- Git-tracked generated artifacts: versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/artifacts/corrective_selection.csv, versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/artifacts/corrective_overlay_summary.json, versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/reports/corrective_overlay_report.md
 - Current state: bundle generated, score not measured yet
 - Training / validation / leaderboard score:
   - validation: pending
@@ -77,3 +78,5 @@ Overlay category counts:
 ## Measurement note
 
 現時点では v9 は **データ生成まで完了** であり、学習・validation・proxy・official の計測はまだです。ここにスコアを追記するまでは、v9 は design branch であって score branch ではありません。
+
+補足として、bundle 本体は約 290MB で通常の GitHub file limit を超えるため local 生成物として保持し、Git 上には再現用 generator と軽量な summary / selection / report を残しています。
