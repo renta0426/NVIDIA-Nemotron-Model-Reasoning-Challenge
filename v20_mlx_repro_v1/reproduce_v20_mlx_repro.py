@@ -11,6 +11,7 @@ import re
 import shlex
 import shutil
 import socket
+import subprocess
 import sys
 import time
 import types
@@ -353,6 +354,36 @@ def build_postprocess_command_tokens(args: argparse.Namespace) -> list[str]:
     return tokens
 
 
+def build_manage_run_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_train_command_tokens(args)
+    tokens[4] = "manage-run"
+    append_command_option(tokens, "--max-tokens", int(args.max_tokens))
+    append_command_option(tokens, "--temperature", float(args.temperature))
+    append_command_option(tokens, "--top-p", float(args.top_p))
+    append_command_option(tokens, "--max-num-seqs", int(args.max_num_seqs))
+    append_command_option(tokens, "--max-model-len", int(args.max_model_len))
+    append_command_option(tokens, "--prompt-chunk-size", int(args.prompt_chunk_size))
+    append_command_option(tokens, "--prefill-batch-size", int(args.prefill_batch_size))
+    append_command_option(tokens, "--completion-batch-size", int(args.completion_batch_size))
+    append_command_option(tokens, "--eval-limit", int(args.eval_limit))
+    append_command_option(tokens, "--validation-sample-size", int(args.validation_sample_size))
+    append_command_option(tokens, "--validation-subset-size", int(args.validation_subset_size))
+    append_command_option(tokens, "--validation-subset-mode", str(args.validation_subset_mode))
+    append_command_option(tokens, "--eval-shards", int(args.eval_shards))
+    append_command_option(tokens, "--eval-shard-index", int(args.eval_shard_index))
+    append_command_bool_option(tokens, "--eval-enable-thinking", bool(args.eval_enable_thinking))
+    append_command_bool_option(tokens, "--lazy-load", bool(args.lazy_load))
+    if bool(args.force_single_generate):
+        tokens.append("--force-single-generate")
+    append_command_option(tokens, "--postprocess-eval-kind", str(args.postprocess_eval_kind))
+    append_command_bool_option(tokens, "--cleanup-completed-run-artifacts", bool(args.cleanup_completed_run_artifacts))
+    append_command_option(tokens, "--manager-sleep-seconds", int(args.manager_sleep_seconds))
+    append_command_option(tokens, "--progress-watch-interval-seconds", int(args.progress_watch_interval_seconds))
+    append_command_option(tokens, "--stall-check-interval-seconds", int(args.stall_check_interval_seconds))
+    append_command_option(tokens, "--stall-threshold-seconds", int(args.stall_threshold_seconds))
+    return tokens
+
+
 def load_run_manifest_for_result(run_result: dict[str, Any]) -> dict[str, Any]:
     run_root_raw = run_result.get("run_root")
     if not run_root_raw:
@@ -459,6 +490,73 @@ def update_score_ledger(run_result: dict[str, Any], eval_result: dict[str, Any])
         "line": replacement_line,
         "changed": changed,
     }
+
+
+def local_now() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def append_log_line(path: Path, message: str) -> None:
+    ensure_dir(path.parent)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(f"[{local_now()}] {message}\n")
+
+
+def make_namespace_with(args: argparse.Namespace, **updates: Any) -> argparse.Namespace:
+    payload = dict(vars(args))
+    payload.update(updates)
+    return argparse.Namespace(**payload)
+
+
+def read_latest_train_report(run_root: Path) -> tuple[int | None, int | None]:
+    report_path = run_root / "adapter" / "latest_train_report.json"
+    if not report_path.exists():
+        return None, None
+    payload = load_json(report_path)
+    step = payload.get("step")
+    age_seconds = int(time.time() - report_path.stat().st_mtime)
+    return int(step) if step is not None else None, age_seconds
+
+
+def list_saved_checkpoints(adapter_dir: Path) -> list[Path]:
+    return sorted(adapter_dir.glob("*_adapters.safetensors"))
+
+
+def find_latest_checkpoint_path(adapter_dir: Path) -> Path | None:
+    checkpoint_paths = list_saved_checkpoints(adapter_dir)
+    return checkpoint_paths[-1] if checkpoint_paths else None
+
+
+def find_run_command_pids(run_name: str, command_name: str) -> list[int]:
+    proc = subprocess.run(["ps", "-axo", "pid,command"], capture_output=True, text=True, check=True)
+    script_name = Path(__file__).name
+    pids: list[int] = []
+    for raw_line in proc.stdout.splitlines():
+        line = raw_line.strip()
+        if not line or script_name not in line:
+            continue
+        if f" {command_name}" not in line or f"--run-name {run_name}" not in line:
+            continue
+        pid_text, _, _ = line.partition(" ")
+        if pid_text.isdigit():
+            pids.append(int(pid_text))
+    return pids
+
+
+def spawn_detached_command(tokens: Sequence[str], *, log_path: Path) -> int:
+    ensure_dir(log_path.parent)
+    env = os.environ.copy()
+    env.setdefault("UV_NO_PROGRESS", "1")
+    with log_path.open("a", encoding="utf-8") as handle:
+        proc = subprocess.Popen(
+            list(tokens),
+            cwd=str(REPO_ROOT),
+            env=env,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    return int(proc.pid)
 
 
 def resolve_hf_snapshot(model_root: Path) -> Path:
@@ -3421,6 +3519,181 @@ def run_prepare(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def run_managed_adapter_validation_pipeline(args: argparse.Namespace, *, run_root: Path, log_path: Path) -> None:
+    env = os.environ.copy()
+    env.setdefault("UV_NO_PROGRESS", "1")
+    eval_shards = max(1, int(args.eval_shards))
+    for shard_index in range(eval_shards):
+        shard_args = make_namespace_with(args, eval_shard_index=shard_index)
+        append_log_line(log_path, f"eval_shard_start shard={shard_index}")
+        with log_path.open("a", encoding="utf-8") as handle:
+            subprocess.run(
+                build_eval_adapter_validation_command_tokens(shard_args),
+                cwd=str(REPO_ROOT),
+                env=env,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
+        append_log_line(log_path, f"eval_shard_done shard={shard_index} exit=0")
+    append_log_line(log_path, "merge_start")
+    with log_path.open("a", encoding="utf-8") as handle:
+        subprocess.run(
+            build_merge_adapter_validation_command_tokens(args),
+            cwd=str(REPO_ROOT),
+            env=env,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+            check=True,
+        )
+    append_log_line(log_path, "merge_done exit=0")
+    postprocess_args = make_namespace_with(args, postprocess_eval_kind="adapter-validation")
+    append_log_line(log_path, "postprocess_start")
+    with log_path.open("a", encoding="utf-8") as handle:
+        subprocess.run(
+            build_postprocess_command_tokens(postprocess_args),
+            cwd=str(REPO_ROOT),
+            env=env,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+            check=True,
+        )
+    append_log_line(log_path, "postprocess_done exit=0")
+
+
+def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    ensure_dir(run_root)
+    managed_log = run_root / "managed_run.log"
+    supervisor_log = run_root / "train_supervisor.log"
+    progress_log = run_root / "progress_watch.log"
+    completion_log = run_root / "completion_watch.log"
+    eval_log = run_root / "eval300_watch.log"
+    stall_log = run_root / "stall_guard.log"
+    append_log_line(managed_log, f"manager_start run_name={args.run_name}")
+    append_log_line(supervisor_log, f"manager_attached run_name={args.run_name}")
+    append_log_line(progress_log, f"manager_attached run_name={args.run_name}")
+    append_log_line(completion_log, f"manager_attached run_name={args.run_name}")
+    append_log_line(eval_log, f"manager_attached run_name={args.run_name}")
+    append_log_line(
+        stall_log,
+        f"manager_attached run_name={args.run_name} stale_seconds={int(args.stall_threshold_seconds)}",
+    )
+    last_completion_step: int | None | str = None
+    last_progress_at = 0.0
+    last_stall_at = 0.0
+    manager_sleep_seconds = max(30, int(args.manager_sleep_seconds))
+    progress_watch_interval_seconds = max(30, int(args.progress_watch_interval_seconds))
+    stall_check_interval_seconds = max(30, int(args.stall_check_interval_seconds))
+    stall_threshold_seconds = max(300, int(args.stall_threshold_seconds))
+    save_every_steps = max(0, int(args.save_every_steps))
+
+    while True:
+        training_result_exists = (run_root / "training_result.json").exists()
+        validation_summary_exists = (run_root / "adapter_validation" / "validation_summary.json").exists()
+        step, age_seconds = read_latest_train_report(run_root)
+        step_value: int | str = step if step is not None else "missing"
+
+        append_log_line(
+            completion_log,
+            f"waiting step={step_value} train_result={int(training_result_exists)} score={int(validation_summary_exists)}",
+        )
+        if step is not None and step != last_completion_step and save_every_steps > 0 and step % save_every_steps == 0:
+            append_log_line(completion_log, "checkpoints_after_cap")
+            for checkpoint_path in list_saved_checkpoints(run_root / "adapter"):
+                append_log_line(completion_log, str(checkpoint_path.resolve()))
+        last_completion_step = step_value
+
+        if training_result_exists and validation_summary_exists:
+            append_log_line(completion_log, "done")
+            append_log_line(managed_log, f"manager_done run_name={args.run_name}")
+            return {
+                "run_root": str(run_root),
+                "managed_log": str(managed_log.resolve()),
+                "status": "done",
+            }
+
+        now = time.time()
+        if not training_result_exists:
+            train_pids = find_run_command_pids(args.run_name, "train")
+            if train_pids:
+                append_log_line(supervisor_log, f"train_alive active={len(train_pids)}")
+            else:
+                latest_checkpoint = find_latest_checkpoint_path(run_root / "adapter")
+                if latest_checkpoint is not None:
+                    append_log_line(supervisor_log, f"relaunch_needed resume_from={latest_checkpoint}")
+                    train_args = make_namespace_with(args, resume_adapter_file=latest_checkpoint)
+                else:
+                    append_log_line(supervisor_log, "relaunch_needed resume_from=none")
+                    train_args = make_namespace_with(args, resume_adapter_file=None)
+                train_pid = spawn_detached_command(
+                    build_train_command_tokens(train_args),
+                    log_path=run_root / "train_detached.log",
+                )
+                append_log_line(supervisor_log, f"train_spawned pid={train_pid}")
+                train_pids = [train_pid]
+
+            if now - last_progress_at >= progress_watch_interval_seconds:
+                if step is None or age_seconds is None:
+                    append_log_line(progress_log, "report_missing")
+                else:
+                    status = "stale_progress_detected" if age_seconds >= 1800 else "progress_ok"
+                    append_log_line(progress_log, f"{status} step={step} age_seconds={age_seconds}")
+                last_progress_at = now
+
+            if now - last_stall_at >= stall_check_interval_seconds:
+                status = "ok"
+                action = "none"
+                if age_seconds is not None and age_seconds >= stall_threshold_seconds and train_pids:
+                    status = "stale_detected"
+                    action = "kill_for_supervisor_restart"
+                    for pid in train_pids:
+                        subprocess.run(["kill", str(pid)], check=False)
+                append_log_line(
+                    stall_log,
+                    str(
+                        {
+                            "status": status,
+                            "action": action,
+                            "step": step_value,
+                            "age_seconds": age_seconds,
+                            "pids": train_pids,
+                        }
+                    ),
+                )
+                last_stall_at = now
+        elif not validation_summary_exists:
+            try:
+                run_managed_adapter_validation_pipeline(args, run_root=run_root, log_path=eval_log)
+            except subprocess.CalledProcessError as exc:
+                append_log_line(eval_log, f"eval_pipeline_failed returncode={exc.returncode}")
+        time.sleep(manager_sleep_seconds)
+
+
+def run_launch_managed(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    ensure_dir(run_root)
+    write_command_script(run_root / "launch_managed_cmd.sh", build_manage_run_command_tokens(args))
+    existing_pids = find_run_command_pids(args.run_name, "manage-run")
+    if existing_pids:
+        return {
+            "run_root": str(run_root),
+            "manager_pids": existing_pids,
+            "managed_log": str((run_root / "managed_run.log").resolve()),
+            "status": "already_running",
+        }
+    manager_pid = spawn_detached_command(
+        build_manage_run_command_tokens(args),
+        log_path=run_root / "managed_run.log",
+    )
+    return {
+        "run_root": str(run_root),
+        "manager_pids": [manager_pid],
+        "managed_log": str((run_root / "managed_run.log").resolve()),
+        "status": "started",
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -3512,6 +3785,10 @@ def parse_args() -> argparse.Namespace:
                 "prune periodic *_adapters.safetensors checkpoints and remove training_bundle_tokens/"
             ),
         )
+        target.add_argument("--manager-sleep-seconds", type=int, default=120)
+        target.add_argument("--progress-watch-interval-seconds", type=int, default=300)
+        target.add_argument("--stall-check-interval-seconds", type=int, default=600)
+        target.add_argument("--stall-threshold-seconds", type=int, default=2400)
 
     prepare = subparsers.add_parser("prepare", help="Prepare the v20 snapshot contract, shadow model, and run manifest.")
     add_shared_args(prepare)
@@ -3556,6 +3833,20 @@ def parse_args() -> argparse.Namespace:
     )
     add_shared_args(postprocess)
     postprocess.set_defaults(func=run_postprocess_existing)
+
+    manage_run = subparsers.add_parser(
+        "manage-run",
+        help="Long-running supervisor that keeps a train alive, runs local300 validation, and postprocesses the result.",
+    )
+    add_shared_args(manage_run)
+    manage_run.set_defaults(func=run_manage_run)
+
+    launch_managed = subparsers.add_parser(
+        "launch-managed-run",
+        help="Spawn a detached manage-run supervisor for a run so future restarts and validation stay in one command.",
+    )
+    add_shared_args(launch_managed)
+    launch_managed.set_defaults(func=run_launch_managed)
 
     return parser.parse_args()
 
