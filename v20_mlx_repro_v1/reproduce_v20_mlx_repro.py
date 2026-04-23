@@ -384,6 +384,19 @@ def build_manage_run_command_tokens(args: argparse.Namespace) -> list[str]:
     return tokens
 
 
+def build_queue_managed_run_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_manage_run_command_tokens(args)
+    tokens[4] = "queue-managed-run"
+    append_command_option(tokens, "--queue-log-path", Path(args.queue_log_path))
+    append_command_option(tokens, "--queue-sleep-seconds", int(args.queue_sleep_seconds))
+    append_command_option(tokens, "--max-active-trains-before-launch", int(args.max_active_trains_before_launch))
+    for path in getattr(args, "wait_for_any_training_result_run_root", []) or []:
+        append_command_option(tokens, "--wait-for-any-training-result-run-root", Path(path))
+    for path in getattr(args, "require_run_start_run_root", []) or []:
+        append_command_option(tokens, "--require-run-start-run-root", Path(path))
+    return tokens
+
+
 def load_run_manifest_for_result(run_result: dict[str, Any]) -> dict[str, Any]:
     run_root_raw = run_result.get("run_root")
     if not run_root_raw:
@@ -527,6 +540,17 @@ def find_latest_checkpoint_path(adapter_dir: Path) -> Path | None:
     return checkpoint_paths[-1] if checkpoint_paths else None
 
 
+def matches_python_driver_command(line: str, script_name: str, command_name: str) -> bool:
+    command_marker = f"{script_name} {command_name}"
+    if command_marker not in line:
+        return False
+    if "bash -c" in line or "bash -lc" in line:
+        return False
+    if line.startswith("uv run "):
+        return False
+    return "python" in line
+
+
 def find_run_command_pids(run_name: str, command_name: str) -> list[int]:
     proc = subprocess.run(["ps", "-axo", "pid,command"], capture_output=True, text=True, check=True)
     script_name = Path(__file__).name
@@ -535,12 +559,29 @@ def find_run_command_pids(run_name: str, command_name: str) -> list[int]:
         line = raw_line.strip()
         if not line or script_name not in line:
             continue
-        if f" {command_name}" not in line or f"--run-name {run_name}" not in line:
+        if f"--run-name {run_name}" not in line:
+            continue
+        _, _, command_line = line.partition(" ")
+        if not matches_python_driver_command(command_line, script_name, command_name):
             continue
         pid_text, _, _ = line.partition(" ")
         if pid_text.isdigit():
             pids.append(int(pid_text))
     return pids
+
+
+def count_active_train_processes() -> int:
+    proc = subprocess.run(["ps", "-axo", "command"], capture_output=True, text=True, check=True)
+    script_name = Path(__file__).name
+    count = 0
+    for raw_line in proc.stdout.splitlines():
+        line = raw_line.strip()
+        if not line or script_name not in line:
+            continue
+        if not matches_python_driver_command(line, script_name, "train"):
+            continue
+        count += 1
+    return count
 
 
 def spawn_detached_command(tokens: Sequence[str], *, log_path: Path) -> int:
@@ -3694,6 +3735,66 @@ def run_launch_managed(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def run_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    ensure_dir(run_root)
+    queue_log_path = Path(args.queue_log_path).resolve()
+    write_command_script(run_root / "queue_managed_cmd.sh", build_queue_managed_run_command_tokens(args))
+    append_log_line(queue_log_path, f"queue_start run_name={args.run_name}")
+    wait_any_roots = [Path(path).resolve() for path in (args.wait_for_any_training_result_run_root or [])]
+    require_start_roots = [Path(path).resolve() for path in (args.require_run_start_run_root or [])]
+    queue_sleep_seconds = max(30, int(args.queue_sleep_seconds))
+    max_active_trains_before_launch = int(args.max_active_trains_before_launch)
+
+    while True:
+        if (run_root / "training_result.json").exists() or (run_root / "adapter" / "latest_train_report.json").exists():
+            append_log_line(queue_log_path, f"already_started run_name={args.run_name}")
+            return {
+                "run_root": str(run_root),
+                "queue_log_path": str(queue_log_path),
+                "status": "already_started",
+            }
+
+        any_ready = True
+        if wait_any_roots:
+            any_ready = any((root / "training_result.json").exists() for root in wait_any_roots)
+
+        required_started = True
+        if require_start_roots:
+            required_started = all(
+                (root / "training_result.json").exists() or (root / "adapter" / "latest_train_report.json").exists()
+                for root in require_start_roots
+            )
+
+        active_trains = count_active_train_processes()
+        active_ready = True
+        if max_active_trains_before_launch > 0:
+            active_ready = active_trains <= max_active_trains_before_launch
+
+        if any_ready and required_started and active_ready:
+            append_log_line(
+                queue_log_path,
+                f"slot_open_detected active={active_trains} require_started={int(required_started)} any_ready={int(any_ready)}",
+            )
+            launch_result = run_launch_managed(args)
+            append_log_line(
+                queue_log_path,
+                f"launch_requested run_name={args.run_name} status={launch_result['status']}",
+            )
+            return {
+                "run_root": str(run_root),
+                "queue_log_path": str(queue_log_path),
+                "status": "launch_requested",
+                "launch_result": launch_result,
+            }
+
+        append_log_line(
+            queue_log_path,
+            f"waiting_for_slot active={active_trains} require_started={int(required_started)} any_ready={int(any_ready)}",
+        )
+        time.sleep(queue_sleep_seconds)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -3847,6 +3948,28 @@ def parse_args() -> argparse.Namespace:
     )
     add_shared_args(launch_managed)
     launch_managed.set_defaults(func=run_launch_managed)
+
+    queue_managed = subparsers.add_parser(
+        "queue-managed-run",
+        help="Wait for queue conditions and then call launch-managed-run from the single-file driver.",
+    )
+    add_shared_args(queue_managed)
+    queue_managed.add_argument("--queue-log-path", type=Path, required=True)
+    queue_managed.add_argument("--queue-sleep-seconds", type=int, default=300)
+    queue_managed.add_argument("--max-active-trains-before-launch", type=int, default=0)
+    queue_managed.add_argument(
+        "--wait-for-any-training-result-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    queue_managed.add_argument(
+        "--require-run-start-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    queue_managed.set_defaults(func=run_queue_managed)
 
     return parser.parse_args()
 

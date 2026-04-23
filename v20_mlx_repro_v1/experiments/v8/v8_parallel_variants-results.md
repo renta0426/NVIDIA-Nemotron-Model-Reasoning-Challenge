@@ -83,7 +83,7 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 - completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
 - score ledger update: `postprocess-run` now writes the measured local300 score back into this tracked markdown ledger automatically once an `adapter_validation` 300-row summary exists
 - score publish watcher: a detached watcher is now armed to detect completed local300 validation, rerun `postprocess-run` defensively, then `git add/commit/push` the updated tracked score ledger
-- queue refresh: both deferred queues (`symbol_cipher_recovery_mix`, `hybrid_bridge`) now wait in lightweight shell loops and call `launch-managed-run`, so future launches inherit the main script's single-file managed supervisor instead of long inline shell watcher blocks
+- queue refresh: both deferred queues (`symbol_cipher_recovery_mix`, `hybrid_bridge`) now run via the main script's `queue-managed-run` entry point instead of lightweight shell loops; the queue process now counts only real Python `train` workers, and the latest queue log confirms `active=2`
 - managed launch: `reproduce_v20_mlx_repro.py` now exposes `launch-managed-run` / `manage-run` so future detached launches can be wired from the main single-file driver instead of long ad-hoc shell blocks
 - local300 score: TBD
 
@@ -152,7 +152,7 @@ Keep direct miss pressure, then add broad answer-only stabilization for numeric_
 
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
-- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached queue will auto-launch this variant once one active run finishes
+- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached `queue-managed-run` process will auto-launch this variant once one active run finishes
 - local300 score: TBD
 
 ## hybrid_bridge
@@ -222,7 +222,7 @@ Balanced bridge run: moderate direct miss repeats, lighter bit-family rebalance,
 
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
-- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached queue is now armed and waiting for `symbol_cipher_recovery_mix` to start, then for active train count to drop below 2 before auto-launching this variant
+- launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached `queue-managed-run` process is now armed and waiting for `symbol_cipher_recovery_mix` to start, then for active train count to drop below 2 before auto-launching this variant
 - local300 score: TBD
 
 ## Generated
