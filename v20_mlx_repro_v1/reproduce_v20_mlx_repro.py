@@ -293,6 +293,7 @@ def build_train_command_tokens(args: argparse.Namespace) -> list[str]:
     append_command_bool_option(tokens, "--bias-correction", bool(args.bias_correction))
     append_command_option(tokens, "--steps-per-report", int(args.steps_per_report))
     append_command_option(tokens, "--save-every-steps", int(args.save_every_steps))
+    append_command_option(tokens, "--max-saved-checkpoints", int(args.max_saved_checkpoints))
     if args.resume_adapter_file is not None:
         append_command_option(tokens, "--resume-adapter-file", Path(args.resume_adapter_file))
     append_command_option(tokens, "--max-optimizer-steps", int(args.max_optimizer_steps))
@@ -1202,6 +1203,7 @@ def create_adapter_config_payload(
         "resume_adapter_file": str(Path(args.resume_adapter_file).resolve()) if args.resume_adapter_file else None,
         "adapter_path": str(adapter_dir),
         "save_every": int(args.save_every_steps) if int(args.save_every_steps) > 0 else int(total_steps),
+        "max_saved_checkpoints": int(args.max_saved_checkpoints),
         "max_seq_length": int(args.max_seq_length),
         "grad_checkpoint": True,
         "grad_accumulation_steps": 1,
@@ -1234,6 +1236,18 @@ def save_adapter_weights(adapter_dir: Path, file_name: str, model: Any) -> Path:
     adapter_weights = dict(tree_flatten(model.trainable_parameters()))
     mx.save_safetensors(str(adapter_path), adapter_weights)
     return adapter_path
+
+
+def prune_saved_checkpoints(adapter_dir: Path, *, max_saved_checkpoints: int) -> list[str]:
+    if max_saved_checkpoints < 1:
+        raise ValueError("max_saved_checkpoints must be >= 1 when periodic checkpoint saving is enabled")
+    checkpoint_paths = sorted(adapter_dir.glob("*_adapters.safetensors"))
+    removed: list[str] = []
+    while len(checkpoint_paths) > max_saved_checkpoints:
+        stale = checkpoint_paths.pop(0)
+        stale.unlink()
+        removed.append(stale.name)
+    return removed
 
 
 def summarize_directory(path: Path) -> list[dict[str, Any]]:
@@ -2019,6 +2033,8 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
     step_plan = load_step_plan(artifacts.step_plan_path)
     if not step_plan:
         raise RuntimeError("Empty step plan.")
+    if int(args.save_every_steps) > 0 and int(args.max_saved_checkpoints) < 1:
+        raise ValueError("--max-saved-checkpoints must be >= 1 when --save-every-steps is enabled")
     total_optimizer_steps = len(step_plan)
     run_limit = int(args.max_optimizer_steps) if int(args.max_optimizer_steps) > 0 else total_optimizer_steps
     step_plan = step_plan[:run_limit]
@@ -2166,6 +2182,10 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
 
         if int(args.save_every_steps) > 0 and (optimizer_step_index + 1) % int(args.save_every_steps) == 0:
             save_adapter_weights(artifacts.adapter_dir, f"{optimizer_step_index + 1:07d}_adapters.safetensors", model)
+            prune_saved_checkpoints(
+                artifacts.adapter_dir,
+                max_saved_checkpoints=int(args.max_saved_checkpoints),
+            )
 
     final_adapter_path = save_adapter_weights(artifacts.adapter_dir, "adapters.safetensors", model)
     bundle_manifest = build_local_mlx_bundle(artifacts.run_root, artifacts.adapter_dir)
@@ -3310,6 +3330,7 @@ def parse_args() -> argparse.Namespace:
         )
         target.add_argument("--steps-per-report", type=int, default=1)
         target.add_argument("--save-every-steps", type=int, default=0)
+        target.add_argument("--max-saved-checkpoints", type=int, default=3)
         target.add_argument("--resume-adapter-file", type=Path, default=None)
         target.add_argument("--max-optimizer-steps", type=int, default=0)
         target.add_argument("--max-tokens", type=int, default=README_EVAL_CONTRACT["max_tokens"])
