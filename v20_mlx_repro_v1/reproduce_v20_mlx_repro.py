@@ -545,15 +545,24 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
     target = resolve_progress_ledger_target(run_root)
     if target is None:
         return None
+    run_root_exists = run_root.exists()
     training_done = (run_root / "training_result.json").exists()
     validation_done = (run_root / "adapter_validation" / "validation_summary.json").exists()
     step, _ = read_latest_train_report(run_root)
     if step is None:
         step = read_training_result_step(run_root)
-    if step is None:
-        return None
     checkpoint_summary = summarize_retained_checkpoints(run_root)
-    runtime_status = "scored" if training_done and validation_done else "training_complete" if training_done else "running"
+    if training_done and validation_done:
+        runtime_status = "scored"
+    elif training_done:
+        runtime_status = "training_complete"
+    elif step is not None:
+        runtime_status = "running"
+    elif run_root_exists:
+        runtime_status = "queued"
+    else:
+        runtime_status = "not_started"
+    step_display = step if step is not None else "not started"
     ledger_path, section_name = target
     original_text = ledger_path.read_text(encoding="utf-8")
     updated_text = replace_markdown_line_in_section(
@@ -566,7 +575,7 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
         updated_text,
         section_name=section_name,
         line_prefix="- latest observed step:",
-        replacement_line=f"- latest observed step: `{step}`",
+        replacement_line=f"- latest observed step: `{step_display}`",
     )
     updated_text = replace_markdown_line_in_section(
         updated_text,
@@ -581,6 +590,7 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
         "ledger_path": str(ledger_path.resolve()),
         "section_name": section_name,
         "step": step,
+        "step_display": str(step_display),
         "checkpoint_summary": checkpoint_summary,
         "runtime_status": runtime_status,
         "changed": changed,
@@ -4034,13 +4044,19 @@ def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
                 loaded_state = load_json(state_path)
                 if isinstance(loaded_state, dict):
                     state = loaded_state
-            published_step = int(state.get("published_step", -step_interval))
+            published_step_raw = state.get("published_step")
+            published_step = int(published_step_raw) if published_step_raw is not None else None
             published_checkpoints = str(state.get("published_checkpoints", ""))
             published_done = bool(state.get("published_done", False))
+            published_runtime_status = str(state.get("published_runtime_status", ""))
             should_publish = False
-            if progress_result["checkpoint_summary"] != published_checkpoints:
+            if str(progress_result["runtime_status"]) != published_runtime_status:
                 should_publish = True
-            elif int(progress_result["step"]) >= published_step + step_interval:
+            elif progress_result["checkpoint_summary"] != published_checkpoints:
+                should_publish = True
+            elif progress_result["step"] is not None and (
+                published_step is None or int(progress_result["step"]) >= published_step + step_interval
+            ):
                 should_publish = True
             elif bool(progress_result["training_done"]) and not published_done:
                 should_publish = True
@@ -4069,9 +4085,10 @@ def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
                 state_path,
                 {
                     "updated_at": utc_now(),
-                    "published_step": int(progress_result["step"]),
+                    "published_step": int(progress_result["step"]) if progress_result["step"] is not None else None,
                     "published_checkpoints": str(progress_result["checkpoint_summary"]),
                     "published_done": bool(progress_result["training_done"]),
+                    "published_runtime_status": str(progress_result["runtime_status"]),
                 },
             )
         if not touched:
