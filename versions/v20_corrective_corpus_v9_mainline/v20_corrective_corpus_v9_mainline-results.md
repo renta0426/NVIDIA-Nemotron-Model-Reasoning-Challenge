@@ -5,6 +5,7 @@
 - Created: 2026-04-23 UTC
 - Generator: versions/v20_corrective_corpus_v9_mainline/reproduce_v20_corrective_corpus_v9_mainline.py
 - Strategy note: versions/v20_corrective_corpus_v9_mainline/v20_corrective_corpus_v9_mainline_strategy_2026-04-23.md
+- Bundle audit: versions/v20_corrective_corpus_v9_mainline/v20_corrective_corpus_v9_mainline_bundle_audit_2026-04-23.md
 - Bundle: A-Open-ProgressPrizePublication/nemotron/training/sft/v20_corrective_corpus_v9_mainline_bundle.jsonl
 - Overlay report: versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/reports/corrective_overlay_report.md
 - Overlay summary: versions/v20_corrective_corpus_v9_mainline/outputs/v9_mainline_default/artifacts/corrective_overlay_summary.json
@@ -20,6 +21,8 @@
 v9 は、v8 の broad BIT exact expansion をやめ、token-safe な v7 donor 骨格に A-Open-style matching auxiliary を追加した corrective branch です。
 
 この branch で新たに増やしたのは final-answer exact teacher ではなく、bit reasoning の局所技能を教える `matching` だけです。狙いは、strict audit 後に曖昧性が残る binary tail に新しい boxed answer を押し込まず、README の本筋である token-level 補助課題をローカル base snapshot 上に復元することです。
+
+2026-04-23 の bundle audit では、この branch が本当に `v7 backbone + matching` になっていること、`04-08-16-14` base snapshot に auxiliary curriculum が存在しないこと、matching rows が non-boxed auxiliary として生成されていることを現物 bundle から確認しました。ただし audit の結論は「strategy-consistent」であって「score-improving proven」ではありません。
 
 ## Overlay mix
 
