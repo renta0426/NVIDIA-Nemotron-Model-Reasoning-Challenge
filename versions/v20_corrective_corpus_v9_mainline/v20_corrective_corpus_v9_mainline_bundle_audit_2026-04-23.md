@@ -232,6 +232,30 @@ v9 does neither. It is a curriculum restoration branch, not a new solver-family 
 
 v9 adds only 543 matching rows. That is useful, but it is far smaller than the full A-Open auxiliary stack, and it does not restore spelling / splitting / concatenation / lstrip. That is intentional for a BIT-focused branch, but it limits expected upside.
 
+## A-Open history constraint
+
+There is one more important constraint from the original A-Open run history.
+
+Direct recount of the training snapshots shows:
+
+- `04-08-16-14`: 7830 examples, competition categories only, no matching / spelling / concatenation / splitting / lstrip
+- `04-10-04-33`: 15679 examples, with matching 4515, spelling 648, concatenation 1500, splitting 1500
+- `04-10-04-15`: 1789 examples, with matching 506, spelling 75, concatenation 168, splitting 168, lstrip 34
+
+README still identifies `04-08-16-14` as the winning submission run. So from the A-Open chronology, auxiliary restoration is already a known method, and the existence of a larger auxiliary-rich run did not automatically supersede the competition-only winning run.
+
+This matters for v9 interpretation.
+
+v9 is not recovering a missing secret that A-Open never tried. It is importing one known later A-Open ingredient into the local corrective branch that descends from `04-08-16-14`.
+
+Therefore the correct read is:
+
+- v9 is a coherent diagnostic branch,
+- v9 may still help if the local `04-08-16-14` derivative is specifically undertrained on bit-local alignment,
+- but v9 does **not** have a strong historical prior of improving leaderboard score on its own.
+
+In other words, the historical evidence weakens the promotion case for v9 as a mainline answer. If `04-08-16-14` already beat auxiliary-rich A-Open siblings, then restoring matching alone is more likely to be a local patch test than a winning redesign.
+
 ## Audit judgment
 
 The bundle is valid and faithful to the written v9 strategy.
@@ -250,3 +274,5 @@ However, the expected benefit should be framed correctly.
 The reason v9 could improve BIT is **not** that it covers more hard answers. The reason is that it may reduce token-local instability in the internal bit-matching stage that A-Open treated as worth isolating into its own curriculum. That is a plausible intervention and a better fit than v8.
 
 But the unresolved binary frontier is still unresolved. If v9 fails to beat at least `78 / 92` proxy binary, the next conclusion should not be "need more matching" by default. The next conclusion should be that auxiliary restoration alone is insufficient and the next branch must add a new query-specific closure or anti-`default 1` mechanism without repeating v8's broad exact-answer expansion mistake.
+
+Given the A-Open history constraint above, there is also a stronger planning implication: even before training, v9 should be treated as promote-ineligible by default unless it produces a clear binary gain without public-safe regressions. If not, the correct next move is a v9 redesign rather than a larger matching replay.
