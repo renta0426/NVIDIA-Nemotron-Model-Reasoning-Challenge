@@ -409,6 +409,17 @@ def build_watch_score_publish_command_tokens(args: argparse.Namespace) -> list[s
     return tokens
 
 
+def build_watch_progress_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("watch-progress-ledger")
+    append_command_option(tokens, "--progress-watch-log-path", Path(args.progress_watch_log_path))
+    append_command_option(tokens, "--progress-watch-state-dir", Path(args.progress_watch_state_dir))
+    append_command_option(tokens, "--progress-watch-sleep-seconds", int(args.progress_watch_sleep_seconds))
+    append_command_option(tokens, "--progress-watch-step-interval", int(args.progress_watch_step_interval))
+    for path in getattr(args, "watch_run_root", []) or []:
+        append_command_option(tokens, "--watch-run-root", Path(path))
+    return tokens
+
+
 def load_run_manifest_for_result(run_result: dict[str, Any]) -> dict[str, Any]:
     run_root_raw = run_result.get("run_root")
     if not run_root_raw:
@@ -445,6 +456,14 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
                 "- local300 score:",
             )
     return None
+
+
+def resolve_progress_ledger_target(run_root: Path) -> tuple[Path, str | None] | None:
+    target = resolve_score_ledger_target({"run_root": str(run_root.resolve())})
+    if target is None:
+        return None
+    ledger_path, section_name, _ = target
+    return ledger_path, section_name
 
 
 def replace_markdown_line_in_section(
@@ -517,6 +536,48 @@ def update_score_ledger(run_result: dict[str, Any], eval_result: dict[str, Any])
     }
 
 
+def summarize_retained_checkpoints(run_root: Path) -> str:
+    checkpoint_names = [path.name for path in list_saved_checkpoints(run_root / "adapter")]
+    return " / ".join(checkpoint_names) if checkpoint_names else "none"
+
+
+def update_progress_ledger(run_root: Path) -> dict[str, Any] | None:
+    target = resolve_progress_ledger_target(run_root)
+    if target is None:
+        return None
+    step, _ = read_latest_train_report(run_root)
+    if step is None:
+        step = read_training_result_step(run_root)
+    if step is None:
+        return None
+    checkpoint_summary = summarize_retained_checkpoints(run_root)
+    ledger_path, section_name = target
+    original_text = ledger_path.read_text(encoding="utf-8")
+    updated_text = replace_markdown_line_in_section(
+        original_text,
+        section_name=section_name,
+        line_prefix="- latest observed step:",
+        replacement_line=f"- latest observed step: `{step}`",
+    )
+    updated_text = replace_markdown_line_in_section(
+        updated_text,
+        section_name=section_name,
+        line_prefix="- retained checkpoints:",
+        replacement_line=f"- retained checkpoints: `{checkpoint_summary}`",
+    )
+    changed = updated_text != original_text
+    if changed:
+        write_text(ledger_path, updated_text)
+    return {
+        "ledger_path": str(ledger_path.resolve()),
+        "section_name": section_name,
+        "step": step,
+        "checkpoint_summary": checkpoint_summary,
+        "changed": changed,
+        "training_done": (run_root / "training_result.json").exists(),
+    }
+
+
 def local_now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -544,15 +605,20 @@ def has_git_diff(path: Path) -> bool:
     return proc.returncode == 1
 
 
-def commit_and_push_score_ledger(*, ledger_path: Path, run_name: str, log_path: Path) -> dict[str, Any]:
+def commit_and_push_tracked_file(
+    *,
+    tracked_path: Path,
+    commit_message: str,
+    log_path: Path,
+    log_prefix: str,
+) -> dict[str, Any]:
     if git_index_is_locked():
-        append_log_line(log_path, f"git_busy run_name={run_name}")
-        return {"status": "git_busy", "ledger_path": str(ledger_path.resolve())}
-    if not has_git_diff(ledger_path):
-        append_log_line(log_path, f"no_ledger_diff run_name={run_name}")
-        return {"status": "no_ledger_diff", "ledger_path": str(ledger_path.resolve())}
-    subprocess.run(["git", "add", "--", relative_to_repo(ledger_path)], cwd=str(REPO_ROOT), check=True)
-    commit_message = f"Publish local300 score for {run_name}"
+        append_log_line(log_path, f"{log_prefix}_git_busy path={relative_to_repo(tracked_path)}")
+        return {"status": "git_busy", "tracked_path": str(tracked_path.resolve())}
+    if not has_git_diff(tracked_path):
+        append_log_line(log_path, f"{log_prefix}_no_diff path={relative_to_repo(tracked_path)}")
+        return {"status": "no_ledger_diff", "tracked_path": str(tracked_path.resolve())}
+    subprocess.run(["git", "add", "--", relative_to_repo(tracked_path)], cwd=str(REPO_ROOT), check=True)
     subprocess.run(
         [
             "git",
@@ -566,12 +632,21 @@ def commit_and_push_score_ledger(*, ledger_path: Path, run_name: str, log_path: 
         check=True,
     )
     subprocess.run(["git", "push"], cwd=str(REPO_ROOT), check=True)
-    append_log_line(log_path, f"score_pushed run_name={run_name}")
+    append_log_line(log_path, f"{log_prefix}_pushed path={relative_to_repo(tracked_path)}")
     return {
         "status": "score_pushed",
-        "ledger_path": str(ledger_path.resolve()),
+        "tracked_path": str(tracked_path.resolve()),
         "commit_message": commit_message,
     }
+
+
+def commit_and_push_score_ledger(*, ledger_path: Path, run_name: str, log_path: Path) -> dict[str, Any]:
+    return commit_and_push_tracked_file(
+        tracked_path=ledger_path,
+        commit_message=f"Publish local300 score for {run_name}",
+        log_path=log_path,
+        log_prefix="score_publish",
+    )
 
 
 def make_namespace_with(args: argparse.Namespace, **updates: Any) -> argparse.Namespace:
@@ -588,6 +663,18 @@ def read_latest_train_report(run_root: Path) -> tuple[int | None, int | None]:
     step = payload.get("step")
     age_seconds = int(time.time() - report_path.stat().st_mtime)
     return int(step) if step is not None else None, age_seconds
+
+
+def read_training_result_step(run_root: Path) -> int | None:
+    training_result_path = run_root / "training_result.json"
+    if not training_result_path.exists():
+        return None
+    payload = load_json(training_result_path)
+    latest_report = payload.get("latest_train_report")
+    if not isinstance(latest_report, dict):
+        return None
+    step = latest_report.get("step")
+    return int(step) if step is not None else None
 
 
 def list_saved_checkpoints(adapter_dir: Path) -> list[Path]:
@@ -3911,6 +3998,71 @@ def run_watch_score_publish(args: argparse.Namespace) -> dict[str, Any]:
         time.sleep(sleep_seconds)
 
 
+def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
+    log_path = Path(args.progress_watch_log_path).resolve()
+    state_dir = Path(args.progress_watch_state_dir).resolve()
+    ensure_dir(state_dir)
+    watch_run_roots = [Path(path).resolve() for path in (args.watch_run_root or [])]
+    if not watch_run_roots:
+        raise ValueError("watch-progress-ledger requires at least one --watch-run-root")
+    write_command_script(state_dir / "progress_watch_cmd.sh", build_watch_progress_command_tokens(args))
+    append_log_line(log_path, f"progress_watcher_start watched_runs={len(watch_run_roots)}")
+    sleep_seconds = max(30, int(args.progress_watch_sleep_seconds))
+    step_interval = max(1, int(args.progress_watch_step_interval))
+
+    while True:
+        touched = False
+        for run_root in watch_run_roots:
+            progress_result = update_progress_ledger(run_root)
+            if not isinstance(progress_result, dict):
+                continue
+            touched = True
+            run_name = run_root.name
+            state_path = state_dir / f"{re.sub(r'[^A-Za-z0-9._-]+', '_', run_name)}.json"
+            state: dict[str, Any] = {}
+            if state_path.exists():
+                loaded_state = load_json(state_path)
+                if isinstance(loaded_state, dict):
+                    state = loaded_state
+            published_step = int(state.get("published_step", -step_interval))
+            published_checkpoints = str(state.get("published_checkpoints", ""))
+            published_done = bool(state.get("published_done", False))
+            should_publish = False
+            if progress_result["checkpoint_summary"] != published_checkpoints:
+                should_publish = True
+            elif int(progress_result["step"]) >= published_step + step_interval:
+                should_publish = True
+            elif bool(progress_result["training_done"]) and not published_done:
+                should_publish = True
+            if not should_publish:
+                continue
+            ledger_path = Path(str(progress_result["ledger_path"])).resolve()
+            try:
+                publish_result = commit_and_push_tracked_file(
+                    tracked_path=ledger_path,
+                    commit_message=f"Record progress for {run_name}",
+                    log_path=log_path,
+                    log_prefix="progress_publish",
+                )
+            except Exception as exc:
+                append_log_line(log_path, f"progress_publish_failed run_name={run_name} error={type(exc).__name__}: {exc}")
+                continue
+            if publish_result["status"] == "git_busy":
+                continue
+            write_json(
+                state_path,
+                {
+                    "updated_at": utc_now(),
+                    "published_step": int(progress_result["step"]),
+                    "published_checkpoints": str(progress_result["checkpoint_summary"]),
+                    "published_done": bool(progress_result["training_done"]),
+                },
+            )
+        if not touched:
+            append_log_line(log_path, "waiting_for_progress")
+        time.sleep(sleep_seconds)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -4111,6 +4263,22 @@ def parse_args() -> argparse.Namespace:
         type=Path,
     )
     watch_score_publish.set_defaults(func=run_watch_score_publish)
+
+    watch_progress = subparsers.add_parser(
+        "watch-progress-ledger",
+        help="Watch training progress and checkpoint retention, then commit/push tracked ledger progress updates safely.",
+    )
+    watch_progress.add_argument("--progress-watch-log-path", type=Path, required=True)
+    watch_progress.add_argument("--progress-watch-state-dir", type=Path, required=True)
+    watch_progress.add_argument("--progress-watch-sleep-seconds", type=int, default=300)
+    watch_progress.add_argument("--progress-watch-step-interval", type=int, default=20)
+    watch_progress.add_argument(
+        "--watch-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    watch_progress.set_defaults(func=run_watch_progress_ledger)
 
     return parser.parse_args()
 
