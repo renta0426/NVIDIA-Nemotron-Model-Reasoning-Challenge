@@ -155,6 +155,8 @@ Keep direct miss pressure, then add broad answer-only stabilization for numeric_
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
 - launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached `queue-managed-run` process will auto-launch this variant once one active run finishes
+- latest observed step: `not started`
+- retained checkpoints: `none`
 - local300 score: TBD
 
 ## hybrid_bridge
@@ -225,6 +227,8 @@ Balanced bridge run: moderate direct miss repeats, lighter bit-family rebalance,
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
 - launch note: held back for now because concurrent `v7 + v8` runs leave only ~9% free system memory, while both observed MLX runs report ~221.94 GB peak memory; a detached `queue-managed-run` process is now armed and waiting for `symbol_cipher_recovery_mix` to start, then for active train count to drop below 2 before auto-launching this variant
+- latest observed step: `not started`
+- retained checkpoints: `none`
 - local300 score: TBD
 
 ## Generated
