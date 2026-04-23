@@ -363,6 +363,100 @@ def load_run_manifest_for_result(run_result: dict[str, Any]) -> dict[str, Any]:
     return load_json(manifest_path)
 
 
+def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str | None, str] | None:
+    manifest = load_run_manifest_for_result(run_result)
+    run_name = str(manifest.get("run_name", "")) if isinstance(manifest, dict) else ""
+    training_data = manifest.get("training_data") if isinstance(manifest, dict) else None
+    bundle_name = ""
+    if isinstance(training_data, dict):
+        bundle_name = Path(str(training_data.get("path", ""))).name
+    if bundle_name == "v7_targeted_miss_recovery_bundle.jsonl" or "v20_mlx_v7_targeted_miss_recovery" in run_name:
+        return (
+            REPO_ROOT / "v20_mlx_repro_v1/experiments/v7/v7_targeted_miss_recovery-results.md",
+            None,
+            "- local300 score after training:",
+        )
+    v8_targets = {
+        "bit_family_rebalance_broadbase_bundle.jsonl": "bit_family_rebalance_broadbase",
+        "symbol_cipher_recovery_mix_bundle.jsonl": "symbol_cipher_recovery_mix",
+        "hybrid_bridge_bundle.jsonl": "hybrid_bridge",
+    }
+    for bundle_key, section_name in v8_targets.items():
+        if bundle_name == bundle_key or section_name in run_name:
+            return (
+                REPO_ROOT / "v20_mlx_repro_v1/experiments/v8/v8_parallel_variants-results.md",
+                section_name,
+                "- local300 score:",
+            )
+    return None
+
+
+def replace_markdown_line_in_section(
+    text: str,
+    *,
+    section_name: str | None,
+    line_prefix: str,
+    replacement_line: str,
+) -> str:
+    lines = text.splitlines()
+    start_index = 0
+    end_index = len(lines)
+    if section_name is not None:
+        section_heading = f"## {section_name}"
+        for index, line in enumerate(lines):
+            if line.strip() == section_heading:
+                start_index = index + 1
+                break
+        else:
+            raise FileNotFoundError(f"Missing markdown section {section_heading!r}")
+        for index in range(start_index, len(lines)):
+            if lines[index].startswith("## "):
+                end_index = index
+                break
+    for index in range(start_index, end_index):
+        if lines[index].startswith(line_prefix):
+            lines[index] = replacement_line
+            return "\n".join(lines) + "\n"
+    insert_index = end_index
+    while insert_index > start_index and lines[insert_index - 1].strip() == "":
+        insert_index -= 1
+    lines.insert(insert_index, replacement_line)
+    return "\n".join(lines) + "\n"
+
+
+def update_score_ledger(run_result: dict[str, Any], eval_result: dict[str, Any]) -> dict[str, Any] | None:
+    target = resolve_score_ledger_target(run_result)
+    if target is None:
+        return None
+    overall = eval_result.get("overall")
+    if not isinstance(overall, dict) or "accuracy" not in overall:
+        return None
+    accuracy = float(overall["accuracy"])
+    correct = overall.get("correct")
+    total = overall.get("total")
+    suffix = f"{accuracy:.6f}"
+    if correct is not None and total is not None:
+        suffix += f" ({int(correct)}/{int(total)})"
+    ledger_path, section_name, line_prefix = target
+    replacement_line = f"{line_prefix} {suffix}"
+    original_text = ledger_path.read_text(encoding="utf-8")
+    updated_text = replace_markdown_line_in_section(
+        original_text,
+        section_name=section_name,
+        line_prefix=line_prefix,
+        replacement_line=replacement_line,
+    )
+    changed = updated_text != original_text
+    if changed:
+        write_text(ledger_path, updated_text)
+    return {
+        "ledger_path": str(ledger_path.resolve()),
+        "section_name": section_name,
+        "line": replacement_line,
+        "changed": changed,
+    }
+
+
 def resolve_hf_snapshot(model_root: Path) -> Path:
     resolved_root = Path(model_root).resolve()
     if (resolved_root / "config.json").exists():
@@ -3236,6 +3330,7 @@ def run_full(args: argparse.Namespace) -> dict[str, Any]:
     run_result = run_train(args)
     eval_result = run_eval_aopen(args)
     update_results_files(args, run_result, eval_result)
+    score_ledger_result = update_score_ledger(run_result, eval_result)
     cleanup_result = None
     if bool(args.cleanup_completed_run_artifacts):
         cleanup_result = cleanup_completed_run_artifacts(Path(run_result["run_root"]).resolve())
@@ -3245,6 +3340,8 @@ def run_full(args: argparse.Namespace) -> dict[str, Any]:
         "results_md": str(DEFAULT_RESULTS_MD.resolve()),
         "results_json": str(DEFAULT_RESULTS_JSON.resolve()),
     }
+    if score_ledger_result is not None:
+        result["score_ledger_result"] = score_ledger_result
     if cleanup_result is not None:
         result["cleanup_result"] = cleanup_result
     return result
@@ -3290,6 +3387,7 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
     run_result = load_json(training_result_path)
     eval_result = load_json(eval_summary_path)
     update_results_files(args, run_result, eval_result)
+    score_ledger_result = update_score_ledger(run_result, eval_result)
     cleanup_result = None
     if bool(args.cleanup_completed_run_artifacts):
         cleanup_result = cleanup_completed_run_artifacts(run_root)
@@ -3300,6 +3398,8 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
         "results_md": str(DEFAULT_RESULTS_MD.resolve()),
         "results_json": str(DEFAULT_RESULTS_JSON.resolve()),
     }
+    if score_ledger_result is not None:
+        result["score_ledger_result"] = score_ledger_result
     if cleanup_result is not None:
         result["cleanup_result"] = cleanup_result
     return result
