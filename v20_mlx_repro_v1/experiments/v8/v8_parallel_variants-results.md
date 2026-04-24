@@ -81,8 +81,8 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 - Bundle generated: YES
 - MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (`step 43` observed after manifest fix; periodic checkpoints `0000020_adapters.safetensors` and `0000040_adapters.safetensors` are now both present; unused `_debug_bundle_tokens` cleanup completed)
 - runtime status: `running`
-- latest observed step: `95`
-- retained checkpoints: `0000040_adapters.safetensors / 0000060_adapters.safetensors / 0000080_adapters.safetensors`
+- latest observed step: `100`
+- retained checkpoints: `0000060_adapters.safetensors / 0000080_adapters.safetensors / 0000100_adapters.safetensors`
 - completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
 - score ledger update: `postprocess-run` now writes the measured local300 score back into this tracked markdown ledger automatically once an `adapter_validation` 300-row summary exists
 - score publish watcher: a detached single-file `watch-score-publish` worker is now armed to detect completed local300 validation, rerun `postprocess-run` defensively, and `git add/commit/push` the updated tracked score ledger while skipping publish attempts whenever `.git/index.lock` is present
