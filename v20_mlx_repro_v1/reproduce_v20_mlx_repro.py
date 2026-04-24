@@ -4147,7 +4147,7 @@ def parse_args() -> argparse.Namespace:
         target.add_argument("--max-tokens", type=int, default=README_EVAL_CONTRACT["max_tokens"])
         target.add_argument("--temperature", type=float, default=README_EVAL_CONTRACT["temperature"])
         target.add_argument("--top-p", type=float, default=README_EVAL_CONTRACT["top_p"])
-        target.add_argument("--max-num-seqs", type=int, default=16)
+        target.add_argument("--max-num-seqs", type=int, default=README_EVAL_CONTRACT["max_num_seqs"])
         target.add_argument("--max-model-len", type=int, default=README_EVAL_CONTRACT["max_model_len"])
         target.add_argument("--prompt-chunk-size", type=int, default=16)
         target.add_argument("--prefill-batch-size", type=int, default=8)
