@@ -73,7 +73,7 @@ Known absent from `train_recommended_learning_target_v1.csv`: `0ec17d2e`
   - `v20_mlx_v7_targeted_miss_recovery_mlxdir_mb1_nobc`: stopped before completion at step 183/265; no `training_result.json`, and its stale output root has since been cleaned to save disk
   - `v20_mlx_v7_targeted_miss_recovery_mlxdir_mb1_nobc_ckpt20`: running again with detached execution, `save_every_steps=20`, `max_saved_checkpoints=3`, resume-aware supervision, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (**step 195 observed**, so it has already passed the earlier `183/265` failure point; retained periodic checkpoints are `140 / 160 / 180`)
 - runtime status: `running`
-- latest observed step: `213`
+- latest observed step: `218`
 - retained checkpoints: `0000160_adapters.safetensors / 0000180_adapters.safetensors / 0000200_adapters.safetensors`
 - completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
 - score ledger update: `postprocess-run` now writes the measured local300 score back into this tracked markdown ledger automatically once an `adapter_validation` 300-row summary exists
