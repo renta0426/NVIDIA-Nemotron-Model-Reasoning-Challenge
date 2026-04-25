@@ -128,10 +128,8 @@ CORE_COMPOSITE_FAMILIES = [
     "pairconcat|min:ac_bd:strip0|max:ac_bd|strip0",
     "concat|x|nat|y|nat|keep",
     "concat|x//y|pad2|x//y|nat|keep",
-    "concat|x-y|nat|x//y|nat|strip0",
     "concat|x*y|nat|y//x|nat|strip0",
     "concat|y//x|nat|y//x|pad2|keep",
-    "concat|x+y|nat|y//x|nat|keep",
     "concat|y|nat|x|nat|keep",
     "mix|x|nat|max:ac_bd|scalar_first",
     "mix|y//x|nat|sum:ac_bd:strip0|scalar_first",
@@ -184,6 +182,299 @@ CORE_1785B35E_PRODUCT_TUPLE_FAMILY = (
     "prod_mod(9-p1,max02)"
 )
 
+CORE_563BF8F9_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-(absdiff03)|"
+    "min02|"
+    "9-p3|"
+    "9-(sum_mod12)"
+)
+
+CORE_A4E4EC1D_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-(max12)|"
+    "9-p0|"
+    "sum_mod(9-p2,p0)|"
+    "absdiff(p0,sum_mod23)"
+)
+
+CORE_0DA1841F_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-(prod_tens01)|"
+    "9-(min01)|"
+    "max(9-p0,sum_mod02)|"
+    "sum_mod(max01,p3)"
+)
+
+CORE_DAC75343_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "p0|"
+    "max(absdiff23,p0)|"
+    "9-(absdiff03)|"
+    "9-(absdiff23)"
+)
+
+CORE_398478F6_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "prod_tens(9-p3,9-p3)|"
+    "prod_tens(p1,p1)|"
+    "9-(max13)|"
+    "9-p1"
+)
+
+CORE_02902EB3_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-p2|"
+    "prod_mod12|"
+    "absdiff(9-p0,max02)|"
+    "max(9-p2,p3)"
+)
+
+CORE_B1B10E83_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "min(9-p1,p1)|"
+    "9-(sum_mod(9-p1,9-p1))|"
+    "prod_tens(9-p2,sum_mod(9-p1,9-p1))|"
+    "prod_tens(9-p1,max(9-p1,p1))"
+)
+
+CORE_5968BF6C_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "max(max01,sum_mod03)|"
+    "sum_mod(max02,p2)|"
+    "prod_tens(9-(prod_mod03),9-p2)|"
+    "sum_mod(min23,prod_mod02)"
+)
+
+CORE_60F55291_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "sum_mod(absdiff13,p2)|"
+    "min(absdiff03,sum_mod03)|"
+    "min(9-p2,absdiff13)|"
+    "9-(sum_mod23)"
+)
+
+CORE_11E77BF9_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "p2|"
+    "prod_mod12|"
+    "absdiff(p1,sum_mod03)|"
+    "p3"
+)
+
+CORE_2E9B1B9D_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "p0|"
+    "p1|"
+    "prod_mod03|"
+    "9-p3"
+)
+
+CORE_693432DA_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "absdiff(max01,p3)|"
+    "absdiff(9-p2,min12)|"
+    "9-(absdiff13)|"
+    "p3"
+)
+
+CORE_F36FE07E_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-(max23)|"
+    "prod_mod12|"
+    "max03|"
+    "p2"
+)
+
+CORE_9F1FF166_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "prod_mod(min12,p1)|"
+    "absdiff(9-p2,min12)|"
+    "sum_mod(9-p2,p1)|"
+    "min(9-p2,p1)"
+)
+
+CORE_93C9B36B_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "absdiff(9-p0,p0)|"
+    "9-(absdiff13)|"
+    "9-(prod_tens02)|"
+    "absdiff(9-p0,sum_mod03)"
+)
+
+CORE_7CB3089E_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "max01|"
+    "prod_mod01|"
+    "sum_mod(9-(absdiff12),max01)|"
+    "sum_carry(p2,p2)"
+)
+
+CORE_FAF1121C_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "prod_mod(9-(prod_mod02),9-p3)|"
+    "prod_mod(9-(max12),9-p0)|"
+    "sum_mod(9-(prod_tens12),prod_mod01)|"
+    "sum_mod(p1,p1)"
+)
+
+CORE_083ED8FE_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "max(9-(sum_mod02),prod_mod03)|"
+    "absdiff(9-p0,sum_mod02)|"
+    "9-(prod_tens(9-p3,p2))|"
+    "prod_mod(9-(prod_tens02),9-p3)"
+)
+
+CORE_053B4C86_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "prod_mod(9-p0,max01)|"
+    "9-(sum_mod(9-p0,9-p3))|"
+    "sum_mod(p1,prod_mod13)|"
+    "min(9-(prod_mod13),p1)"
+)
+
+CORE_24750C4A_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "prod_mod(9-(absdiff01),9-p3)|"
+    "prod_tens(p3,p3)|"
+    "sum_mod(9-(prod_mod23),p1)|"
+    "absdiff(9-p1,min02)"
+)
+
+CORE_FF86CD34_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "min02|"
+    "prod_mod(absdiff13,max02)|"
+    "p3|"
+    "max(p3,9-p3)"
+)
+
+CORE_24B2D8EB_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "absdiff01|"
+    "prod_mod(9-p0,absdiff03)|"
+    "9-(prod_tens13)|"
+    "sum_carry01"
+)
+
+CORE_19968602_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "sum_carry13|"
+    "9-p0|"
+    "sum_mod(p0,absdiff13)|"
+    "9-(sum_mod02)"
+)
+
+CORE_1342687B_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "9-(sum_mod03)|"
+    "9-(min13)|"
+    "sum_mod(prod_mod01,absdiff23)|"
+    "prod_tens23"
+)
+
+CORE_75C8715E_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "sum_mod(p1,sum_mod12)|"
+    "sum_mod(sum_mod01,sum_mod02)|"
+    "9-(absdiff02)|"
+    "sum_carry02"
+)
+
+CORE_8395D060_PRODUCT_TUPLE_FAMILY = (
+    "prod_tuple|"
+    "sum_mod03|"
+    "sum_mod(p0,sum_mod01)|"
+    "sum_mod(p1,sum_mod01)|"
+    "sum_mod(sum_mod12,prod_tens01)"
+)
+
+CORE_1A28140B_PRODUCT_TUPLE_DROP3_FAMILY = (
+    "prod_tuple_drop3|"
+    "9-p2|"
+    "9-p1|"
+    "9-(sum_mod02)|"
+    "p2"
+)
+
+CORE_A692EC38_PRODUCT_TUPLE_DROP3_FAMILY = (
+    "prod_tuple_drop3|"
+    "prod_mod(p2,min02)|"
+    "sum_mod(sum_mod13,absdiff01)|"
+    "absdiff01|"
+    "sum_mod12"
+)
+
+CORE_C7AAE192_PRODUCT_TUPLE_DROP1_FAMILY = (
+    "prod_tuple_drop1|"
+    "absdiff01|"
+    "sum_mod(9-p0,p1)|"
+    "sum_mod(sum_mod01,sum_mod03)|"
+    "prod_tens(9-p1,9-p2)"
+)
+
+CORE_EDF364DA_PRODUCT_TUPLE_DROP0_FAMILY = (
+    "prod_tuple_drop0|"
+    "sum_carry03|"
+    "sum_mod(p2,prod_tens03)|"
+    "sum_mod(9-p2,9-p3)|"
+    "p0"
+)
+
+CORE_B0206BB7_PRODUCT_TUPLE_DROP0_FAMILY = (
+    "prod_tuple_drop0|"
+    "sum_mod(p2,sum_mod02)|"
+    "prod_mod(9-p2,prod_tens02)|"
+    "p3|"
+    "sum_mod(prod_mod12,prod_tens12)"
+)
+
+CORE_7A17137F_PRODUCT_TUPLE_DROP0_FAMILY = (
+    "prod_tuple_drop0|"
+    "sum_mod(prod_mod23,prod_mod23)|"
+    "9-(prod_mod23)|"
+    "prod_mod(sum_mod23,9-p0)|"
+    "sum_mod23"
+)
+
+CORE_65ADD53A_PRODUCT_TUPLE_DROP0_FAMILY = (
+    "prod_tuple_drop0|"
+    "9-p2|"
+    "sum_mod(min23,p3)|"
+    "prod_tens13|"
+    "sum_mod(9-p2,9-p3)"
+)
+
+CORE_7137D73A_PRODUCT_TUPLE_DROP2_FAMILY = (
+    "prod_tuple_drop2|"
+    "absdiff(prod_mod01,sum_carry01)|"
+    "max(9-p1,absdiff02)|"
+    "9-(absdiff23)|"
+    "sum_mod(9-(sum_carry23),9-(sum_mod23))"
+)
+
+CORE_7DB0F3EE_PRODUCT_TRIPLET_FAMILY = (
+    "prod_triplet|"
+    "sum_mod(9-p1,prod_mod03)|"
+    "9-p0|"
+    "9-(sum_carry01)"
+)
+
+CORE_B06625C4_PRODUCT_TRIPLET_FAMILY = (
+    "prod_triplet|"
+    "sum_mod(p0,max12)|"
+    "sum_mod(9-p3,absdiff02)|"
+    "sum_mod(9-p0,9-p0)"
+)
+
+CORE_DE036BBF_PRODUCT_TRIPLET_FAMILY = (
+    "prod_triplet|"
+    "sum_mod(p3,sum_mod13)|"
+    "sum_mod02|"
+    "sum_mod(9-p3,sum_mod01)"
+)
+
 CORE_PRODUCT_DIGIT_FAMILIES = [
     "prod_digits|1785|carry01|max02",
     "prod_digits|1785|carry01|p2",
@@ -191,6 +482,43 @@ CORE_PRODUCT_DIGIT_FAMILIES = [
     "prod_digits|1785|carry13|p2",
     CORE_2FC5_PRODUCT_TUPLE_FAMILY,
     CORE_1785B35E_PRODUCT_TUPLE_FAMILY,
+    CORE_563BF8F9_PRODUCT_TUPLE_FAMILY,
+    CORE_A4E4EC1D_PRODUCT_TUPLE_FAMILY,
+    CORE_0DA1841F_PRODUCT_TUPLE_FAMILY,
+    CORE_DAC75343_PRODUCT_TUPLE_FAMILY,
+    CORE_398478F6_PRODUCT_TUPLE_FAMILY,
+    CORE_02902EB3_PRODUCT_TUPLE_FAMILY,
+    CORE_B1B10E83_PRODUCT_TUPLE_FAMILY,
+    CORE_5968BF6C_PRODUCT_TUPLE_FAMILY,
+    CORE_60F55291_PRODUCT_TUPLE_FAMILY,
+    CORE_11E77BF9_PRODUCT_TUPLE_FAMILY,
+    CORE_2E9B1B9D_PRODUCT_TUPLE_FAMILY,
+    CORE_693432DA_PRODUCT_TUPLE_FAMILY,
+    CORE_F36FE07E_PRODUCT_TUPLE_FAMILY,
+    CORE_9F1FF166_PRODUCT_TUPLE_FAMILY,
+    CORE_93C9B36B_PRODUCT_TUPLE_FAMILY,
+    CORE_7CB3089E_PRODUCT_TUPLE_FAMILY,
+    CORE_FAF1121C_PRODUCT_TUPLE_FAMILY,
+    CORE_083ED8FE_PRODUCT_TUPLE_FAMILY,
+    CORE_053B4C86_PRODUCT_TUPLE_FAMILY,
+    CORE_24750C4A_PRODUCT_TUPLE_FAMILY,
+    CORE_FF86CD34_PRODUCT_TUPLE_FAMILY,
+    CORE_24B2D8EB_PRODUCT_TUPLE_FAMILY,
+    CORE_19968602_PRODUCT_TUPLE_FAMILY,
+    CORE_1342687B_PRODUCT_TUPLE_FAMILY,
+    CORE_75C8715E_PRODUCT_TUPLE_FAMILY,
+    CORE_8395D060_PRODUCT_TUPLE_FAMILY,
+    CORE_1A28140B_PRODUCT_TUPLE_DROP3_FAMILY,
+    CORE_A692EC38_PRODUCT_TUPLE_DROP3_FAMILY,
+    CORE_C7AAE192_PRODUCT_TUPLE_DROP1_FAMILY,
+    CORE_EDF364DA_PRODUCT_TUPLE_DROP0_FAMILY,
+    CORE_B0206BB7_PRODUCT_TUPLE_DROP0_FAMILY,
+    CORE_7A17137F_PRODUCT_TUPLE_DROP0_FAMILY,
+    CORE_65ADD53A_PRODUCT_TUPLE_DROP0_FAMILY,
+    CORE_7137D73A_PRODUCT_TUPLE_DROP2_FAMILY,
+    CORE_7DB0F3EE_PRODUCT_TRIPLET_FAMILY,
+    CORE_B06625C4_PRODUCT_TRIPLET_FAMILY,
+    CORE_DE036BBF_PRODUCT_TRIPLET_FAMILY,
 ]
 
 CORE_PLAIN_PROD_FAMILIES = [
@@ -247,6 +575,10 @@ CORE_FAMILY_PRIORITY = [
     "op_suffix:x-y",
     "op_suffix:y-x",
     "op_suffix:abs(x-y)",
+    "concat|x-y|nat|x//y|nat|strip0",
+    "concat|x+y|nat|y//x|nat|keep",
+    "copymix|generic|absdiff:ac_bd|plain|a|expr_first",
+    "mask|generic|prod:ad_bc:strip0|plain|oN",
 ]
 
 
@@ -710,6 +1042,34 @@ def core_parse_product_digit_tuple_family(
     return expr0, expr1, expr2, expr3
 
 
+def core_parse_product_digit_triplet_family(
+    family_name: str,
+) -> tuple[str, str, str] | None:
+    if not family_name.startswith("prod_triplet|"):
+        return None
+    parts = family_name.split("|")
+    if len(parts) != 4:
+        return None
+    _, expr0, expr1, expr2 = parts
+    return expr0, expr1, expr2
+
+
+def core_parse_product_digit_tuple_drop_family(
+    family_name: str,
+) -> tuple[int, str, str, str, str] | None:
+    prefix = "prod_tuple_drop"
+    if not family_name.startswith(prefix):
+        return None
+    parts = family_name.split("|")
+    if len(parts) != 5:
+        return None
+    drop_part = parts[0][len(prefix):]
+    if drop_part not in {"0", "1", "2", "3"}:
+        return None
+    _, expr0, expr1, expr2, expr3 = parts
+    return int(drop_part), expr0, expr1, expr2, expr3
+
+
 def core_split_product_digit_expr_args(expr: str) -> tuple[str, str] | None:
     depth = 0
     for index, char in enumerate(expr):
@@ -795,7 +1155,9 @@ def core_family_compatible(
     if mode_info is None and generic_info is None:
         composite_info = (
             core_parse_product_digit_family(family_name)
+            or core_parse_product_digit_triplet_family(family_name)
             or core_parse_product_digit_tuple_family(family_name)
+            or core_parse_product_digit_tuple_drop_family(family_name)
             or core_parse_scalar_concat_family(family_name)
             or core_parse_pair_concat_family(family_name)
             or core_parse_scalar_pair_family(family_name)
@@ -1041,6 +1403,14 @@ def core_family_length_bounds(family_name: str) -> tuple[int, int] | None:
     if product_digit_tuple is not None:
         return 4, 4
 
+    product_digit_triplet = core_parse_product_digit_triplet_family(family_name)
+    if product_digit_triplet is not None:
+        return 3, 3
+
+    product_digit_tuple_drop = core_parse_product_digit_tuple_drop_family(family_name)
+    if product_digit_tuple_drop is not None:
+        return 3, 4
+
     scalar_concat = core_parse_scalar_concat_family(family_name)
     if scalar_concat is not None:
         left_expr, left_mode, right_expr, right_mode, strip0 = scalar_concat
@@ -1169,6 +1539,29 @@ def core_render_composite_tokens(
             output_digits.append(str(value))
         return core_string_to_tokens("".join(output_digits))
 
+    product_digit_triplet = core_parse_product_digit_triplet_family(family_name)
+    if product_digit_triplet is not None:
+        prod_digits = f"{x * y:04d}"
+        output_digits = []
+        for expr in product_digit_triplet:
+            value = core_eval_product_digit_expr(expr, prod_digits)
+            if value is None or not (0 <= value <= 9):
+                return None
+            output_digits.append(str(value))
+        return core_string_to_tokens("".join(output_digits))
+
+    product_digit_tuple_drop = core_parse_product_digit_tuple_drop_family(family_name)
+    if product_digit_tuple_drop is not None:
+        _, expr0, expr1, expr2, expr3 = product_digit_tuple_drop
+        prod_digits = f"{x * y:04d}"
+        output_digits = []
+        for expr in (expr0, expr1, expr2, expr3):
+            value = core_eval_product_digit_expr(expr, prod_digits)
+            if value is None or not (0 <= value <= 9):
+                return None
+            output_digits.append(str(value))
+        return core_string_to_tokens("".join(output_digits))
+
     scalar_concat = core_parse_scalar_concat_family(family_name)
     if scalar_concat is not None:
         left_expr, left_mode, right_expr, right_mode, strip0 = scalar_concat
@@ -1266,6 +1659,7 @@ def core_render_generic_tokens(family_name: str, operator_symbol: str, x: int, y
 def core_family_records(family_name: str, operator_symbol: str) -> tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...]:
     records: list[tuple[str, str, tuple[tuple[str, str], ...]]] = []
     mode_info = core_family_mode(family_name)
+    product_digit_tuple_drop = core_parse_product_digit_tuple_drop_family(family_name)
     for x in range(100):
         sx = f"{x:02d}"
         for y in range(100):
@@ -1285,7 +1679,12 @@ def core_family_records(family_name: str, operator_symbol: str) -> tuple[tuple[s
                     tokens = core_render_composite_tokens(family_name, operator_symbol, x, y)
                 if tokens is None:
                     continue
-            records.append((sx, sy, tuple(tokens)))
+            token_tuple = tuple(tokens)
+            records.append((sx, sy, token_tuple))
+            if product_digit_tuple_drop is not None and len(token_tuple) == 4:
+                drop_index = product_digit_tuple_drop[0]
+                dropped_tuple = tuple(token for index, token in enumerate(token_tuple) if index != drop_index)
+                records.append((sx, sy, dropped_tuple))
     return tuple(records)
 
 
@@ -1522,13 +1921,19 @@ def explain_symbol_row_with_core_solver(
         ),
     )
     explored = 0
-    failed_states: set[tuple[int, tuple[tuple[str, str], ...]]] = set()
+    failed_states: set[
+        tuple[int, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]
+    ] = set()
 
     def recurse(index: int, current_assignment: dict[str, str], current_map: dict[str, str]) -> dict | None:
         nonlocal explored
         if explored >= max_assignments:
             return None
-        state_key = (index, core_freeze_symbol_map(current_map))
+        state_key = (
+            index,
+            tuple(sorted(current_assignment.items())),
+            core_freeze_symbol_map(current_map),
+        )
         if state_key in failed_states:
             return None
         if index == len(ordered_operators):

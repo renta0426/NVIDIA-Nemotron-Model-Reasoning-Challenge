@@ -333,7 +333,253 @@
   - default solver (`explain_symbol_row_with_core_solver`) でも `64d775e5` は `{'+' : 'swap_halves', '*' : 'prod_digits|1785|carry01|max02'}` で solve されるようになった。
   - さらに generic `prod_tuple|expr0|expr1|expr2|expr3` interpreter を追加し、`2fc5ef5b` の row-consistent tuple を family 化したことで、default solver でも `{'*': 'prod_tuple|sum_mod(sum_mod01,max13)|prod_mod(sum_mod01,sum_mod23)|9-(prod_tens(9-p0,p2))|9-(sum_mod(absdiff03,max03))', '+': 'x+y'}` で solve されるようになった。
   - 同じ interpreter に `1785b35e` の row-consistent tuple `prod_tuple|9-(prod_mod(p2,prod_mod12))|absdiff(p3,prod_tens13)|sum_mod(absdiff12,max12)|prod_mod(9-p1,max02)` も追加し、default solver で `{'*': 'prod_tuple|9-(prod_mod(p2,prod_mod12))|absdiff(p3,prod_tens13)|sum_mod(absdiff12,max12)|prod_mod(9-p1,max02)', '+': 'prod:ac_bd:swap', '-': 'x-y'}` を再現した。
+  - そのまま `563bf8f9` と `a4e4ec1d` にも target-compatible non-`*` seed search を当てると、両方とも free symbols は高々 2 個で、row-consistent tuples が見つかった。
+  - `563bf8f9` の verified tuple は `pos0 = 9-absdiff:03`, `pos1 = min:02`, `pos2 = 9-p3`, `pos3 = 9-sum_mod:12` で、`+ = sum:ac_bd`, target `- = op+diff:ac_bd` と join し、final map `!->4, "->5, $->8, %->6, '->3, /->2, :->7, <->9, \`->0, {->1` を与えた。
+  - `a4e4ec1d` の verified tuple は `pos0 = 9-max:12`, `pos1 = 9-p0`, `pos2 = sum_mod(9-p2, p0)`, `pos3 = absdiff(p0, sum_mod:23)` で、`- = x-y` と join し、final map `!->4, "->6, $->2, %->1, >->3, @->0, \->5, {->7, |->9, }->8` を与えた。
+  - この 2 tuple も `prod_tuple|...` families として実装済みで、default solver で `563bf8f9` と `a4e4ec1d` の両方を solve する。
   - wider scan で `2e9973b7` も example-side では `prod_digits|1785|carry01|max02` に hit したが、これは new coverage ではない。row 自体は既存 solver でも `{'*': 'x*y', '-': 'y-x', '+': 'drop_op'}` で既に solve 済みだった。
-  - したがってこの wave の immediate value は「example-side hit row を増やすこと」ではなく、既存 solver が未解決だった `*`-heavy rows を実際に回収した点にある。現時点で confirmed new current coverage は `1785b35e`, `2fc5ef5b`, `64d775e5` の 3 行になった。
+  - したがってこの wave の immediate value は「example-side hit row を増やすこと」ではなく、既存 solver が未解決だった `*`-heavy rows を実際に回収した点にある。initial six-row hit slice だけでも `1785b35e`, `2fc5ef5b`, `563bf8f9`, `64d775e5`, `a4e4ec1d` の 5 行を new current coverage として回収した。
   - current symbolic rows のうち「`*` examples が 2 本で両方 4-char」の slice を再走査すると、この family の example-side hit row は `6` 件だった: `1785b35e`, `2e9973b7`, `2fc5ef5b`, `563bf8f9`, `64d775e5`, `a4e4ec1d`。
-  - ただし row-level で見ると、`2e9973b7` は既存 solver で既に解ける redundant hit、`563bf8f9` / `a4e4ec1d` は依然 unsolved のままで、new current coverage として確認できたのは `1785b35e`, `2fc5ef5b`, `64d775e5` の 3 行だった。
+  - row-level で見ると、`2e9973b7` は既存 solver で既に解ける redundant hitだが、それ以外の 5 行はすべて current solver で回収された。つまり same six-row slice は now `6 / 6` solved で、そのうち `5 / 6` が new current coverage である。
+- adjacent low-free row `0da1841f` も bounded seed search で追加回収できた。
+  - この row は `*` examples が 2 本とも 4-char だが、target operator が unseen `+` で、`target = (\+#%`, `answer = (\#%` なので、target side は既存 `drop_op` family で固定できる。
+  - `-` examples 側を既存 families で絞ると、`x+y` join 後の map で free symbols は `#`, `%`, `/` の 3 個だけだった。
+  - その completion 全探索に `*` examples 上の product-digit grammar を当てると、verified tuple `pos0 = 9-prod_tens:01`, `pos1 = 9-min:01`, `pos2 = max(9-p0, sum_mod:02)`, `pos3 = sum_mod(max:01, p3)` が見つかった。
+  - explicit merge では full solution 1 件を再現し、final map は `!->6, "->0, #->3, (->7, )->8, -->1, /->9, \->2, ]->5` だった。decoded row は `29*65 -> 9893`, `69*89 -> 9837`, `65+55 -> 120`, `75+85 -> 160`, target `72+34 -> 7234` で、default solver でも `{'*': 'prod_tuple|9-(prod_tens01)|9-(min01)|max(9-p0,sum_mod02)|sum_mod(max01,p3)', '+': 'drop_op', '-': 'x+y'}` を返す。
+- neighboring row `dac75343` も同じ bounded search で追加回収できた。
+  - この row も `*` examples は 2 本とも 4-char で、non-`*` side は `+` examples / target と `-` examples から seed を作れる。actual solver assignment は `+ = drop_op`, `- = x-y` になった。
+  - target-compatible seeds は `46` 件あったが、いずれも free symbols は `3` 個 (`'`, `[`, `{`) に落ちていた。
+  - completion 全探索に `*` examples 上の product-digit grammar を当てると、verified tuple `pos0 = p0`, `pos1 = max(absdiff:23, p0)`, `pos2 = 9-absdiff:03`, `pos3 = 9-absdiff:23` が見つかった。
+  - explicit merge では full solution 1 件を再現し、final map は `#->9, %->3, '->5, (->1, )->0, @->8, [->6, \`->4, {->7, |->2` だった。decoded row は `32*49 -> 1227`, `82*71 -> 5569`, `33+74 -> 3374`, `38-10 -> 28`, `34-83 -> -49`, target `98+84 -> 9884` で、default solver でも `{'*': 'prod_tuple|p0|max(absdiff23,p0)|9-(absdiff03)|9-(absdiff23)', '+': 'drop_op', '-': 'x-y'}` を返す。
+- neighboring row `398478f6` も low-free seed pair から追加回収できた。
+  - この row は `-` example が 1 本、target `+` が unseen だが、`- = x//y` と target `+ = x*y` の pair が overlap join 後に seed `1` 件・free symbols `2` 個まで落ちた。
+  - その 1 seed に対する bounded completion search で、verified tuple `pos0 = prod_tens(9-p3, 9-p3)`, `pos1 = prod_tens(p1, p1)`, `pos2 = 9-max:13`, `pos3 = 9-p1` が見つかった。
+  - explicit merge では full solution 1 件を再現し、final map は `!->3, )->4, -->1, :->9, @->0, [->6, \->7, ]->5, \`->8, |->2` だった。decoded row は `65-05 -> 13`, `56*76 -> 0037`, `94*80 -> 8244`, target `24*04 -> 96` で、default solver でも `{'*': 'prod_tuple|prod_tens(9-p3,9-p3)|prod_tens(p1,p1)|9-(max13)|9-p1', '+': 'x*y', '-': 'x//y'}` を返す。
+- former `hypothesis_formed` row `02902eb3` も同じ low-free route で回収できた。
+  - この row は `-` example が 1 本、target `+` が unseen だが、`- = x%y` と target `+ = x%y` の pair から seed `6` 件・free symbols `2` 個まで落ちた。
+  - その bounded completion search で、verified tuple `pos0 = 9-p2`, `pos1 = prod_mod:12`, `pos2 = absdiff(9-p0, max:02)`, `pos3 = max(9-p2, p3)` が見つかった。
+  - explicit merge では full solution 1 件を再現し、final map は `!->5, $->2, %->8, &->6, )->4, /->3, >->1, ]->0, }->7` だった。decoded row は `56*88 -> 7818`, `20*66 -> 7667`, `86%31 -> 24`, target `55%21 -> 13` で、default solver でも `{'*': 'prod_tuple|9-p2|prod_mod12|absdiff(9-p0,max02)|max(9-p2,p3)', '+': 'x%y', '-': 'x%y'}` を返す。
+- external `rule_found` row `b1b10e83` も finally 回収できた。
+  - この row は `+` examples / target がすべて `drop_op` なので、non-`*` side は digit map をほとんど固定しない。代わりに `*` examples 側だけに現れる 7 symbols (`"`, `#`, `$`, `)`, `\\`, `{`, `|`) に対して star-only brute force を回した。
+  - 7 symbols なので search space は `10P7 = 604800` 通りで、2 本の `*` examples を current product-digit grammar に通すだけで十分だった。
+  - その結果、verified tuple `pos0 = min(9-p1, p1)`, `pos1 = 9-sum_mod(9-p1, 9-p1)`, `pos2 = prod_tens(9-p2, sum_mod(9-p1, 9-p1))`, `pos3 = prod_tens(9-p1, max(9-p1, p1))` が見つかった。
+  - explicit merge では full solution 1 件を再現し、star-map は `"->0, #->1, $->2, )->3, \\->4, {->5, |->6` だった。decoded star rows は `10*10 -> 1356`, `24*30 -> 2521` で、default solver でも `{'*': 'prod_tuple|min(9-p1,p1)|9-(sum_mod(9-p1,9-p1))|prod_tens(9-p2,sum_mod(9-p1,9-p1))|prod_tens(9-p1,max(9-p1,p1))', '+': 'drop_op'}` を返す。
+- row `5968bf6c` も同じ regime で追加回収できた。
+  - non-`*` side からは `+ = prod:ad_bc:strip0swap`, `- = diff:ac_bd` の mergeable map が 1 本だけ残り、その時点で free symbol は `!` 1 個に落ちた。
+  - その merged map から 3 本の `*` rows の product digits は `1702`, `5238`, `1092` に固定されるので、position-wise signature を直接閉包して新しい tuple `pos0 = max(max:01, sum_mod:03)`, `pos1 = sum_mod(max:02, p2)`, `pos2 = prod_tens(9-prod_mod:03, 9-p2)`, `pos3 = sum_mod(min:23, prod_mod:02)` を得た。
+  - explicit merge では full solution 1 件を再現し、final map は `!->9, "->8, &->5, (->3, /->0, :->2, \\->7, ^->1, |->4, }->6` だった。decoded star rows は `23*74 -> 7160`, `97*54 -> 5858`, target `39*28 -> 3801` で、default solver でも `{'*': 'prod_tuple|max(max01,sum_mod03)|sum_mod(max02,p2)|prod_tens(9-(prod_mod03),9-p2)|sum_mod(min23,prod_mod02)', '+': 'prod:ad_bc:strip0swap', '-': 'diff:ac_bd'}` を返す。
+- row `60f55291` も同じ route で追加回収できた。
+  - non-`*` side は `-` examples だけなので、まず current family で `-` reduced maps を列挙した。最小 survivor は `sum:ac_bd:swap` / `sum:ac_bd:strip0swap` 系で、そこで free symbols は `[` と `\\` の 2 個だけになった。
+  - `sum:ac_bd:strip0swap` の one-map case から free digits 2 通りだけを completion し、3 本の `*` rows (`target` を含む) の product digits `3904`, `0248`, `3337` に対する position-wise signature closure を回すと、short tuple `pos0 = sum_mod(absdiff:13, p2)`, `pos1 = min(absdiff:03, sum_mod:03)`, `pos2 = min(9-p2, absdiff:13)`, `pos3 = 9-sum_mod:23` が見つかった。
+  - default solver での actual assignment は `{'*': 'prod_tuple|sum_mod(absdiff13,p2)|min(absdiff03,sum_mod03)|min(9-p2,absdiff13)|9-(sum_mod23)', '-': 'sum:ac_bd:swap'}` で、explicit merge の final map は `!->1, "->3, /->7, :->2, ?->9, [->8, \\->0, ]->5, {->6, |->4` だった。decoded star rows は `61*64 -> 5155`, `31*08 -> 0857`, target `47*71 -> 7049` になる。
+- row `11e77bf9` も default-priority route で追加回収できた。
+  - `*` side は earlier tuple `9-(absdiff03) / min02 / 9-p3 / 9-(sum_mod12)` では non-`*` side と 0 join だったので、まず default priority の `+` / `-` families だけで mergeable map を列挙した。
+  - `+ = abs(x-y)` / `- = abs(x-y)` から free digit count 2 の merged map が 1 本残り、実際の non-operator free symbol は `^` 1 個だけだった。
+  - その `^` に残る 2 digits (`0`, `9`) を completion し、2 本の `*` rows の product digits `1900`, `2664` に対する position-wise signature closure を回すと、default-compatible short tuple `pos0 = p2`, `pos1 = prod_mod:12`, `pos2 = absdiff(p1, sum_mod:03)`, `pos3 = p3` が見つかった。
+  - default solver では `{'*': 'prod_tuple|p2|prod_mod12|absdiff(p1,sum_mod03)|p3', '+': 'rdiff:ac_bd', '-': 'abs(x-y)'}` を返し、explicit merge の final map は `!->1, #->4, %->7, &->9, '->2, :->6, @->3, \\->8, ^->0` だった。decoded row は `61*89 -> 2809`, `84*39 -> 7416`, `34+76 -> 42`, `83-67 -> 16`, target `61-93 -> 32` になる。
+- ここまでで、broader two-`*` / 4-char regime における confirmed new current coverage は `02902eb3`, `053b4c86`, `083ed8fe`, `0da1841f`, `11e77bf9`, `1785b35e`, `24750c4a`, `2e9b1b9d`, `2fc5ef5b`, `398478f6`, `563bf8f9`, `5968bf6c`, `60f55291`, `64d775e5`, `693432da`, `75c8715e`, `7cb3089e`, `8395d060`, `93c9b36b`, `9f1ff166`, `a4e4ec1d`, `b1b10e83`, `dac75343`, `f36fe07e`, `faf1121c`, and `ff86cd34` の 26 行になった。
+
+- row `2e9b1b9d` も same regime で追加回収できた。
+  - `+ = x+y` の 1-family hit が examples と target を通して full map を一意に固定し、`!->2, "->3, $->5, )->4, :->8, <->6, >->1, ?->0, @->7, [->9` が直ちに得られた。
+  - その map で 2 本の `*` rows を decode すると product digits は `3069`, `3724` になり、position-wise closure から shortest tuple `pos0 = p0`, `pos1 = p1`, `pos2 = prod_mod:03`, `pos3 = 9-p3` が得られた。
+  - default solver でも `{'*': 'prod_tuple|p0|p1|prod_mod03|9-p3', '+': 'x+y'}` を返し、decoded row は `33*93 -> 3070`, `79*52 -> 3705`, target `41+32 -> 64` になる。
+
+- row `693432da` も same regime で追加回収できた。
+  - non-`*` side は `+ = x+y` と `- = rdiff:ac_bd` の merge で full map `'$'->5, '('->8, '-'->0, '>'->7, '?'->9, '['->2, '\\'->3, '^'->4, '{'->6, '|'->1` まで落ちた。
+  - その map から 2 本の `*` rows の product digits は `3627`, `6525` に固定され、position-wise closure で tuple `pos0 = absdiff(max:01, p3)`, `pos1 = absdiff(9-p2, min:12)`, `pos2 = 9-absdiff:13`, `pos3 = p3` が見つかった。
+  - default solver でも `{'*': 'prod_tuple|absdiff(max01,p3)|absdiff(9-p2,min12)|9-(absdiff13)|p3', '+': 'x+y', '-': 'rdiff:ac_bd'}` を返し、decoded row は `49*29 -> 3511`, `83*57 -> 6125`, `25-29 -> 01`, target `98+74 -> 172` になる。
+
+- row `f36fe07e` も same regime で追加回収できた。
+  - mergeable non-`*` side を row-local に全列挙すると、full-map survivor は 3 本まで落ち、その中で one-step star closure が通る map は `!->7, "->0, %->2, &->4, :->6, >->8, ?->1, \\->5, ]->9, }->3` だった。
+  - 2 本の `*` rows の product digits は `5915`, `8624` に固定され、そこから tuple `pos0 = 9-max:23`, `pos1 = prod_mod:12`, `pos2 = max:03`, `pos3 = p2` が shortest で閉じた。
+  - default solver での compatible assignment は `{'*': 'prod_tuple|9-(max23)|prod_mod12|max03|p2', '+': 'x+y', '-': 'y%x'}` で、decoded row は `70*57 -> 0643`, `14*67 -> 1724`, target `81+22 -> 103` になる。
+
+- row `9f1ff166` も same regime で追加回収できた。
+  - target `-` を含む `- = abs(x-y)` の reduced maps 8 本を点検すると、full-map survivor は `"->3, #->8, '->2, /->9, >->1, ?->7, [->5, ]->4, }->0` だった。
+  - その map から 2 本の `*` rows の product digits を固定すると、position-wise closure で tuple `pos0 = prod_mod(min:12, p1)`, `pos1 = absdiff(9-p2, min:12)`, `pos2 = sum_mod(9-p2, p1)`, `pos3 = min(9-p2, p1)` が得られた。
+  - default solver では `{'*': 'prod_tuple|prod_mod(min12,p1)|absdiff(9-p2,min12)|sum_mod(9-p2,p1)|min(9-p2,p1)', '-': 'abs(x-y)'}` を返す。
+
+- row `93c9b36b` も same regime で追加回収できた。
+  - non-`*` side は `+ = sum:ad_bc:strip0swap` と `- = x-y` の join が 1 本だけ残り、free symbol `-` を `0` で completion すると full map `)->3, }->8, %->9, >->1, ^->7, [->6, &->2, (->4, /->5, -->0` まで落ちた。
+  - その map で 2 本の `*` rows の product digits を decode すると、新しい tuple `pos0 = absdiff(9-p0, p0)`, `pos1 = 9-absdiff:13`, `pos2 = 9-prod_tens:02`, `pos3 = absdiff(9-p0, sum_mod:03)` が shortest で閉じた。
+  - default solver では `{'*': 'prod_tuple|absdiff(9-p0,p0)|9-(absdiff13)|9-(prod_tens02)|absdiff(9-p0,sum_mod03)', '-': 'x-y', '+': 'sum:ad_bc:strip0swap'}` を返す。
+
+- row `7cb3089e` も same regime で追加回収できた。
+  - non-`*` side を row-local に列挙すると、full-map survivor は `?->0, |->8, "->4, (->7, ^->5, $->6, %->1, !->3, }->9` の 1 本だけになった。
+  - そこから 2 本の `*` rows を decode して position-wise closure を回すと、tuple `pos0 = max:01`, `pos1 = prod_mod:01`, `pos2 = sum_mod(9-absdiff:12, max:01)`, `pos3 = sum_carry(p2, p2)` が見つかった。
+  - default solver では `{'*': 'prod_tuple|max01|prod_mod01|sum_mod(9-(absdiff12),max01)|sum_carry(p2,p2)', '+': 'x+y', '-': 'sum:ab_cd:strip0swap'}` を返す。
+
+- row `faf1121c` も current solver 実装と ledger の間で未同期だっただけで、実際には same regime の solved row だった。
+  - default solver は `{'*': 'prod_tuple|prod_mod(9-(prod_mod02),9-p3)|prod_mod(9-(max12),9-p0)|sum_mod(9-(prod_tens12),prod_mod01)|sum_mod(p1,p1)', '+': 'sum:ac_bd:swap', '-': 'x*y'}` を返す。
+  - recovered digit map は `"->0, %->1, (->2, )->3, -->4, @->5, [->6, \->7, `->8, }->9` で、decoded row は `32*51 -> 3096`, `29*16 -> 0230`, `25+23 -> 15`, target `03+56 -> 336` になる。
+
+- row `083ed8fe` も新しい low-free anchor として追加回収できた。
+  - `-` side の current survivors を row-local に絞ると、`prod:ab_cd:strip0` など複数 family で non-operator symbols が `#`, `(`, `<` の 3 個まで落ちた。
+  - その 3-free completion 全探索に 3 本の `*` rows を当てると、verified tuple `pos0 = max(9-sum_mod:02, prod_mod:03)`, `pos1 = absdiff(9-p0, sum_mod:02)`, `pos2 = 9-prod_tens(9-p3, p2)`, `pos3 = prod_mod(9-prod_tens:02, 9-p3)` が見つかった。
+  - default solver では `{'*': 'prod_tuple|max(9-(sum_mod02),prod_mod03)|absdiff(9-p0,sum_mod02)|9-(prod_tens(9-p3,p2))|prod_mod(9-(prod_tens02),9-p3)', '-': 'prod:ab_cd:strip0'}` を返し、digit map は `!->0, "->1, #->2, &->3, (->4, )->5, /->6, :->7, <->8, [->9` になる。decoded row は `14*48 -> 8399`, `94*08 -> 0033`, `13-67 -> 5`, target `83*75 -> 9762` になる。
+
+- row `053b4c86` もさらに cheap な 2-free anchor として追加回収できた。
+  - default-priority だけで non-`*` side を絞ると、`+ = sum:ac_bd:swap` と `- = y-x` の merge で free symbols は `#`, `(` の 2 個まで落ちた。
+  - その 2-free completion 全探索に 3 本の `*` rows を当てると、verified tuple `pos0 = prod_mod(9-p0, max:01)`, `pos1 = 9-sum_mod(9-p0, 9-p3)`, `pos2 = sum_mod(p1, prod_mod:13)`, `pos3 = min(9-prod_mod:13, p1)` が見つかった。
+  - default solver では `{'*': 'prod_tuple|prod_mod(9-p0,max01)|9-(sum_mod(9-p0,9-p3))|sum_mod(p1,prod_mod13)|min(9-(prod_mod13),p1)', '-': 'y-x', '+': 'sum:ac_bd:swap'}` を返す。one explicit full solution は `$->6, %->2, "->5, \\->4, ]->1, &->3, @->9, ?->0, #->7, (->8` で、decoded row は `23*76 -> 6033`, `76*71 -> 0211`, `12-51 -> 39`, `62+54 -> 611`, target `89*13 -> 8981` になる。
+
+- row `24750c4a` も default-compatible 2-free anchor として追加回収できた。
+  - non-`*` side は `+ = drop_op` と `- = rdiff:ab_cd` の merge で free symbols `@`, `|` の 2 個まで落ちた。
+  - その bounded completion search に 3 本の `*` rows を当てると、verified tuple `pos0 = prod_mod(9-absdiff:01, 9-p3)`, `pos1 = prod_tens(p3, p3)`, `pos2 = sum_mod(9-prod_mod:23, p1)`, `pos3 = absdiff(9-p1, min:02)` が見つかった。
+  - default solver では `{'*': 'prod_tuple|prod_mod(9-(absdiff01),9-p3)|prod_tens(p3,p3)|sum_mod(9-(prod_mod23),p1)|absdiff(9-p1,min02)', '+': 'drop_op', '-': 'rdiff:ab_cd'}` を返す。one explicit full solution は `/->3, {->1, <->7, )->2, }->4, &->9, ?->8, #->6, @->0, |->5` で、decoded row は `95*63 -> 0285`, `85*90 -> 3021`, `93-41 -> 14`, `89+87 -> 89`, target `53*98 -> 8231` になる。
+
+- row `ff86cd34` も new low-free target-`*` anchor として追加回収できた。
+  - non-`*` side は `+ = sum:ac_bd` と `- = reverse_right` の join で 9 survivor まで落ち、その各 survivor は free symbols `>`, `^` の 2 個しか残さなかった。
+  - その 2-free completion と `*` examples / target の product digits を shallow + depth1 basis で閉じると、verified tuple `pos0 = min:02`, `pos1 = prod_mod(absdiff:13, max:02)`, `pos2 = p3`, `pos3 = max(p3, 9-p3)` が見つかった。
+  - default solver では `{'*': 'prod_tuple|min02|prod_mod(absdiff13,max02)|p3|max(p3,9-p3)', '+': 'sum:ac_bd', '-': 'reverse_right'}` を返す。one explicit full solution は `&->7, '->2, (->9, )->1, [->8, ]->0, ^->6, |->4, }->3, >->5` で、decoded row は `32+87 -> 119`, `04+33 -> 37`, `55-93 -> 39`, `29*01 -> 0899`, `66*02 -> 0327`, target `79*61 -> 1499` になる。
+
+- row `24b2d8eb` も low-free target-`*` anchor として current coverage に昇格できた。
+  - row-local に見ると、`+` side は composite family `concat|x+y|nat|y//x|nat|keep` の 3 survivor だけが残り、各 survivor は free symbols `(`, `|` の 2 個しか残さなかった。
+  - その 2-free completion と `*` example / target の product digits を shallow + depth1 basis で閉じると、verified tuple `pos0 = absdiff:01`, `pos1 = prod_mod(9-p0, absdiff:03)`, `pos2 = 9-prod_tens:13`, `pos3 = sum_carry:01` が見つかった。
+  - ただし tuple 追加だけでは default solver に乗らず、原因は non-`*` seed family が composite-only list にいたことだった。`concat|x+y|nat|y//x|nat|keep` を default priority に昇格すると、default solver は `{'+': 'concat|x+y|nat|y//x|nat|keep', '*': 'prod_tuple|absdiff01|prod_mod(9-p0,absdiff03)|9-(prod_tens13)|sum_carry01'}` を返す。
+  - one explicit full solution は `!->9, "->8, '->4, (->1, /->5, :->7, [->6, `->0, |->3` で、decoded row は `46+44 -> 900`, `77+08 -> 850`, `36*31 -> 0090`, target `09*56 -> 5670` になる。
+
+- row `0d4b2baa` は cheap low-free frontier 候補ではなく、current default solver の既解行だと確認できた。
+  - default solver は `{'*': 'drop_op', '-': 'prod:ac_bd:strip0swap'}` を返し、追加の tuple search は不要だった。
+  - したがってこの row も frontier から外し、以後は新規 anchor 候補として再訪しない。
+
+- row `39a1f5e9` も cheap probe では未解決候補に見えたが、実際には current default solver の既解行だった。
+  - default solver は `{'*': 'swap_halves', '+': 'prod:ad_bc'}` を返し、`*` side に追加 family は要らなかった。
+  - したがってこの row も frontier script の stale candidate として扱い、再訪対象から外す。
+
+- row `19968602` も single non-`*` operator slice の new current coverage として追加回収できた。
+  - `+` side を default priority だけで絞ると、`sum:ab_cd:strip0swap` の survivors から free symbols `!`, `&`, `)` の 3 個まで落ちる。
+  - その 3-free completion と `*` example / target の product digits を shallow + depth1 basis で閉じると、verified tuple `pos0 = sum_carry:13`, `pos1 = 9-p0`, `pos2 = sum_mod(p0, absdiff:13)`, `pos3 = 9-sum_mod:02` が見つかった。
+  - default solver では `{'+': 'sum:ab_cd:strip0swap', '*': 'prod_tuple|sum_carry13|9-p0|sum_mod(p0,absdiff13)|9-(sum_mod02)'}` を返す。one explicit full solution は `[->2, `->0, ?->6, ^->5, "->1, |->4, /->3, !->7, &->9, )->8` で、decoded `*` rows は `34*58 -> 1881`, target `93*23 -> 1704` になる。
+
+- row `02a04b59` も cheap anchor ではなく current default solver の既解行だった。
+  - default solver は `{'*': 'drop_op', '+': 'sum:ac_bd:strip0swap'}` を返し、追加 family 探索は不要だった。
+  - したがってこの row も stale frontier candidate として扱い、再訪対象から外す。
+
+- row `1342687b` も current coverage に追加回収できた。
+  - `+` side を default priority だけで絞ると、`x+y` の survivors から free symbols `#`, `)`, `/`, `:` の 4 個まで落ちる。
+  - その 4-free completion と `*` example / target の product digits を shallow + depth1 basis で閉じると、verified tuple `pos0 = 9-sum_mod:03`, `pos1 = 9-min:13`, `pos2 = sum_mod(prod_mod:01, absdiff:23)`, `pos3 = prod_tens:23` が見つかった。
+  - default solver では `{'+': 'x+y', '*': 'prod_tuple|9-(sum_mod03)|9-(min13)|sum_mod(prod_mod01,absdiff23)|prod_tens23'}` を返す。one explicit full solution は `@->1, (->2, <->3, ]->4, !->5, %->8, #->0, )->6, /->7, :->9` で、decoded `*` rows は `32*46 -> 6791`, target `83*02 -> 3803` になる。
+
+- row `75c8715e` も low-free target-`*` anchor として current coverage に追加回収できた。
+  - non-`*` side は `- = sum:ac_bd:strip0swap` の seed だけで free symbols `)`, `` ` `` の 2 個まで落ち、direct `-`/`*` join は 0 だったので bounded continuation を掛けた。
+  - その 2-free completion と `*` example / target の product digits `1020`, `2838` を shallow + depth1 basis で閉じると、verified tuple `pos0 = sum_mod(p1, sum_mod:12)`, `pos1 = sum_mod(sum_mod:01, sum_mod:02)`, `pos2 = 9-absdiff:02`, `pos3 = sum_carry:02` が見つかった。
+  - default solver では `{'-': 'sum:ac_bd:strip0swap', '*': 'prod_tuple|sum_mod(p1,sum_mod12)|sum_mod(sum_mod01,sum_mod02)|9-(absdiff02)|sum_carry02'}` を返す。one explicit full solution は `[->2, >->4, $->8, #->3, -->7, /->1, \\->6, ^->5, )->0, `->9` で、decoded `*` rows は `20*51 -> 2480`, target `66*43 -> 9580` になる。
+
+- row `8395d060` も low-free target-`*` anchor として current coverage に追加回収できた。
+  - non-`*` side は composite family `concat|x-y|nat|x//y|nat|strip0` の survivors で free symbols `&`, `:`, `?` の 3 個まで落ち、既存 `*` tuple との direct target join は無かったので row-local continuation を掛けた。
+  - その 3-free completion と `*` example / target の product digits `4644`, `4524` を shallow + depth1 basis で閉じると、verified tuple `pos0 = sum_mod:03`, `pos1 = sum_mod(p0, sum_mod:01)`, `pos2 = sum_mod(p1, sum_mod:01)`, `pos3 = sum_mod(sum_mod:12, prod_tens:01)` が見つかった。
+  - ただし tuple 追加だけでは default solver に乗らず、原因は non-`*` seed family が composite-only list にいたことだった。`concat|x-y|nat|x//y|nat|strip0` を default priority に昇格すると、default solver は `{'*': 'prod_tuple|sum_mod03|sum_mod(p0,sum_mod01)|sum_mod(p1,sum_mod01)|sum_mod(sum_mod12,prod_tens01)', '-': 'concat|x-y|nat|x//y|nat|strip0'}` を返す。
+  - one explicit full solution は `$->0, (->1, |->2, @->4, '->3, /->5, !->9, &->6, :->7, ?->8` で、decoded `*` rows は `54*86 -> 8462`, target `87*52 -> 8349` に一致する。
+
+- row `7137d73a` は low-free に見えたが、current family set では open negative だった。
+  - `+ = x*y` の one-map seed を取ると free symbol は `]` 1 個まで縮み、`]=3` の completionで `*` rows は `0064 -> 0977`, `4600 -> 348`, target `2496 -> 872` に落ちる。
+  - そこから mixed-length fixed-drop continuation を掛けると drop index `2` の family `prod_tuple_drop2|absdiff(prod_mod01,sum_carry01)|max(9-p1,absdiff02)|9-(absdiff23)|sum_mod(9-(sum_carry23),9-(sum_mod23))` が row を閉じる。
+  - default solver でも `{'*': 'prod_tuple_drop2|absdiff(prod_mod01,sum_carry01)|max(9-p1,absdiff02)|9-(absdiff23)|sum_mod(9-(sum_carry23),9-(sum_mod23))', '+': 'x*y'}` を返すことを確認した。
+
+- row `97d6db7a` も stale frontier candidate で、現 default solver では既解だった。
+  - default solver は `{'*': 'drop_op', '+': 'sum:ad_bc:strip0'}` を返す。
+  - したがってこの row も再訪対象から外す。
+
+- row `23b0eb54` も stale frontier candidate で、現 default solver では既解だった。
+  - default solver は `{'*': 'drop_op', '-': 'sum:ac_bd:strip0'}` を返す。
+  - したがってこの row も frontier script の取りこぼし補正として再訪対象から外す。
+
+- row `9fc69c17` も stale frontier candidate で、現 default solver では既解だった。
+  - default solver は `{'*': 'drop_op', '-': 'y-x'}` を返す。
+  - したがってこの row も frontier script の取りこぼし補正として再訪対象から外す。
+
+- row `65add53a` は open note から fixed-drop positive に反転した。
+  - non-`*` side は `+ = sum:ac_bd` の 1-map seed で free count `4` まで落ち、未確定 completion は `! = 0`, `\\ = 4`, `^ = 5` の 1 通りが current target answer と両立した。
+  - verified transform は `prod_tuple_drop0|9-p2|sum_mod(min23,p3)|prod_tens13|sum_mod(9-p2,9-p3)` で、decoded `*` row `3192 -> 0407` と target `0425 -> 721` を同時に閉じる。
+  - default solver でも `{'+': 'sum:ac_bd', '*': 'prod_tuple_drop0|9-p2|sum_mod(min23,p3)|prod_tens13|sum_mod(9-p2,9-p3)'}` を返すことを確認した。
+
+- row `ae3d84e7` は open note から positive に反転した。
+  - `*` side は plain `x*y` で unique map に落ち、target `*` も同じ family で join すると full map `@=7, >=4, <=8, &=6, ?=3, \`=1, %=5, ^=0, ]=2` まで確定する。
+  - numeric / generic / scalar-concat では `+` family は見つからなかったが、parser-supported `copymix` を 1 hop 広げると `copymix|generic|absdiff:ac_bd|plain|a|expr_first` が `65+72 -> 136` を与え、full map とも矛盾しない。
+  - default solver でも `{'*': 'x*y', '+': 'copymix|generic|absdiff:ac_bd|plain|a|expr_first'}` を返すことを確認した。
+
+- row `06083e68` は 3-char target-`*` branch の mixed open note に回した。
+  - `+ = x//y` と target-`*` family `prod_tuple_drop3|prod_mod(p2,min02)|sum_mod(sum_mod13,absdiff01)|absdiff01|sum_mod12` を合わせると partial map `48+03 -> 16`, `87*14 -> 111`, `30-43 -> -<` まで固定される。
+  - plain numeric `op_prefix/op_suffix` を広げても `-` side は閉じなかったが、parser-supported `mask` を狭く再探索すると `mask|generic|prod:ad_bc:strip0|plain|oN` が minus example `30-43 -> -9` を与え、そのまま partial map と join した。
+  - default solver でも `{'*': 'prod_tuple_drop3|prod_mod(p2,min02)|sum_mod(sum_mod13,absdiff01)|absdiff01|sum_mod12', '-': 'mask|generic|prod:ad_bc:strip0|plain|oN', '+': 'x//y'}` を返すことを確認した。
+
+- row `7a17137f` は shallow continuation では一度 open note に回ったが、その後の second-order fixed-drop continuation で回収できた。
+  - non-`*` side は `+ = sum:ac_bd`, `- = diff:ac_bd:strip0` で free count `2` まで落ち、未確定 digit completion は `& = 6`, `' = 8` の 1 通りだけが `*`/target 両方と整合した。
+  - verified transform は `prod_tuple_drop0|sum_mod(prod_mod23,prod_mod23)|9-(prod_mod23)|prod_mod(sum_mod23,9-p0)|sum_mod23` で、decoded `*` row `08*79 -> 4631` と target `03*17 -> 446` を同時に閉じる。
+  - default solver でも `{'+': 'sum:ac_bd', '-': 'diff:ac_bd:strip0', '*': 'prod_tuple_drop0|sum_mod(prod_mod23,prod_mod23)|9-(prod_mod23)|prod_mod(sum_mod23,9-p0)|sum_mod23'}` を返すことを確認した。
+
+- row `1a28140b` は 3-char target-`*` frontier の positive として回収できた。
+  - non-`*` side を merge すると `+ = x+y`, `- = x//y` が free symbols `['/', '?']` の clean seed を与え、`*` example `21*96 -> 8061` と target `30*40 -> 592` に対して bounded continuation が通った。
+  - verified transform は target-only fixed drop を持つ `prod_tuple_drop3|9-p2|9-p1|9-(sum_mod02)|p2` で、4-char tuple `5924` から index `3` を落とすと target answer `592` になる。
+  - これを一般 family class として `analyze_symbol_rules.py` に実装し、default solver でも `{'*': 'prod_tuple_drop3|9-p2|9-p1|9-(sum_mod02)|p2', '+': 'x+y', '-': 'x//y'}` を返すことを確認した。
+
+- row `a692ec38` も同じ `prod_tuple_drop3` class の positive として回収できた。
+  - non-`*` side は `+ = sum:ac_bd:strip0swap` だけで free count `4` まで落ち、star-side mixed-length rows `(4,3,3)` に対して full 4-char tuple と target/example drop の両立を探索した。
+  - verified transform は `prod_tuple_drop3|prod_mod(p2,min02)|sum_mod(sum_mod13,absdiff01)|absdiff01|sum_mod12` で、decoded outputs は `0212`, `1238`, `6435` になり、drop index `3` により second `*` example と target がそれぞれ `123`, `643` に落ちる。
+  - default solver でも `{'*': 'prod_tuple_drop3|prod_mod(p2,min02)|sum_mod(sum_mod13,absdiff01)|absdiff01|sum_mod12', '+': 'sum:ac_bd:strip0swap'}` を返すことを確認した。
+
+- row `c7aae192` は fixed-drop class の別 variantとして回収できた。
+  - non-`*` side は `+` と `-` を merge すると free count `2` まで落ち、actual default assignment は `+ = diff:ac_bd`, `- = x-y` になった。
+  - bounded continuation では target-only drop ではなく `drop1` が効き、verified transform `prod_tuple_drop1|absdiff01|sum_mod(9-p0,p1)|sum_mod(sum_mod01,sum_mod03)|prod_tens(9-p1,9-p2)` が `*` example `2126` と target `530` を同時に閉じた。
+  - default solver でも `{'*': 'prod_tuple_drop1|absdiff01|sum_mod(9-p0,p1)|sum_mod(sum_mod01,sum_mod03)|prod_tens(9-p1,9-p2)', '-': 'x-y', '+': 'diff:ac_bd'}` を返すことを確認した。
+
+- row `edf364da` も same frontier の fixed-drop positive だった。
+  - non-`*` side は `+ = x+y` で free count `2` まで落ち、single `*` example `1235` と target `840` に対して target-only fixed-drop continuation を掛けると row-consistent tuple が見つかった。
+  - verified transform は `prod_tuple_drop0|sum_carry03|sum_mod(p2,prod_tens03)|sum_mod(9-p2,9-p3)|p0` で、target full tuple `0840` から先頭桁を落とすと answer `840` になる。
+  - default solver でも `{'*': 'prod_tuple_drop0|sum_carry03|sum_mod(p2,prod_tens03)|sum_mod(9-p2,9-p3)|p0', '+': 'x+y'}` を返すことを確認した。
+
+- row `b0206bb7` も fixed-drop class で回収できた。
+  - 最初の `drop0` hit は `*` example を 1 本しか満たしておらず false positive だった。row には `*` example が 2 本あるため、valid family は `1775 -> 1459` と `4361 -> 2646` を同時に閉じる必要があった。
+  - non-`*` side は `- = x-y` と `+ = x-y / abs(x-y) / x%y` の同一 merged map で free count `1` まで落ち、残り digit は target-only symbol `$` に自動で割り当たる。
+  - verified transform は `prod_tuple_drop0|sum_mod(p2,sum_mod02)|prod_mod(9-p2,prod_tens02)|p3|sum_mod(prod_mod12,prod_tens12)` で、decoded `*` rows `1775 -> 1459`, `4361 -> 2646`, target `1632 -> 029` を同時に満たす。
+  - default solver でも `{'*': 'prod_tuple_drop0|sum_mod(p2,sum_mod02)|prod_mod(9-p2,prod_tens02)|p3|sum_mod(prod_mod12,prod_tens12)', '-': 'x-y', '+': 'x%y'}` を返すことを確認した。
+
+- ここまでで target-`*` 3-char fixed-drop family は `drop0`, `drop1`, `drop2`, `drop3` の全 4 index で positive が出た。さらに `drop0` には `edf364da` の target-only/single-example 型、`b0206bb7` の two-`*`-example 型、`7a17137f` の second-order single-`*`-example 型、`65add53a` の one-`+`-seed 型が揃った。したがってこれは単発 row trick ではなく、current frontier の実 family class とみなしてよい。
+
+- row `7db0f3ee` は fixed-drop ではなく plain 3-digit product family の first positive だった。
+  - non-`*` side は `+ = x+y` だけで free count `1` まで落ち、残り 1 digit completionに対して star rows `399` と target `459` を同時に通す 3-position product-digit tuple を探索した。
+  - verified transform は `prod_triplet|sum_mod(9-p1,prod_mod03)|9-p0|9-(sum_carry01)` で、decoded `*` rows は `0608 -> 399` と `4332 -> 459` に一致した。
+  - これに合わせて `prod_triplet|expr0|expr1|expr2` class を solver に実装し、default solver でも `{'+' : 'x+y', '*' : 'prod_triplet|sum_mod(9-p1,prod_mod03)|9-p0|9-(sum_carry01)'}` を返すことを確認した。
+
+- row `b06625c4` も same-length `prod_triplet` class で回収できた。
+  - non-`*` side は `+` / `-` merge で free count `1` に落ち、actual default assignment は `+ = x-y`, `- = abs(x-y)` になった。
+  - verified transform は `prod_triplet|sum_mod(p0,max12)|sum_mod(9-p3,absdiff02)|sum_mod(9-p0,9-p0)` で、decoded rows `3344 -> 762` と `2905 -> 164` に一致した。
+  - default solver でも `{'*': 'prod_triplet|sum_mod(p0,max12)|sum_mod(9-p3,absdiff02)|sum_mod(9-p0,9-p0)', '-': 'abs(x-y)', '+': 'x-y'}` を返すことを確認した。
+
+- したがって same-length 3-char target-`*` には fixed-drop と別に `prod_triplet` という second family class がある。現時点で `7db0f3ee` と `b06625c4` の 2 行で positive を確認した。
+
+- row `de036bbf` も same-length `prod_triplet` class で回収できた。
+  - non-`*` side は `+` / `-` merge で free count `1` に落ち、actual default assignment は `+ = x+y`, `- = y-x` になった。
+  - verified transform は `prod_triplet|sum_mod(p3,sum_mod13)|sum_mod02|sum_mod(9-p3,sum_mod01)` で、decoded rows `1134 -> 947` と `0220 -> 221` に一致した。
+  - default solver でも `{'-': 'y-x', '+': 'x+y', '*': 'prod_triplet|sum_mod(p3,sum_mod13)|sum_mod02|sum_mod(9-p3,sum_mod01)'}` を返すことを確認した。
+
+- これで `(3,) -> 3` の target-`*` slice には `7db0f3ee`, `b06625c4`, `de036bbf` の 3 positive が出た。same-length 3-digit product family は単発ではなく、現在の frontier で再利用可能な class になった。
+
+- row `194695e8` は stronger negative / open branch として固定した。
+  - `*` side は current plain family `x*y` だけで 1-map に落ちるが、その star-map と両立する target-compatible `-` family は現 library に 1 件も無かった。
+  - 実際には `-` side の examples と target answer から複数の full survivor map を作れても、star-map との join count は常に `0` だった。
+  - したがってこの row は「`*` family を増やせば足りる」型ではなく、少なくとも current `-` family basis の外に missing class が残っている。
+
+- row `208d7838` も current family set では negative 側に倒れた。
+  - `*` side には row-local tuple `prod_tuple|absdiff(max01,p3)|absdiff(9-p2,min12)|9-(absdiff13)|p3` の 1-hit map がある。
+  - しかし non-`*` side を default priority で詰めると、`-` 側で target-compatible に残るのは `concat|x*y|nat|y//x|nat|strip0` の 1 family だけで、`+` side survivors と join した時点で merged maps は `0` 件になった。
+  - よってこの row も「star tuple は見えているが current non-`*` library に end-to-end の接続が無い」open negative と扱う。
+
+- row `3424f037` も cheap positive ではなく verified negative に回した。
+  - `*` examples は plain `x*y` で 1-map に落ちる一方、`+` / `-` side は join 後でも 7 survivor まで縮む。
+  - ただしその 7 survivor を star-map に照合すると join hit は `0 / 7` で、non-`*` side の最小 2-free seeds もすべて `* = x*y` と矛盾した。
+  - したがってこの row も bounded completion を足す段階ではなく、current family basis の不一致として一旦閉じる。
+
+- row `564916b5` は現時点では positive frontier ではなく、verified negative / open branch として固定した。
+  - `*` side 自体は current `b1b10e83` 系 tuple `min(9-p1,p1) / 9-(sum_mod(9-p1,9-p1)) / prod_tens(9-p2,sum_mod(9-p1,9-p1)) / prod_tens(9-p1,max(9-p1,p1))` で 1-map に落ち、`{"->2, {->3, <->5, !->4, $->1, `->0}` まで固定される。
+  - しかし `-` side の current survivor families `abs(x-y)`, `x%y`, `y%x`, `y//x` を examples と target の両方で検査しても、star-map との join は examples 側でも target 側でも 0 件だった。
+  - したがって、この row は「star-only structure は既知 family に乗るが、current non-`*` family library とは end-to-end に接続しない」ケースとして扱い、次の low-cost anchor を優先する。
+
+- row `042f1e53` は cheap frontier 再点検の結果、未解決候補ではなく current default solver の既解行だと確認できた。
+  - default solver は `{'*': 'drop_op', '+': 'sum:ac_bd', '-': 'x-y'}` を返し、composite を広げなくても行全体が閉じる。
+  - したがって、この row は新規 family 探索の対象から外し、「frontier script の取りこぼし補正」扱いにする。
+
+- row `0d90736f` は現 family library では open negative 寄りだった。
+  - non-`*` side は `+` target を通しても `prod:ab_cd:strip0` / `prod:cd_ab:strip0swap` までしか残らず、そこから `-` side を join すると merged non-`*` maps は 0 件になった。
+  - さらに `*` examples 側には current small-hit family が 0 件で、row-local bounded search を始める前段の足場がまだない。
