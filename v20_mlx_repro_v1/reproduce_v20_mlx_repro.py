@@ -3929,7 +3929,15 @@ def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
             if now - last_stall_at >= stall_check_interval_seconds:
                 status = "ok"
                 action = "none"
-                if effective_age_seconds is not None and effective_age_seconds >= stall_threshold_seconds and train_pids:
+                missing_report_stall_threshold_seconds = max(stall_threshold_seconds * 3, 7200)
+                effective_stall_threshold_seconds = (
+                    stall_threshold_seconds if step is not None else missing_report_stall_threshold_seconds
+                )
+                if (
+                    effective_age_seconds is not None
+                    and effective_age_seconds >= effective_stall_threshold_seconds
+                    and train_pids
+                ):
                     status = "stale_detected" if step is not None else "missing_report_stale_detected"
                     action = "kill_for_supervisor_restart"
                     for pid in train_pids:
@@ -3942,6 +3950,7 @@ def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
                             "action": action,
                             "step": step_value,
                             "age_seconds": effective_age_seconds,
+                            "stall_threshold_seconds": effective_stall_threshold_seconds,
                             "pids": train_pids,
                         }
                     ),
