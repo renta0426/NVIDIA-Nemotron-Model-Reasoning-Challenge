@@ -159,8 +159,8 @@ Keep direct miss pressure, then add broad answer-only stabilization for numeric_
 - MLX training: `v20_mlx_v8_symbol_cipher_recovery_mix_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` after a manual `launch-managed-run` override from the same single-file driver, keeping the original detached supervisor / checkpoint-cap / README-style local300 eval wiring intact
 - launch note: after re-checking `vm_stat` and live train RSS, the current memory headroom was sufficient for a second concurrent train, so this variant was front-launched instead of waiting for `broadbase` completion
 - runtime status: `running`
-- latest observed step: `1` (`microbatch_index=1` observed from `adapter/latest_train_report.json`)
-- retained checkpoints: `none yet`
+- latest observed step: `1`
+- retained checkpoints: `none`
 - local300 score: TBD
 
 ## hybrid_bridge
