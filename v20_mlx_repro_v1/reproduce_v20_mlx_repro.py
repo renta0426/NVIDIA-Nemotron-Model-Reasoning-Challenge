@@ -803,6 +803,7 @@ def spawn_detached_command(tokens: Sequence[str], *, log_path: Path) -> int:
             list(tokens),
             cwd=str(REPO_ROOT),
             env=env,
+            stdin=subprocess.DEVNULL,
             stdout=handle,
             stderr=subprocess.STDOUT,
             start_new_session=True,
