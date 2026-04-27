@@ -230,7 +230,7 @@ Balanced bridge run: moderate direct miss repeats, lighter bit-family rebalance,
 
 - Bundle generated: YES
 - MLX training: NOT YET STARTED
-- launch note: still intentionally queued. With `broadbase` and `symbol_cipher_recovery_mix` both active, this branch remains the third train and will wait for the active count to drop rather than pushing the live pair beyond the current memory budget
+- launch note: this branch is now intentionally deprioritized behind the queued `v10` mainline candidate. The old detached `hybrid_bridge` queue was stopped so it cannot steal the next freed slot while `broadbase` and `symbol_cipher_recovery_mix` still occupy the current 2-train budget
 - runtime status: `queued`
 - latest observed step: `not started`
 - retained checkpoints: `none`

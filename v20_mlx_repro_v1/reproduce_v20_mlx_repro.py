@@ -846,6 +846,12 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
                 section_name,
                 "- local300 score:",
             )
+    if bundle_name == "v20_corrective_corpus_v10_mainline_bundle.jsonl" or "v20_mlx_v10_mainline" in run_name:
+        return (
+            REPO_ROOT / "versions/v20_corrective_corpus_v10_mainline/v20_corrective_corpus_v10_mainline-results.md",
+            None,
+            "- local300 score:",
+        )
     return None
 
 

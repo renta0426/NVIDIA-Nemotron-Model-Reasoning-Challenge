@@ -4,6 +4,11 @@
 - strategy note: versions/v10_bit_mainline_strategy_2026-04-23.md
 - README basis: deterministic boxed-answer evaluation, bit_manipulation primary weighting, token-aware supervision, and token-first bundle construction.
 - status: bundle generated; model score not yet measured.
+- MLX launch note: this bundle is now the active queued mainline candidate behind the current v8 live pair. A detached single-file `queue-managed-run` plus dedicated `watch-progress-ledger` / `watch-score-publish` workers were started under `v20_mlx_repro_v1/outputs/v10/queue/`, and the lower-signal queued `hybrid_bridge` branch was explicitly stopped so `v10` gets the next eligible slot.
+- runtime status: `queued`
+- latest observed step: `not started`
+- retained checkpoints: `none`
+- local300 score: TBD
 
 ## Strategy
 
