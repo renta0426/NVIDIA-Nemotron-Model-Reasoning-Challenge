@@ -50,6 +50,9 @@ SNAPSHOT_TOKENS_ROOT = SNAPSHOT_ROOT / "tokens"
 TRAIN_CSV_PATH = REPO_ROOT / "data" / "train.csv"
 PROBLEMS_INDEX_PATH = AOPEN_NEMOTRON_ROOT / "problems.jsonl"
 ADAPTER_VALIDATION_SAMPLE_SIZE = 950
+DEFAULT_ADAPTER_VALIDATION_ROOT_NAME = "adapter_validation"
+DEFAULT_MINI_VALIDATION_ROOT_NAME = "adapter_validation_smoke8_snapshot"
+DEFAULT_MINI_VALIDATION_SUBSET_SIZE = 8
 
 DEFAULT_MODEL_ROOT = Path(
     "/Users/mac-studio/.cache/huggingface/hub/models--mlx-community--NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-BF16"
@@ -682,6 +685,7 @@ def build_eval_adapter_validation_command_tokens(args: argparse.Namespace) -> li
     tokens = build_command_prefix("eval-adapter-validation")
     append_command_option(tokens, "--output-root", Path(args.output_root))
     append_command_option(tokens, "--run-name", args.run_name)
+    append_command_option(tokens, "--adapter-validation-root-name", str(args.adapter_validation_root_name))
     append_command_option(tokens, "--max-tokens", int(args.max_tokens))
     append_command_option(tokens, "--temperature", float(args.temperature))
     append_command_option(tokens, "--top-p", float(args.top_p))
@@ -707,6 +711,7 @@ def build_merge_adapter_validation_command_tokens(args: argparse.Namespace) -> l
     tokens = build_command_prefix("merge-adapter-validation")
     append_command_option(tokens, "--output-root", Path(args.output_root))
     append_command_option(tokens, "--run-name", args.run_name)
+    append_command_option(tokens, "--adapter-validation-root-name", str(args.adapter_validation_root_name))
     append_command_option(tokens, "--max-tokens", int(args.max_tokens))
     append_command_option(tokens, "--temperature", float(args.temperature))
     append_command_option(tokens, "--top-p", float(args.top_p))
@@ -726,6 +731,7 @@ def build_postprocess_command_tokens(args: argparse.Namespace) -> list[str]:
     tokens = build_command_prefix("postprocess-run")
     append_command_option(tokens, "--output-root", Path(args.output_root))
     append_command_option(tokens, "--run-name", args.run_name)
+    append_command_option(tokens, "--adapter-validation-root-name", str(args.adapter_validation_root_name))
     append_command_option(tokens, "--postprocess-eval-kind", str(args.postprocess_eval_kind))
     append_command_bool_option(tokens, "--cleanup-completed-run-artifacts", bool(args.cleanup_completed_run_artifacts))
     return tokens
@@ -734,6 +740,7 @@ def build_postprocess_command_tokens(args: argparse.Namespace) -> list[str]:
 def build_manage_run_command_tokens(args: argparse.Namespace) -> list[str]:
     tokens = build_train_command_tokens(args)
     tokens[4] = "manage-run"
+    append_command_option(tokens, "--adapter-validation-root-name", str(args.adapter_validation_root_name))
     append_command_option(tokens, "--max-tokens", int(args.max_tokens))
     append_command_option(tokens, "--temperature", float(args.temperature))
     append_command_option(tokens, "--top-p", float(args.top_p))
@@ -746,6 +753,9 @@ def build_manage_run_command_tokens(args: argparse.Namespace) -> list[str]:
     append_command_option(tokens, "--validation-sample-size", int(args.validation_sample_size))
     append_command_option(tokens, "--validation-subset-size", int(args.validation_subset_size))
     append_command_option(tokens, "--validation-subset-mode", str(args.validation_subset_mode))
+    append_command_option(tokens, "--mini-validation-subset-size", int(args.mini_validation_subset_size))
+    append_command_option(tokens, "--mini-validation-subset-mode", str(args.mini_validation_subset_mode))
+    append_command_option(tokens, "--mini-validation-root-name", str(args.mini_validation_root_name))
     append_command_option(tokens, "--eval-shards", int(args.eval_shards))
     append_command_option(tokens, "--eval-shard-index", int(args.eval_shard_index))
     append_command_bool_option(tokens, "--eval-enable-thinking", bool(args.eval_enable_thinking))
@@ -2516,8 +2526,14 @@ def resolve_eval_root(run_root: Path, *, shard_count: int, shard_index: int) -> 
     return base_eval_root / "shards" / f"shard_{shard_index:02d}_of_{shard_count:02d}"
 
 
-def resolve_adapter_validation_root(run_root: Path, *, shard_count: int, shard_index: int) -> Path:
-    base_validation_root = run_root / "adapter_validation"
+def resolve_adapter_validation_root(
+    run_root: Path,
+    *,
+    shard_count: int,
+    shard_index: int,
+    root_name: str = DEFAULT_ADAPTER_VALIDATION_ROOT_NAME,
+) -> Path:
+    base_validation_root = run_root / root_name
     if shard_count <= 1:
         return base_validation_root
     return base_validation_root / "shards" / f"shard_{shard_index:02d}_of_{shard_count:02d}"
@@ -2668,6 +2684,108 @@ def summarize_validation_results(results_frame: pd.DataFrame) -> dict[str, Any]:
         },
         "categories": category_rows,
     }
+
+
+def normalize_smoke_prediction_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value)).strip()
+
+
+def evaluate_smoke_validation_gate(validation_root: Path) -> dict[str, Any]:
+    summary_path = validation_root / "validation_summary.json"
+    validation_csv_path = validation_root / "validation.csv"
+    if not summary_path.exists():
+        raise FileNotFoundError(f"Missing smoke validation summary at {summary_path}")
+    if not validation_csv_path.exists():
+        raise FileNotFoundError(f"Missing smoke validation csv at {validation_csv_path}")
+    summary = load_json(summary_path)
+    if not isinstance(summary, dict):
+        raise ValueError(f"Invalid smoke validation summary payload at {summary_path}")
+    overall = summary.get("overall") or {}
+    total = int(overall.get("total", 0))
+    correct = int(overall.get("correct", 0))
+    accuracy = float(overall.get("accuracy", 0.0))
+    validation_frame = pd.read_csv(validation_csv_path)
+    if "predicted" not in validation_frame.columns:
+        raise ValueError(f"Smoke validation csv is missing predicted column: {validation_csv_path}")
+    normalized_predictions = [
+        normalize_smoke_prediction_text(value)
+        for value in validation_frame["predicted"].fillna("").tolist()
+    ]
+    nonempty_predictions = [value for value in normalized_predictions if value]
+    distinct_predictions = sorted(set(nonempty_predictions))
+    prediction_counts = Counter(nonempty_predictions)
+    top_prediction = ""
+    top_prediction_count = 0
+    if prediction_counts:
+        top_prediction, top_prediction_count = max(prediction_counts.items(), key=lambda item: (item[1], item[0]))
+    min_nonempty_required = max(1, math.ceil(max(1, total) * 0.5))
+    min_distinct_required = 1 if total <= 1 else 2
+    failures: list[str] = []
+    if total <= 0:
+        failures.append("no_rows_scored")
+    if len(validation_frame.index) != total:
+        failures.append(f"csv_row_mismatch:{len(validation_frame.index)}!={total}")
+    if len(nonempty_predictions) < min_nonempty_required:
+        failures.append(f"too_many_empty_predictions:{len(nonempty_predictions)}<{min_nonempty_required}")
+    if len(distinct_predictions) < min_distinct_required:
+        failures.append(f"insufficient_prediction_diversity:{len(distinct_predictions)}<{min_distinct_required}")
+    if total > 1 and top_prediction_count >= total:
+        failures.append("single_prediction_repeated_for_all_rows")
+    status = "pass" if not failures else "fail"
+    return {
+        "created_at": utc_now(),
+        "status": status,
+        "proceed": status == "pass",
+        "validation_root": str(validation_root.resolve()),
+        "validation_summary_path": str(summary_path.resolve()),
+        "validation_csv_path": str(validation_csv_path.resolve()),
+        "overall": {
+            "correct": correct,
+            "total": total,
+            "accuracy": accuracy,
+        },
+        "prediction_stats": {
+            "nonempty_predictions": len(nonempty_predictions),
+            "empty_predictions": total - len(nonempty_predictions),
+            "distinct_predictions": len(distinct_predictions),
+            "top_prediction": top_prediction,
+            "top_prediction_count": top_prediction_count,
+        },
+        "failures": failures,
+    }
+
+
+def write_smoke_validation_gate_artifacts(validation_root: Path, gate_result: dict[str, Any]) -> None:
+    gate_json_path = validation_root / "smoke_gate.json"
+    gate_md_path = validation_root / "smoke_gate.md"
+    write_json(gate_json_path, gate_result)
+    overall = gate_result.get("overall") or {}
+    prediction_stats = gate_result.get("prediction_stats") or {}
+    lines = ["# smoke_gate", ""]
+    lines.append(f"- status: `{gate_result.get('status', '')}`")
+    lines.append(f"- proceed_to_full_validation: `{bool(gate_result.get('proceed', False))}`")
+    lines.append(
+        f"- overall_accuracy: `{float(overall.get('accuracy', 0.0)):.6f}` "
+        f"({int(overall.get('correct', 0))}/{int(overall.get('total', 0))})"
+    )
+    lines.append(
+        "- prediction_health: "
+        f"nonempty={int(prediction_stats.get('nonempty_predictions', 0))}, "
+        f"empty={int(prediction_stats.get('empty_predictions', 0))}, "
+        f"distinct={int(prediction_stats.get('distinct_predictions', 0))}"
+    )
+    top_prediction = str(prediction_stats.get("top_prediction", ""))
+    if top_prediction:
+        lines.append(
+            f"- dominant_prediction: `{top_prediction}` "
+            f"(count={int(prediction_stats.get('top_prediction_count', 0))})"
+        )
+    failures = gate_result.get("failures") or []
+    if failures:
+        lines.append("- failures:")
+        for failure in failures:
+            lines.append(f"  - `{failure}`")
+    write_text(gate_md_path, "\n".join(lines).strip() + "\n")
 
 
 def render_validation_markdown_summary(evaluation_name: str, payload: dict[str, Any]) -> str:
@@ -3343,7 +3461,12 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     eval_shard_index = int(args.eval_shard_index)
     if eval_shards == 1 and eval_shard_index != 0:
         raise ValueError("--eval-shard-index must be 0 when --eval-shards=1")
-    validation_root = resolve_adapter_validation_root(run_root, shard_count=eval_shards, shard_index=eval_shard_index)
+    validation_root = resolve_adapter_validation_root(
+        run_root,
+        shard_count=eval_shards,
+        shard_index=eval_shard_index,
+        root_name=str(args.adapter_validation_root_name),
+    )
     progress_path = validation_root / "validation_progress.json"
     summary_path = validation_root / "validation_summary.json"
     checkpoint_path = validation_root / "validation_records_checkpoint.csv"
@@ -3747,7 +3870,7 @@ def run_merge_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
     training_result = load_json(training_result_path)
     model_root = Path(training_result["shadow_model_dir"]).resolve()
     adapter_dir = Path(training_result["adapter_dir"]).resolve()
-    base_validation_root = run_root / "adapter_validation"
+    base_validation_root = run_root / str(args.adapter_validation_root_name)
     shard_root = base_validation_root / "shards"
     write_command_script(base_validation_root / "merge_cmd.sh", build_merge_adapter_validation_command_tokens(args))
     if not shard_root.exists():
@@ -4168,9 +4291,12 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
 
     eval_summary_path: Path | None = None
     if postprocess_eval_kind in {"auto", "adapter-validation"}:
-        validation_summary_path = run_root / "adapter_validation" / "validation_summary.json"
+        primary_validation_root = run_root / str(
+            getattr(args, "adapter_validation_root_name", DEFAULT_ADAPTER_VALIDATION_ROOT_NAME)
+        )
+        validation_summary_path = primary_validation_root / "validation_summary.json"
         if not validation_summary_path.exists():
-            validation_shard_root = run_root / "adapter_validation" / "shards"
+            validation_shard_root = primary_validation_root / "shards"
             if validation_shard_root.exists():
                 run_merge_adapter_validation(args)
         if validation_summary_path.exists():
@@ -4191,7 +4317,9 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
 
     if eval_summary_path is None:
         raise FileNotFoundError(
-            f"No completed evaluation summary found under {run_root / 'adapter_validation'} or {run_root / 'aopen_eval'}"
+            f"No completed evaluation summary found under "
+            f"{run_root / str(getattr(args, 'adapter_validation_root_name', DEFAULT_ADAPTER_VALIDATION_ROOT_NAME))} "
+            f"or {run_root / 'aopen_eval'}"
         )
     run_result = load_json(training_result_path)
     eval_result = load_json(eval_summary_path)
@@ -4352,13 +4480,35 @@ def run_prepare(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def run_managed_adapter_validation_pipeline(args: argparse.Namespace, *, run_root: Path, log_path: Path) -> None:
+def run_adapter_validation_pipeline(
+    args: argparse.Namespace,
+    *,
+    run_root: Path,
+    log_path: Path,
+    pipeline_label: str,
+    adapter_validation_root_name: str,
+    validation_subset_size: int,
+    validation_subset_mode: str,
+    eval_shards: int,
+    run_postprocess: bool,
+) -> Path:
     env = os.environ.copy()
     env.setdefault("UV_NO_PROGRESS", "1")
-    eval_shards = max(1, int(args.eval_shards))
+    pipeline_args = make_namespace_with(
+        args,
+        adapter_validation_root_name=str(adapter_validation_root_name),
+        validation_subset_size=int(validation_subset_size),
+        validation_subset_mode=str(validation_subset_mode),
+        eval_shards=max(1, int(eval_shards)),
+        eval_shard_index=0,
+    )
+    eval_shards = max(1, int(pipeline_args.eval_shards))
     for shard_index in range(eval_shards):
-        shard_args = make_namespace_with(args, eval_shard_index=shard_index)
-        append_log_line(log_path, f"eval_shard_start shard={shard_index}")
+        shard_args = make_namespace_with(pipeline_args, eval_shard_index=shard_index)
+        append_log_line(
+            log_path,
+            f"{pipeline_label}_shard_start shard={shard_index} root={adapter_validation_root_name}",
+        )
         with log_path.open("a", encoding="utf-8") as handle:
             subprocess.run(
                 build_eval_adapter_validation_command_tokens(shard_args),
@@ -4368,30 +4518,95 @@ def run_managed_adapter_validation_pipeline(args: argparse.Namespace, *, run_roo
                 stderr=subprocess.STDOUT,
                 check=True,
             )
-        append_log_line(log_path, f"eval_shard_done shard={shard_index} exit=0")
-    append_log_line(log_path, "merge_start")
-    with log_path.open("a", encoding="utf-8") as handle:
-        subprocess.run(
-            build_merge_adapter_validation_command_tokens(args),
-            cwd=str(REPO_ROOT),
-            env=env,
-            stdout=handle,
-            stderr=subprocess.STDOUT,
-            check=True,
+        append_log_line(
+            log_path,
+            f"{pipeline_label}_shard_done shard={shard_index} exit=0 root={adapter_validation_root_name}",
         )
-    append_log_line(log_path, "merge_done exit=0")
-    postprocess_args = make_namespace_with(args, postprocess_eval_kind="adapter-validation")
-    append_log_line(log_path, "postprocess_start")
-    with log_path.open("a", encoding="utf-8") as handle:
-        subprocess.run(
-            build_postprocess_command_tokens(postprocess_args),
-            cwd=str(REPO_ROOT),
-            env=env,
-            stdout=handle,
-            stderr=subprocess.STDOUT,
-            check=True,
+    if eval_shards > 1:
+        append_log_line(log_path, f"{pipeline_label}_merge_start root={adapter_validation_root_name}")
+        with log_path.open("a", encoding="utf-8") as handle:
+            subprocess.run(
+                build_merge_adapter_validation_command_tokens(pipeline_args),
+                cwd=str(REPO_ROOT),
+                env=env,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
+        append_log_line(log_path, f"{pipeline_label}_merge_done exit=0 root={adapter_validation_root_name}")
+    if run_postprocess:
+        postprocess_args = make_namespace_with(args, postprocess_eval_kind="adapter-validation")
+        append_log_line(log_path, "postprocess_start")
+        with log_path.open("a", encoding="utf-8") as handle:
+            subprocess.run(
+                build_postprocess_command_tokens(postprocess_args),
+                cwd=str(REPO_ROOT),
+                env=env,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
+        append_log_line(log_path, "postprocess_done exit=0")
+    return resolve_adapter_validation_root(
+        run_root,
+        shard_count=1,
+        shard_index=0,
+        root_name=adapter_validation_root_name,
+    )
+
+
+def run_managed_adapter_validation_pipeline(args: argparse.Namespace, *, run_root: Path, log_path: Path) -> None:
+    mini_validation_subset_size = max(0, int(getattr(args, "mini_validation_subset_size", 0)))
+    if mini_validation_subset_size > 0:
+        mini_validation_root_name = str(getattr(args, "mini_validation_root_name", DEFAULT_MINI_VALIDATION_ROOT_NAME))
+        mini_validation_root = resolve_adapter_validation_root(
+            run_root,
+            shard_count=1,
+            shard_index=0,
+            root_name=mini_validation_root_name,
         )
-    append_log_line(log_path, "postprocess_done exit=0")
+        mini_gate_path = mini_validation_root / "smoke_gate.json"
+        mini_gate_payload = load_json(mini_gate_path) if mini_gate_path.exists() else None
+        if isinstance(mini_gate_payload, dict) and not bool(mini_gate_payload.get("proceed", False)):
+            append_log_line(log_path, f"mini_eval_gate_blocked root={mini_validation_root_name}")
+            return
+        if not (isinstance(mini_gate_payload, dict) and bool(mini_gate_payload.get("proceed", False))):
+            mini_validation_root = run_adapter_validation_pipeline(
+                args,
+                run_root=run_root,
+                log_path=log_path,
+                pipeline_label="mini_eval",
+                adapter_validation_root_name=mini_validation_root_name,
+                validation_subset_size=mini_validation_subset_size,
+                validation_subset_mode=str(
+                    getattr(args, "mini_validation_subset_mode", "stratified-category-proportional")
+                ),
+                eval_shards=1,
+                run_postprocess=False,
+            )
+            mini_gate_payload = evaluate_smoke_validation_gate(mini_validation_root)
+            write_smoke_validation_gate_artifacts(mini_validation_root, mini_gate_payload)
+            append_log_line(
+                log_path,
+                "mini_eval_gate "
+                f"status={mini_gate_payload['status']} "
+                f"accuracy={float(mini_gate_payload['overall']['accuracy']):.6f} "
+                f"nonempty={int(mini_gate_payload['prediction_stats']['nonempty_predictions'])} "
+                f"distinct={int(mini_gate_payload['prediction_stats']['distinct_predictions'])}",
+            )
+            if not bool(mini_gate_payload.get("proceed", False)):
+                return
+    run_adapter_validation_pipeline(
+        args,
+        run_root=run_root,
+        log_path=log_path,
+        pipeline_label="full_eval",
+        adapter_validation_root_name=str(args.adapter_validation_root_name),
+        validation_subset_size=int(args.validation_subset_size),
+        validation_subset_mode=str(args.validation_subset_mode),
+        eval_shards=int(args.eval_shards),
+        run_postprocess=True,
+    )
 
 
 def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
@@ -4423,7 +4638,10 @@ def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
 
     while True:
         training_result_exists = (run_root / "training_result.json").exists()
-        validation_summary_exists = (run_root / "adapter_validation" / "validation_summary.json").exists()
+        validation_summary_exists = (
+            run_root / str(getattr(args, "adapter_validation_root_name", DEFAULT_ADAPTER_VALIDATION_ROOT_NAME))
+            / "validation_summary.json"
+        ).exists()
         step, age_seconds = read_latest_train_report(run_root)
         step_value: int | str = step if step is not None else "missing"
 
@@ -4560,7 +4778,10 @@ def run_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
 
     while True:
         training_result_exists = (run_root / "training_result.json").exists()
-        validation_summary_exists = (run_root / "adapter_validation" / "validation_summary.json").exists()
+        validation_summary_exists = (
+            run_root / str(getattr(args, "adapter_validation_root_name", DEFAULT_ADAPTER_VALIDATION_ROOT_NAME))
+            / "validation_summary.json"
+        ).exists()
         existing_manager_pids = find_run_command_pids(args.run_name, "manage-run")
         if training_result_exists and validation_summary_exists:
             append_log_line(queue_log_path, f"already_completed run_name={args.run_name}")
@@ -4638,7 +4859,10 @@ def run_watch_score_publish(args: argparse.Namespace) -> dict[str, Any]:
             if done_file.exists():
                 continue
             training_result_path = run_root / "training_result.json"
-            validation_summary_path = run_root / "adapter_validation" / "validation_summary.json"
+            validation_summary_path = (
+                run_root / str(getattr(args, "adapter_validation_root_name", DEFAULT_ADAPTER_VALIDATION_ROOT_NAME))
+                / "validation_summary.json"
+            )
             if not training_result_path.exists() or not validation_summary_path.exists():
                 continue
             touched = True
@@ -4818,6 +5042,29 @@ def parse_args() -> argparse.Namespace:
             choices=("head", "stratified-category-proportional"),
             default="head",
         )
+        target.add_argument(
+            "--adapter-validation-root-name",
+            type=str,
+            default=DEFAULT_ADAPTER_VALIDATION_ROOT_NAME,
+            help="Subdirectory under run_root for the primary adapter validation artifacts.",
+        )
+        target.add_argument(
+            "--mini-validation-subset-size",
+            type=int,
+            default=DEFAULT_MINI_VALIDATION_SUBSET_SIZE,
+            help="If > 0, run this many stratified smoke rows before the primary adapter validation.",
+        )
+        target.add_argument(
+            "--mini-validation-subset-mode",
+            choices=("head", "stratified-category-proportional"),
+            default="stratified-category-proportional",
+        )
+        target.add_argument(
+            "--mini-validation-root-name",
+            type=str,
+            default=DEFAULT_MINI_VALIDATION_ROOT_NAME,
+            help="Subdirectory under run_root for the smoke validation artifacts.",
+        )
         target.add_argument("--eval-shards", type=int, default=1)
         target.add_argument("--eval-shard-index", type=int, default=0)
         target.add_argument(
@@ -4884,7 +5131,7 @@ def parse_args() -> argparse.Namespace:
 
     merge_adapter_validation = subparsers.add_parser(
         "merge-adapter-validation",
-        help="Merge shard-local adapter validation outputs into run_root/adapter_validation/ and update the root summary.",
+        help="Merge shard-local adapter validation outputs into the selected adapter-validation root and update the root summary.",
     )
     add_shared_args(merge_adapter_validation)
     merge_adapter_validation.set_defaults(func=run_merge_adapter_validation)
@@ -4918,7 +5165,7 @@ def parse_args() -> argparse.Namespace:
 
     manage_run = subparsers.add_parser(
         "manage-run",
-        help="Long-running supervisor that keeps a train alive, runs local300 validation, and postprocesses the result.",
+        help="Long-running supervisor that keeps a train alive, runs smoke validation, then local300 validation and postprocess.",
     )
     add_shared_args(manage_run)
     manage_run.set_defaults(func=run_manage_run)
