@@ -1065,9 +1065,11 @@ def generate_single_with_min_logprob(
     *,
     max_tokens: int,
     sampler: Any,
+    row_timeout_seconds: int = 0,
 ) -> tuple[str, float | None]:
     text_segments: list[str] = []
     min_logprob: float | None = None
+    started_at = time.monotonic()
     for response in stream_generate(
         model,
         tokenizer,
@@ -1081,6 +1083,8 @@ def generate_single_with_min_logprob(
             continue
         sampled_logprob = _sampled_token_logprob(response.logprobs, int(response.token))
         min_logprob = sampled_logprob if min_logprob is None else min(min_logprob, sampled_logprob)
+        if int(row_timeout_seconds) > 0 and (time.monotonic() - started_at) >= int(row_timeout_seconds):
+            break
     return "".join(text_segments), min_logprob
 
 
@@ -2332,6 +2336,7 @@ def build_eval_settings_payload(
         "eval_enable_thinking": bool(args.eval_enable_thinking),
         "lazy_load": bool(args.lazy_load),
         "force_single_generate": bool(args.force_single_generate),
+        "eval_row_timeout_seconds": max(0, int(args.eval_row_timeout_seconds)),
         "eval_shards": int(eval_shards),
         "eval_shard_index": int(eval_shard_index),
     }
@@ -3000,6 +3005,7 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
                     prompt_tokens_single,
                     max_tokens=int(args.max_tokens),
                     sampler=sampler,
+                    row_timeout_seconds=int(args.eval_row_timeout_seconds),
                 )
                 record_validation_completion(chunk_index, row, raw_output, min_logprob)
         else:
@@ -3027,6 +3033,7 @@ def run_eval_adapter_validation(args: argparse.Namespace) -> dict[str, Any]:
                         prompt_tokens_single,
                         max_tokens=int(args.max_tokens),
                         sampler=sampler,
+                        row_timeout_seconds=int(args.eval_row_timeout_seconds),
                     )
                     record_validation_completion(chunk_index, row, raw_output, min_logprob)
 
@@ -4173,6 +4180,12 @@ def parse_args() -> argparse.Namespace:
             default=True,
         )
         target.add_argument("--force-single-generate", action="store_true")
+        target.add_argument(
+            "--eval-row-timeout-seconds",
+            type=int,
+            default=0,
+            help="Optional per-row local eval timeout in seconds. 0 disables the timeout.",
+        )
         target.add_argument(
             "--postprocess-eval-kind",
             choices=("auto", "aopen", "adapter-validation"),

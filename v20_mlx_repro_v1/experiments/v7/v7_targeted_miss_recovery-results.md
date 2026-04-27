@@ -79,7 +79,7 @@ Known absent from `train_recommended_learning_target_v1.csv`: `0ec17d2e`
 - score ledger update: `postprocess-run` now writes the measured local300 score back into this tracked markdown ledger automatically once an `adapter_validation` 300-row summary exists
 - score publish watcher: a detached single-file `watch-score-publish` worker is now armed to detect completed local300 validation, rerun `postprocess-run` defensively, and `git add/commit/push` the updated tracked score ledger while skipping publish attempts whenever `.git/index.lock` is present
 - progress ledger watcher: a detached single-file `watch-progress-ledger` worker now publishes `runtime status` / `latest observed step` / `retained checkpoints` back into this ledger on status or checkpoint changes and at a 5-step cadence, while backing off whenever `.git/index.lock` is present
-- local300 score after training: TBD
+- local300 score after training: 0.096667 (29/300)
 
 ## Generated
 
