@@ -638,20 +638,26 @@ def commit_and_push_tracked_file(
     if not has_git_diff(tracked_path):
         append_log_line(log_path, f"{log_prefix}_no_diff path={relative_to_repo(tracked_path)}")
         return {"status": "no_ledger_diff", "tracked_path": str(tracked_path.resolve())}
-    subprocess.run(["git", "add", "--", relative_to_repo(tracked_path)], cwd=str(REPO_ROOT), check=True)
-    subprocess.run(
-        [
-            "git",
-            "commit",
-            "-m",
-            commit_message,
-            "-m",
-            "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",
-        ],
-        cwd=str(REPO_ROOT),
-        check=True,
-    )
-    subprocess.run(["git", "push"], cwd=str(REPO_ROOT), check=True)
+    try:
+        subprocess.run(["git", "add", "--", relative_to_repo(tracked_path)], cwd=str(REPO_ROOT), check=True)
+        subprocess.run(
+            [
+                "git",
+                "commit",
+                "-m",
+                commit_message,
+                "-m",
+                "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+        )
+        subprocess.run(["git", "push"], cwd=str(REPO_ROOT), check=True)
+    except subprocess.CalledProcessError:
+        if git_index_is_locked():
+            append_log_line(log_path, f"{log_prefix}_git_busy path={relative_to_repo(tracked_path)}")
+            return {"status": "git_busy", "tracked_path": str(tracked_path.resolve())}
+        raise
     append_log_line(log_path, f"{log_prefix}_pushed path={relative_to_repo(tracked_path)}")
     return {
         "status": "score_pushed",
@@ -695,6 +701,44 @@ def read_training_result_step(run_root: Path) -> int | None:
         return None
     step = latest_report.get("step")
     return int(step) if step is not None else None
+
+
+def parse_ps_elapsed_seconds(raw_value: str) -> int | None:
+    value = raw_value.strip()
+    if not value:
+        return None
+    day_count = 0
+    if "-" in value:
+        day_text, _, value = value.partition("-")
+        if not day_text.isdigit():
+            return None
+        day_count = int(day_text)
+    parts = value.split(":")
+    if len(parts) == 2:
+        hour_count = 0
+        minute_text, second_text = parts
+    elif len(parts) == 3:
+        hour_text, minute_text, second_text = parts
+        if not hour_text.isdigit():
+            return None
+        hour_count = int(hour_text)
+    else:
+        return None
+    if not minute_text.isdigit() or not second_text.isdigit():
+        return None
+    return day_count * 86400 + hour_count * 3600 + int(minute_text) * 60 + int(second_text)
+
+
+def read_process_elapsed_seconds(pid: int) -> int | None:
+    proc = subprocess.run(
+        ["ps", "-o", "etime=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return None
+    return parse_ps_elapsed_seconds(proc.stdout)
 
 
 def list_saved_checkpoints(adapter_dir: Path) -> list[Path]:
@@ -3631,13 +3675,28 @@ def render_results_markdown(run_result: dict[str, Any], eval_result: dict[str, A
 
 
 def update_results_files(args: argparse.Namespace, run_result: dict[str, Any], eval_result: dict[str, Any]) -> None:
+    created_at = utc_now()
+    if DEFAULT_RESULTS_JSON.exists():
+        existing_payload = load_json(DEFAULT_RESULTS_JSON)
+        if (
+            isinstance(existing_payload, dict)
+            and existing_payload.get("run_result") == run_result
+            and existing_payload.get("eval_result") == eval_result
+            and existing_payload.get("created_at")
+        ):
+            created_at = str(existing_payload["created_at"])
     results_payload = {
-        "created_at": utc_now(),
+        "created_at": created_at,
         "run_result": run_result,
         "eval_result": eval_result,
     }
-    write_json(DEFAULT_RESULTS_JSON, results_payload)
-    write_text(DEFAULT_RESULTS_MD, render_results_markdown(run_result, eval_result))
+    existing_results_json = load_json(DEFAULT_RESULTS_JSON) if DEFAULT_RESULTS_JSON.exists() else None
+    if existing_results_json != results_payload:
+        write_json(DEFAULT_RESULTS_JSON, results_payload)
+    results_markdown = render_results_markdown(run_result, eval_result)
+    existing_results_md = DEFAULT_RESULTS_MD.read_text(encoding="utf-8") if DEFAULT_RESULTS_MD.exists() else None
+    if existing_results_md != results_markdown:
+        write_text(DEFAULT_RESULTS_MD, results_markdown)
 
 
 def run_full(args: argparse.Namespace) -> dict[str, Any]:
@@ -3847,19 +3906,30 @@ def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
                 append_log_line(supervisor_log, f"train_spawned pid={train_pid}")
                 train_pids = [train_pid]
 
+            effective_age_seconds = age_seconds
+            if effective_age_seconds is None and train_pids:
+                pid_ages = [read_process_elapsed_seconds(pid) for pid in train_pids]
+                resolved_ages = [value for value in pid_ages if value is not None]
+                if resolved_ages:
+                    effective_age_seconds = max(resolved_ages)
+
             if now - last_progress_at >= progress_watch_interval_seconds:
-                if step is None or age_seconds is None:
+                if step is None and effective_age_seconds is None:
+                    append_log_line(progress_log, "report_missing")
+                elif step is None:
+                    append_log_line(progress_log, f"report_missing age_seconds={effective_age_seconds}")
+                elif effective_age_seconds is None:
                     append_log_line(progress_log, "report_missing")
                 else:
-                    status = "stale_progress_detected" if age_seconds >= 1800 else "progress_ok"
-                    append_log_line(progress_log, f"{status} step={step} age_seconds={age_seconds}")
+                    status = "stale_progress_detected" if effective_age_seconds >= 1800 else "progress_ok"
+                    append_log_line(progress_log, f"{status} step={step} age_seconds={effective_age_seconds}")
                 last_progress_at = now
 
             if now - last_stall_at >= stall_check_interval_seconds:
                 status = "ok"
                 action = "none"
-                if age_seconds is not None and age_seconds >= stall_threshold_seconds and train_pids:
-                    status = "stale_detected"
+                if effective_age_seconds is not None and effective_age_seconds >= stall_threshold_seconds and train_pids:
+                    status = "stale_detected" if step is not None else "missing_report_stale_detected"
                     action = "kill_for_supervisor_restart"
                     for pid in train_pids:
                         subprocess.run(["kill", str(pid)], check=False)
@@ -3870,7 +3940,7 @@ def run_manage_run(args: argparse.Namespace) -> dict[str, Any]:
                             "status": status,
                             "action": action,
                             "step": step_value,
-                            "age_seconds": age_seconds,
+                            "age_seconds": effective_age_seconds,
                             "pids": train_pids,
                         }
                     ),
