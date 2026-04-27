@@ -9,6 +9,7 @@
 - Output root: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/experiments/submission/v20_mlx_v4_mainline_submission_repro/outputs/v20_mlx_v4_mainline_submission_repro`
 - submission.zip: `/Users/mac-studio/work/NVIDIA Nemotron Model Reasoning Challenge/v20_mlx_repro_v1/experiments/submission/v20_mlx_v4_mainline_submission_repro/outputs/v20_mlx_v4_mainline_submission_repro/submission.zip`
 - submission.zip size: `3277112238` bytes
+- single-file runner parity: `uv run python v20_mlx_repro_v1/reproduce_v20_mlx_repro.py export-submission --output-root v20_mlx_repro_v1/outputs --run-name v20_mlx_v4_mainline_mb1_nobc --submission-output-root v20_mlx_repro_v1/outputs/v20_mlx_v4_mainline_mb1_nobc/submission_export_from_runner` reproduced a README-valid `submission.zip` with `converted_tensor_count = 12010` and `validation.valid = True`
 
 ## README contract
 

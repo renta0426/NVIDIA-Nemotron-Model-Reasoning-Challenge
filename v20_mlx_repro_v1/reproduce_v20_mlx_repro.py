@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import dataclasses
+import importlib.metadata as importlib_metadata
 import json
 import math
 import os
@@ -15,6 +16,7 @@ import subprocess
 import sys
 import time
 import types
+import zipfile
 from collections import Counter, OrderedDict, defaultdict
 from datetime import datetime, timezone
 from functools import partial
@@ -26,6 +28,7 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 import numpy as np
 import pandas as pd
+from safetensors.numpy import load_file, save_file
 from mlx.nn.utils import average_gradients
 from mlx.utils import tree_flatten, tree_map
 from mlx_lm import batch_generate, generate, load as mlx_load, stream_generate
@@ -55,6 +58,10 @@ DEFAULT_OUTPUT_ROOT = WORK_ROOT / "outputs"
 DEFAULT_RUN_NAME = "v20_mlx_repro_v1_fullrun"
 DEFAULT_RESULTS_MD = WORK_ROOT / "v20_mlx_repro_v1-results.md"
 DEFAULT_RESULTS_JSON = WORK_ROOT / "v20_mlx_repro_v1-results.json"
+DEFAULT_SUBMISSION_BASE_MODEL_NAME_OR_PATH = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
+README_REQUIRED_SUBMISSION_FILES = ("adapter_config.json", "adapter_model.safetensors")
+README_SUBMISSION_ARCHIVE_NAME = "submission.zip"
+TARGET_MODULE_ORDER = ("q_proj", "k_proj", "v_proj", "o_proj", "in_proj", "out_proj", "up_proj", "down_proj", "lm_head")
 
 README_EVAL_CONTRACT = {
     "max_lora_rank": 32,
@@ -259,6 +266,376 @@ def write_command_script(path: Path, tokens: Sequence[str]) -> None:
     )
 
 
+def load_readme_submission_contract() -> dict[str, Any]:
+    text = README_PATH.read_text(encoding="utf-8")
+    lower_text = text.lower()
+    if "adapter_config.json" not in text:
+        raise ValueError("README.md no longer states that submission.zip must include adapter_config.json.")
+    if README_SUBMISSION_ARCHIVE_NAME.lower() not in lower_text:
+        raise ValueError(f"README.md no longer references submission archive {README_SUBMISSION_ARCHIVE_NAME}.")
+    if "submit a lora adapter" not in lower_text:
+        raise ValueError("README.md no longer states that the submission must be a LoRA adapter.")
+    max_lora_rank: int | None = None
+    for line in text.splitlines():
+        if not line.startswith("max_lora_rank\t"):
+            continue
+        raw_value = line.split("\t", 1)[1].strip()
+        if not raw_value:
+            raise ValueError("Malformed README.md evaluation row for max_lora_rank.")
+        try:
+            max_lora_rank = int(raw_value)
+        except ValueError as exc:
+            raise ValueError(f"Malformed README.md evaluation value for max_lora_rank: {raw_value!r}") from exc
+        break
+    if max_lora_rank is None:
+        raise ValueError("Missing README.md evaluation row for max_lora_rank.")
+    contract = {
+        "required_files": list(README_REQUIRED_SUBMISSION_FILES),
+        "max_lora_rank": max_lora_rank,
+        "single_adapter_submission_zip": True,
+        "submission_archive_name": README_SUBMISSION_ARCHIVE_NAME,
+    }
+    if int(contract["max_lora_rank"]) != int(README_EVAL_CONTRACT["max_lora_rank"]):
+        raise ValueError(
+            "README.md submission contract mismatch for max_lora_rank: "
+            f"expected {README_EVAL_CONTRACT['max_lora_rank']}, got {contract['max_lora_rank']}"
+        )
+    return contract
+
+
+def extract_lora_hparams(adapter_config: dict[str, Any]) -> tuple[int, float, float, list[str]]:
+    lora_parameters = adapter_config.get("lora_parameters")
+    if not isinstance(lora_parameters, dict):
+        raise ValueError("adapter_config.json is missing lora_parameters.")
+    try:
+        rank = int(lora_parameters["rank"])
+    except Exception as exc:
+        raise ValueError(f"Invalid LoRA rank in adapter_config.json: {lora_parameters.get('rank')}") from exc
+    try:
+        alpha = float(lora_parameters.get("scale", rank))
+    except Exception as exc:
+        raise ValueError(f"Invalid LoRA scale in adapter_config.json: {lora_parameters.get('scale')}") from exc
+    try:
+        dropout = float(lora_parameters.get("dropout", 0.0))
+    except Exception as exc:
+        raise ValueError(f"Invalid LoRA dropout in adapter_config.json: {lora_parameters.get('dropout')}") from exc
+    raw_keys = lora_parameters.get("keys", [])
+    if not isinstance(raw_keys, list) or not all(isinstance(item, str) for item in raw_keys):
+        raise ValueError("adapter_config.json lora_parameters.keys must be a list of strings.")
+    return rank, alpha, dropout, raw_keys
+
+
+def build_submission_target_modules_regex(mlx_keys: list[str]) -> str:
+    def has_any_fragment(*fragments: str) -> bool:
+        return any(any(fragment in key for fragment in fragments) for key in mlx_keys)
+
+    terminals: list[str] = []
+    for terminal in TARGET_MODULE_ORDER:
+        if terminal == "q_proj" and has_any_fragment(".mixer.q_proj.", "mixer.q_proj"):
+            terminals.append(terminal)
+        elif terminal == "k_proj" and has_any_fragment(".mixer.k_proj.", "mixer.k_proj"):
+            terminals.append(terminal)
+        elif terminal == "v_proj" and has_any_fragment(".mixer.v_proj.", "mixer.v_proj"):
+            terminals.append(terminal)
+        elif terminal == "o_proj" and has_any_fragment(".mixer.o_proj.", "mixer.o_proj"):
+            terminals.append(terminal)
+        elif terminal == "in_proj" and has_any_fragment(".mixer.in_proj.", "mixer.in_proj"):
+            terminals.append(terminal)
+        elif terminal == "out_proj" and has_any_fragment(".mixer.out_proj.", "mixer.out_proj"):
+            terminals.append(terminal)
+        elif terminal == "up_proj" and has_any_fragment(
+            ".mixer.shared_experts.up_proj.",
+            ".mixer.switch_mlp.fc1.",
+            ".mixer.up_proj.",
+            "mixer.shared_experts.up_proj",
+            "mixer.switch_mlp.fc1",
+            "mixer.up_proj",
+        ):
+            terminals.append(terminal)
+        elif terminal == "down_proj" and has_any_fragment(
+            ".mixer.shared_experts.down_proj.",
+            ".mixer.switch_mlp.fc2.",
+            ".mixer.down_proj.",
+            "mixer.shared_experts.down_proj",
+            "mixer.switch_mlp.fc2",
+            "mixer.down_proj",
+        ):
+            terminals.append(terminal)
+        elif terminal == "lm_head" and has_any_fragment(".lm_head.", "lm_head"):
+            terminals.append(terminal)
+    if not terminals:
+        raise ValueError("Could not derive PEFT target_modules regex from MLX adapter keys.")
+    non_root_terminals = [terminal for terminal in terminals if terminal != "lm_head"]
+    if "lm_head" in terminals and non_root_terminals:
+        return "(^lm_head$|.*\\.(" + "|".join(non_root_terminals) + ")$)"
+    if "lm_head" in terminals:
+        return "^lm_head$"
+    return ".*\\.(" + "|".join(non_root_terminals) + ")$"
+
+
+def ensure_nemotron_meta_import_stubs() -> None:
+    def _stub(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("Nemotron meta import stub was called at runtime.")
+
+    for module_name in ("mamba_ssm", "mamba_ssm.ops", "mamba_ssm.ops.triton"):
+        if module_name not in sys.modules:
+            sys.modules[module_name] = types.ModuleType(module_name)
+    layernorm_module = types.ModuleType("mamba_ssm.ops.triton.layernorm_gated")
+    layernorm_module.rmsnorm_fn = _stub
+    selective_module = types.ModuleType("mamba_ssm.ops.triton.selective_state_update")
+    selective_module.selective_state_update = _stub
+    ssd_module = types.ModuleType("mamba_ssm.ops.triton.ssd_combined")
+    ssd_module.mamba_chunk_scan_combined = _stub
+    ssd_module.mamba_split_conv1d_scan_combined = _stub
+    sys.modules["mamba_ssm.ops.triton.layernorm_gated"] = layernorm_module
+    sys.modules["mamba_ssm.ops.triton.selective_state_update"] = selective_module
+    sys.modules["mamba_ssm.ops.triton.ssd_combined"] = ssd_module
+
+
+def build_peft_adapter_config_payload(
+    *,
+    base_model_name_or_path: str,
+    rank: int,
+    alpha: float,
+    dropout: float,
+    target_modules: str,
+) -> dict[str, Any]:
+    return {
+        "alora_invocation_tokens": None,
+        "alpha_pattern": {},
+        "arrow_config": None,
+        "auto_mapping": None,
+        "base_model_name_or_path": str(base_model_name_or_path),
+        "bias": "none",
+        "corda_config": None,
+        "ensure_weight_tying": False,
+        "eva_config": None,
+        "exclude_modules": None,
+        "fan_in_fan_out": False,
+        "inference_mode": True,
+        "init_lora_weights": True,
+        "layer_replication": None,
+        "layers_pattern": None,
+        "layers_to_transform": None,
+        "loftq_config": {},
+        "lora_alpha": int(alpha) if float(alpha).is_integer() else float(alpha),
+        "lora_bias": False,
+        "lora_dropout": float(dropout),
+        "megatron_config": None,
+        "megatron_core": "megatron.core",
+        "modules_to_save": None,
+        "peft_type": "LORA",
+        "peft_version": str(importlib_metadata.version("peft")),
+        "qalora_group_size": 16,
+        "r": int(rank),
+        "rank_pattern": {},
+        "revision": None,
+        "target_modules": str(target_modules),
+        "target_parameters": None,
+        "task_type": "CAUSAL_LM",
+        "trainable_token_indices": None,
+        "use_dora": False,
+        "use_qalora": False,
+        "use_rslora": False,
+    }
+
+
+def build_reference_peft_shapes(
+    *,
+    reference_model_root: Path,
+    target_modules: str,
+    rank: int,
+    alpha: float,
+    dropout: float,
+) -> dict[str, tuple[int, ...]]:
+    from accelerate import init_empty_weights
+    from peft import LoraConfig, TaskType, get_peft_model, get_peft_model_state_dict
+    from transformers import AutoConfig, AutoModelForCausalLM
+
+    ensure_nemotron_meta_import_stubs()
+    config = AutoConfig.from_pretrained(str(reference_model_root), trust_remote_code=True)
+    with init_empty_weights():
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+    peft_config = LoraConfig(
+        task_type=TaskType.CAUSAL_LM,
+        r=int(rank),
+        lora_alpha=float(alpha),
+        lora_dropout=float(dropout),
+        target_modules=str(target_modules),
+        bias="none",
+        use_dora=False,
+        modules_to_save=None,
+        inference_mode=True,
+    )
+    model = get_peft_model(model, peft_config)
+    return {
+        key: tuple(value.shape)
+        for key, value in get_peft_model_state_dict(model).items()
+        if "lora_A" in key or "lora_B" in key
+    }
+
+
+def classify_submission_source_tensor(key: str) -> str:
+    if ".mixer.q_proj." in key or ".mixer.k_proj." in key or ".mixer.v_proj." in key or ".mixer.o_proj." in key:
+        return "attention"
+    if ".mixer.switch_mlp.fc1." in key:
+        return "switch_fc1"
+    if ".mixer.switch_mlp.fc2." in key:
+        return "switch_fc2"
+    if ".mixer.shared_experts." in key:
+        return "shared_experts"
+    if ".mixer.in_proj." in key:
+        return "in_proj"
+    if ".mixer.out_proj." in key:
+        return "out_proj"
+    return "other"
+
+
+def map_mlx_tensor_to_submission_entries(key: str, value: np.ndarray) -> list[tuple[str, np.ndarray]]:
+    prefix, suffix = key.rsplit(".", 1)
+    if suffix not in {"lora_a", "lora_b"}:
+        raise ValueError(f"Unsupported LoRA tensor suffix: {key}")
+    target_suffix = "lora_A.weight" if suffix == "lora_a" else "lora_B.weight"
+    if ".mixer.switch_mlp.fc1." in key:
+        if value.ndim != 3:
+            raise ValueError(f"switch_mlp.fc1 tensor must be 3D, got {key}: {tuple(value.shape)}")
+        base_prefix = prefix.replace(".mixer.switch_mlp.fc1", ".mixer.experts.{expert_index}.up_proj")
+        return [
+            (f"base_model.model.{base_prefix.format(expert_index=expert_index)}.{target_suffix}", value[expert_index])
+            for expert_index in range(value.shape[0])
+        ]
+    if ".mixer.switch_mlp.fc2." in key:
+        if value.ndim != 3:
+            raise ValueError(f"switch_mlp.fc2 tensor must be 3D, got {key}: {tuple(value.shape)}")
+        base_prefix = prefix.replace(".mixer.switch_mlp.fc2", ".mixer.experts.{expert_index}.down_proj")
+        return [
+            (f"base_model.model.{base_prefix.format(expert_index=expert_index)}.{target_suffix}", value[expert_index])
+            for expert_index in range(value.shape[0])
+        ]
+    if value.ndim != 2:
+        raise ValueError(f"Only 2D tensors are supported outside routed experts, got {key}: {tuple(value.shape)}")
+    return [(f"base_model.model.{prefix}.{target_suffix}", value.T)]
+
+
+def convert_mlx_adapter_to_submission_tensors(
+    tensors: dict[str, np.ndarray],
+) -> tuple[dict[str, np.ndarray], list[dict[str, Any]], dict[str, Any]]:
+    converted: dict[str, np.ndarray] = {}
+    conversion_preview: list[dict[str, Any]] = []
+    source_rank_counts: dict[int, int] = {}
+    source_family_counts: dict[str, int] = {}
+    for source_key, value in sorted(tensors.items()):
+        source_rank_counts[value.ndim] = source_rank_counts.get(value.ndim, 0) + 1
+        family = classify_submission_source_tensor(source_key)
+        source_family_counts[family] = source_family_counts.get(family, 0) + 1
+        mapped_entries = map_mlx_tensor_to_submission_entries(source_key, value)
+        for target_key, mapped_value in mapped_entries:
+            converted[target_key] = mapped_value
+            if len(conversion_preview) < 48:
+                conversion_preview.append(
+                    {
+                        "source_key": source_key,
+                        "source_shape": list(value.shape),
+                        "target_key": target_key,
+                        "target_shape": list(mapped_value.shape),
+                    }
+                )
+    source_summary = {
+        "source_tensor_count": len(tensors),
+        "source_tensor_rank_counts": [
+            {"tensor_rank": int(rank), "tensor_count": int(source_rank_counts[rank])}
+            for rank in sorted(source_rank_counts)
+        ],
+        "source_family_counts": [
+            {"family": family, "tensor_count": int(source_family_counts[family])}
+            for family in sorted(source_family_counts)
+        ],
+    }
+    return converted, conversion_preview, source_summary
+
+
+def validate_submission_tensors(
+    converted_tensors: dict[str, np.ndarray],
+    reference_shapes: dict[str, tuple[int, ...]],
+) -> dict[str, Any]:
+    converted_keys = set(converted_tensors)
+    reference_keys = set(reference_shapes)
+    missing_keys = sorted(reference_keys - converted_keys)
+    unexpected_keys = sorted(converted_keys - reference_keys)
+    shape_mismatches: list[dict[str, Any]] = []
+    for key in sorted(converted_keys & reference_keys):
+        converted_shape = tuple(converted_tensors[key].shape)
+        reference_shape = tuple(reference_shapes[key])
+        if converted_shape != reference_shape:
+            shape_mismatches.append(
+                {
+                    "key": key,
+                    "converted_shape": list(converted_shape),
+                    "reference_shape": list(reference_shape),
+                }
+            )
+    return {
+        "valid": not missing_keys and not unexpected_keys and not shape_mismatches,
+        "converted_tensor_count": len(converted_tensors),
+        "reference_tensor_count": len(reference_shapes),
+        "missing_key_count": len(missing_keys),
+        "unexpected_key_count": len(unexpected_keys),
+        "shape_mismatch_count": len(shape_mismatches),
+        "missing_key_examples": missing_keys[:12],
+        "unexpected_key_examples": unexpected_keys[:12],
+        "shape_mismatch_examples": shape_mismatches[:12],
+    }
+
+
+def resolve_submission_reference_model_root(
+    *,
+    run_root: Path,
+    adapter_config: dict[str, Any],
+    explicit_reference_model_root: Path | None,
+) -> Path:
+    if explicit_reference_model_root is not None:
+        return Path(explicit_reference_model_root).resolve()
+    configured_model_root = adapter_config.get("model")
+    if isinstance(configured_model_root, str) and configured_model_root.strip():
+        return Path(configured_model_root).resolve()
+    return (run_root / "shadow_model").resolve()
+
+
+def write_submission_export_results_md(path: Path, manifest: dict[str, Any]) -> None:
+    lines = [
+        f"# {manifest['run_name']} submission export",
+        "",
+        "## README contract",
+        "",
+        "- source_document: `README.md`",
+        f"- max_lora_rank: `{manifest['readme_submission_contract']['max_lora_rank']}`",
+        f"- required files: `{', '.join(manifest['readme_submission_contract']['required_files'])}`",
+        f"- archive name: `{manifest['readme_submission_contract']['submission_archive_name']}`",
+        "",
+        "## Export summary",
+        "",
+        f"- created_at: `{manifest['created_at']}`",
+        f"- run_root: `{manifest['run_root']}`",
+        f"- source_adapter_dir: `{manifest['source_adapter_dir']}`",
+        f"- reference_model_root: `{manifest['reference_model_root']}`",
+        f"- output_root: `{manifest['output_root']}`",
+        f"- submission.zip: `{manifest['submission_zip_path']}`",
+        f"- submission.zip size: `{manifest['submission_zip_size_bytes']}` bytes",
+        f"- base_model_name_or_path: `{manifest['base_model_name_or_path']}`",
+        f"- target_modules regex: `{manifest['target_modules']}`",
+        f"- rank: `{manifest['rank']}`",
+        f"- lora_alpha: `{manifest['lora_alpha']}`",
+        f"- lora_dropout: `{manifest['lora_dropout']}`",
+        f"- converted_tensor_count: `{manifest['converted_tensor_count']}`",
+        f"- validation.valid: `{manifest['validation']['valid']}`",
+        "",
+        "## submission.zip members",
+        "",
+    ]
+    lines.extend(f"- `{member}`" for member in manifest["submission_zip_members"])
+    write_text(path, "\n".join(lines) + "\n")
+
+
 def resolve_training_data_path(args: argparse.Namespace) -> Path:
     if getattr(args, "training_bundle_path", None) is not None:
         return Path(args.training_bundle_path).resolve()
@@ -417,6 +794,20 @@ def build_watch_progress_command_tokens(args: argparse.Namespace) -> list[str]:
     append_command_option(tokens, "--progress-watch-step-interval", int(args.progress_watch_step_interval))
     for path in getattr(args, "watch_run_root", []) or []:
         append_command_option(tokens, "--watch-run-root", Path(path))
+    return tokens
+
+
+def build_export_submission_command_tokens(args: argparse.Namespace) -> list[str]:
+    tokens = build_command_prefix("export-submission")
+    append_command_option(tokens, "--output-root", Path(args.output_root))
+    append_command_option(tokens, "--run-name", args.run_name)
+    if getattr(args, "source_adapter_dir", None) is not None:
+        append_command_option(tokens, "--source-adapter-dir", Path(args.source_adapter_dir))
+    if getattr(args, "submission_output_root", None) is not None:
+        append_command_option(tokens, "--submission-output-root", Path(args.submission_output_root))
+    if getattr(args, "reference_model_root", None) is not None:
+        append_command_option(tokens, "--reference-model-root", Path(args.reference_model_root))
+    append_command_option(tokens, "--base-model-name-or-path", str(args.base_model_name_or_path))
     return tokens
 
 
@@ -3817,6 +4208,132 @@ def run_postprocess_existing(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
+def run_export_submission(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    if not run_root.exists():
+        raise FileNotFoundError(f"Run root does not exist: {run_root}")
+    source_adapter_dir = (
+        Path(args.source_adapter_dir).resolve()
+        if args.source_adapter_dir is not None
+        else (run_root / "adapter").resolve()
+    )
+    output_root = (
+        Path(args.submission_output_root).resolve()
+        if args.submission_output_root is not None
+        else (run_root / "submission_export").resolve()
+    )
+    ensure_dir(output_root)
+    write_command_script(output_root / "export_submission_cmd.sh", build_export_submission_command_tokens(args))
+
+    adapter_config_path = source_adapter_dir / "adapter_config.json"
+    adapter_weights_path = source_adapter_dir / "adapters.safetensors"
+    if not adapter_config_path.exists():
+        raise FileNotFoundError(f"Missing adapter_config.json: {adapter_config_path}")
+    if not adapter_weights_path.exists():
+        raise FileNotFoundError(f"Missing adapters.safetensors: {adapter_weights_path}")
+
+    readme_submission_contract = load_readme_submission_contract()
+    adapter_config = load_json(adapter_config_path)
+    if not isinstance(adapter_config, dict):
+        raise ValueError(f"Invalid adapter_config.json: {adapter_config_path}")
+    rank, alpha, dropout, _raw_target_keys = extract_lora_hparams(adapter_config)
+    if rank > int(readme_submission_contract["max_lora_rank"]):
+        raise ValueError(
+            f"LoRA rank {rank} exceeds README submission limit {readme_submission_contract['max_lora_rank']}."
+        )
+
+    source_tensors = load_file(str(adapter_weights_path))
+    if not source_tensors:
+        raise ValueError(f"No tensors found in {adapter_weights_path}")
+    target_modules = build_submission_target_modules_regex(list(source_tensors.keys()))
+    reference_model_root = resolve_submission_reference_model_root(
+        run_root=run_root,
+        adapter_config=adapter_config,
+        explicit_reference_model_root=args.reference_model_root,
+    )
+    if not reference_model_root.exists():
+        raise FileNotFoundError(f"Reference model root does not exist: {reference_model_root}")
+
+    converted_tensors, conversion_preview, source_summary = convert_mlx_adapter_to_submission_tensors(source_tensors)
+    reference_shapes = build_reference_peft_shapes(
+        reference_model_root=reference_model_root,
+        target_modules=target_modules,
+        rank=rank,
+        alpha=alpha,
+        dropout=dropout,
+    )
+    validation = validate_submission_tensors(converted_tensors, reference_shapes)
+    if not validation["valid"]:
+        raise ValueError(
+            "Converted PEFT tensors do not match the Nemotron meta reference: "
+            f"missing={validation['missing_key_count']} "
+            f"unexpected={validation['unexpected_key_count']} "
+            f"shape_mismatches={validation['shape_mismatch_count']}"
+        )
+
+    submission_dir = ensure_dir(output_root / "submission_adapter")
+    peft_adapter_config = build_peft_adapter_config_payload(
+        base_model_name_or_path=str(args.base_model_name_or_path),
+        rank=rank,
+        alpha=alpha,
+        dropout=dropout,
+        target_modules=target_modules,
+    )
+    output_adapter_config_path = submission_dir / "adapter_config.json"
+    output_adapter_model_path = submission_dir / "adapter_model.safetensors"
+    write_json(output_adapter_config_path, peft_adapter_config)
+    save_file(converted_tensors, str(output_adapter_model_path))
+
+    submission_zip_path = output_root / README_SUBMISSION_ARCHIVE_NAME
+    with zipfile.ZipFile(submission_zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.write(output_adapter_config_path, "adapter_config.json")
+        archive.write(output_adapter_model_path, "adapter_model.safetensors")
+    with zipfile.ZipFile(submission_zip_path) as archive:
+        submission_zip_members = archive.namelist()
+    if sorted(submission_zip_members) != sorted(readme_submission_contract["required_files"]):
+        raise ValueError(
+            "submission.zip members do not match README contract: "
+            f"got={submission_zip_members} expected={readme_submission_contract['required_files']}"
+        )
+
+    validation_summary_path = run_root / "adapter_validation" / "validation_summary.json"
+    validation_summary_payload = None
+    if validation_summary_path.exists():
+        loaded_validation_summary = load_json(validation_summary_path)
+        if isinstance(loaded_validation_summary, dict):
+            validation_summary_payload = loaded_validation_summary
+    manifest = {
+        "created_at": utc_now(),
+        "run_name": args.run_name,
+        "run_root": str(run_root),
+        "source_adapter_dir": str(source_adapter_dir),
+        "source_adapter_config_path": str(adapter_config_path),
+        "source_adapter_weights_path": str(adapter_weights_path),
+        "reference_model_root": str(reference_model_root),
+        "output_root": str(output_root),
+        "submission_dir": str(submission_dir),
+        "submission_zip_path": str(submission_zip_path),
+        "submission_zip_size_bytes": submission_zip_path.stat().st_size,
+        "base_model_name_or_path": str(args.base_model_name_or_path),
+        "target_modules": target_modules,
+        "rank": int(rank),
+        "lora_alpha": float(alpha),
+        "lora_dropout": float(dropout),
+        "readme_submission_contract": readme_submission_contract,
+        "readme_submission_contract_verified_from_readme_file": True,
+        "source_summary": source_summary,
+        "converted_tensor_count": len(converted_tensors),
+        "validation": validation,
+        "conversion_preview": conversion_preview,
+        "submission_zip_members": submission_zip_members,
+        "source_validation_summary_path": str(validation_summary_path) if validation_summary_path.exists() else None,
+        "source_validation_summary": validation_summary_payload,
+    }
+    write_json(output_root / "export_manifest.json", manifest)
+    write_submission_export_results_md(output_root / "submission_export_results.md", manifest)
+    return manifest
+
+
 def run_prepare(args: argparse.Namespace) -> dict[str, Any]:
     artifacts = prepare_run(args)
     return {
@@ -4376,6 +4893,22 @@ def parse_args() -> argparse.Namespace:
     )
     add_shared_args(postprocess)
     postprocess.set_defaults(func=run_postprocess_existing)
+
+    export_submission = subparsers.add_parser(
+        "export-submission",
+        help="Convert a completed MLX adapter into a README-contract submission.zip using the single-file runner.",
+    )
+    export_submission.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    export_submission.add_argument("--run-name", type=str, default=DEFAULT_RUN_NAME)
+    export_submission.add_argument("--source-adapter-dir", type=Path, default=None)
+    export_submission.add_argument("--submission-output-root", type=Path, default=None)
+    export_submission.add_argument("--reference-model-root", type=Path, default=None)
+    export_submission.add_argument(
+        "--base-model-name-or-path",
+        type=str,
+        default=DEFAULT_SUBMISSION_BASE_MODEL_NAME_OR_PATH,
+    )
+    export_submission.set_defaults(func=run_export_submission)
 
     manage_run = subparsers.add_parser(
         "manage-run",
