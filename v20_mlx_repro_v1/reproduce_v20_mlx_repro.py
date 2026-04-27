@@ -2602,11 +2602,45 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
     for optimizer_step_index, step in enumerate(step_plan):
         step_started_at = time.perf_counter()
         microbatches = chunk_examples(step.examples, int(args.micro_batch_size))
+        step_status_report = {
+            "observed_at": utc_now(),
+            "status": "step_started",
+            "step": optimizer_step_index + 1,
+            "step_zero_indexed": optimizer_step_index,
+            "v20_snapshot_step": int(step.step),
+            "examples_in_step": len(step.examples),
+            "microbatch_index": 0,
+            "microbatches_in_step": len(microbatches),
+            "trained_tokens": trained_tokens,
+            "total_elapsed_seconds": round(time.perf_counter() - started_at, 4),
+        }
+        write_json(latest_train_report_path, step_status_report)
+        print(
+            f"Step {optimizer_step_index + 1}/{total_optimizer_steps}: "
+            f"started microbatches={len(microbatches)} snapshot_step={int(step.step)}",
+            flush=True,
+        )
         grad_accum = None
         weighted_loss_total = 0.0
         token_total = 0
 
         for microbatch_index, micro_examples in enumerate(microbatches):
+            write_json(
+                latest_train_report_path,
+                {
+                    "observed_at": utc_now(),
+                    "status": "running_microbatch",
+                    "step": optimizer_step_index + 1,
+                    "step_zero_indexed": optimizer_step_index,
+                    "v20_snapshot_step": int(step.step),
+                    "examples_in_step": len(step.examples),
+                    "microbatch_index": microbatch_index + 1,
+                    "microbatches_in_step": len(microbatches),
+                    "trained_tokens": trained_tokens + token_total,
+                    "step_tokens_so_far": token_total,
+                    "total_elapsed_seconds": round(time.perf_counter() - started_at, 4),
+                },
+            )
             batch_array, lengths_array = build_microbatch_arrays(
                 micro_examples,
                 micro_batch_size=int(args.micro_batch_size),
@@ -2631,6 +2665,7 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
         lr = v20_step_lr(optimizer_step_index, total_optimizer_steps, float(args.learning_rate))
         report = {
             "observed_at": utc_now(),
+            "status": "step_complete",
             "step": optimizer_step_index + 1,
             "step_zero_indexed": optimizer_step_index,
             "v20_snapshot_step": int(step.step),
@@ -2650,7 +2685,8 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
         print(
             f"Step {optimizer_step_index + 1}/{total_optimizer_steps}: "
             f"loss={report['train_loss']:.6f} lr={lr:.8f} "
-            f"tokens={token_total} elapsed={elapsed:.2f}s"
+            f"tokens={token_total} elapsed={elapsed:.2f}s",
+            flush=True,
         )
 
         if int(args.save_every_steps) > 0 and (optimizer_step_index + 1) % int(args.save_every_steps) == 0:
