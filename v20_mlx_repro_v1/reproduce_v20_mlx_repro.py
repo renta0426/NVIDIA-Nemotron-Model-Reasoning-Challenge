@@ -3920,12 +3920,26 @@ def run_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
     max_active_trains_before_launch = int(args.max_active_trains_before_launch)
 
     while True:
-        if (run_root / "training_result.json").exists() or (run_root / "adapter" / "latest_train_report.json").exists():
-            append_log_line(queue_log_path, f"already_started run_name={args.run_name}")
+        training_result_exists = (run_root / "training_result.json").exists()
+        validation_summary_exists = (run_root / "adapter_validation" / "validation_summary.json").exists()
+        existing_manager_pids = find_run_command_pids(args.run_name, "manage-run")
+        if training_result_exists and validation_summary_exists:
+            append_log_line(queue_log_path, f"already_completed run_name={args.run_name}")
             return {
                 "run_root": str(run_root),
                 "queue_log_path": str(queue_log_path),
-                "status": "already_started",
+                "status": "already_completed",
+            }
+        if existing_manager_pids:
+            append_log_line(
+                queue_log_path,
+                f"already_running run_name={args.run_name} manager_pids={','.join(str(pid) for pid in existing_manager_pids)}",
+            )
+            return {
+                "run_root": str(run_root),
+                "queue_log_path": str(queue_log_path),
+                "status": "already_running",
+                "manager_pids": existing_manager_pids,
             }
 
         any_ready = True
@@ -3940,9 +3954,7 @@ def run_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
             )
 
         active_trains = count_active_train_processes()
-        active_ready = True
-        if max_active_trains_before_launch > 0:
-            active_ready = active_trains <= max_active_trains_before_launch
+        active_ready = active_trains <= max_active_trains_before_launch
 
         if any_ready and required_started and active_ready:
             append_log_line(
