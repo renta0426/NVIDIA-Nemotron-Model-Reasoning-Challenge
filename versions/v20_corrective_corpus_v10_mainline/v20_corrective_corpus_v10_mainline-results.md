@@ -4,7 +4,7 @@
 - strategy note: versions/v10_bit_mainline_strategy_2026-04-23.md
 - README basis: deterministic boxed-answer evaluation, bit_manipulation primary weighting, token-aware supervision, and token-first bundle construction.
 - status: bundle generated; model score not yet measured.
-- MLX launch note: this bundle is now the active queued mainline candidate behind the current v8 live pair. A detached single-file `queue-managed-run` plus dedicated `watch-progress-ledger` / `watch-score-publish` workers were started under `v20_mlx_repro_v1/outputs/v10/queue/`, and the lower-signal queued `hybrid_bridge` branch was explicitly stopped so `v10` gets the next eligible slot.
+- MLX launch note: this bundle is now the active queued mainline candidate behind the remaining `v8 broadbase` run. A detached single-file `queue-managed-run` plus dedicated `watch-progress-ledger` / `watch-score-publish` workers were started under `v20_mlx_repro_v1/outputs/v10/queue/`; after the manual `symbol` stop, the queue now sees `active=1` and is waiting only for a completed predecessor result (`any_ready=0`) before launch.
 - eval gate note: the single-file runner now replays a `stratified_category_8_of_950` smoke validation into `adapter_validation_smoke8_snapshot/` before the README-contract local300 run, and only proceeds to full validation when prediction health is not obviously broken.
 - runtime status: `queued`
 - latest observed step: `not started`
