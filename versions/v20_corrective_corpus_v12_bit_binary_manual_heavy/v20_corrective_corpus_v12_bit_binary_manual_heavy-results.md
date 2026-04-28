@@ -6,8 +6,8 @@
 - local target: current best local300 `0.846667` -> aim for `> 0.9` by combining the full curated binary core with all 87 manual binary rows as answer-only support.
 - status: bundle generated and queued behind the two active MLX trains; model score not yet measured.
 - planned run name: `v20_mlx_v12_bit_binary_manual_heavy_mlxdir_mb1_nobc_ckpt20`
-- runtime status: `queued`
-- latest observed step: `queued waiting_for_slot (active=2 require_started=1 any_ready=1)`
+- runtime status: `running`
+- latest observed step: `1`
 - retained checkpoints: `none`
 - local300 score: TBD
 
