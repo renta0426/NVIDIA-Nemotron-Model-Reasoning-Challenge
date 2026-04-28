@@ -281,6 +281,11 @@ V36_RESULTS_MD = V36_RESULTS_DIR / "v20_corrective_corpus_v36_bit_binary_affine_
 V36_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support_bundle.jsonl"
 V36_VERSION_NAME = "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support"
 V36_RUN_NAME = "v20_mlx_v36_bit_binary_affine_boolean4_cipher_unknown2_support_mlxdir_mb1_nobc_ckpt20"
+V37_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion"
+V37_RESULTS_MD = V37_RESULTS_DIR / "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion-results.md"
+V37_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion_bundle.jsonl"
+V37_VERSION_NAME = "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion"
+V37_RUN_NAME = "v20_mlx_v37_bit_binary_affine_boolean4_nonbit_fusion_mlxdir_mb1_nobc_ckpt20"
 V11_LOCAL_BIT_MISS_IDS = {
     "000b53cf",
     "012fb81b",
@@ -453,6 +458,11 @@ V36_BINARY_ANSWER_ONLY_SOURCE_MIX = "v36_binary_answer_only_affine_boolean4_ciph
 V36_BINARY_MANUAL_SOURCE_MIX = "v36_binary_manual_affine_boolean4_cipher_unknown2_support"
 V36_NUMERIC_GUESS_SOURCE_MIX = "v36_numeric_guess_rescue"
 V36_CIPHER_SOURCE_MIX = "v36_cipher_unknown2_support"
+V37_BINARY_VERIFIED_SOURCE_MIX = "v37_binary_verified_affine_boolean4_nonbit_fusion"
+V37_BINARY_ANSWER_ONLY_SOURCE_MIX = "v37_binary_answer_only_affine_boolean4_nonbit_fusion"
+V37_BINARY_MANUAL_SOURCE_MIX = "v37_binary_manual_affine_boolean4_nonbit_fusion"
+V37_NUMERIC_GUESS_SOURCE_MIX = "v37_numeric_guess_nonbit_fusion"
+V37_CIPHER_SOURCE_MIX = "v37_cipher_nonbit_fusion"
 V11_PROMPT_SUFFIX = (
     "\nPlease put your final answer inside `\\boxed{}`. "
     "For example: `\\boxed{your answer}`"
@@ -1354,6 +1364,13 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
         return (
             REPO_ROOT
             / "versions/v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support/v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support-results.md",
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion_bundle.jsonl" or "v20_mlx_v37_bit_binary_affine_boolean4_nonbit_fusion" in run_name:
+        return (
+            REPO_ROOT
+            / "versions/v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion/v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion-results.md",
             None,
             "- local300 score:",
         )
@@ -10378,6 +10395,199 @@ def build_v36_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]]
     return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
 
 
+def build_v37_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unique_rows, repeated_rows, diagnostics = build_v34_overlay_rows()
+    unique_rows = [dict(row) for row in unique_rows]
+    repeated_rows = [dict(row) for row in repeated_rows]
+    diagnostics = dict(diagnostics)
+    remap_overlay_source_mixes(
+        unique_rows,
+        {
+            V34_BINARY_VERIFIED_SOURCE_MIX: V37_BINARY_VERIFIED_SOURCE_MIX,
+            V34_BINARY_ANSWER_ONLY_SOURCE_MIX: V37_BINARY_ANSWER_ONLY_SOURCE_MIX,
+            V34_BINARY_MANUAL_SOURCE_MIX: V37_BINARY_MANUAL_SOURCE_MIX,
+            V34_NUMERIC_GUESS_SOURCE_MIX: V37_NUMERIC_GUESS_SOURCE_MIX,
+            V34_CIPHER_SOURCE_MIX: V37_CIPHER_SOURCE_MIX,
+        },
+    )
+    remap_overlay_source_mixes(
+        repeated_rows,
+        {
+            V34_BINARY_VERIFIED_SOURCE_MIX: V37_BINARY_VERIFIED_SOURCE_MIX,
+            V34_BINARY_ANSWER_ONLY_SOURCE_MIX: V37_BINARY_ANSWER_ONLY_SOURCE_MIX,
+            V34_BINARY_MANUAL_SOURCE_MIX: V37_BINARY_MANUAL_SOURCE_MIX,
+            V34_NUMERIC_GUESS_SOURCE_MIX: V37_NUMERIC_GUESS_SOURCE_MIX,
+            V34_CIPHER_SOURCE_MIX: V37_CIPHER_SOURCE_MIX,
+        },
+    )
+    recommended_map = {row["id"]: row for row in load_csv_rows(TRAIN_RECOMMENDED_LEARNING_TARGET_PATH)}
+    numeric_support_rows = select_v35_numeric_operator_support_rows(TRAIN_ANSWER_ONLY_KEEP_PATH)
+    cipher_support_rows = select_v36_cipher_completion_rows(TRAIN_ANSWER_ONLY_KEEP_PATH)
+    unique_seen = {(str(row["id"]).strip(), str(row["bucket"]).strip()) for row in unique_rows}
+
+    def append_unique(
+        row: dict[str, Any],
+        *,
+        bucket: str,
+        source_mix: str,
+        styles: Sequence[str],
+        source_tags: Sequence[str],
+    ) -> None:
+        key = (str(row["id"]).strip(), bucket)
+        if key in unique_seen:
+            return
+        unique_rows.append(
+            {
+                "id": str(row["id"]).strip(),
+                "category": detect_validation_category(str(row["prompt"])),
+                "bucket": bucket,
+                "selection_tier": str(row.get("selection_tier", "")).strip(),
+                "template_subtype": str(row.get("template_subtype", "")).strip(),
+                "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                "recommended_repeat_count": len(styles),
+                "assistant_styles": "|".join(sorted(set(styles))),
+                "source_mix": source_mix,
+                "source_tags": "|".join(sorted(set(str(tag) for tag in source_tags if str(tag).strip()))),
+                "binary_family_key": v11_binary_family_key(row),
+                "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+            }
+        )
+        unique_seen.add(key)
+
+    def append_repeated(
+        row: dict[str, Any],
+        *,
+        bucket: str,
+        source_mix: str,
+        styles: Sequence[str],
+        source_tags: Sequence[str],
+    ) -> None:
+        category = detect_validation_category(str(row["prompt"]))
+        for assistant_style in styles:
+            if bucket == "numeric_guess_rescue":
+                completion_text = build_v11_numeric_completion(row, assistant_style)
+                supervision_role = "lane4_numeric_guess_rescue"
+            elif bucket == "cipher_guardrail":
+                completion_text = build_v11_text_completion(row, assistant_style)
+                supervision_role = "lane5_cipher_guardrail"
+            else:
+                raise ValueError(f"Unsupported v37 bucket: {bucket}")
+            repeated_rows.append(
+                {
+                    "id": str(row["id"]).strip(),
+                    "category": category,
+                    "bucket": bucket,
+                    "prompt": str(row["prompt"]).strip(),
+                    "answer": str(row["answer"]).strip(),
+                    "completion_text": completion_text,
+                    "assistant_style": assistant_style,
+                    "supervision_role": supervision_role,
+                    "selection_tier": str(row.get("selection_tier", "")).strip(),
+                    "template_subtype": str(row.get("template_subtype", "")).strip(),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                    "source_mix": source_mix,
+                    "source_tags": sorted(set(str(tag) for tag in source_tags if str(tag).strip())),
+                    "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+                    "audit_reasons": str(row.get("audit_reasons", "")).strip(),
+                    "analysis_notes": str(row.get("analysis_notes", "")).strip(),
+                    "symbol_query_operator": str(row.get("symbol_query_operator", "")).strip(),
+                    "symbol_numeric_formula_name": str(row.get("symbol_numeric_formula_name", "")).strip(),
+                    "bit_query_binary": str(row.get("bit_query_binary", "")).strip(),
+                    "bit_structured_formula_name": str(row.get("bit_structured_formula_name", "")).strip(),
+                    "bit_structured_formula_prediction": str(row.get("bit_structured_formula_prediction", "")).strip(),
+                    "bit_structured_formula_abstract_family": str(
+                        row.get("bit_structured_formula_abstract_family", "")
+                    ).strip(),
+                    "bit_not_structured_formula_name": str(row.get("bit_not_structured_formula_name", "")).strip(),
+                    "bit_not_structured_formula_prediction": str(
+                        row.get("bit_not_structured_formula_prediction", "")
+                    ).strip(),
+                    "bit_not_structured_formula_abstract_family": str(
+                        row.get("bit_not_structured_formula_abstract_family", "")
+                    ).strip(),
+                }
+            )
+
+    for row_id in sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS):
+        row = recommended_map.get(row_id)
+        if row is None:
+            raise FileNotFoundError(f"Missing v37 numeric guess rescue row in recommended target: {row_id}")
+        update_overlay_unique_repeat_count(unique_rows, row_id=row_id, bucket="numeric_guess_rescue", repeat_count=12)
+        append_repeated(
+            row,
+            bucket="numeric_guess_rescue",
+            source_mix=V37_NUMERIC_GUESS_SOURCE_MIX,
+            styles=build_v11_nonbit_styles("numeric_guess_rescue", repeat_count=4),
+            source_tags=["equation_numeric_guess", "best_local_numeric_guess_miss", "answer_only_rescue"],
+        )
+
+    for row_id in sorted(V11_LOCAL_CIPHER_MISS_IDS):
+        row = recommended_map.get(row_id)
+        if row is None:
+            raise FileNotFoundError(f"Missing v37 cipher rescue row in recommended target: {row_id}")
+        update_overlay_unique_repeat_count(unique_rows, row_id=row_id, bucket="cipher_guardrail", repeat_count=12)
+        append_repeated(
+            row,
+            bucket="cipher_guardrail",
+            source_mix=V37_CIPHER_SOURCE_MIX,
+            styles=build_v11_nonbit_styles("cipher_guardrail", repeat_count=6),
+            source_tags=["cipher", "best_local_cipher_miss", "guardrail"],
+        )
+
+    for row in numeric_support_rows:
+        query_operator = str(row.get("symbol_query_operator", "")).strip()
+        operator_tag = "query_operator_quote" if query_operator == '"' else "query_operator_star"
+        styles = build_v11_nonbit_styles("numeric_guess_rescue", repeat_count=build_v35_numeric_operator_support_repeat_count(row))
+        source_tags = [
+            "equation_numeric_guess",
+            "operator_prior_support",
+            "answer_only_low_ratio",
+            operator_tag,
+        ]
+        append_unique(
+            row,
+            bucket="numeric_guess_rescue",
+            source_mix=V37_NUMERIC_GUESS_SOURCE_MIX,
+            styles=styles,
+            source_tags=source_tags,
+        )
+        append_repeated(
+            row,
+            bucket="numeric_guess_rescue",
+            source_mix=V37_NUMERIC_GUESS_SOURCE_MIX,
+            styles=styles,
+            source_tags=source_tags,
+        )
+
+    for row in cipher_support_rows:
+        styles = build_v11_nonbit_styles("cipher_guardrail", repeat_count=build_v36_cipher_completion_repeat_count(row))
+        source_tags = [
+            "cipher",
+            "monoalphabetic_answer_completion",
+            "unknown_char_count_2",
+            "answer_only_low_ratio",
+        ]
+        append_unique(
+            row,
+            bucket="cipher_guardrail",
+            source_mix=V37_CIPHER_SOURCE_MIX,
+            styles=styles,
+            source_tags=source_tags,
+        )
+        append_repeated(
+            row,
+            bucket="cipher_guardrail",
+            source_mix=V37_CIPHER_SOURCE_MIX,
+            styles=styles,
+            source_tags=source_tags,
+        )
+
+    diagnostics["numeric_operator_support_unique"] = len(numeric_support_rows)
+    diagnostics["cipher_unknown2_support_unique"] = len(cipher_support_rows)
+    unique_rows.sort(key=lambda row: (str(row["bucket"]), str(row["id"])))
+    return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
+
+
 def build_binary_variant_training_bundle(
     *,
     repeated_rows: Sequence[dict[str, Any]],
@@ -10825,6 +11035,19 @@ def build_v36_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle
             "Single-file training bundle for v36. Keeps the checked-in v20 snapshot intact, "
             "retains the narrow affine/boolean4 exact binary core from v34, "
             "and adds low-ratio monoalphabetic cipher answer-completion support on the unknown-char=2 slice under the README evaluation contract."
+        ),
+    )
+
+
+def build_v37_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V37_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v37. Keeps the checked-in v20 snapshot intact, "
+            "retains the narrow affine/boolean4 exact binary core from v34, "
+            "and combines the low-ratio numeric-operator prior from v35 with the low-ratio cipher unknown-char=2 support from v36 under the README evaluation contract."
         ),
     )
 
@@ -11338,6 +11561,24 @@ def validate_v36_summary(
         verified_source_mix=V36_BINARY_VERIFIED_SOURCE_MIX,
         answer_only_source_mix=V36_BINARY_ANSWER_ONLY_SOURCE_MIX,
         required_source_mixes=(V36_BINARY_MANUAL_SOURCE_MIX,),
+    )
+
+
+def validate_v37_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V37_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V37_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(V37_BINARY_MANUAL_SOURCE_MIX,),
     )
 
 
@@ -14229,6 +14470,118 @@ def run_build_v36_bit_binary_affine_boolean4_cipher_unknown2_support(args: argpa
         "training_bundle": training_bundle,
     }
     write_text(Path(args.results_path).resolve(), render_v36_results_markdown(summary))
+    return summary
+
+
+def render_v37_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V37_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: combine `cuda-train-data-analysis-v1/reports/67_aopen_symbol_wall_breakthrough_assessment.md` for low-ratio `equation_numeric_guess` operator support and `reports/06_text_unknown_notes.md` for low-risk monoalphabetic answer-completion support, while preserving the exact bit-other core from `reports/60_binary_exact_disambiguation_and_boolean4_recovery.md`.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` by preserving v34's exact affine/boolean4 bit core and fusing both broader non-BIT residual lanes in one branch.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V37_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Reuse the same narrow exact `binary_affine_xor` / `boolean4` verified core as v34 for the main bit lane.",
+        "- Increase the local numeric and cipher rescue repeats together, then add the low-ratio broader `*` / `\"` numeric-operator support from v35 plus the `unknown_char_count = 2` monoalphabetic support slice from v36.",
+        "- Use this branch to test whether the remaining local non-BIT misses want the combined prior rather than an isolated numeric-only or cipher-only support lane.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- numeric_operator_support_unique: {summary['diagnostics'].get('numeric_operator_support_unique', 0)}",
+        f"- cipher_unknown2_support_unique: {summary['diagnostics'].get('cipher_unknown2_support_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def run_build_v37_bit_binary_affine_boolean4_nonbit_fusion(args: argparse.Namespace) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v37 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v37_overlay_rows()
+    training_bundle = build_v37_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v37_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V37_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v37_results_markdown(summary))
     return summary
 
 
@@ -17253,6 +17606,14 @@ def parse_args() -> argparse.Namespace:
     build_v36.add_argument("--bundle-path", type=Path, default=V36_BUNDLE_PATH)
     build_v36.add_argument("--results-path", type=Path, default=V36_RESULTS_MD)
     build_v36.set_defaults(func=run_build_v36_bit_binary_affine_boolean4_cipher_unknown2_support)
+
+    build_v37 = subparsers.add_parser(
+        "build-v37-bit-binary-affine-boolean4-nonbit-fusion",
+        help="Build the v37 affine/boolean4 + non-bit-fusion bit-binary bundle and tracked markdown ledger.",
+    )
+    build_v37.add_argument("--bundle-path", type=Path, default=V37_BUNDLE_PATH)
+    build_v37.add_argument("--results-path", type=Path, default=V37_RESULTS_MD)
+    build_v37.set_defaults(func=run_build_v37_bit_binary_affine_boolean4_nonbit_fusion)
 
     watch_score_publish = subparsers.add_parser(
         "watch-score-publish",
