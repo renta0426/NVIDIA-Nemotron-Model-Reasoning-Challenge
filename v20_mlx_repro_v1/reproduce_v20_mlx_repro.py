@@ -426,6 +426,16 @@ V65_RESULTS_MD = V65_RESULTS_DIR / "v20_corrective_corpus_v65_bit_binary_mainlin
 V65_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy_bundle.jsonl"
 V65_VERSION_NAME = "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy"
 V65_RUN_NAME = "v20_mlx_v65_bit_binary_mainline_crypt_guess_heavy_mlxdir_mb1_nobc_ckpt20"
+V66_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light"
+V66_RESULTS_MD = V66_RESULTS_DIR / "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light-results.md"
+V66_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light_bundle.jsonl"
+V66_VERSION_NAME = "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light"
+V66_RUN_NAME = "v20_mlx_v66_bit_binary_manual_heavy_crypt_guess_light_mlxdir_mb1_nobc_ckpt20"
+V67_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy"
+V67_RESULTS_MD = V67_RESULTS_DIR / "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy-results.md"
+V67_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy_bundle.jsonl"
+V67_VERSION_NAME = "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy"
+V67_RUN_NAME = "v20_mlx_v67_bit_binary_manual_heavy_crypt_guess_heavy_mlxdir_mb1_nobc_ckpt20"
 V64_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light"
 V64_RESULTS_MD = V64_RESULTS_DIR / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md"
 V64_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl"
@@ -796,6 +806,18 @@ V65_BINARY_MANUAL_SOURCE_MIX = "v65_binary_manual_rescue"
 V65_NUMERIC_GUESS_SOURCE_MIX = "v65_numeric_guess_rescue"
 V65_CIPHER_SOURCE_MIX = "v65_cipher_guardrail"
 V65_CRYPT_GUESS_SOURCE_MIX = "v65_crypt_guess_heavy"
+V66_BINARY_VERIFIED_SOURCE_MIX = "v66_binary_verified_manual_heavy"
+V66_BINARY_ANSWER_ONLY_SOURCE_MIX = "v66_binary_answer_only_manual_heavy"
+V66_BINARY_MANUAL_SOURCE_MIX = "v66_binary_manual_full"
+V66_NUMERIC_GUESS_SOURCE_MIX = "v66_numeric_guess_rescue"
+V66_CIPHER_SOURCE_MIX = "v66_cipher_guardrail"
+V66_CRYPT_GUESS_SOURCE_MIX = "v66_crypt_guess_light"
+V67_BINARY_VERIFIED_SOURCE_MIX = "v67_binary_verified_manual_heavy"
+V67_BINARY_ANSWER_ONLY_SOURCE_MIX = "v67_binary_answer_only_manual_heavy"
+V67_BINARY_MANUAL_SOURCE_MIX = "v67_binary_manual_full"
+V67_NUMERIC_GUESS_SOURCE_MIX = "v67_numeric_guess_rescue"
+V67_CIPHER_SOURCE_MIX = "v67_cipher_guardrail"
+V67_CRYPT_GUESS_SOURCE_MIX = "v67_crypt_guess_heavy"
 V64_BINARY_VERIFIED_SOURCE_MIX = "v64_binary_verified_mainline"
 V64_BINARY_ANSWER_ONLY_SOURCE_MIX = "v64_binary_answer_only_mainline"
 V64_BINARY_MANUAL_SOURCE_MIX = "v64_binary_manual_rescue"
@@ -1912,6 +1934,20 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
         return (
             REPO_ROOT
             / "versions/v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy/v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy-results.md",
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light_bundle.jsonl" or "v20_mlx_v66_bit_binary_manual_heavy_crypt_guess_light" in run_name:
+        return (
+            REPO_ROOT
+            / "versions/v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light/v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light-results.md",
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy_bundle.jsonl" or "v20_mlx_v67_bit_binary_manual_heavy_crypt_guess_heavy" in run_name:
+        return (
+            REPO_ROOT
+            / "versions/v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy/v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy-results.md",
             None,
             "- local300 score:",
         )
@@ -15322,6 +15358,145 @@ def build_v65_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]]
     )
 
 
+def build_v66_like_overlay_rows(
+    *,
+    verified_source_mix: str,
+    answer_only_source_mix: str,
+    manual_source_mix: str,
+    numeric_guess_source_mix: str,
+    cipher_source_mix: str,
+    crypt_guess_source_mix: str,
+    repeat_count_builder,
+    guess_tag: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unique_rows, repeated_rows, diagnostics = build_v12_overlay_rows()
+    unique_rows = [dict(row) for row in unique_rows]
+    repeated_rows = [dict(row) for row in repeated_rows]
+    diagnostics = dict(diagnostics)
+    remap_overlay_source_mixes(
+        unique_rows,
+        {
+            V12_BINARY_VERIFIED_SOURCE_MIX: verified_source_mix,
+            V12_BINARY_ANSWER_ONLY_SOURCE_MIX: answer_only_source_mix,
+            V12_BINARY_MANUAL_SOURCE_MIX: manual_source_mix,
+            V12_NUMERIC_GUESS_SOURCE_MIX: numeric_guess_source_mix,
+            V12_CIPHER_SOURCE_MIX: cipher_source_mix,
+        },
+    )
+    remap_overlay_source_mixes(
+        repeated_rows,
+        {
+            V12_BINARY_VERIFIED_SOURCE_MIX: verified_source_mix,
+            V12_BINARY_ANSWER_ONLY_SOURCE_MIX: answer_only_source_mix,
+            V12_BINARY_MANUAL_SOURCE_MIX: manual_source_mix,
+            V12_NUMERIC_GUESS_SOURCE_MIX: numeric_guess_source_mix,
+            V12_CIPHER_SOURCE_MIX: cipher_source_mix,
+        },
+    )
+    crypt_guess_rows = select_v55_crypt_guess_rows(TRAIN_ANSWER_ONLY_KEEP_PATH)
+    unique_seen = {(str(row["id"]).strip(), str(row["bucket"]).strip()) for row in unique_rows}
+
+    def append_unique(row: dict[str, Any], *, bucket: str, source_mix: str, styles: Sequence[str], source_tags: Sequence[str]) -> None:
+        key = (str(row["id"]).strip(), bucket)
+        if key in unique_seen:
+            return
+        unique_rows.append(
+            {
+                "id": str(row["id"]).strip(),
+                "category": detect_validation_category(str(row["prompt"])),
+                "bucket": bucket,
+                "selection_tier": str(row.get("selection_tier", "")).strip(),
+                "template_subtype": str(row.get("template_subtype", "")).strip(),
+                "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                "recommended_repeat_count": len(styles),
+                "assistant_styles": "|".join(sorted(set(styles))),
+                "source_mix": source_mix,
+                "source_tags": "|".join(sorted(set(str(tag) for tag in source_tags if str(tag).strip()))),
+                "binary_family_key": v11_binary_family_key(row),
+                "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+            }
+        )
+        unique_seen.add(key)
+
+    def append_repeated(row: dict[str, Any], *, bucket: str, source_mix: str, styles: Sequence[str], source_tags: Sequence[str]) -> None:
+        category = detect_validation_category(str(row["prompt"]))
+        for assistant_style in styles:
+            if bucket == "cryptarithm_guess_support":
+                completion_text = build_v54_crypt_completion(row, assistant_style)
+                supervision_role = "lane7_cryptarithm_guess_support"
+            else:
+                raise ValueError(f"Unsupported v66-like bucket: {bucket}")
+            repeated_rows.append(
+                {
+                    "id": str(row["id"]).strip(),
+                    "category": category,
+                    "bucket": bucket,
+                    "prompt": str(row["prompt"]).strip(),
+                    "answer": str(row["answer"]).strip(),
+                    "completion_text": completion_text,
+                    "assistant_style": assistant_style,
+                    "supervision_role": supervision_role,
+                    "selection_tier": str(row.get("selection_tier", "")).strip(),
+                    "template_subtype": str(row.get("template_subtype", "")).strip(),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                    "source_mix": source_mix,
+                    "source_tags": sorted(set(str(tag) for tag in source_tags if str(tag).strip())),
+                    "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+                    "audit_reasons": str(row.get("audit_reasons", "")).strip(),
+                    "analysis_notes": str(row.get("analysis_notes", "")).strip(),
+                    "symbol_query_operator": str(row.get("symbol_query_operator", "")).strip(),
+                    "symbol_numeric_formula_name": str(row.get("symbol_numeric_formula_name", "")).strip(),
+                    "bit_query_binary": str(row.get("bit_query_binary", "")).strip(),
+                    "bit_structured_formula_name": str(row.get("bit_structured_formula_name", "")).strip(),
+                    "bit_structured_formula_prediction": str(row.get("bit_structured_formula_prediction", "")).strip(),
+                    "bit_structured_formula_abstract_family": str(row.get("bit_structured_formula_abstract_family", "")).strip(),
+                    "bit_not_structured_formula_name": str(row.get("bit_not_structured_formula_name", "")).strip(),
+                    "bit_not_structured_formula_prediction": str(row.get("bit_not_structured_formula_prediction", "")).strip(),
+                    "bit_not_structured_formula_abstract_family": str(row.get("bit_not_structured_formula_abstract_family", "")).strip(),
+                }
+            )
+
+    for row in crypt_guess_rows:
+        hard_score = parse_float_text(row.get("hard_score", 0.0), 0.0)
+        num_examples = parse_int_text(row.get("num_examples", 0), 0)
+        source_tags = ["cryptarithm", "guess", "glyph_len5", guess_tag, f"num_examples_{num_examples}"]
+        if hard_score >= 4.0:
+            source_tags.append("hardscore_ge4")
+        styles = build_v11_nonbit_styles("cryptarithm_guess_support", repeat_count=repeat_count_builder(row))
+        append_unique(row, bucket="cryptarithm_guess_support", source_mix=crypt_guess_source_mix, styles=styles, source_tags=source_tags)
+        append_repeated(row, bucket="cryptarithm_guess_support", source_mix=crypt_guess_source_mix, styles=styles, source_tags=source_tags)
+
+    diagnostics["crypt_guess_support_unique"] = len(crypt_guess_rows)
+    unique_rows.sort(key=lambda row: (str(row["bucket"]), str(row["id"])))
+    return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
+
+
+def build_v66_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    return build_v66_like_overlay_rows(
+        verified_source_mix=V66_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V66_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        manual_source_mix=V66_BINARY_MANUAL_SOURCE_MIX,
+        numeric_guess_source_mix=V66_NUMERIC_GUESS_SOURCE_MIX,
+        cipher_source_mix=V66_CIPHER_SOURCE_MIX,
+        crypt_guess_source_mix=V66_CRYPT_GUESS_SOURCE_MIX,
+        repeat_count_builder=build_v55_crypt_guess_repeat_count,
+        guess_tag="answer_only_guess_light",
+    )
+
+
+def build_v67_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    return build_v66_like_overlay_rows(
+        verified_source_mix=V67_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V67_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        manual_source_mix=V67_BINARY_MANUAL_SOURCE_MIX,
+        numeric_guess_source_mix=V67_NUMERIC_GUESS_SOURCE_MIX,
+        cipher_source_mix=V67_CIPHER_SOURCE_MIX,
+        crypt_guess_source_mix=V67_CRYPT_GUESS_SOURCE_MIX,
+        repeat_count_builder=build_v57_crypt_guess_repeat_count,
+        guess_tag="answer_only_guess_heavy",
+    )
+
+
 def build_binary_variant_training_bundle(
     *,
     repeated_rows: Sequence[dict[str, Any]],
@@ -16145,6 +16320,32 @@ def build_v65_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle
         note=(
             "Single-file training bundle for v65. Keeps the checked-in v20 snapshot intact, "
             "retains the broader v11 bit-binary mainline core, "
+            "and adds heavier explicit cryptarithm_guess replay under the README evaluation contract."
+        ),
+    )
+
+
+def build_v66_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V66_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v66. Keeps the checked-in v20 snapshot intact, "
+            "retains the broader v12 manual-heavy bit-binary core, "
+            "and adds lighter explicit cryptarithm_guess replay under the README evaluation contract."
+        ),
+    )
+
+
+def build_v67_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V67_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v67. Keeps the checked-in v20 snapshot intact, "
+            "retains the broader v12 manual-heavy bit-binary core, "
             "and adds heavier explicit cryptarithm_guess replay under the README evaluation contract."
         ),
     )
@@ -17179,6 +17380,42 @@ def validate_v65_summary(
         training_bundle=training_bundle,
         verified_source_mix=V65_BINARY_VERIFIED_SOURCE_MIX,
         answer_only_source_mix=V65_BINARY_ANSWER_ONLY_SOURCE_MIX,
+    )
+
+
+def validate_v66_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V66_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V66_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(V66_BINARY_MANUAL_SOURCE_MIX,),
+    )
+
+
+def validate_v67_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V67_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V67_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(V67_BINARY_MANUAL_SOURCE_MIX,),
     )
 
 
@@ -23313,6 +23550,228 @@ def run_build_v65_bit_binary_mainline_crypt_guess_heavy(args: argparse.Namespace
     return summary
 
 
+def render_v66_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V66_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: `README.md` shows `Cryptarithm (Guess)` is the hardest slice, so this branch keeps the broader v12 manual-heavy bit mainline and adds lighter explicit guess replay.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` while testing whether the broader v12 manual-heavy base plus light crypt guess replay outperforms both plain v12 and the v64 broad-mainline light control.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V66_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Retain the broader v12 bit-binary mainline core, including the manual binary answer-only lane that saturates the curated binary pool.",
+        "- Add only lighter explicit `cryptarithm_guess` replay because `README.md` shows that slice starts at `0/164` on the base model.",
+        "- Use this branch as the v12-based guess-light comparator against plain v12 and the v64 broad-mainline light control.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- crypt_guess_support_unique: {summary['diagnostics'].get('crypt_guess_support_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def run_build_v66_bit_binary_manual_heavy_crypt_guess_light(args: argparse.Namespace) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v66 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v66_overlay_rows()
+    training_bundle = build_v66_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v66_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V66_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v66_results_markdown(summary))
+    return summary
+
+
+def render_v67_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V67_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: `README.md` shows `Cryptarithm (Guess)` is the hardest slice, so this branch keeps the broader v12 manual-heavy bit mainline and adds heavier explicit guess replay.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` while testing whether the broader v12 manual-heavy base plus heavy crypt guess replay outperforms both plain v12 and the v65 broad-mainline heavy control.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V67_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Retain the broader v12 bit-binary mainline core, including the manual binary answer-only lane that saturates the curated binary pool.",
+        "- Add heavier explicit `cryptarithm_guess` replay because `README.md` shows that slice starts at `0/164` on the base model.",
+        "- Use this branch as the v12-based guess-heavy comparator against plain v12 and the v65 broad-mainline heavy control.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- crypt_guess_support_unique: {summary['diagnostics'].get('crypt_guess_support_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def run_build_v67_bit_binary_manual_heavy_crypt_guess_heavy(args: argparse.Namespace) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v67 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v67_overlay_rows()
+    training_bundle = build_v67_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v67_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V67_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v67_results_markdown(summary))
+    return summary
+
+
 def allocate_proportional_counts(
     category_counts: Sequence[tuple[str, int]],
     *,
@@ -26566,6 +27025,22 @@ def parse_args() -> argparse.Namespace:
     build_v65.add_argument("--bundle-path", type=Path, default=V65_BUNDLE_PATH)
     build_v65.add_argument("--results-path", type=Path, default=V65_RESULTS_MD)
     build_v65.set_defaults(func=run_build_v65_bit_binary_mainline_crypt_guess_heavy)
+
+    build_v66 = subparsers.add_parser(
+        "build-v66-bit-binary-manual-heavy-crypt-guess-light",
+        help="Build the v66 broader v12 manual-heavy bit-mainline plus crypt guess-light bundle and tracked markdown ledger.",
+    )
+    build_v66.add_argument("--bundle-path", type=Path, default=V66_BUNDLE_PATH)
+    build_v66.add_argument("--results-path", type=Path, default=V66_RESULTS_MD)
+    build_v66.set_defaults(func=run_build_v66_bit_binary_manual_heavy_crypt_guess_light)
+
+    build_v67 = subparsers.add_parser(
+        "build-v67-bit-binary-manual-heavy-crypt-guess-heavy",
+        help="Build the v67 broader v12 manual-heavy bit-mainline plus crypt guess-heavy bundle and tracked markdown ledger.",
+    )
+    build_v67.add_argument("--bundle-path", type=Path, default=V67_BUNDLE_PATH)
+    build_v67.add_argument("--results-path", type=Path, default=V67_RESULTS_MD)
+    build_v67.set_defaults(func=run_build_v67_bit_binary_manual_heavy_crypt_guess_heavy)
 
     watch_score_publish = subparsers.add_parser(
         "watch-score-publish",
