@@ -4,7 +4,7 @@
 - README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.
 - analysis basis: `cuda-train-data-analysis-v1/FINAL_SUMMARY_REPORT.md` says to use `verified_trace_ready` as the trace core, mix `answer_only_keep` conservatively, and avoid raw `manual_audit_priority` CoT promotion.
 - local target: current best local300 `0.846667` -> aim for `> 0.9` by boosting the 16 observed BIT misses plus the 2 numeric-guess and 1 cipher residuals.
-- status: bundle generated and v11 queue armed; model score not yet measured.
+- status: bundle generated and parallel MLX training started; model score not yet measured.
 - planned run name: `v20_mlx_v11_bit_binary_mainline_mlxdir_mb1_nobc_ckpt20`
 - runtime status: `running`
 - latest observed step: `1`
