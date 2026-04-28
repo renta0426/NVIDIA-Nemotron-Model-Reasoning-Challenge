@@ -156,10 +156,10 @@ Keep direct miss pressure, then add broad answer-only stabilization for numeric_
 ### Status
 
 - Bundle generated: YES
-- MLX training: `v20_mlx_v8_symbol_cipher_recovery_mix_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` after a manual `launch-managed-run` override from the same single-file driver, keeping the original detached supervisor / checkpoint-cap / README-style local300 eval wiring intact
-- launch note: after re-checking `vm_stat` and live train RSS, the current memory headroom was sufficient for a second concurrent train, so this variant was front-launched instead of waiting for `broadbase` completion
-- runtime status: `running`
-- latest observed step: `3` (`Step 2/321: loss=0.360445 lr=0.00019938 tokens=91684 elapsed=9260.43s`; `step 3` started immediately after)
+- MLX training: `v20_mlx_v8_symbol_cipher_recovery_mix_mlxdir_mb1_nobc_ckpt20` was running under `v20_mlx_repro_v1/outputs/v8/` after a manual `launch-managed-run` override from the same single-file driver, keeping the original detached supervisor / checkpoint-cap / README-style local300 eval wiring intact
+- launch note: after re-checking `vm_stat` and live train RSS, the current memory headroom was sufficient for a second concurrent train, so this variant was front-launched instead of waiting for `broadbase` completion; it was then intentionally stopped on 2026-04-28 when host RAM rose to roughly `489 / 512 GB`, preserving `broadbase` as the higher-priority bit-focused run
+- runtime status: `stopped`
+- latest observed step: `3` (`Step 2/321: loss=0.360445 lr=0.00019938 tokens=91684 elapsed=9260.43s`; `step 3` had reached heartbeat `microbatch 30 / 32` before the manual stop)
 - retained checkpoints: `none`
 - local300 score: TBD
 
