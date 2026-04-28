@@ -79,16 +79,16 @@ Miss-family bit rebalance plus prompt-local support. Directly repeats the 19 kno
 ### Status
 
 - Bundle generated: YES
-- MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` is now running under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s` (`step 43` observed after manifest fix; periodic checkpoints `0000020_adapters.safetensors` and `0000040_adapters.safetensors` are now both present; unused `_debug_bundle_tokens` cleanup completed)
-- runtime status: `running`
-- latest observed step: `12` (`Step 11/296: loss=0.003051 lr=0.00019324 tokens=130193 elapsed=5771.29s`; current heartbeat has already entered `step 12`)
+- MLX training: `v20_mlx_v8_bit_family_rebalance_broadbase_mlxdir_mb1_nobc_ckpt20` ran under `v20_mlx_repro_v1/outputs/v8/` with detached supervisor, checkpoint cap (`save_every_steps=20`, `max_saved_checkpoints=3`), README-style local300 watcher armed, a repaired detached progress watcher, and a stale-progress guard that kills only the exact train PID if `latest_train_report.json` goes stale for `>= 2400s`; it was then intentionally stopped after `Step 11/296` completed so the active two-run budget could be reassigned to the stronger bit/binary-specific `v11` + `v12` pair
+- runtime status: `stopped`
+- latest observed step: `12` (`Step 11/296: loss=0.003051 lr=0.00019324 tokens=130193 elapsed=5771.29s`; a `step 12` heartbeat was seen before the intentional stop, but `Step 12/296` completion was not observed)
 - retained checkpoints: `0000060_adapters.safetensors / 0000080_adapters.safetensors / 0000100_adapters.safetensors`
 - completed-run cleanup: `postprocess-run` / `full-run` now prune periodic `*_adapters.safetensors` checkpoints and remove `training_bundle_tokens/` by default after a completed evaluation summary exists
 - score ledger update: `postprocess-run` now writes the measured local300 score back into this tracked markdown ledger automatically once an `adapter_validation` 300-row summary exists
 - score publish watcher: a detached single-file `watch-score-publish` worker is now armed to detect completed local300 validation, rerun `postprocess-run` defensively, and `git add/commit/push` the updated tracked score ledger while skipping publish attempts whenever `.git/index.lock` is present
 - progress ledger watcher: a detached single-file `watch-progress-ledger` worker now publishes `runtime status` / `latest observed step` / `retained checkpoints` back into this ledger on status or checkpoint changes and at a 5-step cadence, while backing off whenever `.git/index.lock` is present
 - queued eval contract: future queued launches are being realigned to the root `README.md` evaluation contract for `max_num_seqs=64`; only the currently running legacy `v7` / `v8` runs still reflect their older detached launch arguments
-- queue refresh: older deferred queues (`symbol_cipher_recovery_mix`, `hybrid_bridge`, later `v10`) have been superseded by the newer single-file follow-up path; the active staged successor is now `v12_bit_binary_manual_heavy` under `v20_mlx_repro_v1/outputs/v12/queue/`, where `queue-managed-run` is waiting at `active=2 require_started=1 any_ready=1` until either `broadbase` or `v11` frees a slot
+- queue refresh: older deferred queues (`symbol_cipher_recovery_mix`, `hybrid_bridge`, later `v10`) have been superseded by the newer single-file follow-up path; `v12_bit_binary_manual_heavy` was first queued under `v20_mlx_repro_v1/outputs/v12/queue/`, then launched directly after `broadbase` was intentionally stopped, so the active run pair is now `v11_bit_binary_mainline` + `v12_bit_binary_manual_heavy`
 - managed launch: `reproduce_v20_mlx_repro.py` now exposes `launch-managed-run` / `manage-run` so future detached launches can be wired from the main single-file driver instead of long ad-hoc shell blocks
 - local300 score: TBD
 
