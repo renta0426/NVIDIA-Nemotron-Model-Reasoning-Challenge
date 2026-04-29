@@ -7,7 +7,7 @@
 - status: bundle generated and parallel MLX training is running; step 5 has completed and step 6 is now in progress, but model score is not yet measured.
 - planned run name: `v20_mlx_v12_bit_binary_manual_heavy_mlxdir_mb1_nobc_ckpt20`
 - runtime status: `running`
-- latest observed step: `step 6 in progress (step5 loss=0.171541 elapsed=8607.70s tokens=101421)`
+- latest observed step: `11`
 - retained checkpoints: `none`
 - local300 score: TBD
 
