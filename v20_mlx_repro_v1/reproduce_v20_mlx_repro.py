@@ -2037,6 +2037,21 @@ def summarize_retained_checkpoints(run_root: Path) -> str:
     return " / ".join(checkpoint_names) if checkpoint_names else "none"
 
 
+def build_progress_status_line(*, runtime_status: str, step_display: str) -> str:
+    if runtime_status == "queued":
+        return "- status: bundle generated; detached queue/watch armed, model score not yet measured."
+    if runtime_status == "running":
+        return (
+            "- status: bundle generated and MLX training is running; "
+            f"latest observed step is `{step_display}`, and model score is not yet measured."
+        )
+    if runtime_status == "training_complete":
+        return "- status: bundle generated; MLX training completed and local300 evaluation is pending, model score not yet measured."
+    if runtime_status == "scored":
+        return "- status: bundle generated; MLX training and local300 evaluation completed."
+    return "- status: bundle generated; model score not yet measured."
+
+
 def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, Any] | None:
     target = resolve_progress_ledger_target(run_root)
     if target is None:
@@ -2063,6 +2078,12 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
     original_text = ledger_path.read_text(encoding="utf-8")
     updated_text = replace_markdown_line_in_section(
         original_text,
+        section_name=section_name,
+        line_prefix="- status:",
+        replacement_line=build_progress_status_line(runtime_status=runtime_status, step_display=str(step_display)),
+    )
+    updated_text = replace_markdown_line_in_section(
+        updated_text,
         section_name=section_name,
         line_prefix="- runtime status:",
         replacement_line=f"- runtime status: `{runtime_status}`",
