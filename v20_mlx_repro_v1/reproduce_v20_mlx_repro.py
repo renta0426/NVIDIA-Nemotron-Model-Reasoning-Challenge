@@ -1496,7 +1496,7 @@ def resolve_training_data_path(args: argparse.Namespace) -> Path:
 
 
 def build_command_prefix(command: str) -> list[str]:
-    return ["uv", "run", "python", command_path_value(Path(__file__).resolve()), command]
+    return [sys.executable, "-u", command_path_value(Path(__file__).resolve()), "--", command]
 
 
 def build_train_command_tokens(args: argparse.Namespace) -> list[str]:
@@ -2466,8 +2466,8 @@ def find_latest_checkpoint_path(adapter_dir: Path) -> Path | None:
 
 
 def matches_python_driver_command(line: str, script_name: str, command_name: str) -> bool:
-    command_marker = f"{script_name} {command_name}"
-    if command_marker not in line:
+    command_markers = (f"{script_name} {command_name}", f"{script_name} -- {command_name}")
+    if not any(marker in line for marker in command_markers):
         return False
     if "bash -c" in line or "bash -lc" in line:
         return False
