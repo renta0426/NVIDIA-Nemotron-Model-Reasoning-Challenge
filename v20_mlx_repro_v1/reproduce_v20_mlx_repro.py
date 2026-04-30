@@ -467,6 +467,11 @@ V70_RESULTS_MD = V70_RESULTS_DIR / "v20_corrective_corpus_v70_bit_binary_manual_
 V70_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v70_bit_binary_manual_exact_symbol_guess_hybrid_bundle.jsonl"
 V70_VERSION_NAME = "v20_corrective_corpus_v70_bit_binary_manual_exact_symbol_guess_hybrid"
 V70_RUN_NAME = "v20_mlx_v70_bit_binary_manual_exact_symbol_guess_hybrid_mlxdir_mb1_nobc_ckpt20"
+V71_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v71_bit_binary_manual_exact_symbol_deduce_hybrid")
+V71_RESULTS_MD = V71_RESULTS_DIR / "v20_corrective_corpus_v71_bit_binary_manual_exact_symbol_deduce_hybrid-results.md"
+V71_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v71_bit_binary_manual_exact_symbol_deduce_hybrid_bundle.jsonl"
+V71_VERSION_NAME = "v20_corrective_corpus_v71_bit_binary_manual_exact_symbol_deduce_hybrid"
+V71_RUN_NAME = "v20_mlx_v71_bit_binary_manual_exact_symbol_deduce_hybrid_mlxdir_mb1_nobc_ckpt20"
 V64_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light")
 V64_RESULTS_MD = V64_RESULTS_DIR / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md"
 V64_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl"
@@ -865,6 +870,12 @@ V70_BINARY_MANUAL_SOURCE_MIX = "v70_binary_manual_full"
 V70_NUMERIC_GUESS_SOURCE_MIX = "v70_numeric_symbol_guess_hybrid"
 V70_CIPHER_SOURCE_MIX = "v70_cipher_symbol_guess_hybrid"
 V70_CRYPT_GUESS_SOURCE_MIX = "v70_crypt_guess_light"
+V71_BINARY_VERIFIED_SOURCE_MIX = "v71_binary_verified_manual_exact_symbol_deduce_hybrid"
+V71_BINARY_ANSWER_ONLY_SOURCE_MIX = "v71_binary_answer_only_manual_exact_symbol_deduce_hybrid"
+V71_BINARY_MANUAL_SOURCE_MIX = "v71_binary_manual_full"
+V71_NUMERIC_GUESS_SOURCE_MIX = "v71_numeric_symbol_deduce_hybrid"
+V71_CIPHER_SOURCE_MIX = "v71_cipher_symbol_deduce_hybrid"
+V71_CRYPT_DEDUCE_SOURCE_MIX = "v71_crypt_deduce_low_ratio"
 V64_BINARY_VERIFIED_SOURCE_MIX = "v64_binary_verified_mainline"
 V64_BINARY_ANSWER_ONLY_SOURCE_MIX = "v64_binary_answer_only_mainline"
 V64_BINARY_MANUAL_SOURCE_MIX = "v64_binary_manual_rescue"
@@ -1956,6 +1967,12 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
     if bundle_name == "v20_corrective_corpus_v70_bit_binary_manual_exact_symbol_guess_hybrid_bundle.jsonl" or "v20_mlx_v70_bit_binary_manual_exact_symbol_guess_hybrid" in run_name:
         return (
             resolve_mlx_results_md("v20_corrective_corpus_v70_bit_binary_manual_exact_symbol_guess_hybrid"),
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v71_bit_binary_manual_exact_symbol_deduce_hybrid_bundle.jsonl" or "v20_mlx_v71_bit_binary_manual_exact_symbol_deduce_hybrid" in run_name:
+        return (
+            resolve_mlx_results_md("v20_corrective_corpus_v71_bit_binary_manual_exact_symbol_deduce_hybrid"),
             None,
             "- local300 score:",
         )
@@ -16299,6 +16316,126 @@ def build_v70_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]]
     return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
 
 
+def build_v71_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unique_rows, repeated_rows, diagnostics = build_v69_overlay_rows()
+    unique_rows = [dict(row) for row in unique_rows]
+    repeated_rows = [dict(row) for row in repeated_rows]
+    diagnostics = dict(diagnostics)
+    remap_overlay_source_mixes(
+        unique_rows,
+        {
+            V69_BINARY_VERIFIED_SOURCE_MIX: V71_BINARY_VERIFIED_SOURCE_MIX,
+            V69_BINARY_ANSWER_ONLY_SOURCE_MIX: V71_BINARY_ANSWER_ONLY_SOURCE_MIX,
+            V69_BINARY_MANUAL_SOURCE_MIX: V71_BINARY_MANUAL_SOURCE_MIX,
+            V69_NUMERIC_GUESS_SOURCE_MIX: V71_NUMERIC_GUESS_SOURCE_MIX,
+            V69_CIPHER_SOURCE_MIX: V71_CIPHER_SOURCE_MIX,
+        },
+    )
+    remap_overlay_source_mixes(
+        repeated_rows,
+        {
+            V69_BINARY_VERIFIED_SOURCE_MIX: V71_BINARY_VERIFIED_SOURCE_MIX,
+            V69_BINARY_ANSWER_ONLY_SOURCE_MIX: V71_BINARY_ANSWER_ONLY_SOURCE_MIX,
+            V69_BINARY_MANUAL_SOURCE_MIX: V71_BINARY_MANUAL_SOURCE_MIX,
+            V69_NUMERIC_GUESS_SOURCE_MIX: V71_NUMERIC_GUESS_SOURCE_MIX,
+            V69_CIPHER_SOURCE_MIX: V71_CIPHER_SOURCE_MIX,
+        },
+    )
+    crypt_deduce_rows = select_v58_crypt_training_rows(TRAIN_ANSWER_ONLY_KEEP_PATH)
+    unique_seen = {(str(row["id"]).strip(), str(row["bucket"]).strip()) for row in unique_rows}
+
+    def append_unique(row: dict[str, Any], *, bucket: str, source_mix: str, styles: Sequence[str], source_tags: Sequence[str]) -> None:
+        key = (str(row["id"]).strip(), bucket)
+        if key in unique_seen:
+            return
+        unique_rows.append(
+            {
+                "id": str(row["id"]).strip(),
+                "category": detect_validation_category(str(row["prompt"])),
+                "bucket": bucket,
+                "selection_tier": str(row.get("selection_tier", "")).strip(),
+                "template_subtype": str(row.get("template_subtype", "")).strip(),
+                "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                "recommended_repeat_count": len(styles),
+                "assistant_styles": "|".join(sorted(set(styles))),
+                "source_mix": source_mix,
+                "source_tags": "|".join(sorted(set(str(tag) for tag in source_tags if str(tag).strip()))),
+                "binary_family_key": v11_binary_family_key(row),
+                "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+            }
+        )
+        unique_seen.add(key)
+
+    def append_repeated(row: dict[str, Any], *, bucket: str, source_mix: str, styles: Sequence[str], source_tags: Sequence[str]) -> None:
+        category = detect_validation_category(str(row["prompt"]))
+        for assistant_style in styles:
+            if bucket == "cryptarithm_deduce_support":
+                completion_text = build_v54_crypt_completion(row, assistant_style)
+                supervision_role = "lane6_cryptarithm_deduce_support"
+            else:
+                raise ValueError(f"Unsupported v71 bucket: {bucket}")
+            repeated_rows.append(
+                {
+                    "id": str(row["id"]).strip(),
+                    "category": category,
+                    "bucket": bucket,
+                    "prompt": str(row["prompt"]).strip(),
+                    "answer": str(row["answer"]).strip(),
+                    "completion_text": completion_text,
+                    "assistant_style": assistant_style,
+                    "supervision_role": supervision_role,
+                    "selection_tier": str(row.get("selection_tier", "")).strip(),
+                    "template_subtype": str(row.get("template_subtype", "")).strip(),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                    "source_mix": source_mix,
+                    "source_tags": sorted(set(str(tag) for tag in source_tags if str(tag).strip())),
+                    "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+                    "audit_reasons": str(row.get("audit_reasons", "")).strip(),
+                    "analysis_notes": str(row.get("analysis_notes", "")).strip(),
+                    "symbol_query_operator": str(row.get("symbol_query_operator", "")).strip(),
+                    "symbol_numeric_formula_name": str(row.get("symbol_numeric_formula_name", "")).strip(),
+                    "bit_query_binary": str(row.get("bit_query_binary", "")).strip(),
+                    "bit_structured_formula_name": str(row.get("bit_structured_formula_name", "")).strip(),
+                    "bit_structured_formula_prediction": str(row.get("bit_structured_formula_prediction", "")).strip(),
+                    "bit_structured_formula_abstract_family": str(row.get("bit_structured_formula_abstract_family", "")).strip(),
+                    "bit_not_structured_formula_name": str(row.get("bit_not_structured_formula_name", "")).strip(),
+                    "bit_not_structured_formula_prediction": str(row.get("bit_not_structured_formula_prediction", "")).strip(),
+                    "bit_not_structured_formula_abstract_family": str(row.get("bit_not_structured_formula_abstract_family", "")).strip(),
+                }
+            )
+
+    for row in crypt_deduce_rows:
+        num_examples = parse_int_text(row.get("num_examples", 0), 0)
+        source_tags = [
+            "cryptarithm",
+            "deduce",
+            V58_CRYPT_DEDUCE_TRAINING_NOTE,
+            "glyph_len5",
+            "answer_only_training_lane",
+            "manual_exact_symbol_deduce_hybrid",
+            f"num_examples_{num_examples}",
+        ]
+        styles = build_v11_nonbit_styles("cryptarithm_deduce_support", repeat_count=build_v58_crypt_deduce_repeat_count(row))
+        append_unique(
+            row,
+            bucket="cryptarithm_deduce_support",
+            source_mix=V71_CRYPT_DEDUCE_SOURCE_MIX,
+            styles=styles,
+            source_tags=source_tags,
+        )
+        append_repeated(
+            row,
+            bucket="cryptarithm_deduce_support",
+            source_mix=V71_CRYPT_DEDUCE_SOURCE_MIX,
+            styles=styles,
+            source_tags=source_tags,
+        )
+
+    diagnostics["crypt_deduce_support_unique"] = len(crypt_deduce_rows)
+    unique_rows.sort(key=lambda row: (str(row["bucket"]), str(row["id"])))
+    return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
+
+
 def build_binary_variant_training_bundle(
     *,
     repeated_rows: Sequence[dict[str, Any]],
@@ -17188,6 +17325,19 @@ def build_v70_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle
             "Single-file training bundle for v70. Keeps the checked-in v20 snapshot intact, "
             "retains the broader v12 manual-heavy bit-binary core, "
             "inherits the v69 denser numeric/cipher support, and adds a light cryptarithm_guess replay lane under the README evaluation contract."
+        ),
+    )
+
+
+def build_v71_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V71_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v71. Keeps the checked-in v20 snapshot intact, "
+            "retains the broader v12 manual-heavy bit-binary core, "
+            "inherits the v69 denser numeric/cipher support, and adds a low-ratio cryptarithm_deduce lane under the README evaluation contract."
         ),
     )
 
@@ -18311,6 +18461,24 @@ def validate_v70_summary(
         verified_source_mix=V70_BINARY_VERIFIED_SOURCE_MIX,
         answer_only_source_mix=V70_BINARY_ANSWER_ONLY_SOURCE_MIX,
         required_source_mixes=(V70_BINARY_MANUAL_SOURCE_MIX, V70_CRYPT_GUESS_SOURCE_MIX),
+    )
+
+
+def validate_v71_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V71_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V71_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(V71_BINARY_MANUAL_SOURCE_MIX, V71_CRYPT_DEDUCE_SOURCE_MIX),
     )
 
 
@@ -25004,6 +25172,119 @@ def run_build_v70_bit_binary_manual_exact_symbol_guess_hybrid(args: argparse.Nam
     return summary
 
 
+def render_v71_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V71_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: `README.md` highlights weak base slices in BIT, cipher, numeric-style symbol tasks, and especially `Cryptarithm (Deduce)`. This branch keeps v69's safe BIT/symbol set and adds a low-ratio explicit deduce lane.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` by preserving the broader v12 manual-heavy BIT base, keeping v69's denser numeric/cipher support, and testing whether a low-ratio cryptarithm_deduce lane helps without shifting too much mass away from BIT.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V71_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Retain the broader v12 bit-binary mainline core, including the full manual binary answer-only lane.",
+        "- Keep the same exact-safe BIT, `numeric_2x2`, and `text_monoalphabetic` support used in v69 so the new comparison isolates the added `cryptarithm_deduce` lane.",
+        "- Add a low-ratio boxed-safe `cryptarithm_deduce` support lane because `README.md` shows that slice starts near-zero on the base model.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- numeric_support_unique: {summary['diagnostics'].get('numeric_support_unique', 0)}",
+        f"- cipher_support_unique: {summary['diagnostics'].get('cipher_support_unique', 0)}",
+        f"- crypt_deduce_support_unique: {summary['diagnostics'].get('crypt_deduce_support_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def run_build_v71_bit_binary_manual_exact_symbol_deduce_hybrid(args: argparse.Namespace) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v71 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v71_overlay_rows()
+    training_bundle = build_v71_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v71_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V71_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v71_results_markdown(summary))
+    return summary
+
+
 def allocate_proportional_counts(
     category_counts: Sequence[tuple[str, int]],
     *,
@@ -28297,6 +28578,14 @@ def parse_args() -> argparse.Namespace:
     build_v70.add_argument("--bundle-path", type=Path, default=V70_BUNDLE_PATH)
     build_v70.add_argument("--results-path", type=Path, default=V70_RESULTS_MD)
     build_v70.set_defaults(func=run_build_v70_bit_binary_manual_exact_symbol_guess_hybrid)
+
+    build_v71 = subparsers.add_parser(
+        "build-v71-bit-binary-manual-exact-symbol-deduce-hybrid",
+        help="Build the v71 v69-style symbol boost plus low-ratio cryptarithm-deduce support bundle and tracked markdown ledger.",
+    )
+    build_v71.add_argument("--bundle-path", type=Path, default=V71_BUNDLE_PATH)
+    build_v71.add_argument("--results-path", type=Path, default=V71_RESULTS_MD)
+    build_v71.set_defaults(func=run_build_v71_bit_binary_manual_exact_symbol_deduce_hybrid)
 
     watch_score_publish = subparsers.add_parser(
         "watch-score-publish",
