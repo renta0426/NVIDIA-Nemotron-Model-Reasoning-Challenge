@@ -1,6 +1,6 @@
 # v20_corrective_corpus_v11_stable_frontier results
 
-- created_at: 2026-04-30T08:42:01+00:00
+- created_at: 2026-04-30T08:48:12+00:00
 - README basis: README.md deterministic boxed-answer Accuracy contract.
 - strategy note: versions/v11_stable_frontier_strategy_2026-04-30.md
 - status: data generated and strategy-validated; model score not yet measured.
@@ -29,6 +29,37 @@
 - v11_hard_row_slot_table_closure: `68`
 - v11_mapping_program_trace_synth: `152`
 - v11_surface_guardrail_from_v10: `111`
+
+## Detailed Selection
+
+- executable formula families: `456` unique formulas -> `2750` synthetic rows
+- hard-row exact slot closure: `68` rows; skipped without supported executable formula: `['0245b9bb', '06881e47', '069dbaab', '0ec17d2e', '12154247', '132ec6ae', '14a72508', 'b9500f41']`
+- affine XOR synthesis: `96` seed rows -> `192` rows
+- bit mapping synthesis: `76` seed rows -> `152` rows
+- answer-only stabilizers: `220` source problems -> `226` rows
+- v10 surface guardrails retained after boxed normalization: `111` rows
+
+## V10 Comparison
+
+- overlay size multiplier vs v10: `4.31x`
+- v10 source mix:
+  - v10_manual_frontier: `48`
+  - v10_numeral_surface_synth: `1`
+  - v10_verified_frontier: `385`
+  - v4_public_base: `318`
+  - v6_binary_donor: `27`
+  - v6_cipher_guardrail_donor: `6`
+  - v6_gravity_guardrail_donor: `6`
+  - v6_numeral_surface_donor: `10`
+  - v6_symbol_prefix_donor: `4`
+  - v6_unit_guardrail_donor: `6`
+- v11 source mix:
+  - v11_affine_program_trace_synth: `192`
+  - v11_answer_only_stabilizer: `226`
+  - v11_exact_program_trace_synth: `2750`
+  - v11_hard_row_slot_table_closure: `68`
+  - v11_mapping_program_trace_synth: `152`
+  - v11_surface_guardrail_from_v10: `111`
 
 ## Validation
 
