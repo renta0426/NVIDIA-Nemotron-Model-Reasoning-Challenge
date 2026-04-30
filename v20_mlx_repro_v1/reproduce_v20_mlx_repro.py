@@ -2037,9 +2037,22 @@ def summarize_retained_checkpoints(run_root: Path) -> str:
     return " / ".join(checkpoint_names) if checkpoint_names else "none"
 
 
+def read_manual_pause_reason(run_root: Path) -> str | None:
+    pause_reason_path = run_root / "manual_pause_reason.txt"
+    if not pause_reason_path.exists():
+        return None
+    text = pause_reason_path.read_text(encoding="utf-8").strip()
+    return text or "manual pause"
+
+
 def build_progress_status_line(*, runtime_status: str, step_display: str) -> str:
     if runtime_status == "queued":
         return "- status: bundle generated; detached queue/watch armed, model score not yet measured."
+    if runtime_status == "paused":
+        return (
+            "- status: bundle generated; MLX training is intentionally paused to reduce host RAM, "
+            f"latest observed step is `{step_display}`, and model score is not yet measured."
+        )
     if runtime_status == "running":
         return (
             "- status: bundle generated and MLX training is running; "
@@ -2059,6 +2072,7 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
     run_root_exists = run_root.exists()
     training_done = (run_root / "training_result.json").exists()
     validation_done = (run_root / "adapter_validation" / "validation_summary.json").exists()
+    manual_pause_reason = read_manual_pause_reason(run_root)
     step, _ = read_latest_train_report(run_root)
     if step is None:
         step = read_training_result_step(run_root)
@@ -2067,6 +2081,8 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
         runtime_status = "scored"
     elif training_done:
         runtime_status = "training_complete"
+    elif manual_pause_reason is not None:
+        runtime_status = "paused"
     elif step is not None:
         runtime_status = "running"
     elif run_root_exists:
@@ -2110,6 +2126,7 @@ def update_progress_ledger(run_root: Path, *, apply_changes: bool) -> dict[str, 
         "step_display": str(step_display),
         "checkpoint_summary": checkpoint_summary,
         "runtime_status": runtime_status,
+        "manual_pause_reason": manual_pause_reason,
         "changed": changed,
         "training_done": training_done,
     }
