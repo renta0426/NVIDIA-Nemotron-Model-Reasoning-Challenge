@@ -151,297 +151,313 @@ TRAIN_VERIFIED_TRACE_READY_PATH = CUDA_ANALYSIS_ARTIFACTS_ROOT / "train_verified
 TRAIN_ANSWER_ONLY_KEEP_PATH = CUDA_ANALYSIS_ARTIFACTS_ROOT / "train_answer_only_keep_v1.csv"
 TRAIN_MANUAL_AUDIT_PRIORITY_PATH = CUDA_ANALYSIS_ARTIFACTS_ROOT / "train_manual_audit_priority_v1.csv"
 TRAIN_RECOMMENDED_LEARNING_TARGET_PATH = CUDA_ANALYSIS_ARTIFACTS_ROOT / "train_recommended_learning_target_v1.csv"
-V11_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v11_bit_binary_mainline"
+
+
+def resolve_mlx_results_dir(version_name: str) -> Path:
+    preferred_dir = WORK_ROOT / version_name
+    legacy_dir = REPO_ROOT / "versions" / version_name
+    if preferred_dir.exists():
+        return preferred_dir
+    if legacy_dir.exists():
+        return legacy_dir
+    return preferred_dir
+
+
+def resolve_mlx_results_md(version_name: str) -> Path:
+    return resolve_mlx_results_dir(version_name) / f"{version_name}-results.md"
+
+
+V11_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v11_bit_binary_mainline")
 V11_RESULTS_MD = V11_RESULTS_DIR / "v20_corrective_corpus_v11_bit_binary_mainline-results.md"
 V11_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v11_bit_binary_mainline_bundle.jsonl"
 V11_VERSION_NAME = "v20_corrective_corpus_v11_bit_binary_mainline"
 V11_RUN_NAME = "v20_mlx_v11_bit_binary_mainline_mlxdir_mb1_nobc_ckpt20"
-V12_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v12_bit_binary_manual_heavy"
+V12_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v12_bit_binary_manual_heavy")
 V12_RESULTS_MD = V12_RESULTS_DIR / "v20_corrective_corpus_v12_bit_binary_manual_heavy-results.md"
 V12_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v12_bit_binary_manual_heavy_bundle.jsonl"
 V12_VERSION_NAME = "v20_corrective_corpus_v12_bit_binary_manual_heavy"
 V12_RUN_NAME = "v20_mlx_v12_bit_binary_manual_heavy_mlxdir_mb1_nobc_ckpt20"
-V13_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v13_bit_binary_promptlocal_heavy"
+V13_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v13_bit_binary_promptlocal_heavy")
 V13_RESULTS_MD = V13_RESULTS_DIR / "v20_corrective_corpus_v13_bit_binary_promptlocal_heavy-results.md"
 V13_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v13_bit_binary_promptlocal_heavy_bundle.jsonl"
 V13_VERSION_NAME = "v20_corrective_corpus_v13_bit_binary_promptlocal_heavy"
 V13_RUN_NAME = "v20_mlx_v13_bit_binary_promptlocal_heavy_mlxdir_mb1_nobc_ckpt20"
-V14_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v14_bit_binary_structured_heavy"
+V14_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v14_bit_binary_structured_heavy")
 V14_RESULTS_MD = V14_RESULTS_DIR / "v20_corrective_corpus_v14_bit_binary_structured_heavy-results.md"
 V14_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v14_bit_binary_structured_heavy_bundle.jsonl"
 V14_VERSION_NAME = "v20_corrective_corpus_v14_bit_binary_structured_heavy"
 V14_RUN_NAME = "v20_mlx_v14_bit_binary_structured_heavy_mlxdir_mb1_nobc_ckpt20"
-V15_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v15_bit_binary_bitother_heavy"
+V15_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v15_bit_binary_bitother_heavy")
 V15_RESULTS_MD = V15_RESULTS_DIR / "v20_corrective_corpus_v15_bit_binary_bitother_heavy-results.md"
 V15_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v15_bit_binary_bitother_heavy_bundle.jsonl"
 V15_VERSION_NAME = "v20_corrective_corpus_v15_bit_binary_bitother_heavy"
 V15_RUN_NAME = "v20_mlx_v15_bit_binary_bitother_heavy_mlxdir_mb1_nobc_ckpt20"
-V16_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v16_bit_binary_miss_family_heavy"
+V16_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v16_bit_binary_miss_family_heavy")
 V16_RESULTS_MD = V16_RESULTS_DIR / "v20_corrective_corpus_v16_bit_binary_miss_family_heavy-results.md"
 V16_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v16_bit_binary_miss_family_heavy_bundle.jsonl"
 V16_VERSION_NAME = "v20_corrective_corpus_v16_bit_binary_miss_family_heavy"
 V16_RUN_NAME = "v20_mlx_v16_bit_binary_miss_family_heavy_mlxdir_mb1_nobc_ckpt20"
-V17_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal"
+V17_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal")
 V17_RESULTS_MD = V17_RESULTS_DIR / "v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal-results.md"
 V17_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal_bundle.jsonl"
 V17_VERSION_NAME = "v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal"
 V17_RUN_NAME = "v20_mlx_v17_bit_binary_hybrid_miss_promptlocal_mlxdir_mb1_nobc_ckpt20"
-V18_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v18_bit_binary_explicit_local_miss"
+V18_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v18_bit_binary_explicit_local_miss")
 V18_RESULTS_MD = V18_RESULTS_DIR / "v20_corrective_corpus_v18_bit_binary_explicit_local_miss-results.md"
 V18_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v18_bit_binary_explicit_local_miss_bundle.jsonl"
 V18_VERSION_NAME = "v20_corrective_corpus_v18_bit_binary_explicit_local_miss"
 V18_RUN_NAME = "v20_mlx_v18_bit_binary_explicit_local_miss_mlxdir_mb1_nobc_ckpt20"
-V19_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v19_bit_binary_hardscore_tail"
+V19_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v19_bit_binary_hardscore_tail")
 V19_RESULTS_MD = V19_RESULTS_DIR / "v20_corrective_corpus_v19_bit_binary_hardscore_tail-results.md"
 V19_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v19_bit_binary_hardscore_tail_bundle.jsonl"
 V19_VERSION_NAME = "v20_corrective_corpus_v19_bit_binary_hardscore_tail"
 V19_RUN_NAME = "v20_mlx_v19_bit_binary_hardscore_tail_mlxdir_mb1_nobc_ckpt20"
-V20_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion"
+V20_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion")
 V20_RESULTS_MD = V20_RESULTS_DIR / "v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion-results.md"
 V20_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion_bundle.jsonl"
 V20_VERSION_NAME = "v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion"
 V20_RUN_NAME = "v20_mlx_v20_bit_binary_localmiss_hardscore_fusion_mlxdir_mb1_nobc_ckpt20"
-V21_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion"
+V21_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion")
 V21_RESULTS_MD = V21_RESULTS_DIR / "v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion-results.md"
 V21_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion_bundle.jsonl"
 V21_VERSION_NAME = "v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion"
 V21_RUN_NAME = "v20_mlx_v21_bit_binary_structured_promptlocal_fusion_mlxdir_mb1_nobc_ckpt20"
-V22_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v22_bit_binary_verified_precision_fusion"
+V22_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v22_bit_binary_verified_precision_fusion")
 V22_RESULTS_MD = V22_RESULTS_DIR / "v20_corrective_corpus_v22_bit_binary_verified_precision_fusion-results.md"
 V22_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v22_bit_binary_verified_precision_fusion_bundle.jsonl"
 V22_VERSION_NAME = "v20_corrective_corpus_v22_bit_binary_verified_precision_fusion"
 V22_RUN_NAME = "v20_mlx_v22_bit_binary_verified_precision_fusion_mlxdir_mb1_nobc_ckpt20"
-V23_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v23_bit_binary_verified_structured_precision"
+V23_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v23_bit_binary_verified_structured_precision")
 V23_RESULTS_MD = V23_RESULTS_DIR / "v20_corrective_corpus_v23_bit_binary_verified_structured_precision-results.md"
 V23_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v23_bit_binary_verified_structured_precision_bundle.jsonl"
 V23_VERSION_NAME = "v20_corrective_corpus_v23_bit_binary_verified_structured_precision"
 V23_RUN_NAME = "v20_mlx_v23_bit_binary_verified_structured_precision_mlxdir_mb1_nobc_ckpt20"
-V24_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v24_bit_binary_verified_extreme_precision"
+V24_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v24_bit_binary_verified_extreme_precision")
 V24_RESULTS_MD = V24_RESULTS_DIR / "v20_corrective_corpus_v24_bit_binary_verified_extreme_precision-results.md"
 V24_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v24_bit_binary_verified_extreme_precision_bundle.jsonl"
 V24_VERSION_NAME = "v20_corrective_corpus_v24_bit_binary_verified_extreme_precision"
 V24_RUN_NAME = "v20_mlx_v24_bit_binary_verified_extreme_precision_mlxdir_mb1_nobc_ckpt20"
-V25_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v25_bit_binary_family_priority_precision"
+V25_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v25_bit_binary_family_priority_precision")
 V25_RESULTS_MD = V25_RESULTS_DIR / "v20_corrective_corpus_v25_bit_binary_family_priority_precision-results.md"
 V25_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v25_bit_binary_family_priority_precision_bundle.jsonl"
 V25_VERSION_NAME = "v20_corrective_corpus_v25_bit_binary_family_priority_precision"
 V25_RUN_NAME = "v20_mlx_v25_bit_binary_family_priority_precision_mlxdir_mb1_nobc_ckpt20"
-V26_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v26_bit_binary_family_structured_max"
+V26_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v26_bit_binary_family_structured_max")
 V26_RESULTS_MD = V26_RESULTS_DIR / "v20_corrective_corpus_v26_bit_binary_family_structured_max-results.md"
 V26_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v26_bit_binary_family_structured_max_bundle.jsonl"
 V26_VERSION_NAME = "v20_corrective_corpus_v26_bit_binary_family_structured_max"
 V26_RUN_NAME = "v20_mlx_v26_bit_binary_family_structured_max_mlxdir_mb1_nobc_ckpt20"
-V27_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge"
+V27_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge")
 V27_RESULTS_MD = V27_RESULTS_DIR / "v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge-results.md"
 V27_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge_bundle.jsonl"
 V27_VERSION_NAME = "v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge"
 V27_RUN_NAME = "v20_mlx_v27_bit_binary_bitother_unknown_bridge_mlxdir_mb1_nobc_ckpt20"
-V28_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v28_bit_binary_tail_recovery"
+V28_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v28_bit_binary_tail_recovery")
 V28_RESULTS_MD = V28_RESULTS_DIR / "v20_corrective_corpus_v28_bit_binary_tail_recovery-results.md"
 V28_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v28_bit_binary_tail_recovery_bundle.jsonl"
 V28_VERSION_NAME = "v20_corrective_corpus_v28_bit_binary_tail_recovery"
 V28_RUN_NAME = "v20_mlx_v28_bit_binary_tail_recovery_mlxdir_mb1_nobc_ckpt20"
-V29_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v29_bit_binary_manual_bitother_max"
+V29_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v29_bit_binary_manual_bitother_max")
 V29_RESULTS_MD = V29_RESULTS_DIR / "v20_corrective_corpus_v29_bit_binary_manual_bitother_max-results.md"
 V29_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v29_bit_binary_manual_bitother_max_bundle.jsonl"
 V29_VERSION_NAME = "v20_corrective_corpus_v29_bit_binary_manual_bitother_max"
 V29_RUN_NAME = "v20_mlx_v29_bit_binary_manual_bitother_max_mlxdir_mb1_nobc_ckpt20"
-V30_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance"
+V30_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance")
 V30_RESULTS_MD = V30_RESULTS_DIR / "v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance-results.md"
 V30_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance_bundle.jsonl"
 V30_VERSION_NAME = "v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance"
 V30_RUN_NAME = "v20_mlx_v30_bit_binary_family_structured_manual_balance_mlxdir_mb1_nobc_ckpt20"
-V31_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v31_bit_binary_verified_bitother_exact"
+V31_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v31_bit_binary_verified_bitother_exact")
 V31_RESULTS_MD = V31_RESULTS_DIR / "v20_corrective_corpus_v31_bit_binary_verified_bitother_exact-results.md"
 V31_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v31_bit_binary_verified_bitother_exact_bundle.jsonl"
 V31_VERSION_NAME = "v20_corrective_corpus_v31_bit_binary_verified_bitother_exact"
 V31_RUN_NAME = "v20_mlx_v31_bit_binary_verified_bitother_exact_mlxdir_mb1_nobc_ckpt20"
-V32_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore"
+V32_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore")
 V32_RESULTS_MD = V32_RESULTS_DIR / "v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore-results.md"
 V32_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore_bundle.jsonl"
 V32_VERSION_NAME = "v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore"
 V32_RUN_NAME = "v20_mlx_v32_bit_binary_verified_bitother_localmiss_hardscore_mlxdir_mb1_nobc_ckpt20"
-V33_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal"
+V33_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal")
 V33_RESULTS_MD = V33_RESULTS_DIR / "v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal-results.md"
 V33_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal_bundle.jsonl"
 V33_VERSION_NAME = "v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal"
 V33_RUN_NAME = "v20_mlx_v33_bit_binary_verified_bitother_structured_promptlocal_mlxdir_mb1_nobc_ckpt20"
-V34_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact"
+V34_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact")
 V34_RESULTS_MD = V34_RESULTS_DIR / "v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact-results.md"
 V34_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact_bundle.jsonl"
 V34_VERSION_NAME = "v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact"
 V34_RUN_NAME = "v20_mlx_v34_bit_binary_verified_affine_boolean4_exact_mlxdir_mb1_nobc_ckpt20"
-V35_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior"
+V35_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior")
 V35_RESULTS_MD = V35_RESULTS_DIR / "v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior-results.md"
 V35_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior_bundle.jsonl"
 V35_VERSION_NAME = "v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior"
 V35_RUN_NAME = "v20_mlx_v35_bit_binary_affine_boolean4_numeric_operator_prior_mlxdir_mb1_nobc_ckpt20"
-V36_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support"
+V36_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support")
 V36_RESULTS_MD = V36_RESULTS_DIR / "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support-results.md"
 V36_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support_bundle.jsonl"
 V36_VERSION_NAME = "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support"
 V36_RUN_NAME = "v20_mlx_v36_bit_binary_affine_boolean4_cipher_unknown2_support_mlxdir_mb1_nobc_ckpt20"
-V37_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion"
+V37_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion")
 V37_RESULTS_MD = V37_RESULTS_DIR / "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion-results.md"
 V37_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion_bundle.jsonl"
 V37_VERSION_NAME = "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion"
 V37_RUN_NAME = "v20_mlx_v37_bit_binary_affine_boolean4_nonbit_fusion_mlxdir_mb1_nobc_ckpt20"
-V38_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow"
+V38_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow")
 V38_RESULTS_MD = V38_RESULTS_DIR / "v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow-results.md"
 V38_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow_bundle.jsonl"
 V38_VERSION_NAME = "v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow"
 V38_RUN_NAME = "v20_mlx_v38_bit_binary_affine_boolean4_numeric_narrow_mlxdir_mb1_nobc_ckpt20"
-V39_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1"
+V39_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1")
 V39_RESULTS_MD = V39_RESULTS_DIR / "v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1-results.md"
 V39_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1_bundle.jsonl"
 V39_VERSION_NAME = "v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1"
 V39_RUN_NAME = "v20_mlx_v39_bit_binary_affine_boolean4_cipher_hard1_mlxdir_mb1_nobc_ckpt20"
-V40_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse"
+V40_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse")
 V40_RESULTS_MD = V40_RESULTS_DIR / "v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse-results.md"
 V40_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse_bundle.jsonl"
 V40_VERSION_NAME = "v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse"
 V40_RUN_NAME = "v20_mlx_v40_bit_binary_affine_boolean4_numeric_reverse_mlxdir_mb1_nobc_ckpt20"
-V41_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4"
+V41_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4")
 V41_RESULTS_MD = V41_RESULTS_DIR / "v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4-results.md"
 V41_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4_bundle.jsonl"
 V41_VERSION_NAME = "v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4"
 V41_RUN_NAME = "v20_mlx_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4_mlxdir_mb1_nobc_ckpt20"
-V42_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion"
+V42_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion")
 V42_RESULTS_MD = V42_RESULTS_DIR / "v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion-results.md"
 V42_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion_bundle.jsonl"
 V42_VERSION_NAME = "v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion"
 V42_RUN_NAME = "v20_mlx_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion_mlxdir_mb1_nobc_ckpt20"
-V43_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion"
+V43_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion")
 V43_RESULTS_MD = V43_RESULTS_DIR / "v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion-results.md"
 V43_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion_bundle.jsonl"
 V43_VERSION_NAME = "v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion"
 V43_RUN_NAME = "v20_mlx_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion_mlxdir_mb1_nobc_ckpt20"
-V44_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion"
+V44_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion")
 V44_RESULTS_MD = V44_RESULTS_DIR / "v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion-results.md"
 V44_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion_bundle.jsonl"
 V44_VERSION_NAME = "v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion"
 V44_RUN_NAME = "v20_mlx_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion_mlxdir_mb1_nobc_ckpt20"
-V45_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion"
+V45_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion")
 V45_RESULTS_MD = V45_RESULTS_DIR / "v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion-results.md"
 V45_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion_bundle.jsonl"
 V45_VERSION_NAME = "v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion"
 V45_RUN_NAME = "v20_mlx_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion_mlxdir_mb1_nobc_ckpt20"
-V46_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4"
+V46_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4")
 V46_RESULTS_MD = V46_RESULTS_DIR / "v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4-results.md"
 V46_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4_bundle.jsonl"
 V46_VERSION_NAME = "v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4"
 V46_RUN_NAME = "v20_mlx_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4_mlxdir_mb1_nobc_ckpt20"
-V47_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4"
+V47_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4")
 V47_RESULTS_MD = V47_RESULTS_DIR / "v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4-results.md"
 V47_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4_bundle.jsonl"
 V47_VERSION_NAME = "v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4"
 V47_RUN_NAME = "v20_mlx_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4_mlxdir_mb1_nobc_ckpt20"
-V48_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4"
+V48_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4")
 V48_RESULTS_MD = V48_RESULTS_DIR / "v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4-results.md"
 V48_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4_bundle.jsonl"
 V48_VERSION_NAME = "v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4"
 V48_RUN_NAME = "v20_mlx_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4_mlxdir_mb1_nobc_ckpt20"
-V49_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4"
+V49_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4")
 V49_RESULTS_MD = V49_RESULTS_DIR / "v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4-results.md"
 V49_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4_bundle.jsonl"
 V49_VERSION_NAME = "v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4"
 V49_RUN_NAME = "v20_mlx_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4_mlxdir_mb1_nobc_ckpt20"
-V50_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4"
+V50_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4")
 V50_RESULTS_MD = V50_RESULTS_DIR / "v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4-results.md"
 V50_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4_bundle.jsonl"
 V50_VERSION_NAME = "v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4"
 V50_RUN_NAME = "v20_mlx_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4_mlxdir_mb1_nobc_ckpt20"
-V51_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4"
+V51_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4")
 V51_RESULTS_MD = V51_RESULTS_DIR / "v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4-results.md"
 V51_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4_bundle.jsonl"
 V51_VERSION_NAME = "v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4"
 V51_RUN_NAME = "v20_mlx_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4_mlxdir_mb1_nobc_ckpt20"
-V52_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4"
+V52_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4")
 V52_RESULTS_MD = V52_RESULTS_DIR / "v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4-results.md"
 V52_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4_bundle.jsonl"
 V52_VERSION_NAME = "v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4"
 V52_RUN_NAME = "v20_mlx_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4_mlxdir_mb1_nobc_ckpt20"
-V53_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4"
+V53_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4")
 V53_RESULTS_MD = V53_RESULTS_DIR / "v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4-results.md"
 V53_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4_bundle.jsonl"
 V53_VERSION_NAME = "v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4"
 V53_RUN_NAME = "v20_mlx_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4_mlxdir_mb1_nobc_ckpt20"
-V54_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus"
+V54_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus")
 V54_RESULTS_MD = V54_RESULTS_DIR / "v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus-results.md"
 V54_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus_bundle.jsonl"
 V54_VERSION_NAME = "v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus"
 V54_RUN_NAME = "v20_mlx_v54_bit_binary_affine_boolean4_crypt_deduce_focus_mlxdir_mb1_nobc_ckpt20"
-V55_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion"
+V55_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion")
 V55_RESULTS_MD = V55_RESULTS_DIR / "v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion-results.md"
 V55_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion_bundle.jsonl"
 V55_VERSION_NAME = "v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion"
 V55_RUN_NAME = "v20_mlx_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion_mlxdir_mb1_nobc_ckpt20"
-V56_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full"
+V56_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full")
 V56_RESULTS_MD = V56_RESULTS_DIR / "v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full-results.md"
 V56_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full_bundle.jsonl"
 V56_VERSION_NAME = "v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full"
 V56_RUN_NAME = "v20_mlx_v56_bit_binary_affine_boolean4_crypt_deduce_full_mlxdir_mb1_nobc_ckpt20"
-V57_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy"
+V57_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy")
 V57_RESULTS_MD = V57_RESULTS_DIR / "v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy-results.md"
 V57_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy_bundle.jsonl"
 V57_VERSION_NAME = "v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy"
 V57_RUN_NAME = "v20_mlx_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy_mlxdir_mb1_nobc_ckpt20"
-V58_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only"
+V58_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only")
 V58_RESULTS_MD = V58_RESULTS_DIR / "v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only-results.md"
 V58_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only_bundle.jsonl"
 V58_VERSION_NAME = "v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only"
 V58_RUN_NAME = "v20_mlx_v58_bit_binary_affine_boolean4_crypt_training_only_mlxdir_mb1_nobc_ckpt20"
-V59_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy"
+V59_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy")
 V59_RESULTS_MD = V59_RESULTS_DIR / "v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy-results.md"
 V59_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy_bundle.jsonl"
 V59_VERSION_NAME = "v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy"
 V59_RUN_NAME = "v20_mlx_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy_mlxdir_mb1_nobc_ckpt20"
-V60_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light"
+V60_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light")
 V60_RESULTS_MD = V60_RESULTS_DIR / "v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light-results.md"
 V60_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light_bundle.jsonl"
 V60_VERSION_NAME = "v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light"
 V60_RUN_NAME = "v20_mlx_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light_mlxdir_mb1_nobc_ckpt20"
-V61_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light"
+V61_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light")
 V61_RESULTS_MD = V61_RESULTS_DIR / "v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light-results.md"
 V61_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light_bundle.jsonl"
 V61_VERSION_NAME = "v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light"
 V61_RUN_NAME = "v20_mlx_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light_mlxdir_mb1_nobc_ckpt20"
-V62_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light"
+V62_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light")
 V62_RESULTS_MD = V62_RESULTS_DIR / "v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light-results.md"
 V62_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light_bundle.jsonl"
 V62_VERSION_NAME = "v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light"
 V62_RUN_NAME = "v20_mlx_v62_bit_binary_affine_boolean4_crypt_guess_only_light_mlxdir_mb1_nobc_ckpt20"
-V63_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy"
+V63_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy")
 V63_RESULTS_MD = V63_RESULTS_DIR / "v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy-results.md"
 V63_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy_bundle.jsonl"
 V63_VERSION_NAME = "v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy"
 V63_RUN_NAME = "v20_mlx_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy_mlxdir_mb1_nobc_ckpt20"
-V64_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light"
+V64_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light")
 V64_RESULTS_MD = V64_RESULTS_DIR / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md"
 V64_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl"
 V64_VERSION_NAME = "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light"
 V64_RUN_NAME = "v20_mlx_v64_bit_binary_mainline_crypt_guess_light_mlxdir_mb1_nobc_ckpt20"
-V65_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy"
+V65_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy")
 V65_RESULTS_MD = V65_RESULTS_DIR / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy-results.md"
 V65_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy_bundle.jsonl"
 V65_VERSION_NAME = "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy"
 V65_RUN_NAME = "v20_mlx_v65_bit_binary_mainline_crypt_guess_heavy_mlxdir_mb1_nobc_ckpt20"
-V66_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light"
+V66_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light")
 V66_RESULTS_MD = V66_RESULTS_DIR / "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light-results.md"
 V66_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light_bundle.jsonl"
 V66_VERSION_NAME = "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light"
 V66_RUN_NAME = "v20_mlx_v66_bit_binary_manual_heavy_crypt_guess_light_mlxdir_mb1_nobc_ckpt20"
-V67_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy"
+V67_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy")
 V67_RESULTS_MD = V67_RESULTS_DIR / "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy-results.md"
 V67_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy_bundle.jsonl"
 V67_VERSION_NAME = "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy"
 V67_RUN_NAME = "v20_mlx_v67_bit_binary_manual_heavy_crypt_guess_heavy_mlxdir_mb1_nobc_ckpt20"
-V64_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light"
+V64_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light")
 V64_RESULTS_MD = V64_RESULTS_DIR / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md"
 V64_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl"
 V64_VERSION_NAME = "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light"
 V64_RUN_NAME = "v20_mlx_v64_bit_binary_mainline_crypt_guess_light_mlxdir_mb1_nobc_ckpt20"
-V65_RESULTS_DIR = REPO_ROOT / "versions" / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy"
+V65_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy")
 V65_RESULTS_MD = V65_RESULTS_DIR / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy-results.md"
 V65_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy_bundle.jsonl"
 V65_VERSION_NAME = "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy"
@@ -1548,406 +1564,349 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
             )
     if bundle_name == "v20_corrective_corpus_v10_mainline_bundle.jsonl" or "v20_mlx_v10_mainline" in run_name:
         return (
-            REPO_ROOT / "versions/v20_corrective_corpus_v10_mainline/v20_corrective_corpus_v10_mainline-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v10_mainline"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v11_bit_binary_mainline_bundle.jsonl" or "v20_mlx_v11_bit_binary_mainline" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v11_bit_binary_mainline/v20_corrective_corpus_v11_bit_binary_mainline-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v11_bit_binary_mainline"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v12_bit_binary_manual_heavy_bundle.jsonl" or "v20_mlx_v12_bit_binary_manual_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v12_bit_binary_manual_heavy/v20_corrective_corpus_v12_bit_binary_manual_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v12_bit_binary_manual_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v13_bit_binary_promptlocal_heavy_bundle.jsonl" or "v20_mlx_v13_bit_binary_promptlocal_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v13_bit_binary_promptlocal_heavy/v20_corrective_corpus_v13_bit_binary_promptlocal_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v13_bit_binary_promptlocal_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v14_bit_binary_structured_heavy_bundle.jsonl" or "v20_mlx_v14_bit_binary_structured_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v14_bit_binary_structured_heavy/v20_corrective_corpus_v14_bit_binary_structured_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v14_bit_binary_structured_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v15_bit_binary_bitother_heavy_bundle.jsonl" or "v20_mlx_v15_bit_binary_bitother_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v15_bit_binary_bitother_heavy/v20_corrective_corpus_v15_bit_binary_bitother_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v15_bit_binary_bitother_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v16_bit_binary_miss_family_heavy_bundle.jsonl" or "v20_mlx_v16_bit_binary_miss_family_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v16_bit_binary_miss_family_heavy/v20_corrective_corpus_v16_bit_binary_miss_family_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v16_bit_binary_miss_family_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal_bundle.jsonl" or "v20_mlx_v17_bit_binary_hybrid_miss_promptlocal" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal/v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v17_bit_binary_hybrid_miss_promptlocal"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v18_bit_binary_explicit_local_miss_bundle.jsonl" or "v20_mlx_v18_bit_binary_explicit_local_miss" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v18_bit_binary_explicit_local_miss/v20_corrective_corpus_v18_bit_binary_explicit_local_miss-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v18_bit_binary_explicit_local_miss"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v19_bit_binary_hardscore_tail_bundle.jsonl" or "v20_mlx_v19_bit_binary_hardscore_tail" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v19_bit_binary_hardscore_tail/v20_corrective_corpus_v19_bit_binary_hardscore_tail-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v19_bit_binary_hardscore_tail"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion_bundle.jsonl" or "v20_mlx_v20_bit_binary_localmiss_hardscore_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion/v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v20_bit_binary_localmiss_hardscore_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion_bundle.jsonl" or "v20_mlx_v21_bit_binary_structured_promptlocal_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion/v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v21_bit_binary_structured_promptlocal_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v22_bit_binary_verified_precision_fusion_bundle.jsonl" or "v20_mlx_v22_bit_binary_verified_precision_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v22_bit_binary_verified_precision_fusion/v20_corrective_corpus_v22_bit_binary_verified_precision_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v22_bit_binary_verified_precision_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v23_bit_binary_verified_structured_precision_bundle.jsonl" or "v20_mlx_v23_bit_binary_verified_structured_precision" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v23_bit_binary_verified_structured_precision/v20_corrective_corpus_v23_bit_binary_verified_structured_precision-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v23_bit_binary_verified_structured_precision"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v24_bit_binary_verified_extreme_precision_bundle.jsonl" or "v20_mlx_v24_bit_binary_verified_extreme_precision" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v24_bit_binary_verified_extreme_precision/v20_corrective_corpus_v24_bit_binary_verified_extreme_precision-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v24_bit_binary_verified_extreme_precision"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v25_bit_binary_family_priority_precision_bundle.jsonl" or "v20_mlx_v25_bit_binary_family_priority_precision" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v25_bit_binary_family_priority_precision/v20_corrective_corpus_v25_bit_binary_family_priority_precision-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v25_bit_binary_family_priority_precision"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v26_bit_binary_family_structured_max_bundle.jsonl" or "v20_mlx_v26_bit_binary_family_structured_max" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v26_bit_binary_family_structured_max/v20_corrective_corpus_v26_bit_binary_family_structured_max-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v26_bit_binary_family_structured_max"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge_bundle.jsonl" or "v20_mlx_v27_bit_binary_bitother_unknown_bridge" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge/v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v27_bit_binary_bitother_unknown_bridge"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v28_bit_binary_tail_recovery_bundle.jsonl" or "v20_mlx_v28_bit_binary_tail_recovery" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v28_bit_binary_tail_recovery/v20_corrective_corpus_v28_bit_binary_tail_recovery-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v28_bit_binary_tail_recovery"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v29_bit_binary_manual_bitother_max_bundle.jsonl" or "v20_mlx_v29_bit_binary_manual_bitother_max" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v29_bit_binary_manual_bitother_max/v20_corrective_corpus_v29_bit_binary_manual_bitother_max-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v29_bit_binary_manual_bitother_max"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance_bundle.jsonl" or "v20_mlx_v30_bit_binary_family_structured_manual_balance" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance/v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v30_bit_binary_family_structured_manual_balance"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v31_bit_binary_verified_bitother_exact_bundle.jsonl" or "v20_mlx_v31_bit_binary_verified_bitother_exact" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v31_bit_binary_verified_bitother_exact/v20_corrective_corpus_v31_bit_binary_verified_bitother_exact-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v31_bit_binary_verified_bitother_exact"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore_bundle.jsonl" or "v20_mlx_v32_bit_binary_verified_bitother_localmiss_hardscore" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore/v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v32_bit_binary_verified_bitother_localmiss_hardscore"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal_bundle.jsonl" or "v20_mlx_v33_bit_binary_verified_bitother_structured_promptlocal" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal/v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v33_bit_binary_verified_bitother_structured_promptlocal"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact_bundle.jsonl" or "v20_mlx_v34_bit_binary_verified_affine_boolean4_exact" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact/v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v34_bit_binary_verified_affine_boolean4_exact"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior_bundle.jsonl" or "v20_mlx_v35_bit_binary_affine_boolean4_numeric_operator_prior" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior/v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v35_bit_binary_affine_boolean4_numeric_operator_prior"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support_bundle.jsonl" or "v20_mlx_v36_bit_binary_affine_boolean4_cipher_unknown2_support" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support/v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v36_bit_binary_affine_boolean4_cipher_unknown2_support"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion_bundle.jsonl" or "v20_mlx_v37_bit_binary_affine_boolean4_nonbit_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion/v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v37_bit_binary_affine_boolean4_nonbit_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow_bundle.jsonl" or "v20_mlx_v38_bit_binary_affine_boolean4_numeric_narrow" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow/v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v38_bit_binary_affine_boolean4_numeric_narrow"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1_bundle.jsonl" or "v20_mlx_v39_bit_binary_affine_boolean4_cipher_hard1" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1/v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v39_bit_binary_affine_boolean4_cipher_hard1"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse_bundle.jsonl" or "v20_mlx_v40_bit_binary_affine_boolean4_numeric_reverse" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse/v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v40_bit_binary_affine_boolean4_numeric_reverse"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4_bundle.jsonl" or "v20_mlx_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4/v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v41_bit_binary_affine_boolean4_cipher_unknown12_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion_bundle.jsonl" or "v20_mlx_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion/v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v42_bit_binary_affine_boolean4_reverse_cipher_hard_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion_bundle.jsonl" or "v20_mlx_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion/v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v43_bit_binary_affine_boolean4_numeric_narrow_cipher_hard_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion_bundle.jsonl" or "v20_mlx_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion/v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v44_bit_binary_affine_boolean4_numeric_operator_cipher_hard_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion_bundle.jsonl" or "v20_mlx_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion/v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v45_bit_binary_affine_boolean4_numeric_operator_reverse_bias_cipher_hard_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4_bundle.jsonl" or "v20_mlx_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4/v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v46_bit_binary_affine_boolean4_numeric_star_cipher_unknown123_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4_bundle.jsonl" or "v20_mlx_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4/v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v47_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown123_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4_bundle.jsonl" or "v20_mlx_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4/v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v48_bit_binary_affine_boolean4_numeric_star_cipher_unknown12_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4_bundle.jsonl" or "v20_mlx_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4/v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v49_bit_binary_affine_boolean4_numeric_star_reverse_bias_cipher_unknown12_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4_bundle.jsonl" or "v20_mlx_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4/v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v50_bit_binary_affine_boolean4_numeric_quote_cipher_unknown12_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4_bundle.jsonl" or "v20_mlx_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4/v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v51_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown12_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4_bundle.jsonl" or "v20_mlx_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4/v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v52_bit_binary_affine_boolean4_numeric_quote_cipher_unknown123_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4_bundle.jsonl" or "v20_mlx_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4/v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v53_bit_binary_affine_boolean4_numeric_quote_reverse_bias_cipher_unknown123_hard4"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus_bundle.jsonl" or "v20_mlx_v54_bit_binary_affine_boolean4_crypt_deduce_focus" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus/v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v54_bit_binary_affine_boolean4_crypt_deduce_focus"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion_bundle.jsonl" or "v20_mlx_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion/v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v55_bit_binary_affine_boolean4_crypt_deduce_guess_fusion"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full_bundle.jsonl" or "v20_mlx_v56_bit_binary_affine_boolean4_crypt_deduce_full" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full/v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v56_bit_binary_affine_boolean4_crypt_deduce_full"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy_bundle.jsonl" or "v20_mlx_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy/v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v57_bit_binary_affine_boolean4_crypt_deduce_full_guess_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only_bundle.jsonl" or "v20_mlx_v58_bit_binary_affine_boolean4_crypt_training_only" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only/v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v58_bit_binary_affine_boolean4_crypt_training_only"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy_bundle.jsonl" or "v20_mlx_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy/v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v59_bit_binary_affine_boolean4_crypt_training_only_guess_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light_bundle.jsonl" or "v20_mlx_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light/v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v60_bit_binary_affine_boolean4_crypt_deduce_full_guess_light"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light_bundle.jsonl" or "v20_mlx_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light/v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v61_bit_binary_affine_boolean4_crypt_training_only_guess_light"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light_bundle.jsonl" or "v20_mlx_v62_bit_binary_affine_boolean4_crypt_guess_only_light" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light/v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v62_bit_binary_affine_boolean4_crypt_guess_only_light"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy_bundle.jsonl" or "v20_mlx_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy/v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v63_bit_binary_affine_boolean4_crypt_guess_only_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl" or "v20_mlx_v64_bit_binary_mainline_crypt_guess_light" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light/v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy_bundle.jsonl" or "v20_mlx_v65_bit_binary_mainline_crypt_guess_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy/v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v65_bit_binary_mainline_crypt_guess_heavy"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light_bundle.jsonl" or "v20_mlx_v66_bit_binary_manual_heavy_crypt_guess_light" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light/v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v66_bit_binary_manual_heavy_crypt_guess_light"),
             None,
             "- local300 score:",
         )
     if bundle_name == "v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy_bundle.jsonl" or "v20_mlx_v67_bit_binary_manual_heavy_crypt_guess_heavy" in run_name:
         return (
-            REPO_ROOT
-            / "versions/v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy/v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy-results.md",
+            resolve_mlx_results_md("v20_corrective_corpus_v67_bit_binary_manual_heavy_crypt_guess_heavy"),
             None,
             "- local300 score:",
         )
