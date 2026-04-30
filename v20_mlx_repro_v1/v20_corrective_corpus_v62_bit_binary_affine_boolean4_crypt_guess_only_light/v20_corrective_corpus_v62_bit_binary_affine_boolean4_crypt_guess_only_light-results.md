@@ -4,10 +4,10 @@
 - README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.
 - analysis basis: `README.md` shows `Cryptarithm (Guess)` is the hardest slice, and report 67 says explicit answer-conditioned operator-semantics replay may help accuracy even if strict identifiability remains unsolved, so this branch isolates lighter guess-only replay.
 - local target: current best local300 `0.846667` -> aim for `> 0.9` while testing whether pure guess replay helps without any added cryptarithm-deduce mass.
-- status: bundle generated; detached queue/watch armed, model score not yet measured.
+- status: bundle generated; MLX training is intentionally paused to reduce host RAM, latest observed step is `1`, and model score is not yet measured.
 - planned run name: `v20_mlx_v62_bit_binary_affine_boolean4_crypt_guess_only_light_mlxdir_mb1_nobc_ckpt20`
-- runtime status: `queued`
-- latest observed step: `not started`
+- runtime status: `paused`
+- latest observed step: `1`
 - retained checkpoints: `none`
 - local300 score: TBD
 
