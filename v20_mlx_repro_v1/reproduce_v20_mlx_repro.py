@@ -2495,6 +2495,61 @@ def find_run_command_pids(run_name: str, command_name: str) -> list[int]:
     return pids
 
 
+def normalize_cli_path_argument(value: str) -> str:
+    path = Path(value)
+    if not path.is_absolute():
+        path = (REPO_ROOT / path).resolve()
+    else:
+        path = path.resolve()
+    return str(path)
+
+
+def find_command_pids_by_fragments(
+    command_name: str,
+    *,
+    run_name: str | None = None,
+    watch_run_roots: Sequence[Path] | None = None,
+) -> list[int]:
+    proc = subprocess.run(["ps", "-axo", "pid,command"], capture_output=True, text=True, check=True)
+    script_name = Path(__file__).name
+    pids: list[int] = []
+    command_markers = (f"{script_name} {command_name}", f"{script_name} -- {command_name}")
+    expected_watch_roots = None
+    if watch_run_roots is not None:
+        expected_watch_roots = sorted(normalize_cli_path_argument(str(path)) for path in watch_run_roots)
+    for raw_line in proc.stdout.splitlines():
+        line = raw_line.strip()
+        if not line or script_name not in line:
+            continue
+        if not any(marker in line for marker in command_markers):
+            continue
+        pid_text, _, command_line = line.partition(" ")
+        if not pid_text.isdigit():
+            continue
+        try:
+            argv = shlex.split(command_line)
+        except ValueError:
+            continue
+        if command_name not in argv:
+            continue
+        if run_name is not None:
+            if "--run-name" not in argv:
+                continue
+            run_name_index = argv.index("--run-name") + 1
+            if run_name_index >= len(argv) or argv[run_name_index] != run_name:
+                continue
+        if expected_watch_roots is not None:
+            actual_watch_roots = sorted(
+                normalize_cli_path_argument(argv[index + 1])
+                for index, token in enumerate(argv[:-1])
+                if token == "--watch-run-root"
+            )
+            if actual_watch_roots != expected_watch_roots:
+                continue
+        pids.append(int(pid_text))
+    return pids
+
+
 def count_active_train_processes() -> int:
     proc = subprocess.run(["ps", "-axo", "command"], capture_output=True, text=True, check=True)
     script_name = Path(__file__).name
@@ -30859,6 +30914,28 @@ def run_launch_managed(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def run_launch_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
+    run_root = Path(args.output_root).resolve() / args.run_name
+    ensure_dir(run_root)
+    queue_log_path = Path(args.queue_log_path).resolve()
+    write_command_script(run_root / "queue_managed_cmd.sh", build_queue_managed_run_command_tokens(args))
+    existing_pids = find_command_pids_by_fragments("queue-managed-run", run_name=args.run_name)
+    if existing_pids:
+        return {
+            "run_root": str(run_root),
+            "queue_log_path": str(queue_log_path),
+            "queue_pids": existing_pids,
+            "status": "already_running",
+        }
+    queue_pid = spawn_detached_command(build_queue_managed_run_command_tokens(args), log_path=queue_log_path)
+    return {
+        "run_root": str(run_root),
+        "queue_log_path": str(queue_log_path),
+        "queue_pids": [queue_pid],
+        "status": "started",
+    }
+
+
 def run_queue_managed(args: argparse.Namespace) -> dict[str, Any]:
     run_root = Path(args.output_root).resolve() / args.run_name
     ensure_dir(run_root)
@@ -30994,6 +31071,32 @@ def run_watch_score_publish(args: argparse.Namespace) -> dict[str, Any]:
         time.sleep(sleep_seconds)
 
 
+def run_launch_watch_score_publish(args: argparse.Namespace) -> dict[str, Any]:
+    log_path = Path(args.score_watch_log_path).resolve()
+    state_dir = Path(args.score_watch_state_dir).resolve()
+    ensure_dir(state_dir)
+    watch_run_roots = [Path(path).resolve() for path in (args.watch_run_root or [])]
+    if not watch_run_roots:
+        raise ValueError("launch-watch-score-publish requires at least one --watch-run-root")
+    write_command_script(state_dir / "score_publish_watch_cmd.sh", build_watch_score_publish_command_tokens(args))
+    existing_pids = find_command_pids_by_fragments(
+        "watch-score-publish",
+        watch_run_roots=watch_run_roots,
+    )
+    if existing_pids:
+        return {
+            "score_watch_log_path": str(log_path),
+            "watcher_pids": existing_pids,
+            "status": "already_running",
+        }
+    watcher_pid = spawn_detached_command(build_watch_score_publish_command_tokens(args), log_path=log_path)
+    return {
+        "score_watch_log_path": str(log_path),
+        "watcher_pids": [watcher_pid],
+        "status": "started",
+    }
+
+
 def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
     log_path = Path(args.progress_watch_log_path).resolve()
     state_dir = Path(args.progress_watch_state_dir).resolve()
@@ -31070,6 +31173,32 @@ def run_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
         if not touched:
             append_log_line(log_path, "waiting_for_progress")
         time.sleep(sleep_seconds)
+
+
+def run_launch_watch_progress_ledger(args: argparse.Namespace) -> dict[str, Any]:
+    log_path = Path(args.progress_watch_log_path).resolve()
+    state_dir = Path(args.progress_watch_state_dir).resolve()
+    ensure_dir(state_dir)
+    watch_run_roots = [Path(path).resolve() for path in (args.watch_run_root or [])]
+    if not watch_run_roots:
+        raise ValueError("launch-watch-progress-ledger requires at least one --watch-run-root")
+    write_command_script(state_dir / "progress_watch_cmd.sh", build_watch_progress_command_tokens(args))
+    existing_pids = find_command_pids_by_fragments(
+        "watch-progress-ledger",
+        watch_run_roots=watch_run_roots,
+    )
+    if existing_pids:
+        return {
+            "progress_watch_log_path": str(log_path),
+            "watcher_pids": existing_pids,
+            "status": "already_running",
+        }
+    watcher_pid = spawn_detached_command(build_watch_progress_command_tokens(args), log_path=log_path)
+    return {
+        "progress_watch_log_path": str(log_path),
+        "watcher_pids": [watcher_pid],
+        "status": "started",
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -31270,6 +31399,28 @@ def parse_args() -> argparse.Namespace:
     )
     add_shared_args(launch_managed)
     launch_managed.set_defaults(func=run_launch_managed)
+
+    launch_queue_managed = subparsers.add_parser(
+        "launch-queue-managed-run",
+        help="Spawn a detached queue-managed-run watcher for a run from the single-file driver.",
+    )
+    add_shared_args(launch_queue_managed)
+    launch_queue_managed.add_argument("--queue-log-path", type=Path, required=True)
+    launch_queue_managed.add_argument("--queue-sleep-seconds", type=int, default=300)
+    launch_queue_managed.add_argument("--max-active-trains-before-launch", type=int, default=0)
+    launch_queue_managed.add_argument(
+        "--wait-for-any-training-result-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    launch_queue_managed.add_argument(
+        "--require-run-start-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    launch_queue_managed.set_defaults(func=run_launch_queue_managed)
 
     queue_managed = subparsers.add_parser(
         "queue-managed-run",
@@ -31878,6 +32029,31 @@ def parse_args() -> argparse.Namespace:
     )
     watch_score_publish.set_defaults(func=run_watch_score_publish)
 
+    launch_watch_score_publish = subparsers.add_parser(
+        "launch-watch-score-publish",
+        help="Spawn a detached score-ledger watcher from the single-file driver.",
+    )
+    launch_watch_score_publish.add_argument("--score-watch-log-path", type=Path, required=True)
+    launch_watch_score_publish.add_argument("--score-watch-state-dir", type=Path, required=True)
+    launch_watch_score_publish.add_argument("--score-watch-sleep-seconds", type=int, default=300)
+    launch_watch_score_publish.add_argument(
+        "--postprocess-eval-kind",
+        choices=("auto", "aopen", "adapter-validation"),
+        default="adapter-validation",
+    )
+    launch_watch_score_publish.add_argument(
+        "--cleanup-completed-run-artifacts",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    launch_watch_score_publish.add_argument(
+        "--watch-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    launch_watch_score_publish.set_defaults(func=run_launch_watch_score_publish)
+
     watch_progress = subparsers.add_parser(
         "watch-progress-ledger",
         help="Watch training progress and checkpoint retention, then commit/push tracked ledger progress updates safely.",
@@ -31893,6 +32069,22 @@ def parse_args() -> argparse.Namespace:
         type=Path,
     )
     watch_progress.set_defaults(func=run_watch_progress_ledger)
+
+    launch_watch_progress = subparsers.add_parser(
+        "launch-watch-progress-ledger",
+        help="Spawn a detached progress-ledger watcher from the single-file driver.",
+    )
+    launch_watch_progress.add_argument("--progress-watch-log-path", type=Path, required=True)
+    launch_watch_progress.add_argument("--progress-watch-state-dir", type=Path, required=True)
+    launch_watch_progress.add_argument("--progress-watch-sleep-seconds", type=int, default=300)
+    launch_watch_progress.add_argument("--progress-watch-step-interval", type=int, default=5)
+    launch_watch_progress.add_argument(
+        "--watch-run-root",
+        action="append",
+        default=[],
+        type=Path,
+    )
+    launch_watch_progress.set_defaults(func=run_launch_watch_progress_ledger)
 
     return parser.parse_args()
 
