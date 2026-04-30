@@ -1509,6 +1509,38 @@ V142_BUNDLE_PATH = (
 )
 V142_VERSION_NAME = "v20_corrective_corpus_v142_v140_ciphercrypt6"
 V142_RUN_NAME = "v20_mlx_v142_v140_ciphercrypt6_mlxdir_mb1_nobc_ckpt20"
+V143_RESULTS_DIR = resolve_mlx_results_dir(
+    "v20_corrective_corpus_v143_v141_bitrefresh7"
+)
+V143_RESULTS_MD = (
+    V143_RESULTS_DIR
+    / "v20_corrective_corpus_v143_v141_bitrefresh7-results.md"
+)
+V143_BUNDLE_PATH = (
+    AOPEN_NEMOTRON_ROOT
+    / "training"
+    / "sft"
+    / "MLX"
+    / "v20_corrective_corpus_v143_v141_bitrefresh7_bundle.jsonl"
+)
+V143_VERSION_NAME = "v20_corrective_corpus_v143_v141_bitrefresh7"
+V143_RUN_NAME = "v20_mlx_v143_v141_bitrefresh7_mlxdir_mb1_nobc_ckpt20"
+V144_RESULTS_DIR = resolve_mlx_results_dir(
+    "v20_corrective_corpus_v144_v142_bitrefresh7"
+)
+V144_RESULTS_MD = (
+    V144_RESULTS_DIR
+    / "v20_corrective_corpus_v144_v142_bitrefresh7-results.md"
+)
+V144_BUNDLE_PATH = (
+    AOPEN_NEMOTRON_ROOT
+    / "training"
+    / "sft"
+    / "MLX"
+    / "v20_corrective_corpus_v144_v142_bitrefresh7_bundle.jsonl"
+)
+V144_VERSION_NAME = "v20_corrective_corpus_v144_v142_bitrefresh7"
+V144_RUN_NAME = "v20_mlx_v144_v142_bitrefresh7_mlxdir_mb1_nobc_ckpt20"
 V64_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light")
 V64_RESULTS_MD = V64_RESULTS_DIR / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md"
 V64_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl"
@@ -2289,6 +2321,8 @@ V140_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX = "v140_crypt_guess_heavy_boost"
 V141_OPERATOR_TAIL_BOOST_SOURCE_MIX = "v141_numeric_operator_tail_boost"
 V141_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX = "v141_numeric_quote_reverse_tail_boost"
 V142_HARD_CIPHER_BOOST_SOURCE_MIX = "v142_cipher_unknown123_hard4_boost"
+V143_BIT_EXACT_BOOST_SOURCE_MIX = "v143_bit_exact_boost"
+V144_BIT_EXACT_BOOST_SOURCE_MIX = "v144_bit_exact_boost"
 V64_BINARY_VERIFIED_SOURCE_MIX = "v64_binary_verified_mainline"
 V64_BINARY_ANSWER_ONLY_SOURCE_MIX = "v64_binary_answer_only_mainline"
 V64_BINARY_MANUAL_SOURCE_MIX = "v64_binary_manual_rescue"
@@ -3812,6 +3846,18 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
     if bundle_name == "v20_corrective_corpus_v142_v140_ciphercrypt6_bundle.jsonl" or "v20_mlx_v142_v140_ciphercrypt6" in run_name:
         return (
             resolve_mlx_results_md("v20_corrective_corpus_v142_v140_ciphercrypt6"),
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v143_v141_bitrefresh7_bundle.jsonl" or "v20_mlx_v143_v141_bitrefresh7" in run_name:
+        return (
+            resolve_mlx_results_md("v20_corrective_corpus_v143_v141_bitrefresh7"),
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v144_v142_bitrefresh7_bundle.jsonl" or "v20_mlx_v144_v142_bitrefresh7" in run_name:
+        return (
+            resolve_mlx_results_md("v20_corrective_corpus_v144_v142_bitrefresh7"),
             None,
             "- local300 score:",
         )
@@ -28338,6 +28384,192 @@ def build_v142_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]
     return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
 
 
+def build_v143_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unique_rows, repeated_rows, diagnostics = build_v141_overlay_rows()
+    unique_rows = [dict(row) for row in unique_rows]
+    repeated_rows = [dict(row) for row in repeated_rows]
+    diagnostics = dict(diagnostics)
+    verified_rows = select_v11_binary_rows(TRAIN_VERIFIED_TRACE_READY_PATH, required_tier="verified_trace_ready")
+
+    def append_binary_repeated(
+        row: dict[str, Any],
+        *,
+        source_mix: str,
+        styles: Sequence[str],
+        source_tags: Sequence[str],
+    ) -> None:
+        category = detect_validation_category(str(row["prompt"]))
+        for assistant_style in styles:
+            completion_text = build_v11_binary_completion(row, assistant_style)
+            supervision_role = (
+                "lane1_binary_verified"
+                if assistant_style in {"exact_rule_commit", "exact_closure_commit"}
+                else "lane2_binary_local_miss"
+                if assistant_style == "anti_default1_commit"
+                else "lane3_binary_answer_only"
+            )
+            repeated_rows.append(
+                {
+                    "id": str(row["id"]).strip(),
+                    "category": category,
+                    "bucket": "binary_verified_core",
+                    "prompt": str(row["prompt"]).strip(),
+                    "answer": str(row["answer"]).strip(),
+                    "completion_text": completion_text,
+                    "assistant_style": assistant_style,
+                    "supervision_role": supervision_role,
+                    "selection_tier": str(row.get("selection_tier", "")).strip(),
+                    "template_subtype": str(row.get("template_subtype", "")).strip(),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                    "source_mix": source_mix,
+                    "source_tags": sorted(set(str(tag) for tag in source_tags if str(tag).strip())),
+                    "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+                    "audit_reasons": str(row.get("audit_reasons", "")).strip(),
+                    "analysis_notes": str(row.get("analysis_notes", "")).strip(),
+                    "symbol_query_operator": str(row.get("symbol_query_operator", "")).strip(),
+                    "symbol_numeric_formula_name": str(row.get("symbol_numeric_formula_name", "")).strip(),
+                    "bit_query_binary": str(row.get("bit_query_binary", "")).strip(),
+                    "bit_structured_formula_name": str(row.get("bit_structured_formula_name", "")).strip(),
+                    "bit_structured_formula_prediction": str(row.get("bit_structured_formula_prediction", "")).strip(),
+                    "bit_structured_formula_abstract_family": str(row.get("bit_structured_formula_abstract_family", "")).strip(),
+                    "bit_not_structured_formula_name": str(row.get("bit_not_structured_formula_name", "")).strip(),
+                    "bit_not_structured_formula_prediction": str(row.get("bit_not_structured_formula_prediction", "")).strip(),
+                    "bit_not_structured_formula_abstract_family": str(row.get("bit_not_structured_formula_abstract_family", "")).strip(),
+                }
+            )
+
+    focus_ids: list[str] = []
+    for row in verified_rows:
+        if not is_v80_bit_exact_focus_row(row):
+            continue
+        row_id = str(row["id"]).strip()
+        affine_unique = parse_bool_text(row.get("bit_affine_unique", False))
+        boolean2_unique = parse_bool_text(row.get("bit_boolean2_unique", False))
+        boolean3_unique = parse_bool_text(row.get("bit_boolean3_unique", False))
+        boolean4_unique = parse_bool_text(row.get("bit_boolean4_unique", False))
+        repeat_count = min(5, max(2, build_v80_bit_exact_focus_repeat_count(row) - 1))
+        styles = build_v11_binary_styles(row, verified=True, repeat_count=repeat_count)
+        tags = [
+            "bit_manipulation",
+            "verified_trace_ready",
+            "curated_binary",
+            "bit_exact_boost",
+            "post_numericcipher_refresh7",
+        ]
+        if row_id in V11_LOCAL_BIT_MISS_IDS:
+            tags.append("best_local_bit_miss")
+        if is_v31_verified_bitother_exact_row(row):
+            tags.append("verified_bitother_exact_priority")
+        if affine_unique:
+            tags.append("affine_exact_priority")
+        if boolean2_unique:
+            tags.append("boolean2_exact_support")
+        if boolean3_unique:
+            tags.append("boolean3_exact_support")
+        if boolean4_unique:
+            tags.append("boolean4_exact_priority")
+        append_binary_repeated(row, source_mix=V143_BIT_EXACT_BOOST_SOURCE_MIX, styles=styles, source_tags=tags)
+        focus_ids.append(row_id)
+
+    diagnostics["bit_exact_boost_unique"] = len(sorted(set(focus_ids)))
+    diagnostics["bit_exact_boost_ids"] = sorted(set(focus_ids))
+    unique_rows.sort(key=lambda row: (str(row["bucket"]), str(row["id"])))
+    return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
+
+
+def build_v144_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unique_rows, repeated_rows, diagnostics = build_v142_overlay_rows()
+    unique_rows = [dict(row) for row in unique_rows]
+    repeated_rows = [dict(row) for row in repeated_rows]
+    diagnostics = dict(diagnostics)
+    verified_rows = select_v11_binary_rows(TRAIN_VERIFIED_TRACE_READY_PATH, required_tier="verified_trace_ready")
+
+    def append_binary_repeated(
+        row: dict[str, Any],
+        *,
+        source_mix: str,
+        styles: Sequence[str],
+        source_tags: Sequence[str],
+    ) -> None:
+        category = detect_validation_category(str(row["prompt"]))
+        for assistant_style in styles:
+            completion_text = build_v11_binary_completion(row, assistant_style)
+            supervision_role = (
+                "lane1_binary_verified"
+                if assistant_style in {"exact_rule_commit", "exact_closure_commit"}
+                else "lane2_binary_local_miss"
+                if assistant_style == "anti_default1_commit"
+                else "lane3_binary_answer_only"
+            )
+            repeated_rows.append(
+                {
+                    "id": str(row["id"]).strip(),
+                    "category": category,
+                    "bucket": "binary_verified_core",
+                    "prompt": str(row["prompt"]).strip(),
+                    "answer": str(row["answer"]).strip(),
+                    "completion_text": completion_text,
+                    "assistant_style": assistant_style,
+                    "supervision_role": supervision_role,
+                    "selection_tier": str(row.get("selection_tier", "")).strip(),
+                    "template_subtype": str(row.get("template_subtype", "")).strip(),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                    "source_mix": source_mix,
+                    "source_tags": sorted(set(str(tag) for tag in source_tags if str(tag).strip())),
+                    "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+                    "audit_reasons": str(row.get("audit_reasons", "")).strip(),
+                    "analysis_notes": str(row.get("analysis_notes", "")).strip(),
+                    "symbol_query_operator": str(row.get("symbol_query_operator", "")).strip(),
+                    "symbol_numeric_formula_name": str(row.get("symbol_numeric_formula_name", "")).strip(),
+                    "bit_query_binary": str(row.get("bit_query_binary", "")).strip(),
+                    "bit_structured_formula_name": str(row.get("bit_structured_formula_name", "")).strip(),
+                    "bit_structured_formula_prediction": str(row.get("bit_structured_formula_prediction", "")).strip(),
+                    "bit_structured_formula_abstract_family": str(row.get("bit_structured_formula_abstract_family", "")).strip(),
+                    "bit_not_structured_formula_name": str(row.get("bit_not_structured_formula_name", "")).strip(),
+                    "bit_not_structured_formula_prediction": str(row.get("bit_not_structured_formula_prediction", "")).strip(),
+                    "bit_not_structured_formula_abstract_family": str(row.get("bit_not_structured_formula_abstract_family", "")).strip(),
+                }
+            )
+
+    focus_ids: list[str] = []
+    for row in verified_rows:
+        if not is_v80_bit_exact_focus_row(row):
+            continue
+        row_id = str(row["id"]).strip()
+        affine_unique = parse_bool_text(row.get("bit_affine_unique", False))
+        boolean2_unique = parse_bool_text(row.get("bit_boolean2_unique", False))
+        boolean3_unique = parse_bool_text(row.get("bit_boolean3_unique", False))
+        boolean4_unique = parse_bool_text(row.get("bit_boolean4_unique", False))
+        repeat_count = min(5, max(2, build_v80_bit_exact_focus_repeat_count(row) - 1))
+        styles = build_v11_binary_styles(row, verified=True, repeat_count=repeat_count)
+        tags = [
+            "bit_manipulation",
+            "verified_trace_ready",
+            "curated_binary",
+            "bit_exact_boost",
+            "post_numericcipher_refresh7",
+        ]
+        if row_id in V11_LOCAL_BIT_MISS_IDS:
+            tags.append("best_local_bit_miss")
+        if is_v31_verified_bitother_exact_row(row):
+            tags.append("verified_bitother_exact_priority")
+        if affine_unique:
+            tags.append("affine_exact_priority")
+        if boolean2_unique:
+            tags.append("boolean2_exact_support")
+        if boolean3_unique:
+            tags.append("boolean3_exact_support")
+        if boolean4_unique:
+            tags.append("boolean4_exact_priority")
+        append_binary_repeated(row, source_mix=V144_BIT_EXACT_BOOST_SOURCE_MIX, styles=styles, source_tags=tags)
+        focus_ids.append(row_id)
+
+    diagnostics["bit_exact_boost_unique"] = len(sorted(set(focus_ids)))
+    diagnostics["bit_exact_boost_ids"] = sorted(set(focus_ids))
+    unique_rows.sort(key=lambda row: (str(row["bucket"]), str(row["id"])))
+    return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
+
+
 def build_binary_variant_training_bundle(
     *,
     repeated_rows: Sequence[dict[str, Any]],
@@ -30221,6 +30453,34 @@ def build_v142_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundl
             "retains the broader v12 manual-heavy bit-binary core, "
             "inherits the v140 post-sixth-BIT guess stack, "
             "and adds another hard-cipher replay pass under the README evaluation contract."
+        ),
+    )
+
+
+def build_v143_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V143_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v143. Keeps the checked-in v20 snapshot intact, "
+            "retains the broader v12 manual-heavy bit-binary core, "
+            "inherits the v141 post-seventh numeric/cipher stack, "
+            "and adds another exact-safe BIT replay pass under the README evaluation contract."
+        ),
+    )
+
+
+def build_v144_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V144_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v144. Keeps the checked-in v20 snapshot intact, "
+            "retains the broader v12 manual-heavy bit-binary core, "
+            "inherits the v142 post-seventh numeric/cipher stack, "
+            "and adds another exact-safe BIT replay pass under the README evaluation contract."
         ),
     )
 
@@ -34184,6 +34444,128 @@ def validate_v142_summary(
             V138_BIT_EXACT_BOOST_SOURCE_MIX,
             V140_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
             V142_HARD_CIPHER_BOOST_SOURCE_MIX,
+        ),
+    )
+
+
+def validate_v143_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V99_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V99_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(
+            V99_BINARY_MANUAL_SOURCE_MIX,
+            V99_NUMERIC_GUESS_SOURCE_MIX,
+            V99_CIPHER_SOURCE_MIX,
+            V99_CRYPT_GUESS_SOURCE_MIX,
+            V99_CRYPT_DEDUCE_SOURCE_MIX,
+            V99_BIT_EXACT_FOCUS_SOURCE_MIX,
+            V99_OPERATOR_TAIL_SOURCE_MIX,
+            V99_QUOTE_REVERSE_TAIL_SOURCE_MIX,
+            V99_HARD_CIPHER_TAIL_SOURCE_MIX,
+            V99_CRYPT_GUESS_HEAVY_SOURCE_MIX,
+            V99_CRYPT_DEDUCE_FOCUS_SOURCE_MIX,
+            V99_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V99_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V99_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V99_BIT_EXACT_BOOST_SOURCE_MIX,
+            V99_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V101_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V103_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V103_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V105_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V107_BIT_EXACT_BOOST_SOURCE_MIX,
+            V109_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V111_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V111_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V113_BIT_EXACT_BOOST_SOURCE_MIX,
+            V115_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V117_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V117_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V119_BIT_EXACT_BOOST_SOURCE_MIX,
+            V121_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V123_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V123_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V125_BIT_EXACT_BOOST_SOURCE_MIX,
+            V127_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V129_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V129_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V131_BIT_EXACT_BOOST_SOURCE_MIX,
+            V133_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V135_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V135_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V137_BIT_EXACT_BOOST_SOURCE_MIX,
+            V139_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V141_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V141_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V143_BIT_EXACT_BOOST_SOURCE_MIX,
+        ),
+    )
+
+
+def validate_v144_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V100_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V100_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(
+            V100_BINARY_MANUAL_SOURCE_MIX,
+            V100_NUMERIC_GUESS_SOURCE_MIX,
+            V100_CIPHER_SOURCE_MIX,
+            V100_CRYPT_GUESS_SOURCE_MIX,
+            V100_CRYPT_DEDUCE_SOURCE_MIX,
+            V100_BIT_EXACT_FOCUS_SOURCE_MIX,
+            V100_OPERATOR_TAIL_SOURCE_MIX,
+            V100_QUOTE_REVERSE_TAIL_SOURCE_MIX,
+            V100_HARD_CIPHER_TAIL_SOURCE_MIX,
+            V100_CRYPT_GUESS_HEAVY_SOURCE_MIX,
+            V100_CRYPT_TRAINING_FOCUS_SOURCE_MIX,
+            V100_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V100_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V100_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V100_BIT_EXACT_BOOST_SOURCE_MIX,
+            V100_CRYPT_DEDUCE_EXTRA_BOOST_SOURCE_MIX,
+            V102_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V104_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V106_OPERATOR_TAIL_BOOST_SOURCE_MIX,
+            V106_QUOTE_REVERSE_TAIL_BOOST_SOURCE_MIX,
+            V108_BIT_EXACT_BOOST_SOURCE_MIX,
+            V110_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V112_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V114_BIT_EXACT_BOOST_SOURCE_MIX,
+            V116_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V118_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V120_BIT_EXACT_BOOST_SOURCE_MIX,
+            V122_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V124_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V126_BIT_EXACT_BOOST_SOURCE_MIX,
+            V128_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V130_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V132_BIT_EXACT_BOOST_SOURCE_MIX,
+            V134_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V136_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V138_BIT_EXACT_BOOST_SOURCE_MIX,
+            V140_CRYPT_GUESS_EXTRA_BOOST_SOURCE_MIX,
+            V142_HARD_CIPHER_BOOST_SOURCE_MIX,
+            V144_BIT_EXACT_BOOST_SOURCE_MIX,
         ),
     )
 
@@ -46369,6 +46751,172 @@ def render_v142_results_markdown(summary: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_v143_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V143_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: `README.md` highlights especially weak base slices in `Bit Manipulation`, `Cipher`, `Equation Numeric (Guess)`, `Cryptarithm (Deduce)`, and `Cryptarithm (Guess)`. This branch keeps the v141 post-seventh numeric frontier and adds one more exact-safe BIT replay pass.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` by preserving the broader v141 recovery stack while re-pressuring the README `Bit Manipulation` weakness.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V143_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Retain the broader v12 bit-binary mainline core and the v141 stack that already replayed the seventh numeric pass.",
+        "- Add another exact-safe BIT replay so the branch revisits the README `Bit Manipulation` slice after the seventh numeric/cipher refresh.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- numeric_support_unique: {summary['diagnostics'].get('numeric_support_unique', 0)}",
+        f"- cipher_support_unique: {summary['diagnostics'].get('cipher_support_unique', 0)}",
+        f"- crypt_guess_support_unique: {summary['diagnostics'].get('crypt_guess_support_unique', 0)}",
+        f"- crypt_deduce_support_unique: {summary['diagnostics'].get('crypt_deduce_support_unique', 0)}",
+        f"- bit_exact_focus_unique: {summary['diagnostics'].get('bit_exact_focus_unique', 0)}",
+        f"- crypt_guess_extra_boost_unique: {summary['diagnostics'].get('crypt_guess_extra_boost_unique', 0)}",
+        f"- crypt_deduce_extra_boost_unique: {summary['diagnostics'].get('crypt_deduce_extra_boost_unique', 0)}",
+        f"- operator_tail_numeric_boost_unique: {summary['diagnostics'].get('operator_tail_numeric_boost_unique', 0)}",
+        f"- quote_reverse_tail_numeric_boost_unique: {summary['diagnostics'].get('quote_reverse_tail_numeric_boost_unique', 0)}",
+        f"- hard_cipher_unknown123_boost_unique: {summary['diagnostics'].get('hard_cipher_unknown123_boost_unique', 0)}",
+        f"- bit_exact_boost_unique: {summary['diagnostics'].get('bit_exact_boost_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def render_v144_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V144_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: `README.md` highlights especially weak base slices in `Bit Manipulation`, `Cipher`, `Equation Numeric (Guess)`, `Cryptarithm (Guess)`, and `Cryptarithm (Deduce)`. This branch keeps the v142 post-seventh cipher frontier and adds one more exact-safe BIT replay pass.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` by preserving the broader v142 recovery stack while re-pressuring the README `Bit Manipulation` weakness.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V144_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Retain the broader v12 bit-binary mainline core and the v142 stack that already replayed the seventh cipher pass.",
+        "- Add another exact-safe BIT replay so the branch revisits the README `Bit Manipulation` slice after the seventh numeric/cipher refresh.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- numeric_support_unique: {summary['diagnostics'].get('numeric_support_unique', 0)}",
+        f"- cipher_support_unique: {summary['diagnostics'].get('cipher_support_unique', 0)}",
+        f"- crypt_guess_support_unique: {summary['diagnostics'].get('crypt_guess_support_unique', 0)}",
+        f"- crypt_deduce_support_unique: {summary['diagnostics'].get('crypt_deduce_support_unique', 0)}",
+        f"- bit_exact_focus_unique: {summary['diagnostics'].get('bit_exact_focus_unique', 0)}",
+        f"- crypt_guess_extra_boost_unique: {summary['diagnostics'].get('crypt_guess_extra_boost_unique', 0)}",
+        f"- crypt_deduce_extra_boost_unique: {summary['diagnostics'].get('crypt_deduce_extra_boost_unique', 0)}",
+        f"- operator_tail_numeric_boost_unique: {summary['diagnostics'].get('operator_tail_numeric_boost_unique', 0)}",
+        f"- quote_reverse_tail_numeric_boost_unique: {summary['diagnostics'].get('quote_reverse_tail_numeric_boost_unique', 0)}",
+        f"- hard_cipher_unknown123_boost_unique: {summary['diagnostics'].get('hard_cipher_unknown123_boost_unique', 0)}",
+        f"- bit_exact_boost_unique: {summary['diagnostics'].get('bit_exact_boost_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def render_v93_results_markdown(summary: dict[str, Any]) -> str:
     bundle = summary["training_bundle"]
     validation = summary["validation"]
@@ -49546,6 +50094,84 @@ def run_build_v142_v140_ciphercrypt6(
         "training_bundle": training_bundle,
     }
     write_text(Path(args.results_path).resolve(), render_v142_results_markdown(summary))
+    return summary
+
+
+def run_build_v143_v141_bitrefresh7(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v143 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v143_overlay_rows()
+    training_bundle = build_v143_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v143_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V143_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v143_results_markdown(summary))
+    return summary
+
+
+def run_build_v144_v142_bitrefresh7(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v144 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v144_overlay_rows()
+    training_bundle = build_v144_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v144_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V144_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v144_results_markdown(summary))
     return summary
 
 
@@ -53514,6 +54140,22 @@ def parse_args() -> argparse.Namespace:
     build_v142.add_argument("--bundle-path", type=Path, default=V142_BUNDLE_PATH)
     build_v142.add_argument("--results-path", type=Path, default=V142_RESULTS_MD)
     build_v142.set_defaults(func=run_build_v142_v140_ciphercrypt6)
+
+    build_v143 = subparsers.add_parser(
+        "build-v143-v141-bitrefresh7",
+        help="Build the v143 v141-style stack plus extra exact-safe BIT replay and tracked markdown ledger.",
+    )
+    build_v143.add_argument("--bundle-path", type=Path, default=V143_BUNDLE_PATH)
+    build_v143.add_argument("--results-path", type=Path, default=V143_RESULTS_MD)
+    build_v143.set_defaults(func=run_build_v143_v141_bitrefresh7)
+
+    build_v144 = subparsers.add_parser(
+        "build-v144-v142-bitrefresh7",
+        help="Build the v144 v142-style stack plus extra exact-safe BIT replay and tracked markdown ledger.",
+    )
+    build_v144.add_argument("--bundle-path", type=Path, default=V144_BUNDLE_PATH)
+    build_v144.add_argument("--results-path", type=Path, default=V144_RESULTS_MD)
+    build_v144.set_defaults(func=run_build_v144_v142_bitrefresh7)
 
     watch_score_publish = subparsers.add_parser(
         "watch-score-publish",
