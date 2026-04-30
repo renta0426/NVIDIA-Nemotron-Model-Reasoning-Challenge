@@ -3,13 +3,16 @@
 - created_at: 2026-04-23T14:20:36+00:00
 - strategy note: versions/v10_bit_mainline_strategy_2026-04-23.md
 - README basis: deterministic boxed-answer evaluation, bit_manipulation primary weighting, token-aware supervision, and token-first bundle construction.
-- status: bundle generated; model score not yet measured.
-- MLX launch note: this bundle is now the active queued mainline candidate behind the remaining `v8 broadbase` run. A detached single-file `queue-managed-run` plus dedicated `watch-progress-ledger` / `watch-score-publish` workers were started under `v20_mlx_repro_v1/outputs/v10/queue/`; after the manual `symbol` stop, the queue now sees `active=1` and is waiting only for a completed predecessor result (`any_ready=0`) before launch, and that blocker still remained immediately after `broadbase` completed `Step 10/296`.
-- eval gate note: the single-file runner now replays a `stratified_category_8_of_950` smoke validation into `adapter_validation_smoke8_snapshot/` before the README-contract local300 run, and only proceeds to full validation when prediction health is not obviously broken.
-- runtime status: `queued`
-- latest observed step: `not started`
-- retained checkpoints: `none`
-- local300 score: TBD
+- status: measured; failed official/public promotion.
+- failure analysis: versions/v20_corrective_corpus_v10_mainline/v10_failure_analysis_2026-04-30.md
+
+## Measured score
+
+- official leaderboard: `0.84 x3` (user-reported)
+- validation: `839 / 950 = 0.8832`
+- leaderboard proxy: `178 / 200 = 0.8900`
+- proxy binary: `78 / 92 = 0.8478`
+- promotion decision: reject; v10 did not preserve v4 public edge and did not transplant v6 binary gain.
 
 ## Strategy
 
@@ -78,3 +81,4 @@
 - max_seq_len: 7971
 - reused_base_synthetic_problem_count: 298
 - retokenized_overlay_problem_count: 254
+- audit note: the historical bundle path recorded above was not present in the current working tree during the 2026-04-30 analysis; selection artifacts were regenerated without rewriting the training bundle.
