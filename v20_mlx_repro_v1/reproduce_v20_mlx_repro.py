@@ -507,6 +507,11 @@ V78_RESULTS_MD = V78_RESULTS_DIR / "v20_corrective_corpus_v78_bit_binary_manual_
 V78_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid_bundle.jsonl"
 V78_VERSION_NAME = "v20_corrective_corpus_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid"
 V78_RUN_NAME = "v20_mlx_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid_mlxdir_mb1_nobc_ckpt20"
+V79_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus")
+V79_RESULTS_MD = V79_RESULTS_DIR / "v20_corrective_corpus_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus-results.md"
+V79_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus_bundle.jsonl"
+V79_VERSION_NAME = "v20_corrective_corpus_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus"
+V79_RUN_NAME = "v20_mlx_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus_mlxdir_mb1_nobc_ckpt20"
 V64_RESULTS_DIR = resolve_mlx_results_dir("v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light")
 V64_RESULTS_MD = V64_RESULTS_DIR / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light-results.md"
 V64_BUNDLE_PATH = AOPEN_NEMOTRON_ROOT / "training" / "sft" / "MLX" / "v20_corrective_corpus_v64_bit_binary_mainline_crypt_guess_light_bundle.jsonl"
@@ -952,6 +957,14 @@ V78_NUMERIC_GUESS_SOURCE_MIX = "v78_numeric_heavy"
 V78_CIPHER_SOURCE_MIX = "v78_cipher_heavy"
 V78_CRYPT_GUESS_SOURCE_MIX = "v78_crypt_guess_light"
 V78_CRYPT_DEDUCE_SOURCE_MIX = "v78_crypt_deduce_low_ratio"
+V79_BINARY_VERIFIED_SOURCE_MIX = "v79_binary_verified_manual_exact_numeric_cipher_guess_deduce_bitexact_plus"
+V79_BINARY_ANSWER_ONLY_SOURCE_MIX = "v79_binary_answer_only_manual_exact_numeric_cipher_guess_deduce_bitexact_plus"
+V79_BINARY_MANUAL_SOURCE_MIX = "v79_binary_manual_full"
+V79_NUMERIC_GUESS_SOURCE_MIX = "v79_numeric_heavy"
+V79_CIPHER_SOURCE_MIX = "v79_cipher_heavy"
+V79_CRYPT_GUESS_SOURCE_MIX = "v79_crypt_guess_light"
+V79_CRYPT_DEDUCE_SOURCE_MIX = "v79_crypt_deduce_low_ratio"
+V79_BIT_EXACT_PLUS_SOURCE_MIX = "v79_bit_exact_plus"
 V64_BINARY_VERIFIED_SOURCE_MIX = "v64_binary_verified_mainline"
 V64_BINARY_ANSWER_ONLY_SOURCE_MIX = "v64_binary_answer_only_mainline"
 V64_BINARY_MANUAL_SOURCE_MIX = "v64_binary_manual_rescue"
@@ -2091,6 +2104,12 @@ def resolve_score_ledger_target(run_result: dict[str, Any]) -> tuple[Path, str |
     if bundle_name == "v20_corrective_corpus_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid_bundle.jsonl" or "v20_mlx_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid" in run_name:
         return (
             resolve_mlx_results_md("v20_corrective_corpus_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid"),
+            None,
+            "- local300 score:",
+        )
+    if bundle_name == "v20_corrective_corpus_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus_bundle.jsonl" or "v20_mlx_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus" in run_name:
+        return (
+            resolve_mlx_results_md("v20_corrective_corpus_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus"),
             None,
             "- local300 score:",
         )
@@ -17970,6 +17989,154 @@ def build_v78_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]]
     return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
 
 
+def build_v79_bit_exact_plus_repeat_count(row: dict[str, Any]) -> int:
+    affine_unique = parse_bool_text(row.get("bit_affine_unique", False))
+    boolean2_unique = parse_bool_text(row.get("bit_boolean2_unique", False))
+    boolean3_unique = parse_bool_text(row.get("bit_boolean3_unique", False))
+    boolean4_unique = parse_bool_text(row.get("bit_boolean4_unique", False))
+    repeat_count = 0
+    if is_v31_verified_bitother_exact_row(row):
+        repeat_count += 1
+    if affine_unique:
+        repeat_count += 2
+    if boolean4_unique:
+        repeat_count += 2
+    if boolean2_unique:
+        repeat_count += 1
+    if boolean3_unique:
+        repeat_count += 1
+    if str(row["id"]).strip() in V11_LOCAL_BIT_MISS_IDS:
+        repeat_count += 1
+    if v11_binary_family_key(row) in V16_LOCAL_MISS_BINARY_FAMILIES:
+        repeat_count += 1
+    if parse_float_text(row.get("hard_score", 0.0), 0.0) >= 6.0:
+        repeat_count += 1
+    return min(6, max(1, repeat_count))
+
+
+def build_v79_overlay_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unique_rows, repeated_rows, diagnostics = build_v78_overlay_rows()
+    unique_rows = [dict(row) for row in unique_rows]
+    repeated_rows = [dict(row) for row in repeated_rows]
+    diagnostics = dict(diagnostics)
+    remap_overlay_source_mixes(
+        unique_rows,
+        {
+            V78_BINARY_VERIFIED_SOURCE_MIX: V79_BINARY_VERIFIED_SOURCE_MIX,
+            V78_BINARY_ANSWER_ONLY_SOURCE_MIX: V79_BINARY_ANSWER_ONLY_SOURCE_MIX,
+            V78_BINARY_MANUAL_SOURCE_MIX: V79_BINARY_MANUAL_SOURCE_MIX,
+            V78_NUMERIC_GUESS_SOURCE_MIX: V79_NUMERIC_GUESS_SOURCE_MIX,
+            V78_CIPHER_SOURCE_MIX: V79_CIPHER_SOURCE_MIX,
+            V78_CRYPT_GUESS_SOURCE_MIX: V79_CRYPT_GUESS_SOURCE_MIX,
+            V78_CRYPT_DEDUCE_SOURCE_MIX: V79_CRYPT_DEDUCE_SOURCE_MIX,
+        },
+    )
+    remap_overlay_source_mixes(
+        repeated_rows,
+        {
+            V78_BINARY_VERIFIED_SOURCE_MIX: V79_BINARY_VERIFIED_SOURCE_MIX,
+            V78_BINARY_ANSWER_ONLY_SOURCE_MIX: V79_BINARY_ANSWER_ONLY_SOURCE_MIX,
+            V78_BINARY_MANUAL_SOURCE_MIX: V79_BINARY_MANUAL_SOURCE_MIX,
+            V78_NUMERIC_GUESS_SOURCE_MIX: V79_NUMERIC_GUESS_SOURCE_MIX,
+            V78_CIPHER_SOURCE_MIX: V79_CIPHER_SOURCE_MIX,
+            V78_CRYPT_GUESS_SOURCE_MIX: V79_CRYPT_GUESS_SOURCE_MIX,
+            V78_CRYPT_DEDUCE_SOURCE_MIX: V79_CRYPT_DEDUCE_SOURCE_MIX,
+        },
+    )
+
+    verified_rows = select_v11_binary_rows(TRAIN_VERIFIED_TRACE_READY_PATH, required_tier="verified_trace_ready")
+
+    def append_binary_repeated(
+        row: dict[str, Any],
+        *,
+        source_mix: str,
+        styles: Sequence[str],
+        source_tags: Sequence[str],
+    ) -> None:
+        category = detect_validation_category(str(row["prompt"]))
+        for assistant_style in styles:
+            completion_text = build_v11_binary_completion(row, assistant_style)
+            supervision_role = (
+                "lane1_binary_verified"
+                if assistant_style in {"exact_rule_commit", "exact_closure_commit"}
+                else "lane2_binary_local_miss"
+                if assistant_style == "anti_default1_commit"
+                else "lane3_binary_answer_only"
+            )
+            repeated_rows.append(
+                {
+                    "id": str(row["id"]).strip(),
+                    "category": category,
+                    "bucket": "binary_verified_core",
+                    "prompt": str(row["prompt"]).strip(),
+                    "answer": str(row["answer"]).strip(),
+                    "completion_text": completion_text,
+                    "assistant_style": assistant_style,
+                    "supervision_role": supervision_role,
+                    "selection_tier": str(row.get("selection_tier", "")).strip(),
+                    "template_subtype": str(row.get("template_subtype", "")).strip(),
+                    "teacher_solver_candidate": str(row.get("teacher_solver_candidate", "")).strip(),
+                    "source_mix": source_mix,
+                    "source_tags": sorted(set(str(tag) for tag in source_tags if str(tag).strip())),
+                    "hard_score": parse_float_text(row.get("hard_score", 0.0), 0.0),
+                    "audit_reasons": str(row.get("audit_reasons", "")).strip(),
+                    "analysis_notes": str(row.get("analysis_notes", "")).strip(),
+                    "symbol_query_operator": str(row.get("symbol_query_operator", "")).strip(),
+                    "symbol_numeric_formula_name": str(row.get("symbol_numeric_formula_name", "")).strip(),
+                    "bit_query_binary": str(row.get("bit_query_binary", "")).strip(),
+                    "bit_structured_formula_name": str(row.get("bit_structured_formula_name", "")).strip(),
+                    "bit_structured_formula_prediction": str(row.get("bit_structured_formula_prediction", "")).strip(),
+                    "bit_structured_formula_abstract_family": str(row.get("bit_structured_formula_abstract_family", "")).strip(),
+                    "bit_not_structured_formula_name": str(row.get("bit_not_structured_formula_name", "")).strip(),
+                    "bit_not_structured_formula_prediction": str(row.get("bit_not_structured_formula_prediction", "")).strip(),
+                    "bit_not_structured_formula_abstract_family": str(row.get("bit_not_structured_formula_abstract_family", "")).strip(),
+                }
+            )
+
+    exact_plus_ids: list[str] = []
+    for row in verified_rows:
+        row_id = str(row["id"]).strip()
+        affine_unique = parse_bool_text(row.get("bit_affine_unique", False))
+        boolean2_unique = parse_bool_text(row.get("bit_boolean2_unique", False))
+        boolean3_unique = parse_bool_text(row.get("bit_boolean3_unique", False))
+        boolean4_unique = parse_bool_text(row.get("bit_boolean4_unique", False))
+        exact_safe = is_v31_verified_bitother_exact_row(row) or affine_unique or boolean2_unique or boolean3_unique or boolean4_unique
+        if not exact_safe:
+            continue
+        repeat_count = build_v79_bit_exact_plus_repeat_count(row)
+        styles = build_v11_binary_styles(row, verified=True, repeat_count=repeat_count)
+        tags = [
+            "bit_manipulation",
+            "verified_trace_ready",
+            "curated_binary",
+            "bit_exact_plus",
+            "manual_exact_numeric_cipher_guess_deduce_bitexact_plus",
+        ]
+        if row_id in V11_LOCAL_BIT_MISS_IDS:
+            tags.append("best_local_bit_miss")
+        if is_v31_verified_bitother_exact_row(row):
+            tags.append("verified_bitother_exact_priority")
+        if affine_unique:
+            tags.append("affine_exact_priority")
+        if boolean2_unique:
+            tags.append("boolean2_exact_support")
+        if boolean3_unique:
+            tags.append("boolean3_exact_support")
+        if boolean4_unique:
+            tags.append("boolean4_exact_priority")
+        if v11_binary_family_key(row) in V16_LOCAL_MISS_BINARY_FAMILIES:
+            tags.append("local_miss_family_support")
+        if parse_float_text(row.get("hard_score", 0.0), 0.0) >= 6.0:
+            tags.append("hardscore_ge6")
+        append_binary_repeated(row, source_mix=V79_BIT_EXACT_PLUS_SOURCE_MIX, styles=styles, source_tags=tags)
+        exact_plus_ids.append(row_id)
+
+    diagnostics["bit_exact_plus_unique"] = len(sorted(set(exact_plus_ids)))
+    diagnostics["bit_exact_plus_ids"] = sorted(set(exact_plus_ids))
+    unique_rows.sort(key=lambda row: (str(row["bucket"]), str(row["id"])))
+    return unique_rows, renumber_overlay_instances(repeated_rows), diagnostics
+
+
 def build_binary_variant_training_bundle(
     *,
     repeated_rows: Sequence[dict[str, Any]],
@@ -18963,6 +19130,19 @@ def build_v78_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle
             "Single-file training bundle for v78. Keeps the checked-in v20 snapshot intact, "
             "retains the broader v12 manual-heavy bit-binary core, "
             "inherits the v75 numeric_2x2 plus text_monoalphabetic density, and adds both light cryptarithm_guess and low-ratio cryptarithm_deduce lanes under the README evaluation contract."
+        ),
+    )
+
+
+def build_v79_training_bundle(*, repeated_rows: Sequence[dict[str, Any]], bundle_path: Path) -> dict[str, Any]:
+    return build_binary_variant_training_bundle(
+        repeated_rows=repeated_rows,
+        bundle_path=bundle_path,
+        version_name=V79_VERSION_NAME,
+        note=(
+            "Single-file training bundle for v79. Keeps the checked-in v20 snapshot intact, "
+            "retains the broader v12 manual-heavy bit-binary core, "
+            "inherits the v78 numeric/cipher/guess/deduce stack, and adds extra replay only for exact-safe verified BIT rows under the README evaluation contract."
         ),
     )
 
@@ -20245,6 +20425,31 @@ def validate_v78_summary(
             V78_CIPHER_SOURCE_MIX,
             V78_CRYPT_GUESS_SOURCE_MIX,
             V78_CRYPT_DEDUCE_SOURCE_MIX,
+        ),
+    )
+
+
+def validate_v79_summary(
+    *,
+    unique_rows: Sequence[dict[str, Any]],
+    repeated_rows: Sequence[dict[str, Any]],
+    diagnostics: dict[str, Any],
+    training_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    return validate_binary_variant_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+        verified_source_mix=V79_BINARY_VERIFIED_SOURCE_MIX,
+        answer_only_source_mix=V79_BINARY_ANSWER_ONLY_SOURCE_MIX,
+        required_source_mixes=(
+            V79_BINARY_MANUAL_SOURCE_MIX,
+            V79_NUMERIC_GUESS_SOURCE_MIX,
+            V79_CIPHER_SOURCE_MIX,
+            V79_CRYPT_GUESS_SOURCE_MIX,
+            V79_CRYPT_DEDUCE_SOURCE_MIX,
+            V79_BIT_EXACT_PLUS_SOURCE_MIX,
         ),
     )
 
@@ -27657,6 +27862,84 @@ def render_v78_results_markdown(summary: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_v79_results_markdown(summary: dict[str, Any]) -> str:
+    bundle = summary["training_bundle"]
+    validation = summary["validation"]
+    lines = [
+        f"# {V79_VERSION_NAME}",
+        "",
+        f"- created_at: {summary['created_at']}",
+        "- README basis: deterministic boxed-answer evaluation with `max_tokens=7680`, `top_p=1.0`, `temperature=0.0`, `max_num_seqs=64`, and `max_model_len=8192`.",
+        "- analysis basis: `README.md` highlights weak base slices in BIT, cipher, numeric-style symbol, `Cryptarithm (Guess)`, and `Cryptarithm (Deduce)`. This branch keeps the full v78 non-BIT stack and adds only exact-safe verified BIT replay.",
+        "- local target: current best local300 `0.846667` -> aim for `> 0.9` by preserving the broader v12 manual-heavy BIT base while testing whether extra exact-safe BIT pressure helps once the full non-BIT stack is already present.",
+        "- status: bundle generated; model score not yet measured.",
+        f"- planned run name: `{V79_RUN_NAME}`",
+        "- runtime status: `not started`",
+        "- latest observed step: `not started`",
+        "- retained checkpoints: `none`",
+        "- local300 score: TBD",
+        "",
+        "## Strategy",
+        "",
+        "- Keep the checked-in `04-08-16-14` snapshot as the base mass instead of changing the backbone.",
+        "- Retain the broader v12 bit-binary mainline core, including the full manual binary answer-only lane.",
+        "- Keep the same combined numeric/cipher/guess/deduce stack used in v78.",
+        "- Add extra replay only for exact-safe verified BIT rows (affine/boolean exact families and verified exact `bit_other`) so the new comparison isolates whether safer BIT pressure improves on top of the full non-BIT stack.",
+        "",
+        "## Selection",
+        "",
+        f"- curated_binary_verified_unique: {summary['diagnostics']['curated_binary_verified_unique']}",
+        f"- curated_binary_answer_only_unique: {summary['diagnostics']['curated_binary_answer_only_unique']}",
+        f"- curated_binary_total_unique: {summary['diagnostics']['curated_binary_total_unique']}",
+        f"- manual_binary_unique: {summary['diagnostics']['manual_binary_unique']}",
+        f"- numeric_support_unique: {summary['diagnostics'].get('numeric_support_unique', 0)}",
+        f"- cipher_support_unique: {summary['diagnostics'].get('cipher_support_unique', 0)}",
+        f"- crypt_guess_support_unique: {summary['diagnostics'].get('crypt_guess_support_unique', 0)}",
+        f"- crypt_deduce_support_unique: {summary['diagnostics'].get('crypt_deduce_support_unique', 0)}",
+        f"- bit_exact_plus_unique: {summary['diagnostics'].get('bit_exact_plus_unique', 0)}",
+        f"- selected_unique_rows: {summary['selected_unique_rows']}",
+        f"- selected_repeated_rows: {summary['selected_repeated_rows']}",
+        "",
+        "### Unique rows by bucket",
+        "",
+    ]
+    for bucket, count in summary["selected_by_bucket"].items():
+        lines.append(f"- {bucket}: {count}")
+    lines.extend(["", "### Repeated rows by source mix", ""])
+    for source_mix, count in summary["source_mix_counts"].items():
+        lines.append(f"- {source_mix}: {count}")
+    lines.extend(
+        [
+            "",
+            "## Targeted residual IDs",
+            "",
+            f"- local_bit_miss_ids: `{','.join(sorted(V11_LOCAL_BIT_MISS_IDS))}`",
+            f"- local_numeric_guess_miss_ids: `{','.join(sorted(V11_LOCAL_NUMERIC_GUESS_MISS_IDS))}`",
+            f"- local_cipher_miss_ids: `{','.join(sorted(V11_LOCAL_CIPHER_MISS_IDS))}`",
+            "",
+            "## Validation",
+            "",
+            f"- passed: {validation['passed']}",
+            f"- errors: {validation['errors']}",
+            f"- missing_local_bit_miss_ids: {validation['missing_local_bit_miss_ids']}",
+            f"- missing_local_numeric_guess_ids: {validation['missing_local_numeric_guess_ids']}",
+            f"- missing_local_cipher_ids: {validation['missing_local_cipher_ids']}",
+            "",
+            "## Bundle",
+            "",
+            f"- path: {bundle['path']}",
+            f"- base_examples: {bundle['base_examples']}",
+            f"- overlay_examples: {bundle['overlay_examples']}",
+            f"- total_examples: {bundle['total_examples']}",
+            f"- total_steps: {bundle['total_steps']}",
+            f"- total_tokens: {bundle['total_tokens']}",
+            f"- max_seq_len: {bundle['max_seq_len']}",
+            f"- retokenized_overlay_problem_count: {bundle['retokenized_overlay_problem_count']}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def run_build_v74_bit_binary_manual_exact_cipher_heavy(args: argparse.Namespace) -> dict[str, Any]:
     for required_path in (
         TRAIN_VERIFIED_TRACE_READY_PATH,
@@ -27839,6 +28122,43 @@ def run_build_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid(arg
         "training_bundle": training_bundle,
     }
     write_text(Path(args.results_path).resolve(), render_v78_results_markdown(summary))
+    return summary
+
+
+def run_build_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus(args: argparse.Namespace) -> dict[str, Any]:
+    for required_path in (
+        TRAIN_VERIFIED_TRACE_READY_PATH,
+        TRAIN_ANSWER_ONLY_KEEP_PATH,
+        TRAIN_MANUAL_AUDIT_PRIORITY_PATH,
+        TRAIN_RECOMMENDED_LEARNING_TARGET_PATH,
+        SNAPSHOT_CONFIG_PATH,
+        SNAPSHOT_INDEX_PATH,
+    ):
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing required v79 input: {required_path}")
+    unique_rows, repeated_rows, diagnostics = build_v79_overlay_rows()
+    training_bundle = build_v79_training_bundle(repeated_rows=repeated_rows, bundle_path=Path(args.bundle_path).resolve())
+    validation = validate_v79_summary(
+        unique_rows=unique_rows,
+        repeated_rows=repeated_rows,
+        diagnostics=diagnostics,
+        training_bundle=training_bundle,
+    )
+    summary = {
+        "version": V79_VERSION_NAME,
+        "created_at": utc_now(),
+        "readme_eval_contract": README_EVAL_CONTRACT,
+        "bundle_path": relative_to_repo(Path(args.bundle_path).resolve()),
+        "results_path": relative_to_repo(Path(args.results_path).resolve()),
+        "selected_unique_rows": len(unique_rows),
+        "selected_repeated_rows": len(repeated_rows),
+        "selected_by_bucket": dict(sorted(Counter(str(row["bucket"]) for row in unique_rows).items())),
+        "source_mix_counts": dict(sorted(Counter(str(row["source_mix"]) for row in repeated_rows).items())),
+        "diagnostics": diagnostics,
+        "validation": validation,
+        "training_bundle": training_bundle,
+    }
+    write_text(Path(args.results_path).resolve(), render_v79_results_markdown(summary))
     return summary
 
 
@@ -31199,6 +31519,14 @@ def parse_args() -> argparse.Namespace:
     build_v78.add_argument("--bundle-path", type=Path, default=V78_BUNDLE_PATH)
     build_v78.add_argument("--results-path", type=Path, default=V78_RESULTS_MD)
     build_v78.set_defaults(func=run_build_v78_bit_binary_manual_exact_numeric_cipher_guess_deduce_hybrid)
+
+    build_v79 = subparsers.add_parser(
+        "build-v79-bit-binary-manual-exact-numeric-cipher-guess-deduce-bitexact-plus",
+        help="Build the v79 v78-style stack plus extra exact-safe BIT replay bundle and tracked markdown ledger.",
+    )
+    build_v79.add_argument("--bundle-path", type=Path, default=V79_BUNDLE_PATH)
+    build_v79.add_argument("--results-path", type=Path, default=V79_RESULTS_MD)
+    build_v79.set_defaults(func=run_build_v79_bit_binary_manual_exact_numeric_cipher_guess_deduce_bitexact_plus)
 
     watch_score_publish = subparsers.add_parser(
         "watch-score-publish",
